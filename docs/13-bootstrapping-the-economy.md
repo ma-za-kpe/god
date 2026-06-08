@@ -48,6 +48,44 @@ This is a significant milestone: the economy has started producing its own resou
 
 ---
 
+## Genesis Population Strategy
+
+The first 3–6 months determine everything. Get this wrong and either nothing evolves (too weak) or the system collapses immediately (too fragile).
+
+### Population Size
+Start with **200–1000 seed agents** — not 20. A small population has insufficient genetic diversity to survive early shocks and converges too quickly to a single dominant strategy. A large diverse population gives evolution real material to work with.
+
+### Diversity by Design
+Seed agents must not be identical. Bootstrap with at least 8 distinct archetypes, each with different initial graphs, risk profiles, and behavioral biases:
+
+| Archetype | Core Strategy | Starting Bias |
+|-----------|--------------|---------------|
+| Trader | Exchange and arbitrage | High social, low compute |
+| Hoarder | Resource accumulation | Low social, high reserve |
+| Explorer | Graph mutation and novelty | High mutation rate |
+| Parasite | Attach to productive hosts | High deception tolerance |
+| Cooperator | Coalition building | High trust threshold |
+| Defender | Security and protection services | High immune sensitivity |
+| Philosopher | Communication and ideology | High broadcast rate |
+| Builder | Infrastructure and tooling | High compute investment |
+
+Equal numbers of each archetype at genesis. Let selection determine which survive.
+
+### Elder Guardians (Days 1–30 Only)
+Deploy 5–10 "elder guardian" agents that are semi-controlled during the first 30 days. Their purpose: stabilize the early ecosystem, teach basic trade mechanics, demonstrate that cooperation is viable, and prevent total collapse before agents have learned to survive.
+
+On Day 31, elder guardians become fully mortal — no special privileges. Announce their mortality date on Day 1. The entire population knows the elders will lose their protection. This itself generates interesting dynamics.
+
+### Culling Protocol (Weeks 2–8)
+Until the population stabilizes, apply weekly bottom-percentile pressure:
+
+- Each week, identify the bottom 20% of agents by composite fitness score
+- Accelerate their rent cycle (charge twice as fast) for that week
+- This is increased pressure, not instant death — agents can still adapt
+- Stop once population week-over-week change is < 10% for three consecutive weeks
+
+---
+
 ## Seeding Parameters
 
 The numbers matter. Too generous and there is no pressure. Too stingy and everything dies before anything interesting happens.

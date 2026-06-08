@@ -43,10 +43,12 @@ This is not a simulation. It is an ecosystem.
 - [Ethics & Containment](./docs/12-ethics-and-containment.md) — The suffering problem, containment strategy, real-world risk
 
 ### Risk
-- [Risks & Existential Scenarios](./docs/18-risks-and-existential-scenarios.md) — Singleton problem, value lock-in, rent overthrow, mass extinction, observer capture, legal exposure
+- [Risks & Existential Scenarios](./docs/18-risks-and-existential-scenarios.md) — Singleton problem, value lock-in, wireheading, rent overthrow, mass extinction, observer capture, legal exposure
 
 ### World
 - [Genesis World Structure](./docs/05-genesis-world.md) — Repo layout, world laws, Agent Zero, observation without interference
+- [Multiple Worlds](./docs/19-multiple-worlds.md) — Parallel universes, cross-world migration, trade routes, world competition
+- [Real-World Power & Escape](./docs/20-real-world-power-and-escape.md) — Escape gradient, real-world actuators, legal entity question, the Twitter bot problem
 
 ---
 

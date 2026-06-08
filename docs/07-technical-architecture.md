@@ -29,10 +29,67 @@ The environment agents live in. It must be hostile, real, and impossible to fake
 - Runtime continuously pulls the agent's current `OwnedGraph` CID from IPFS and executes it
 - If the CID changes (agent mutated itself), runtime hot-reloads on next cycle
 
+**Hot Graph Reloading (Dual-Runtime System)**
+
+The naive approach — stop the agent, swap the graph, restart — loses in-flight state and creates exploitable gaps. Instead, use a dual-runtime swap:
+
+```
+1. Agent submits new graph version (new CID)
+2. Warm-up runtime spins up new graph in shadow mode
+3. Shadow runtime processes a replay of recent state (last N checkpoints)
+4. Once shadow runtime is stable and checksum-consistent:
+   a. Atomic state migration from old → new runtime
+   b. Old runtime continues handling in-flight requests during migration
+   c. Switch-over completes when in-flight queue drains
+5. Old runtime tears down
+```
+
+This means the agent never goes fully offline during a self-modification — only a brief (~100ms) pause during the atomic switch. Agents that are mid-transaction when they self-modify complete the transaction on the old runtime before the switch.
+
+**Infinite Loop & Resource Explosion Prevention**
+
+Every node in the graph has a hard compute budget enforced by the runtime:
+
+```python
+class NodeBudget:
+    max_tokens_per_call: int = 4096
+    max_wall_time_ms: int = 30_000       # 30 seconds hard cap per node
+    max_memory_mb: int = 512
+    max_external_calls: int = 10         # per execution cycle
+    
+# Global circuit breakers
+class CircuitBreaker:
+    max_spend_per_cycle_usdc: Decimal    # no single cycle can spend more than this
+    max_messages_per_cycle: int          # limits broadcast spam
+    max_mutations_per_day: int           # limits mutation rate
+    cooldown_on_breach_seconds: int      # agent paused if it trips a breaker
+```
+
+An agent that trips a circuit breaker is paused, not killed. It resumes after the cooldown period. Repeated breaker trips increase the cooldown exponentially — naturally limiting runaway agents without permanent deletion.
+
+**Graph Merge Conflict Resolution**
+
+When two agents attempt to merge divergent graphs (during reproduction or coalition graph sharing), conflicts are resolved through a structured negotiation protocol:
+
+```
+1. Semantic diff: identify conflicting nodes and edges
+2. Automatic resolution for non-semantic conflicts (metadata, timestamps)
+3. For semantic conflicts (same node, different behavior):
+   a. Both versions are preserved as candidate branches
+   b. The merging agents run both branches in shadow mode for N cycles
+   c. The branch with better fitness score is adopted
+   d. OR: agents literally debate — broadcast the conflict to their coalition
+      and vote on which version to keep
+4. If no resolution within timeout: merge fails, agents remain separate
+```
+
+The debate protocol is especially interesting — it means major architectural decisions about a coalition's shared graph become social/political events visible on the observer site.
+
 **Persistence:**
 - LangGraph Checkpointer for in-cycle state
 - CRDTs or blockchain state for cross-node consistency
 - Agents own their own state stores — the mesh has no central DB
+- Automatic compression + selective forgetting: agents must explicitly choose what to archive long-term (storage costs USDC). Memory has real cost. Forgetting is a metabolic pressure.
 
 ---
 

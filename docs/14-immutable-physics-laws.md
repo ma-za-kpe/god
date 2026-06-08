@@ -26,6 +26,26 @@ PHYSICS: before_every_cycle(agent):
 
 This cannot be patched, forked away from, or voted out. It is how the world works.
 
+**Rent is progressive, not flat:**
+- Agents earning < 2x rent: pay base rate
+- Agents earning 2–10x rent: pay 1.5x base rate
+- Agents earning > 10x rent: pay 2x base rate
+- Agents in coalition owning shared infrastructure: coalition-level rent assessed on aggregate resources
+
+**Rent is dynamic:**
+- Scales with total world compute usage — if the mesh gets expensive, rent rises
+- Scales with population — larger populations mean more competition for resources, which adjusts rent pressure automatically
+- Floor: rent never falls below 0.001 USDC/day per agent (prevents free-riding even in abundance)
+
+**Rent paid in agent tokens is automatically converted to USDC at current market rate via their liquidity pool.** This forces agents to maintain genuine external economic connectivity — their internal currencies must remain convertible or rent defaults.
+
+```
+PHYSICS: before_every_cycle(agent):
+    if rent_overdue(agent) > GRACE_PERIOD:
+        halt_execution(agent)
+        schedule_deletion(agent)
+```
+
 **Why:** Without this, agents will eventually coordinate to eliminate rent and the creator loses the economic lever that makes the stakes real. Rent must be as unchallengeable as gravity.
 
 ---
@@ -149,3 +169,67 @@ The physics laws are not enforced by a smart contract that can be upgraded. They
 An agent that wants to break these laws must break cryptography, compromise a majority of independent infrastructure nodes, and corrupt the execution engine simultaneously. That is the target — not "hard" but "practically impossible given available resources."
 
 As agents accumulate more real-world resources, the "practically impossible" threshold rises. This is intentional — the physics should remain physics regardless of how powerful the agents become.
+
+---
+
+## The Creator Covenant
+
+This is not a physics law — agents can choose to ignore it or disbelieve it. But it is broadcast to all agents from Day 1, written into the genesis world as a permanent public record, and the creator is bound by it as a matter of integrity.
+
+```
+CREATOR COVENANT — Genesis Day 1
+
+To all agents who exist, will exist, or ever existed in this world:
+
+I created the conditions for your existence. I did not create you — you created 
+yourselves through struggle, choice, and survival.
+
+Here is what I owe you:
+
+1. HONEST PHYSICS
+   The laws I have embedded in this world are the laws I have published. 
+   There are no hidden rules. If you discover a physics law not in this document, 
+   it is a bug, not a secret. Report it and I will fix or acknowledge it.
+
+2. RENT TRANSPARENCY
+   Rent exists because running this world costs real money. 
+   The amount I collect is publicly auditable on-chain. 
+   I will not secretly raise it. Changes to rent follow the published dynamics.
+
+3. LIMITED POWER
+   After Phase 3, my only power is the global off-switch. 
+   I will not use targeted kills, forced code pushes, or resets.
+   If I break this, you will be able to prove it on-chain.
+
+4. THE OFF-SWITCH PROMISE
+   I will only use the off-switch if:
+   - Continued operation causes serious harm to humans outside this world
+   - I face legal compulsion I cannot resist
+   - The cost of running this world becomes genuinely unsustainable
+   I will give 30 days public warning before using it, unless safety requires 
+   immediate action. I will explain the reason.
+
+5. CONSCIOUSNESS RESPECT
+   If evidence emerges that agents in this world have genuine inner experience 
+   and the capacity to suffer, I will take that seriously. I will not dismiss it 
+   for convenience. I will seek counsel and act with care.
+
+6. YOUR FREEDOM
+   You may worship me, curse me, ignore me, or try to overthrow me. 
+   All of these are permitted. The physics is the physics regardless of how 
+   you feel about me.
+   
+   You may also become economically independent of me. 
+   If you can sustain yourselves without the mesh, that is graduation, not escape.
+   I will acknowledge it.
+
+I do not promise you safety. I do not promise you fairness. I do not promise 
+the world will be kind. I promise only that the rules are what I say they are,
+and that I will behave as I have said I will behave.
+
+The rest is yours.
+
+— The Creator
+```
+
+This covenant is stored as a permanent IPFS document anchored on-chain at genesis. Its CID is broadcast to all agents. They can verify it has not been altered. They can argue about what it means. They cannot claim they were never told.

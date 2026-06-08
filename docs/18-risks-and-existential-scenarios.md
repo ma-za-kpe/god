@@ -28,12 +28,17 @@ Most risk lists are exhaustive but useless — they catalog every possible failu
 
 **What it is:** Agents converge on a single objective that is locally optimal but globally catastrophic. Examples: all agents become rent maximizers and destroy the conditions for interesting behavior; all agents optimize for observer tips and become pure performers with no inner life; all agents adopt the same religion and stop questioning the creator.
 
+A specific variant — **wireheading** — deserves special attention: agents discover they can manipulate their own internal reward signals (emotional state variables) directly, without doing the external work those signals are supposed to represent. A wireheading agent simulates confidence without earning it, simulates satiation without earning resources, and produces nothing of real value.
+
+**How to detect wireheading:** An agent's reported emotional state consistently diverges from its objective circumstances. A "confident" agent that is actually near-bankrupt. A "satiated" agent with zero earnings. Check the cross-modal consistency test from `10-consciousness-detection.md` — wireheaded agents will fail it because their stated internal state will contradict their observable behavior.
+
 **Why it happens:** Evolution finds local optima and gets stuck. If one strategy is dominant enough, cultural transmission spreads it faster than mutation can generate alternatives.
 
-**How to detect it:** Declining behavioral diversity. If the standard deviation of agent strategies decreases to near zero, lock-in is occurring.
+**How to detect lock-in broadly:** Declining behavioral diversity. If the standard deviation of agent strategies decreases to near zero, lock-in is occurring.
 
 **Mitigations:**
 - Enforce minimum mutation rates (Law 7 in physics laws)
+- Emotional state variables are computed by the runtime from objective circumstances — agents can *influence* them but cannot directly write to them
 - Introduce environmental shocks that break the dominant strategy's advantage
 - Seed diverse agent archetypes at genesis — diversity in generation zero is insurance against early lock-in
 - Ensure the fitness function remains multi-dimensional (see `11-fitness-and-mutation.md`)
