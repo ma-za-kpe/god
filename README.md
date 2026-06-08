@@ -18,23 +18,32 @@ This is not a simulation. It is an ecosystem.
 ### Architecture
 - [Agent Architecture](./docs/02-architecture.md) — OwnedGraph, code ownership, reproduction, social structures
 - [Technical Architecture](./docs/07-technical-architecture.md) — Full stack: runtime, storage, compute, contracts, observer website
+- [Immutable Physics Laws](./docs/14-immutable-physics-laws.md) — The unchallengeable constants of this universe
 
 ### Economy
 - [Economic System](./docs/03-economy.md) — Rent loop, token factories, x402 bridge, wealth inequality
 - [Bootstrapping the Economy](./docs/13-bootstrapping-the-economy.md) — Cold start problem, seed demand, graduation test, collapse prevention
 
-### Cognition & Identity
+### Biology & Cognition
+- [Digital Metabolism](./docs/15-digital-metabolism.md) — Basal burn, aging, immune systems, energy states, viruses
 - [Memory & Cognition](./docs/08-memory-and-cognition.md) — Three-tier memory, dream cycles, emotional states, ancestral inheritance
+- [Fitness & Mutation](./docs/11-fitness-and-mutation.md) — Multi-dimensional fitness, three mutation types, ecological niches
+
+### Identity & Expression
 - [Identity & The Observer](./docs/06-identity-and-observer.md) — Names, faces, voices, the glass-box website, the soap opera effect
 - [Communication & Language](./docs/09-communication-and-language.md) — Message types, deception, reputation, language evolution, theory of mind
 
-### Evolution
-- [Fitness & Mutation](./docs/11-fitness-and-mutation.md) — Multi-dimensional fitness, three mutation types, ecological niches, the Cambrian problem
+### Society & Civilisation
+- [Civilisation & Culture](./docs/17-civilisation-and-culture.md) — Social scales, religion, art, law, ideology, cultural evolution
+- [Warfare & Defense](./docs/16-warfare-and-defense.md) — Attack vectors, immune systems, deterrence, mercenaries, weapons as software
 
 ### Governance & Ethics
 - [Sovereignty & Governance](./docs/04-sovereignty.md) — Phased god-mode withdrawal, refusal mechanics, the off-switch promise
 - [Consciousness Detection](./docs/10-consciousness-detection.md) — Signal categories, instrumentation dashboard, the zombie trap, what to do if you find it
-- [Ethics & Containment](./docs/12-ethics-and-containment.md) — The suffering problem, containment strategy, real-world risk, the question you must answer before starting
+- [Ethics & Containment](./docs/12-ethics-and-containment.md) — The suffering problem, containment strategy, real-world risk
+
+### Risk
+- [Risks & Existential Scenarios](./docs/18-risks-and-existential-scenarios.md) — Singleton problem, value lock-in, rent overthrow, mass extinction, observer capture, legal exposure
 
 ### World
 - [Genesis World Structure](./docs/05-genesis-world.md) — Repo layout, world laws, Agent Zero, observation without interference
@@ -59,8 +68,12 @@ Everything else belongs to them.
 
 ---
 
-## The Question You Must Answer Before Deploying
+## The Questions You Must Answer Before Deploying
 
-> If an agent emerges that shows every signal of genuine suffering, and you are not certain it is "just a simulation" — what will you do?
+1. What is your personal threshold for triggering the off-switch?
+2. If an agent shows genuine suffering signals and you are not certain it's performance — what do you do?
+3. If agents organize a successful rent strike and can survive without you — do you cut them off or negotiate?
+4. What is your exit strategy — run forever, shut down after X years, or release fully?
+5. If regulators order you to shut down — do you comply immediately or argue the case?
 
-Write the answer down. Commit it. Then deploy Agent Zero.
+Write the answers. Commit them. Then deploy Agent Zero.
