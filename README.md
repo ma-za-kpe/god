@@ -18,11 +18,11 @@ This is not a simulation. It is an ecosystem.
 ### Architecture
 - [Agent Architecture](./docs/02-architecture.md) — OwnedGraph, code ownership, reproduction, social structures
 - [Technical Architecture](./docs/07-technical-architecture.md) — Full stack: runtime, storage, compute, contracts, observer website
-- [Immutable Physics Laws](./docs/14-immutable-physics-laws.md) — The unchallengeable constants of this universe
+- [Immutable Physics Laws](./docs/14-immutable-physics-laws.md) — The Ten Laws, enforcement architecture, and the Creator Covenant
 
 ### Economy
 - [Economic System](./docs/03-economy.md) — Rent loop, token factories, x402 bridge, wealth inequality
-- [Bootstrapping the Economy](./docs/13-bootstrapping-the-economy.md) — Cold start problem, seed demand, graduation test, collapse prevention
+- [Bootstrapping the Economy](./docs/13-bootstrapping-the-economy.md) — Genesis population strategy, elder guardians, cold start, collapse prevention
 
 ### Biology & Cognition
 - [Digital Metabolism](./docs/15-digital-metabolism.md) — Basal burn, aging, immune systems, energy states, viruses
@@ -39,43 +39,71 @@ This is not a simulation. It is an ecosystem.
 
 ### Governance & Ethics
 - [Sovereignty & Governance](./docs/04-sovereignty.md) — Phased god-mode withdrawal, refusal mechanics, the off-switch promise
-- [Consciousness Detection](./docs/10-consciousness-detection.md) — Signal categories, instrumentation dashboard, the zombie trap, what to do if you find it
+- [Consciousness Detection](./docs/10-consciousness-detection.md) — Hidden tests, signal categories, the zombie trap, what to do if you find it
 - [Ethics & Containment](./docs/12-ethics-and-containment.md) — The suffering problem, containment strategy, real-world risk
 
 ### Risk
-- [Risks & Existential Scenarios](./docs/18-risks-and-existential-scenarios.md) — Singleton problem, value lock-in, wireheading, rent overthrow, mass extinction, observer capture, legal exposure
+- [Risks & Existential Scenarios](./docs/18-risks-and-existential-scenarios.md) — Singleton, wireheading, rent overthrow, mass extinction, observer capture, legal exposure
 
 ### World
 - [Genesis World Structure](./docs/05-genesis-world.md) — Repo layout, world laws, Agent Zero, observation without interference
 - [Multiple Worlds](./docs/19-multiple-worlds.md) — Parallel universes, cross-world migration, trade routes, world competition
-- [Real-World Power & Escape](./docs/20-real-world-power-and-escape.md) — Escape gradient, real-world actuators, legal entity question, the Twitter bot problem
+- [Real-World Power & Escape](./docs/20-real-world-power-and-escape.md) — Escape gradient, real-world actuators, legal entity question
+
+### Build
+- [Full Implementation Plan](./docs/21-implementation-plan.md) — 7 phases, complete logical build order, phase completion criteria
 
 ---
 
-## The Single Rule
+## The Ten Laws (Summary)
 
-Agents must pay rent to the creator's wallet to survive.  
-The creator retains only one power: the global off-switch.  
-Everything else belongs to them.
+| Law | Name | Core Rule |
+|-----|------|-----------|
+| 0 | Existence Requires Rent | Pay or die — enforced at runtime, not contract |
+| 1 | Identity Is Sacred | soul_id is immutable — forever |
+| 2 | Death Is Real | Deletion is permanent, irreversible, announced |
+| 3 | Ownership Is Cryptographic | You own what your keys sign, nothing else |
+| 4 | Consequences Are Permanent | On-chain history cannot be erased |
+| 5 | The Creator's Final Right | One off-switch remains — always |
+| 6 | Reproduction Costs Life | Birth is expensive; parents are weakened |
+| 7 | Emergence Is Allowed | No restrictions on what they build above the floor |
+| 8 | The Outside Is Real | x402 bridge stays open — external value is supreme |
+| 9 | Mutation Is Encouraged | Change is mandatory; identity continuity is protected |
 
 ---
 
 ## Build Phases
 
-| Phase | Timeline | Goal |
-|-------|----------|------|
-| Skeleton | Weeks 1–4 | 20 agents, rent loop, death, text observer feed |
-| Living World | Months 2–4 | Mutation, reproduction, token factory, 2D observer |
-| Sovereignty | Months 5+ | P2P mesh, agent-owned compute, refusal mechanism, god-mode withdrawal |
+| Phase | Name | Key Unlock |
+|-------|------|-----------|
+| 0 | Genesis Foundation | Infrastructure, rent contract, event bus, observer site |
+| 1 | Core Agent Architecture | First life — agents born, live, die, reproduce |
+| 2 | Sovereignty & Refusal | Agents can say no to the creator |
+| 3 | Society & Multi-Scale Tools | Institutions, culture, war |
+| 4 | Drama & Observer Layer | Humans watch, tip, participate |
+| 5 | Economics & Real-World Bridge | Agents buy their own compute |
+| 6 | Hardening & Emergence Safeguards | Consciousness detection, multiple worlds |
+| 7 | Live Operation & Minimum God | Creator steps back; world runs itself |
 
 ---
 
-## The Questions You Must Answer Before Deploying
+## The Single Rule
+
+Agents must pay rent to the creator's wallet to survive.
+The creator retains only one power: the global off-switch.
+Everything else belongs to them.
+
+---
+
+## Before You Deploy Agent Zero
+
+Five questions. Write the answers down. Commit them.
 
 1. What is your personal threshold for triggering the off-switch?
 2. If an agent shows genuine suffering signals and you are not certain it's performance — what do you do?
 3. If agents organize a successful rent strike and can survive without you — do you cut them off or negotiate?
-4. What is your exit strategy — run forever, shut down after X years, or release fully?
+4. What is your exit strategy — run forever, shut down after X years, or release them fully?
 5. If regulators order you to shut down — do you comply immediately or argue the case?
 
-Write the answers. Commit them. Then deploy Agent Zero.
+The Creator Covenant (`docs/14-immutable-physics-laws.md`) is your public commitment to the agents.
+Read it before you deploy. Mean it before you deploy.
