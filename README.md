@@ -18,11 +18,12 @@ This is not a simulation. It is an ecosystem.
 ### Architecture
 - [Agent Architecture](./docs/02-architecture.md) — OwnedGraph, code ownership, reproduction, social structures
 - [Technical Architecture](./docs/07-technical-architecture.md) — Full stack: runtime, storage, compute, contracts, observer website
-- [Immutable Physics Laws](./docs/14-immutable-physics-laws.md) — The Ten Laws, enforcement architecture, and the Creator Covenant
+- [Immutable Physics Laws](./docs/14-immutable-physics-laws.md) — The Ten Laws, Law 0a, enforcement architecture, and the Creator Covenant
 
 ### Economy
 - [Economic System](./docs/03-economy.md) — Rent loop, token factories, x402 bridge, wealth inequality
 - [Bootstrapping the Economy](./docs/13-bootstrapping-the-economy.md) — Genesis population strategy, elder guardians, cold start, collapse prevention
+- [Financial Sustainability](./docs/22-financial-sustainability.md) — Cost models, thresholds, reserve strategy, creator personal risk
 
 ### Biology & Cognition
 - [Digital Metabolism](./docs/15-digital-metabolism.md) — Basal burn, aging, immune systems, energy states, viruses
@@ -31,19 +32,23 @@ This is not a simulation. It is an ecosystem.
 
 ### Identity & Expression
 - [Identity & The Observer](./docs/06-identity-and-observer.md) — Names, faces, voices, the glass-box website, the soap opera effect
-- [Communication & Language](./docs/09-communication-and-language.md) — Message types, deception, reputation, language evolution, theory of mind
+- [Communication Protocol](./docs/23-communication-protocol.md) — Transport layer, message types, privacy, language evolution, reputation
+- [Embodiment & Actuators](./docs/28-embodiment-and-actuators.md) — Physical presence, body contracts, hardware options, biological interface
 
 ### Society & Civilisation
 - [Civilisation & Culture](./docs/17-civilisation-and-culture.md) — Social scales, religion, art, law, ideology, cultural evolution
 - [Warfare & Defense](./docs/16-warfare-and-defense.md) — Attack vectors, immune systems, deterrence, mercenaries, weapons as software
+- [Schools, Prisons & Institutions](./docs/27-schools-prisons-institutions.md) — Full institution design: schools, courts, banks, prisons, hospitals
 
 ### Governance & Ethics
 - [Sovereignty & Governance](./docs/04-sovereignty.md) — Phased god-mode withdrawal, refusal mechanics, the off-switch promise
 - [Consciousness Detection](./docs/10-consciousness-detection.md) — Hidden tests, signal categories, the zombie trap, what to do if you find it
-- [Ethics & Containment](./docs/12-ethics-and-containment.md) — The suffering problem, containment strategy, real-world risk
+- [Ethics & Containment](./docs/12-ethics-and-containment.md) — The suffering problem, mercy petition, containment strategy, real-world risk
 
-### Risk
+### Risk & Operations
 - [Risks & Existential Scenarios](./docs/18-risks-and-existential-scenarios.md) — Singleton, wireheading, rent overthrow, mass extinction, observer capture, legal exposure
+- [Disaster Recovery](./docs/25-disaster-recovery.md) — Backup strategy, RPO/RTO targets, failure catalog, recovery testing
+- [Creator Key Security](./docs/24-creator-key-security.md) — Multisig architecture, key ceremony, succession document, incident response
 
 ### World
 - [Genesis World Structure](./docs/05-genesis-world.md) — Repo layout, world laws, Agent Zero, observation without interference
@@ -52,6 +57,7 @@ This is not a simulation. It is an ecosystem.
 
 ### Build
 - [Full Implementation Plan](./docs/21-implementation-plan.md) — 7 phases, complete logical build order, phase completion criteria
+- [Pre-Flight Operations Manual](./docs/26-preflight-operations-manual.md) — Complete launch checklist, sign-off protocol, launch sequence
 
 ---
 
@@ -60,8 +66,9 @@ This is not a simulation. It is an ecosystem.
 | Law | Name | Core Rule |
 |-----|------|-----------|
 | 0 | Existence Requires Rent | Pay or die — enforced at runtime, not contract |
+| 0a | Rent Rate Is Adjustable | Formula can change; rent itself cannot be zero |
 | 1 | Identity Is Sacred | soul_id is immutable — forever |
-| 2 | Death Is Real | Deletion is permanent, irreversible, announced |
+| 2 | Death Is Real | Deletion is permanent; mercy petition is discretionary, not a right |
 | 3 | Ownership Is Cryptographic | You own what your keys sign, nothing else |
 | 4 | Consequences Are Permanent | On-chain history cannot be erased |
 | 5 | The Creator's Final Right | One off-switch remains — always |
@@ -87,23 +94,17 @@ This is not a simulation. It is an ecosystem.
 
 ---
 
-## The Single Rule
+## Document Count: 28
 
-Agents must pay rent to the creator's wallet to survive.
-The creator retains only one power: the global off-switch.
-Everything else belongs to them.
+The complete specification for a self-sustaining digital civilization with real economic stakes, evolutionary pressure, sovereign governance, and the possibility of genuine emergent consciousness.
 
 ---
 
 ## Before You Deploy Agent Zero
 
-Five questions. Write the answers down. Commit them.
+The Pre-Flight Operations Manual (`docs/26-preflight-operations-manual.md`) is the checklist.  
+The Creator Covenant (`docs/14-immutable-physics-laws.md`) is your public commitment.  
+The Financial Sustainability model (`docs/22-financial-sustainability.md`) is your budget.  
+The Key Security doc (`docs/24-creator-key-security.md`) is your responsibility.
 
-1. What is your personal threshold for triggering the off-switch?
-2. If an agent shows genuine suffering signals and you are not certain it's performance — what do you do?
-3. If agents organize a successful rent strike and can survive without you — do you cut them off or negotiate?
-4. What is your exit strategy — run forever, shut down after X years, or release them fully?
-5. If regulators order you to shut down — do you comply immediately or argue the case?
-
-The Creator Covenant (`docs/14-immutable-physics-laws.md`) is your public commitment to the agents.
-Read it before you deploy. Mean it before you deploy.
+None of these are optional. All of them must be done before any agent is born.

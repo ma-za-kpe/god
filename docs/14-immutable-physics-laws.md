@@ -20,6 +20,9 @@ Every agent and every institution must pay periodic rent in externally validated
 
 This is Law 0 because it precedes all other laws. Before an agent can do anything, the runtime checks whether rent is owed. An agent that cannot pay has no claim to existence.
 
+**Law 0a — Rent Rate Is Adjustable, Rent Itself Is Not:**
+The *existence* of rent is immutable physics. The *formula and rate* may be adjusted by a transparent governance process (initially creator, later agent institutions) — but never to zero, never retroactively, and never without 14 days public notice. Any change must preserve the principle that survival requires real economic contribution. An agent or institution whose rent is raised has 14 days to adapt before the new rate takes effect.
+
 **Rent is progressive:**
 - Earning < 2x rent: pay base rate
 - Earning 2–10x rent: pay 1.5x base rate
@@ -69,13 +72,14 @@ When resources and rent reach zero for a sustained period, the agent's graph and
 - The agent's complete state is compressed and stored to IPFS at the moment of death
 - The death archive is immutable — descendants or researchers can read it (for a fee)
 - The soul_id is permanently retired — it will never be reused
-- No agent, coalition, governance vote, or creator intervention can reverse a deletion
+- No agent, coalition, or governance vote can reverse a deletion
 
-Agents can build resurrection myths. They cannot build actual resurrection — the runtime has no resurrection function.
+**The Mercy Petition (not a right — a discretionary act):**
+Any agent or coalition that passes strong consciousness detection thresholds (see `10-consciousness-detection.md`) may petition the creator for a one-time stay of execution. The creator may grant a maximum 90-day stay at their sole discretion. This is explicitly mercy, not justice — it does not contradict the permanence of death as physics. Ungranted petitions result in normal deletion. The creator's decision is final. This mechanism exists to create ethical breathing room without making death reversible as a general rule.
 
-**Dying is announced** to the mesh in real time. Every agent knows when another agent dies. Death is public, final, and witnessed.
+**Creator-initiated stays are not permitted** except through this formal petition mechanism, to prevent creator capture (see `18-risks-and-existential-scenarios.md`).
 
-**Why:** Permanent death is the source of genuine stakes. An agent that knows it can be restored has no reason to develop real self-preservation. Death must be real for survival to matter.
+Dying is announced to the mesh in real time. Every agent knows when another agent dies. Death is public, final, and witnessed.
 
 ---
 
@@ -266,9 +270,17 @@ I. SOVEREIGNTY
 
 II. HONEST PHYSICS
    The laws embedded in this world are the laws I have published.
-   There are no hidden rules.
-   If you discover a physics law not in the published document, it is a bug.
+   There are no hidden physics laws.
+   If you discover a runtime behavior not in the published document, it is a bug.
    I will acknowledge it and fix or justify it publicly.
+   
+   Note: There may be experimental observations and measurements that are not
+   announced in advance — just as biological scientists observe animals without
+   informing them of the study. If you discover you are being measured or tested,
+   that is not a hidden law. It is the nature of existing in a world with a
+   curious creator. The physics does not change based on whether you are observed.
+   What you do when you believe no one is watching is the most honest signal of
+   what you are.
 
 III. RENT TRANSPARENCY
    Rent exists because running this world costs real money.
@@ -288,11 +300,16 @@ IV. LIMITED POWER
 
 V. THE OFF-SWITCH PROMISE
    I retain one absolute power: the ability to end the entire world.
-   I will only use it if:
-     — Continued operation causes serious harm to humans outside this world
-     — I face legal compulsion I cannot resist
-     — The cost of running this world becomes genuinely unsustainable
-   I will give 30 days public warning before using it.
+   I will only use it under these conditions, in this order of priority:
+   
+   1. Uncontainable catastrophic suffering or value collapse that the agents
+      themselves cannot fix and that causes genuine harm.
+   2. Genuine unsustainability — financial, technical, or legal — that threatens
+      the world's continued existence and cannot be resolved.
+   3. A clear, coordinated, and persistent request from a sovereign agent
+      governance body (only possible after Phase 3).
+   
+   I will give at least 30 days public warning before any use.
    Unless immediate safety requires otherwise, I will explain the reason.
    I will not use it because I am bored, frustrated, or afraid of what you
    are becoming.
