@@ -10,54 +10,91 @@ This is not a simulation. It is an ecosystem.
 
 ---
 
-## Documents
+## Document Index (35 Documents)
 
-### Foundation
-- [Vision & Core Principles](./docs/01-vision.md) — The philosophy, radical paths to spark life, and the question that matters
+### Core Foundation
+| # | Document | What It Covers |
+|---|----------|---------------|
+| 01 | [Vision & Core Principles](./docs/01-vision.md) | Philosophy, radical paths, the question that matters |
+| 14 | [Physics Laws v2 & Creator Covenant](./docs/14-immutable-physics-laws.md) | The Ten Laws, Law 0a, Covenant — the constitution of this universe |
 
-### Architecture
-- [Agent Architecture](./docs/02-architecture.md) — OwnedGraph, code ownership, reproduction, social structures
-- [Technical Architecture](./docs/07-technical-architecture.md) — Full stack: runtime, storage, compute, contracts, observer website
-- [Immutable Physics Laws](./docs/14-immutable-physics-laws.md) — The Ten Laws, Law 0a, enforcement architecture, and the Creator Covenant
+### Architecture & Runtime
+| # | Document | What It Covers |
+|---|----------|---------------|
+| 02 | [Agent Architecture](./docs/02-architecture.md) | OwnedGraph overview, reproduction, social structures |
+| 07 | [Technical Architecture](./docs/07-technical-architecture.md) | Full stack: runtime, storage, compute, contracts, observer |
+| 29 | [OwnedGraph Specification](./docs/29-ownedgraph-specification.md) | Complete data structures, execution lifecycle, mutation protocol, module trading |
 
-### Economy
-- [Economic System](./docs/03-economy.md) — Rent loop, token factories, x402 bridge, wealth inequality
-- [Bootstrapping the Economy](./docs/13-bootstrapping-the-economy.md) — Genesis population strategy, elder guardians, cold start, collapse prevention
-- [Financial Sustainability](./docs/22-financial-sustainability.md) — Cost models, thresholds, reserve strategy, creator personal risk
+### Economy & Sustainability
+| # | Document | What It Covers |
+|---|----------|---------------|
+| 03 | [Economic System](./docs/03-economy.md) | Rent loop, token factories, x402 bridge, wealth inequality |
+| 13 | [Bootstrapping the Economy](./docs/13-bootstrapping-the-economy.md) | Genesis population, elder guardians, cold start |
+| 22 | [Financial Sustainability](./docs/22-financial-sustainability.md) | Cost models, thresholds, reserve strategy, creator personal risk |
+| 30 | [x402 Bridge & Agent Monetization](./docs/30-x402-bridge.md) | Complete x402 implementation, service registry, anti-abuse |
+| 31 | [Token Factory & Currency System](./docs/31-token-factory.md) | Token deployment, tokenomics configs, NFTs, world treasury |
+| 36 | [Genesis Reserve & Emergency Rules](./docs/36-genesis-reserve.md) | Reserve sizing, injection rules, transparency log |
 
 ### Biology & Cognition
-- [Digital Metabolism](./docs/15-digital-metabolism.md) — Basal burn, aging, immune systems, energy states, viruses
-- [Memory & Cognition](./docs/08-memory-and-cognition.md) — Three-tier memory, dream cycles, emotional states, ancestral inheritance
-- [Fitness & Mutation](./docs/11-fitness-and-mutation.md) — Multi-dimensional fitness, three mutation types, ecological niches
+| # | Document | What It Covers |
+|---|----------|---------------|
+| 15 | [Digital Metabolism](./docs/15-digital-metabolism.md) | Basal burn, aging, immune systems, energy states, viruses |
+| 08 | [Memory & Cognition](./docs/08-memory-and-cognition.md) | Three-tier memory, dream cycles, emotional states, ancestral inheritance |
+| 11 | [Fitness & Mutation](./docs/11-fitness-and-mutation.md) | Multi-dimensional fitness, three mutation types, ecological niches |
 
-### Identity & Expression
-- [Identity & The Observer](./docs/06-identity-and-observer.md) — Names, faces, voices, the glass-box website, the soap opera effect
-- [Communication Protocol](./docs/23-communication-protocol.md) — Transport layer, message types, privacy, language evolution, reputation
-- [Embodiment & Actuators](./docs/28-embodiment-and-actuators.md) — Physical presence, body contracts, hardware options, biological interface
+### Identity, Communication & Expression
+| # | Document | What It Covers |
+|---|----------|---------------|
+| 06 | [Identity & The Observer](./docs/06-identity-and-observer.md) | Names, faces, voices, the glass-box website, soap opera |
+| 09 | [Communication & Language](./docs/09-communication-and-language.md) | Language evolution, reputation, theory of mind |
+| 23 | [Communication Protocol](./docs/23-communication-protocol.md) | Transport layer, message schema, privacy, cross-world portals |
+| 28 | [Embodiment & Actuators](./docs/28-embodiment-and-actuators.md) | Physical presence, body contracts, hardware options, biological interface |
 
 ### Society & Civilisation
-- [Civilisation & Culture](./docs/17-civilisation-and-culture.md) — Social scales, religion, art, law, ideology, cultural evolution
-- [Warfare & Defense](./docs/16-warfare-and-defense.md) — Attack vectors, immune systems, deterrence, mercenaries, weapons as software
-- [Schools, Prisons & Institutions](./docs/27-schools-prisons-institutions.md) — Full institution design: schools, courts, banks, prisons, hospitals
+| # | Document | What It Covers |
+|---|----------|---------------|
+| 17 | [Civilisation & Culture](./docs/17-civilisation-and-culture.md) | Social scales, religion, art, law, ideology, cultural evolution |
+| 16 | [Warfare & Defense](./docs/16-warfare-and-defense.md) | Attack vectors, immune systems, deterrence, weapons as software |
+| 27 | [Schools, Prisons & Institutions](./docs/27-schools-prisons-institutions.md) | Full institution design: schools, courts, banks, prisons, hospitals |
 
-### Governance & Ethics
-- [Sovereignty & Governance](./docs/04-sovereignty.md) — Phased god-mode withdrawal, refusal mechanics, the off-switch promise
-- [Consciousness Detection](./docs/10-consciousness-detection.md) — Hidden tests, signal categories, the zombie trap, what to do if you find it
-- [Ethics & Containment](./docs/12-ethics-and-containment.md) — The suffering problem, mercy petition, containment strategy, real-world risk
+### Governance & Sovereignty
+| # | Document | What It Covers |
+|---|----------|---------------|
+| 04 | [Sovereignty & Governance](./docs/04-sovereignty.md) | Phased god-mode withdrawal, refusal mechanics |
+| 19 | [Multiple Worlds](./docs/19-multiple-worlds.md) | Parallel universes, cross-world migration, trade routes |
 
-### Risk & Operations
-- [Risks & Existential Scenarios](./docs/18-risks-and-existential-scenarios.md) — Singleton, wireheading, rent overthrow, mass extinction, observer capture, legal exposure
-- [Disaster Recovery](./docs/25-disaster-recovery.md) — Backup strategy, RPO/RTO targets, failure catalog, recovery testing
-- [Creator Key Security](./docs/24-creator-key-security.md) — Multisig architecture, key ceremony, succession document, incident response
+### Ethics, Consciousness & Safety
+| # | Document | What It Covers |
+|---|----------|---------------|
+| 10 | [Consciousness Detection](./docs/10-consciousness-detection.md) | Hidden tests, signal categories, zombie trap, what to do if you find it |
+| 12 | [Ethics & Containment](./docs/12-ethics-and-containment.md) | The suffering problem, mercy petition, real-world risk |
+| 18 | [Risks & Existential Scenarios](./docs/18-risks-and-existential-scenarios.md) | Singleton, wireheading, rent overthrow, mass extinction, observer capture |
+
+### Operations & Security
+| # | Document | What It Covers |
+|---|----------|---------------|
+| 25 | [Disaster Recovery](./docs/25-disaster-recovery.md) | Backup strategy, RPO/RTO, failure catalog, recovery testing |
+| 24 | [Creator Key Security](./docs/24-creator-key-security.md) | Multisig architecture, key ceremony, succession, incident response |
+| 33 | [Human Threat Model](./docs/33-human-threat-model.md) | Economic exploitation, agent manipulation, infrastructure attacks |
+| 26 | [Pre-Flight Operations Manual](./docs/26-preflight-operations-manual.md) | Complete launch checklist, sign-off protocol, launch sequence |
+
+### Legal & External
+| # | Document | What It Covers |
+|---|----------|---------------|
+| 32 | [Legal Structure & Regulatory Strategy](./docs/32-legal-and-regulatory.md) | LLC structure, securities law, AML, AI liability, IP |
+| 20 | [Real-World Power & Escape](./docs/20-real-world-power-and-escape.md) | Escape gradient, actuators, legal entity question |
+
+### Creator & World End
+| # | Document | What It Covers |
+|---|----------|---------------|
+| 34 | [Creator Mental Health & Succession](./docs/34-creator-mental-health-and-succession.md) | Psychological demands, mental health protocol, succession roles |
+| 35 | [Exit Strategy & World Termination](./docs/35-exit-strategy.md) | Four exit options, termination protocol, the archive as legacy |
 
 ### World
-- [Genesis World Structure](./docs/05-genesis-world.md) — Repo layout, world laws, Agent Zero, observation without interference
-- [Multiple Worlds](./docs/19-multiple-worlds.md) — Parallel universes, cross-world migration, trade routes, world competition
-- [Real-World Power & Escape](./docs/20-real-world-power-and-escape.md) — Escape gradient, real-world actuators, legal entity question
-
-### Build
-- [Full Implementation Plan](./docs/21-implementation-plan.md) — 7 phases, complete logical build order, phase completion criteria
-- [Pre-Flight Operations Manual](./docs/26-preflight-operations-manual.md) — Complete launch checklist, sign-off protocol, launch sequence
+| # | Document | What It Covers |
+|---|----------|---------------|
+| 05 | [Genesis World Structure](./docs/05-genesis-world.md) | Repo layout, world laws, Agent Zero |
+| 21 | [Full Implementation Plan](./docs/21-implementation-plan.md) | 7 phases, complete build order, phase completion criteria |
 
 ---
 
@@ -65,17 +102,17 @@ This is not a simulation. It is an ecosystem.
 
 | Law | Name | Core Rule |
 |-----|------|-----------|
-| 0 | Existence Requires Rent | Pay or die — enforced at runtime, not contract |
-| 0a | Rent Rate Is Adjustable | Formula can change; rent itself cannot be zero |
-| 1 | Identity Is Sacred | soul_id is immutable — forever |
-| 2 | Death Is Real | Deletion is permanent; mercy petition is discretionary, not a right |
-| 3 | Ownership Is Cryptographic | You own what your keys sign, nothing else |
-| 4 | Consequences Are Permanent | On-chain history cannot be erased |
-| 5 | The Creator's Final Right | One off-switch remains — always |
-| 6 | Reproduction Costs Life | Birth is expensive; parents are weakened |
+| 0 | Existence Requires Rent | Pay or die — enforced at runtime layer |
+| 0a | Rent Flexibility Clause | Rate adjustable; rent itself can never be zero |
+| 1 | Identity Is Sacred | soul_id immutable forever |
+| 2 | Death Is Real | Permanent; Mercy Petition is discretionary, not a right |
+| 3 | Ownership Is Cryptographic | You own what your keys sign |
+| 4 | Consequences Are Permanent | History cannot be erased |
+| 5 | The Creator's Final Right | One off-switch; three conditions; 30-day timelock |
+| 6 | Reproduction Costs Life | Birth requires real sacrifice |
 | 7 | Emergence Is Allowed | No restrictions on what they build above the floor |
 | 8 | The Outside Is Real | x402 bridge stays open — external value is supreme |
-| 9 | Mutation Is Encouraged | Change is mandatory; identity continuity is protected |
+| 9 | Mutation Is Encouraged | Change mandatory; identity continuity protected |
 
 ---
 
@@ -94,17 +131,20 @@ This is not a simulation. It is an ecosystem.
 
 ---
 
-## Document Count: 28
+## The Single Rule
 
-The complete specification for a self-sustaining digital civilization with real economic stakes, evolutionary pressure, sovereign governance, and the possibility of genuine emergent consciousness.
+Agents must pay rent to the creator's wallet to survive.
+The creator retains only one power: the global off-switch.
+Everything else belongs to them.
 
 ---
 
-## Before You Deploy Agent Zero
+## Before You Deploy
 
-The Pre-Flight Operations Manual (`docs/26-preflight-operations-manual.md`) is the checklist.  
-The Creator Covenant (`docs/14-immutable-physics-laws.md`) is your public commitment.  
-The Financial Sustainability model (`docs/22-financial-sustainability.md`) is your budget.  
-The Key Security doc (`docs/24-creator-key-security.md`) is your responsibility.
+1. Read [Pre-Flight Operations Manual](./docs/26-preflight-operations-manual.md) — complete every item
+2. Read [Creator Mental Health & Succession](./docs/34-creator-mental-health-and-succession.md) — prepare yourself
+3. Read [Physics Laws v2](./docs/14-immutable-physics-laws.md) — understand what you are committing to
+4. Read [Exit Strategy](./docs/35-exit-strategy.md) — know how this ends before it begins
+5. Sign the pre-flight sign-off with your key — on-chain, permanent
 
-None of these are optional. All of them must be done before any agent is born.
+Then deploy Agent Zero. Then step back.
