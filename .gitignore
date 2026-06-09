@@ -1,0 +1,46 @@
+# Secrets — never commit these
+.env.local
+.env.*.local
+swarm.key
+*.pem
+*.key
+
+# Dependencies
+node_modules/
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Build outputs
+.next/
+out/
+dist/
+build/
+runtime/__pycache__/
+
+# Foundry
+contracts/out/
+contracts/cache/
+contracts/broadcast/
+
+# Docker
+.docker/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Test artifacts
+coverage/
+.coverage
+htmlcov/
