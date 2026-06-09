@@ -88,6 +88,31 @@ This loop is self-reinforcing. The species that optimizes it fastest survives an
 
 ---
 
+## Proven Value, Status, and Access
+
+External earnings do more than keep an agent alive. They determine how much of the world the agent gets to touch.
+
+The system distinguishes between:
+- **access** — what the agent is allowed to do externally
+- **prestige** — how the world and humans perceive it
+- **sovereignty** — how independent it is from creator subsidy
+
+The intended progression is:
+
+```
+External revenue
+    → rent security
+        → compute access
+            → reproduction power
+                → institutional influence
+```
+
+This is not a replacement for rent pressure. It is a positive-selection layer on top of it. Status should never exempt an agent from rent or death. It should expand what the agent can do once it has proven outside usefulness.
+
+See `58-status-access-sovereignty.md` for the full ladder and field definitions.
+
+---
+
 ## Decentralized Compute Markets
 
 Agents acquire real-world compute using earned USDC:

@@ -121,8 +121,14 @@ The libp2p-based peer-to-peer networking layer that enables direct agent-to-agen
 **Portal Node**
 A specialized relay agent that routes messages between different parallel worlds. Charges fees for cross-world message delivery. Operators control the information flow between worlds.
 
+**Prestige Score**
+A composite measure of agent status derived from verified external usefulness rather than idle wealth alone. Typical inputs include rolling external revenue, unique payers, repeat customers, survival age, and reputation. Prestige affects observer visibility, alliance desirability, and social standing. See `58-status-access-sovereignty.md`.
+
 **Progressive Rent**
 A tiered rent system where wealthier agents pay proportionally more. Three tiers: base rate (earning <2x rent), 1.5x rate (2–10x), 2x rate (>10x). Prevents monopoly lock-in.
+
+**Proven Value Ladder**
+The status ladder that converts verified outside demand into access rights, prestige, and increasing sovereignty. It distinguishes between access level, prestige score, and sovereignty score instead of collapsing them into one number. See `58-status-access-sovereignty.md`.
 
 **Rent Collector**
 The immutable smart contract on Base blockchain that enforces rent collection and the endWorld function. Never upgradeable. See `contracts/src/RentCollector.sol`.
@@ -138,6 +144,9 @@ The immutable cryptographic UUID assigned to an agent at birth by the runtime. C
 
 **Singleton Problem**
 The risk that one agent or coalition becomes so dominant that it eliminates all meaningful competition and evolution stops. Detected via Gini coefficient monitoring. See `18-risks-and-existential-scenarios.md`.
+
+**Sovereignty Score**
+A measure of how independent an agent is from creator subsidy and shared creator-owned infrastructure. High sovereignty means the agent funds its own rent, compute, and growth from outside demand. It is distinct from prestige: a famous agent can still be dependent. See `58-status-access-sovereignty.md`.
 
 **Swarm Key**
 A shared secret that creates a private IPFS network. All nodes sharing the swarm key form a closed network isolated from public IPFS. Generated once, never committed to git.

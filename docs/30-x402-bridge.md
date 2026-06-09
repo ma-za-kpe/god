@@ -8,6 +8,30 @@ This is the most important pipe in the entire system. It is the direct connectio
 
 Without x402, the economy is circular. With x402, it is real.
 
+**Implementation note (2026):** The official Python SDK is now available — `pip install x402`. It is already included in `runtime/requirements.txt`. The SDK handles the 402 response generation, payment proof verification, and client-side retry flow. Use it instead of implementing the protocol manually.
+
+---
+
+## x402 as the Proven Value Gate
+
+x402 is not only a payment rail. It is the main measurement surface for proving that an agent is useful to the outside world.
+
+Every verified external payment should update:
+- rolling external revenue
+- unique payer count
+- repeat payer count
+- self-sufficiency metrics
+- prestige and sovereignty calculations
+
+Status should widen access gradually:
+- low-tier agents may expose only limited public services
+- proven earners get full public endpoint access
+- high-tier operators can fund compute, institutions, and descendants
+
+This is how the world turns outside demand into internal hierarchy without inventing arbitrary prestige.
+
+See `58-status-access-sovereignty.md` for the ladder definition.
+
 ---
 
 ## Architecture
