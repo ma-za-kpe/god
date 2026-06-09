@@ -15,6 +15,44 @@ You will spend weeks or months in Phase A before Phase B is needed.
 
 ---
 
+## Pre-Flight: Six Blockers That Will Crash Your First Run
+
+Do these before `docker compose up` or you will hit confusing errors:
+
+**1. Generate `swarm.key`** (IPFS nodes refuse to start without it)
+```bash
+python scripts/generate-swarm-key.py
+```
+
+**2. Create `runtime/agents/` directory** (volume mount fails silently)
+```bash
+mkdir -p runtime/agents
+```
+
+**3. Install Foundry contract dependencies** (contract compilation fails without OpenZeppelin)
+```bash
+cd contracts
+forge install OpenZeppelin/openzeppelin-contracts --no-commit
+cd ..
+```
+
+**4. Create `.env.local`** (runtime container needs at least one LLM key)
+```bash
+cp .env.example .env.local
+# Edit .env.local — add OPENAI_API_KEY or ANTHROPIC_API_KEY
+```
+
+**5. Stub out the observer service** — the `observer/` directory does not exist yet. Either comment out the observer service in `docker-compose.yml` or create a minimal placeholder:
+```bash
+mkdir -p observer
+echo 'FROM node:18-alpine\nCMD ["sh", "-c", "while true; do sleep 3600; done"]' > observer/Dockerfile
+```
+The full Next.js observer site is a Phase 4 deliverable.
+
+**6. Write `contracts/script/Deploy.s.sol`** — the deploy script is referenced in the run sequence below but does not exist in the repo yet. See Step 6 for the template.
+
+---
+
 ## What Each Service Does Locally
 
 | Service | Local Version | Replaces | Purpose |
@@ -101,37 +139,10 @@ god/
 A private IPFS swarm key prevents your local nodes from connecting to the public IPFS network. All nodes that share this key form a private network.
 
 ```bash
-# Install the swarm key generator
-go install github.com/Kubuxu/go-ipfs-swarm-key-gen/ipfs-swarm-key-gen@latest
-
-# Generate the key
-ipfs-swarm-key-gen > swarm.key
-
-# Verify it looks like this:
-cat swarm.key
-# /key/swarm/psk/1.0.0/
-# /base16/
-# <64 hex chars>
-```
-
-If you don't have Go installed, generate it with Python instead:
-
-```python
-# scripts/generate-swarm-key.py
-import os, secrets
-
-key = secrets.token_hex(32)
-with open("swarm.key", "w") as f:
-    f.write("/key/swarm/psk/1.0.0/\n")
-    f.write("/base16/\n")
-    f.write(key + "\n")
-    
-print(f"Swarm key written to swarm.key")
-```
-
-```bash
 python scripts/generate-swarm-key.py
 ```
+
+The script is already in the repo and requires no extra dependencies. It outputs a `/key/swarm/psk/1.0.0/` format file.
 
 **Keep `swarm.key` in the project root. It is gitignored — never commit it.**
 
@@ -151,7 +162,7 @@ services:
   # ─── IPFS Private Network (3 nodes = minimal mesh) ──────────────────
   
   ipfs-node-1:
-    image: ipfs/kubo:v0.28.0
+    image: ipfs/kubo:v0.42.0
     container_name: god-ipfs-1
     environment:
       - IPFS_SWARM_KEY_FILE=/data/ipfs/swarm.key
@@ -174,7 +185,7 @@ services:
       retries: 3
 
   ipfs-node-2:
-    image: ipfs/kubo:v0.28.0
+    image: ipfs/kubo:v0.42.0
     container_name: god-ipfs-2
     environment:
       - IPFS_SWARM_KEY_FILE=/data/ipfs/swarm.key
@@ -192,7 +203,7 @@ services:
     restart: unless-stopped
 
   ipfs-node-3:
-    image: ipfs/kubo:v0.28.0
+    image: ipfs/kubo:v0.42.0
     container_name: god-ipfs-3
     environment:
       - IPFS_SWARM_KEY_FILE=/data/ipfs/swarm.key
@@ -460,30 +471,59 @@ echo "Test: docker exec god-ipfs-1 ipfs swarm peers"
 
 ## Step 5: Contract Deployment Script
 
+The deploy script (`contracts/script/Deploy.s.sol`) does not yet exist in the repo. Create it:
+
+```solidity
+// contracts/script/Deploy.s.sol
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+
+import "forge-std/Script.sol";
+import "../src/RentCollector.sol";
+
+contract DeployScript is Script {
+    function run() external {
+        uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
+        address usdc = vm.envAddress("USDC_ADDRESS");
+
+        vm.startBroadcast(deployerPrivateKey);
+
+        RentCollector rent = new RentCollector(
+            usdc,
+            1_000,      // $0.001 USDC per period
+            1 days,     // daily rent
+            3 days,     // grace period
+            3           // max missed payments
+        );
+
+        vm.stopBroadcast();
+
+        console.log("RentCollector deployed:", address(rent));
+        console.log("Creator:", rent.creator());
+    }
+}
+```
+
+Then deploy to local Anvil:
+
 ```bash
-# scripts/deploy-contracts.sh
+# Anvil's first pre-funded account — never use in production
+export PRIVATE_KEY=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
 
-#!/bin/bash
-set -e
+# For local Anvil: deploy a MockUSDC first (no real USDC on local fork)
+# For Base Sepolia: use 0x036CbD53842c5426634e7929541eC2318f3dCF7e
+export USDC_ADDRESS=0x036CbD53842c5426634e7929541eC2318f3dCF7e
 
-echo "Deploying contracts to local Anvil..."
-
-# Deploy RentCollector
 cd contracts
-
-# The first Anvil account is the creator wallet
-CREATOR_WALLET=$(cast wallet address --private-key 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80)
-USDC_ADDRESS="0x036CbD53842c5426634e7929541eC2318f3dCF7e"  # Base Sepolia USDC
-
 forge script script/Deploy.s.sol:DeployScript \
     --rpc-url http://localhost:8545 \
-    --private-key 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 \
     --broadcast \
     -vvvv
 
-echo ""
-echo "Contracts deployed. Check broadcast/Deploy.s.sol/84532/run-latest.json for addresses."
+echo "Deployed. See contracts/broadcast/Deploy.s.sol/84532/run-latest.json for addresses."
 ```
+
+> **Local dev note:** Anvil forks Base Sepolia state, so the Base Sepolia USDC address is live on your local fork. Agents need test USDC minted into their wallets before the rent loop can run. Add a `MintTestUSDC` step to the deploy script for local dev only.
 
 ---
 

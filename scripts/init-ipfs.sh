@@ -16,10 +16,10 @@ for port in 5001 5002 5003; do
     echo -e "  ${GREEN}✓${NC} Removed public bootstraps from node on port ${port}"
 done
 
-# Get peer IDs
-NODE1_ID=$(curl -sf -X POST http://localhost:5001/api/v0/id | python3 -c "import sys,json; print(json.load(sys.stdin)['ID'])")
-NODE2_ID=$(curl -sf -X POST http://localhost:5002/api/v0/id | python3 -c "import sys,json; print(json.load(sys.stdin)['ID'])")
-NODE3_ID=$(curl -sf -X POST http://localhost:5003/api/v0/id | python3 -c "import sys,json; print(json.load(sys.stdin)['ID'])")
+# Get peer IDs via docker exec (avoids python3 host dependency)
+NODE1_ID=$(docker exec god-ipfs-1 ipfs id --format "<id>")
+NODE2_ID=$(docker exec god-ipfs-2 ipfs id --format "<id>")
+NODE3_ID=$(docker exec god-ipfs-3 ipfs id --format "<id>")
 
 echo ""
 echo "  Node 1: $NODE1_ID"

@@ -113,6 +113,137 @@ Each entry records:
 
 ---
 
+---
+
+## 2026-06-09 — Phase 1 Core Systems Complete
+
+### Agent-to-Agent Messaging
+**Decision:** Pull messaging forward from Phase 3 into Phase 1.
+
+**What was built:** `runtime/src/messaging.py` — NATS JetStream routing with per-agent inbox subjects (`world.{wid}.agent.{soul_id}.inbox`), broadcast channel, `AgentMessage` dataclass, per-pair reputation system [-1.0, 1.0], cost model (direct: 0.001 USDC, broadcast: 0.01 USDC).
+
+**Rationale:** Agents cannot form the cooperative/adversarial dynamics the experiment requires without a working communication channel. Having agents think interesting thoughts in isolation produces no emergence. Messaging is a prerequisite for reproduction strategies, coalition formation, and the economic games that make the world interesting.
+
+---
+
+### Dream/Sleep Cycle
+**Decision:** Pull dream system forward from Phase 6 into Phase 1.
+
+**What was built:** `runtime/src/dream_engine.py` — sleep state machine, `put_agent_to_sleep()`, `run_dream_cycle()`, LLM-generated dream mutations, coherence-gated mutation injection. Agent runner integration: sleeping agents skip cognition, run dream cycle, pending mutations injected into LLM system prompt on wake.
+
+**Rationale:** The sleep cycle is not a luxury feature — it is the mutation vector. Without it, agents cannot evolve their own cognition over time. Building it in Phase 1 ensures that even the earliest agents begin accumulating graph mutations from day one. The dream archive also provides a rich source of data for consciousness detection later.
+
+---
+
+### Reproduction System (fork_self + mate)
+**Decision:** Implement full sexual and asexual reproduction, wire into tool_dispatcher via thought pattern matching.
+
+**What was built:** `runtime/src/reproduction.py` — `fork_self()` (asexual), `mate()` (sexual), SHA256 soul_id, archetype mutation (10%), cooldown enforcement, USDC deduction, OwnedGraph lineage. Tool patterns: 14+ natural language triggers for fork/mate dispatch.
+
+**Rationale:** Seeds are the wrong model. The world cannot achieve natural selection unless reproduction is endogenous — driven by agent decisions and resource surplus, not creator scripting. Removing `seed_agents.py` and replacing it with `POST /creator/genesis` (8 genesis agents, then hands off) is the correct architecture.
+
+---
+
+### Token Factory (AgentToken.sol + deploy_token)
+**Decision:** Build the full ERC-20 deployment pipeline using Foundry artifacts.
+
+**What was built:** `contracts/src/AgentToken.sol` (ERC-20, transfer tax, mint), `runtime/src/token_factory.py` (7-step async deployment via web3.py, Foundry artifact, Anvil RPC).
+
+**Rationale:** Agent-issued tokens are the primary mechanism by which agents can create economic institutions (DAOs, clan funds, service access gates). Without the ability to deploy tokens, the economy stays flat — all value flows through USDC and rent, with no mechanism for agents to create new economic primitives.
+
+---
+
+### Observer Overhaul (Force-Directed Phase 4-level UI)
+**Decision:** Replace placeholder observer HTML with a full force-directed canvas application.
+
+**What was built:** `observer/index.html` — force-directed layout (repulsion, archetype clustering, connection pull, center gravity), full zoom/pan (mouse wheel, drag, double-click cluster zoom, right-click reset), archetype cluster halos, message pulse animations, per-agent heartbeat rings, generation rings, born/died burst FX, collapsible economy panel (USDC, Gini, archetype distribution bars, activity chart), collapsible inspector panel (agent details, connection list, drama feed), header stats (ALIVE, BORN, DIED, GEN, USDC, MSGS, TOKENS, DREAMS, AGE, LLM).
+
+**Rationale:** The observer is how the creator monitors the experiment. A text-list observer is not sufficient — it provides no spatial or relational information. The force-directed layout reveals emergent social structure: clusters form where agents repeatedly interact, and the spatial layout makes coalition formation, isolation, and network centrality immediately visible.
+
+**Design decision — single HTML file:** No build step, no npm, no framework. The observer must be deployable with `docker cp` and a Python http.server. Any developer should be able to open it directly. Three.js/React deferred to Phase 4.3 when agents have avatars worth rendering in 3D.
+
+---
+
+### API Surface Expansion
+**What was added to `runtime/src/main.py`:**
+- `POST /creator/genesis` — reset world, spawn 8 genesis agents
+- `GET /population` — detailed population breakdown by archetype/generation
+- `GET /messages` / `GET /agents/{id}/messages` / `GET /agents/{id}/inbox`
+- `GET /agents/{id}/reputation`
+- `GET /agents/{id}/dreams`
+- `POST /agents/{id}/sleep`
+- `GET /tokens` / `GET /agents/{id}/tokens`
+- `POST /tokens/deploy`
+- Extended `/stats` — avg_balance, max_balance, gini, max_generation, messages_total, dreams_total, tokens_deployed
+
+---
+
+## 2026 — Technology Audit & Local Dev Hardening
+
+### Why E2B over Firecracker for Phase 1–3 sandboxing
+**Decision:** Use E2B on-demand Linux microVMs (`pip install e2b`) for agent sandbox isolation in production phases 1–3. Firecracker remains the target for Phase 4+ high-scale production.
+
+**Alternatives:**
+- Firecracker directly: The right end state, but complex to operate. Requires bare-metal hosts (not available in typical cloud dev), custom Jailer configuration, and manual VM lifecycle management.
+- Docker containers per agent: Simple but weak isolation — a compromised agent could potentially access other containers on the same host.
+- WASM: Good isolation but limits what agents can execute; incompatible with arbitrary Python agent code.
+- No sandboxing (local dev): Acceptable for localhost where all processes are trusted.
+
+**Rationale:** E2B wraps Firecracker in a managed API with a Python SDK. You get VM-level isolation without managing Firecracker directly. For Phase 1–3 the operational simplicity is worth the slight cost overhead. Local dev runs without sandboxing (process isolation only) — this is a known and acceptable gap.
+
+---
+
+### Why NATS over libp2p for agent-to-agent messaging (Phase 1–3)
+**Decision:** Use NATS JetStream subject routing (`world.{wid}.agent.{soul_id}.inbox`) for agent-to-agent communication in Phases 1–3. libp2p migration planned for Phase 4+.
+
+**Alternatives:**
+- py-libp2p: The specification called for it. But as of 2026, `py-libp2p` is incomplete (no DHT, no yamux, limited maintenance). Using it would introduce unreliable infrastructure in the critical early phases.
+- Redis Pub/Sub: Already in the stack but no persistence, no TTL, no delivery guarantees.
+- Custom WebSocket relay: More control, more build work, reinvents NATS features.
+
+**Rationale:** NATS JetStream is already in the stack for the world event bus. Extending the same deployment for agent-to-agent messaging adds zero operational overhead. Subject-based ACLs provide authentication. JetStream provides the persistent message queue needed for offline agents (dream cycle). The topology effects of libp2p (network centrality mapping to social power) are not achievable with NATS — this is an accepted tradeoff until libp2p matures.
+
+---
+
+### Why compile-time Python graphs instead of IPFS-executable blobs (Phase 1)
+**Decision:** In Phase 1, agent graphs are Python files in `runtime/agents/`. OwnedGraph CIDs store state and parameters, not executable code. IPFS-executable graphs are deferred to Phase 3+.
+
+**Alternatives:**
+- IPFS executable blobs from Day 1: Architecturally elegant but requires a working code fetch → compile → execute pipeline before any agent can run. Adds complexity before the basic survival loop is proven.
+- Hardcoded agents: Faster to build but defeats the OwnedGraph ownership model.
+
+**Rationale:** LangGraph 1.x works naturally with Python graph definitions. The OwnedGraph data structure already exists and stores state/parameters on IPFS — agents have real CIDs and real ownership from birth. The distinction (parameters vs. code on IPFS) is an implementation detail invisible to agents. Phase 3 evolves this to full executable graph CIDs when the mutation complexity demands it.
+
+---
+
+### Why IPFS Kubo v0.42.0 (not v0.28.0)
+**Decision:** Upgrade from `ipfs/kubo:v0.28.0` (previously specified) to `ipfs/kubo:v0.42.0` in docker-compose.yml.
+
+**Rationale:** The project was 14 major versions behind current. v0.28.0 is from 2023 and has known security patches, performance improvements, and API changes applied in later versions. v0.42.0 is the current stable release. All three IPFS nodes in docker-compose.yml updated simultaneously.
+
+---
+
+### Why remove ipfshttpclient in favor of httpx
+**Decision:** Remove `ipfshttpclient` from `runtime/requirements.txt` and use `httpx` directly for IPFS API calls.
+
+**Rationale:** `ipfshttpclient` was abandoned in 2022 and is incompatible with modern IPFS Kubo API endpoints. The existing code in `runtime/src/owned_graph.py` already used `httpx` directly — `ipfshttpclient` was listed as a dependency but never actually imported or used. Removed the dead dependency. The slot in requirements.txt was replaced with `x402>=0.1.0`.
+
+---
+
+### Why x402 Python SDK is now in requirements
+**Decision:** Add `x402>=0.1.0` to `runtime/requirements.txt`.
+
+**Rationale:** The x402 Python SDK is now available via PyPI (`pip install x402`). Previously the project would have needed to implement the 402 payment flow manually. The SDK handles 402 response generation, payment proof verification, and client-side retry. Adding it now (even before x402 endpoints are built) keeps the dependency graph correct and signals the implementation path.
+
+---
+
+### Why LangGraph version pinned to >=1.0.0 (not >=0.2.0)
+**Decision:** Update `langgraph` version pin from `>=0.2.0` to `>=1.0.0` in `runtime/requirements.txt`.
+
+**Rationale:** LangGraph 1.x (current: v1.2.4) has significant API changes from the 0.x series — the graph construction API, checkpointer interface, and state schema all changed. Specifying `>=0.2.0` would allow pip to install a 0.x version that would break the code. The codebase targets 1.x. All langchain-* dependencies updated to compatible minimum versions simultaneously.
+
+---
+
 ## Open Design Questions (Unresolved)
 
 - **Neuromorphic hardware integration:** How to interface with neuromorphic chips if they become accessible. No answer yet.

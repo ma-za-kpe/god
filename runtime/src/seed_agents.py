@@ -13,10 +13,12 @@ import asyncio
 import json
 import logging
 import os
+import time
 import uuid
 from decimal import Decimal
 from typing import Optional
 
+import psycopg2
 from eth_account import Account
 
 from .owned_graph import OwnedGraph, ARCHETYPES, create_agent_zero
@@ -24,8 +26,37 @@ from .owned_graph import OwnedGraph, ARCHETYPES, create_agent_zero
 log = logging.getLogger("god.seed")
 
 SEED_BALANCE_USDC = Decimal(os.getenv("SEED_BALANCE_USDC", "0.10"))
-WORLD_ID = os.getenv("WORLD_ID", "local-dev-world-1")
-IPFS_API = os.getenv("IPFS_API", "http://localhost:5001")
+WORLD_ID          = os.getenv("WORLD_ID",      "local-dev-world-1")
+IPFS_API          = os.getenv("IPFS_API",      "http://localhost:5001")
+DATABASE_URL      = os.getenv("DATABASE_URL",  "postgresql://god:localdev@localhost:5432/god_world")
+
+
+def _persist_agent(agent: dict):
+    """Register agent in PostgreSQL so the runtime and observer can see it."""
+    conn = psycopg2.connect(DATABASE_URL)
+    cur  = conn.cursor()
+    cur.execute(
+        """
+        INSERT INTO agents
+            (soul_id, graph_cid, wallet_address, current_name,
+             birth_timestamp, is_alive, world_id, archetype, balance_usdc)
+        VALUES (%s, %s, %s, %s, %s, true, %s, %s, %s)
+        ON CONFLICT (soul_id) DO NOTHING
+        """,
+        (
+            agent["soul_id"],
+            agent["graph_cid"],
+            agent["wallet_address"],
+            agent["name"],
+            int(time.time()),
+            WORLD_ID,
+            agent["archetype"],
+            float(SEED_BALANCE_USDC),
+        ),
+    )
+    conn.commit()
+    cur.close()
+    conn.close()
 
 
 async def seed_one_agent(
@@ -67,7 +98,7 @@ async def seed_one_agent(
         cid = f"local:{graph.content_hash()[:16]}"
         graph.graph_id = cid
 
-    return {
+    result = {
         "soul_id": soul_id,
         "graph_cid": cid,
         "wallet_address": wallet_address,
@@ -76,6 +107,13 @@ async def seed_one_agent(
         "name": graph.identity.current_name,
         "is_elder": is_elder,
     }
+
+    try:
+        _persist_agent(result)
+    except Exception as e:
+        log.warning(f"  DB persist failed for {soul_id[:8]}: {e}")
+
+    return result
 
 
 async def seed_population(

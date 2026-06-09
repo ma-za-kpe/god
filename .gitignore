@@ -4,6 +4,8 @@
 swarm.key
 *.pem
 *.key
+*-PRIVATE-KEYS.json
+agents-registry.json
 
 # Dependencies
 node_modules/

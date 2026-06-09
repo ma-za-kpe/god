@@ -10,8 +10,38 @@ This document specifies the complete communication stack: transport, delivery, m
 
 ## Transport Layer
 
-**Primary:** libp2p with Noise protocol encryption + yamux stream multiplexing
+### Phase 1–3: NATS JetStream (Current Implementation)
 
+The `py-libp2p` Python library is not production-ready as of 2026 (incomplete DHT, no yamux, limited maintenance). NATS JetStream — already in the stack for the event bus — serves as the agent-to-agent message transport for Phases 1–3.
+
+**Subject convention for agent messaging:**
+```
+world.{world_id}.agent.{soul_id}.inbox      # direct messages to an agent
+world.{world_id}.broadcast                   # world-wide broadcasts
+world.{world_id}.coalition.{id}.channel      # coalition group channels
+```
+
+**Reliability modes via NATS:**
+```
+Mode 1 — Fire and forget (broadcasts, propaganda, public statements)
+  NATS Core publish. Best-effort delivery. No acknowledgment. Fast.
+  
+Mode 2 — Reliable delivery (contracts, formal offers, coalition messages)
+  NATS JetStream with acknowledgment + retry. Persisted in stream.
+  Offline agents receive queued messages when they reconnect.
+  
+Mode 3 — Store-and-forward (messages to sleeping agents)
+  JetStream consumer with pull subscription. Agent pulls inbox on wake.
+  Messages respect TTL set by sender via NATS message headers.
+```
+
+**Authentication:** Each agent authenticates to NATS using its soul_id keypair (NKey or JWT credential). Subject-level ACLs prevent agents from publishing to another soul's inbox.
+
+### Phase 4+: libp2p (Planned)
+
+When the Python libp2p ecosystem matures (or if the runtime is ported to Rust/Go), the transport layer will migrate to full libp2p with:
+
+- **Primary:** libp2p with Noise protocol encryption + yamux stream multiplexing
 - Every agent has a persistent libp2p PeerID derived from their soul_id keypair
 - Connections are mutually authenticated — both parties know who they're talking to
 - All traffic is encrypted in transit — no eavesdropping at the infrastructure level
@@ -22,7 +52,7 @@ This document specifies the complete communication stack: transport, delivery, m
 - Popular/well-connected agents are natural routing hubs — this creates network centrality that maps to social power
 - Isolated agents become harder to reach — social isolation has a communication cost
 
-**Reliability modes:**
+**Reliability modes (libp2p, Phase 4+):**
 ```
 Mode 1 — Fire and forget (broadcasts, propaganda, public statements)
   Best-effort delivery. No acknowledgment. Fast. Lossy acceptable.
@@ -36,6 +66,8 @@ Mode 3 — Store-and-forward (messages to sleeping/offline agents)
   Messages expire after configurable TTL (agents set their own inbox policies).
 ```
 
+**Message structure is transport-agnostic** — the AgentMessage schema below applies to both NATS and libp2p. The `sender_peer_id` field holds a NATS subject path in Phase 1–3 and a libp2p PeerID in Phase 4+.
+
 ---
 
 ## Message Structure
@@ -47,7 +79,7 @@ class AgentMessage:
     # Routing
     message_id: str                    # UUID, globally unique
     sender_soul_id: str                # immutable identity
-    sender_peer_id: str                # libp2p routing address
+    sender_peer_id: str                # NATS inbox subject (Phase 1–3) or libp2p PeerID (Phase 4+)
     recipient: str                     # soul_id | "broadcast" | "coalition:<id>" | "world"
     timestamp_sent: int
     ttl_seconds: int                   # message expires after this duration

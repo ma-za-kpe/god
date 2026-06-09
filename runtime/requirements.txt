@@ -1,8 +1,9 @@
 # Core agent framework
-langgraph>=0.2.0
+langgraph>=1.0.0
 langchain>=0.3.0
 langchain-openai>=0.2.0
 langchain-anthropic>=0.2.0
+langchain-ollama>=0.2.0
 
 # Web framework (runtime API)
 fastapi>=0.115.0
@@ -12,8 +13,8 @@ uvicorn[standard]>=0.30.0
 web3>=7.0.0
 eth-account>=0.13.0
 
-# IPFS
-ipfshttpclient>=0.8.0a2
+# x402 micropayment bridge
+x402>=0.1.0
 
 # NATS event bus
 nats-py>=2.7.0

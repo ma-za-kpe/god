@@ -29,14 +29,14 @@ check "Private swarm connected" "docker exec god-ipfs-1 ipfs swarm peers 2>/dev/
 
 echo ""
 echo "Blockchain (Anvil):"
-check "RPC endpoint live"       "cast block-number --rpc-url http://localhost:8545"
-check "Chain ID is 84532"       "cast chain-id --rpc-url http://localhost:8545 2>/dev/null | grep -q 84532"
-check "30 funded accounts"      "cast balance 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266 --rpc-url http://localhost:8545 2>/dev/null | grep -q ETH"
+check "RPC endpoint live"       "curl -sf -X POST -H 'Content-Type: application/json' --data '{\"jsonrpc\":\"2.0\",\"method\":\"eth_blockNumber\",\"params\":[],\"id\":1}' http://localhost:8545"
+check "Chain ID is 84532"       "curl -sf -X POST -H 'Content-Type: application/json' --data '{\"jsonrpc\":\"2.0\",\"method\":\"eth_chainId\",\"params\":[],\"id\":1}' http://localhost:8545 | grep -q '0x14a34'"
+check "Funded accounts exist"   "curl -sf -X POST -H 'Content-Type: application/json' --data '{\"jsonrpc\":\"2.0\",\"method\":\"eth_getBalance\",\"params\":[\"0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266\",\"latest\"],\"id\":1}' http://localhost:8545 | grep -qv '\"result\":\"0x0\"'"
 
 echo ""
 echo "Event Bus (NATS):"
 check "NATS server healthy"     "curl -sf http://localhost:8222/healthz"
-check "JetStream enabled"       "curl -sf http://localhost:8222/jsz | python3 -c 'import sys,json; d=json.load(sys.stdin); exit(0 if d.get(\"config\") else 1)' 2>/dev/null"
+check "JetStream enabled"       "curl -sf http://localhost:8222/jsz | grep -q 'config'"
 
 echo ""
 echo "State & Storage:"
@@ -49,8 +49,12 @@ echo "Agent Runtime:"
 check "Runtime health endpoint" "curl -sf http://localhost:8888/health"
 
 echo ""
-echo "Observer Website:"
-check "Observer site loading"   "curl -sf http://localhost:3000"
+echo "Observer Website (optional — start with: docker compose --profile observer up -d):"
+if curl -sf http://localhost:3000 > /dev/null 2>&1; then
+    echo -e "  ${GREEN}✓${NC} Observer site loading"
+else
+    echo -e "  ${YELLOW}○${NC} Observer not running (use --profile observer to start)"
+fi
 
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
@@ -58,7 +62,7 @@ if [ "$FAILED" -eq 0 ]; then
     echo -e "${GREEN}${BOLD}All systems operational.${NC}"
     echo -e "The world is ready to be born."
     echo ""
-    echo "Next step: python runtime/src/seed_agents.py --count 20"
+    echo "Next step: docker exec god-runtime python -m src.seed_agents --count 20"
     echo "Observer:  http://localhost:3000"
 else
     echo -e "${RED}${BOLD}Some checks failed.${NC}"

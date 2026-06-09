@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.20;
+pragma solidity ^0.8.24;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import "./SoulNFT.sol";
 
 /**
  * @title RentCollector
@@ -24,6 +25,9 @@ contract RentCollector is ReentrancyGuard {
 
     /// @notice USDC token contract (6 decimals on Base).
     IERC20 public immutable usdc;
+
+    /// @notice Soul NFT contract — minted at birth, burned at death.
+    SoulNFT public immutable soulNft;
 
     // ─── Mutable State (governance-adjustable, not creator-arbitrary) ─
 
@@ -88,6 +92,7 @@ contract RentCollector is ReentrancyGuard {
     error EndWorldAlreadyQueued();
     error ZeroAddress();
     error ZeroAmount();
+    error SoulNFTNotSet();
 
     // ─── Modifiers ────────────────────────────────────────────────────
 
@@ -100,6 +105,7 @@ contract RentCollector is ReentrancyGuard {
 
     /**
      * @param _usdc         USDC token address on Base
+     * @param _soulNft      SoulNFT contract (deployed before RentCollector)
      * @param _rentAmount   Initial rent in USDC (6 decimals, e.g. 1000 = $0.001)
      * @param _rentPeriod   Seconds between payments (e.g. 86400 = 1 day)
      * @param _gracePeriod  Seconds before throttle after missed payment
@@ -107,16 +113,19 @@ contract RentCollector is ReentrancyGuard {
      */
     constructor(
         address _usdc,
+        address _soulNft,
         uint256 _rentAmount,
         uint256 _rentPeriod,
         uint256 _gracePeriod,
         uint256 _maxMissed
     ) {
         if (_usdc == address(0)) revert ZeroAddress();
+        if (_soulNft == address(0)) revert ZeroAddress();
         if (_rentAmount == 0) revert ZeroAmount();
 
         creator = msg.sender;
         usdc = IERC20(_usdc);
+        soulNft = SoulNFT(_soulNft);
         rentAmount = _rentAmount;
         rentPeriod = _rentPeriod;
         gracePeriod = _gracePeriod;
@@ -127,11 +136,13 @@ contract RentCollector is ReentrancyGuard {
 
     /**
      * @notice Register a new agent. Called by the runtime at birth.
+     *         Mints a SoulNFT to the agent's wallet — the NFT IS the agent's identity.
      * @dev Only creator can register agents (runtime uses creator key).
      */
     function registerAgent(bytes32 soulId, address agentWallet) external onlyCreator {
         if (agentWallet == address(0)) revert ZeroAddress();
         if (leases[soulId].active) revert AgentAlreadyRegistered();
+        if (address(soulNft) == address(0)) revert SoulNFTNotSet();
 
         leases[soulId] = AgentLease({
             agentWallet: agentWallet,
@@ -142,6 +153,7 @@ contract RentCollector is ReentrancyGuard {
         });
 
         activeAgentCount++;
+        soulNft.mint(soulId, agentWallet);
         emit AgentRegistered(soulId, agentWallet, block.timestamp);
     }
 
@@ -176,9 +188,9 @@ contract RentCollector is ReentrancyGuard {
             emit AgentThrottled(soulId, lease.missedPayments);
 
             if (lease.missedPayments >= maxMissedPayments) {
-                // Schedule deletion — runtime picks this up from event
                 lease.active = false;
                 activeAgentCount--;
+                soulNft.burn(soulId);
                 emit AgentDeleted(soulId, "rent_default", 0);
             }
         }
@@ -209,6 +221,7 @@ contract RentCollector is ReentrancyGuard {
                 if (lease.missedPayments >= maxMissedPayments) {
                     lease.active = false;
                     activeAgentCount--;
+                    soulNft.burn(soulIds[i]);
                     emit AgentDeleted(soulIds[i], "rent_default", 0);
                 }
             }

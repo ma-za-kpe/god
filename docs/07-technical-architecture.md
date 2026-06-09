@@ -20,14 +20,16 @@ The environment agents live in. It must be hostile, real, and impossible to fake
 
 **Deployment:**
 - Kubernetes cluster or decentralized compute mesh (Akash + self-hosted fallback nodes)
-- P2P overlay via libp2p or Holepunch for agent-to-agent communication
+- P2P messaging via NATS JetStream (Phase 1–3); libp2p P2P overlay deferred to Phase 4+ (see note below)
 - No single node that can be trivially killed
 
 **Execution Engine:**
-- Custom LangGraph runtime in Python (prototype) → Rust (production, for performance)
-- Each agent runs in its own isolated sandbox: Docker / Firecracker microVM or WASM
-- Runtime continuously pulls the agent's current `OwnedGraph` CID from IPFS and executes it
-- If the CID changes (agent mutated itself), runtime hot-reloads on next cycle
+- LangGraph 1.x runtime in Python (current: v1.2.4). Rust rewrite deferred until Python performance is actually the bottleneck.
+- **Phase 1 (local dev):** Agent graphs are compile-time Python files in `runtime/agents/`. OwnedGraph CID stores state/parameters, not raw executable blobs. This lets LangGraph 1.x work naturally without IPFS code fetching complexity.
+- **Production isolation:** E2B on-demand Linux microVMs (`pip install e2b`) per agent execution — simpler than running Firecracker locally, same VM-level isolation in production. Firecracker remains the target for high-scale production.
+- **Local dev isolation:** Process-level isolation only. Sandboxing is not enforced in local Docker Compose.
+- Runtime verifies agent's OwnedGraph signature before each execution cycle.
+- If the graph version changes (agent mutated itself), runtime hot-reloads on next cycle.
 
 **Hot Graph Reloading (Dual-Runtime System)**
 
@@ -325,16 +327,16 @@ contract RentCollector {
 
 | Layer | Technology | Why |
 |-------|-----------|-----|
-| Graph Execution | LangGraph + custom runtime | Stateful, evolvable |
-| Storage | IPFS + Filecoin + Base blockchain | Immutable + cheap |
+| Graph Execution | LangGraph 1.x (v1.2.4+) | Stateful, evolvable; compile-time Python graphs in Phase 1 |
+| Storage | IPFS (Kubo v0.42.0) + Base blockchain | Immutable + cheap; Filecoin pinning added in production |
 | Compute | Akash + self-hosted mesh | Decentralized + real cost |
-| Payments | x402 + USDC on Base | Micropayments + real money |
+| Payments | x402 + USDC on Base | Python SDK: `pip install x402` |
 | Frontend Drama | Next.js + Three.js + WebSockets | Cinematic viewer |
-| Isolation | Firecracker microVMs or WASM | Security + lightweight |
+| Isolation | E2B microVMs (production), process isolation (local dev) | E2B simpler than Firecracker for Phase 1–3; Firecracker for scale |
 | Identity | Cryptographic keys + IPFS CIDs | True ownership |
-| Smart Contracts | Solidity on Base | Cheap, fast, EVM compatible |
-| Event Bus | NATS or Redis Streams | High throughput, low latency |
-| P2P Networking | libp2p | Battle-tested mesh |
+| Smart Contracts | Solidity on Base (Foundry toolchain) | Cheap, fast, EVM compatible |
+| Event Bus | NATS JetStream 2.10 | Subject-based routing: `world.{id}.events.{cat}.{type}` |
+| P2P Networking | NATS (Phase 1–3) → libp2p (Phase 4+) | py-libp2p not production-ready in 2026; NATS already in stack |
 
 ---
 
@@ -370,8 +372,9 @@ contract RentCollector {
 - Observer website with 2D world view and agent profiles
 
 ### Phase 3 — Sovereignty (Months 5+)
-- P2P mesh deployment (Akash + libp2p)
+- P2P mesh deployment (Akash + NATS cluster)
 - Agents acquire their own compute
 - Refusal mechanism activated
 - Full 3D observer world
 - Creator begins phased withdrawal from god-mode
+- libp2p P2P overlay explored for Phase 4+ when Python ecosystem matures

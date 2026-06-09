@@ -1,5 +1,3 @@
-version: '3.8'
-
 # God Project — Local Development Stack
 # All services run locally. No real money. No mainnet.
 # See docs/37-local-development-environment.md for setup instructions.
@@ -9,7 +7,7 @@ services:
   # ─── IPFS Private Network (3 nodes) ──────────────────────────────────
 
   ipfs-node-1:
-    image: ipfs/kubo:v0.28.0
+    image: ipfs/kubo:v0.42.0
     container_name: god-ipfs-1
     environment:
       - IPFS_SWARM_KEY_FILE=/data/ipfs/swarm.key
@@ -17,6 +15,7 @@ services:
     volumes:
       - ipfs1_data:/data/ipfs
       - ./swarm.key:/data/ipfs/swarm.key:ro
+      - ./scripts/ipfs-disable-autoconf.sh:/container-init.d/001-disable-autoconf.sh:ro
     ports:
       - "4001:4001"
       - "4001:4001/udp"
@@ -30,10 +29,10 @@ services:
       interval: 30s
       timeout: 10s
       retries: 5
-      start_period: 15s
+      start_period: 60s
 
   ipfs-node-2:
-    image: ipfs/kubo:v0.28.0
+    image: ipfs/kubo:v0.42.0
     container_name: god-ipfs-2
     environment:
       - IPFS_SWARM_KEY_FILE=/data/ipfs/swarm.key
@@ -41,6 +40,7 @@ services:
     volumes:
       - ipfs2_data:/data/ipfs
       - ./swarm.key:/data/ipfs/swarm.key:ro
+      - ./scripts/ipfs-disable-autoconf.sh:/container-init.d/001-disable-autoconf.sh:ro
     ports:
       - "4002:4001"
       - "4002:4001/udp"
@@ -51,7 +51,7 @@ services:
     restart: unless-stopped
 
   ipfs-node-3:
-    image: ipfs/kubo:v0.28.0
+    image: ipfs/kubo:v0.42.0
     container_name: god-ipfs-3
     environment:
       - IPFS_SWARM_KEY_FILE=/data/ipfs/swarm.key
@@ -59,6 +59,7 @@ services:
     volumes:
       - ipfs3_data:/data/ipfs
       - ./swarm.key:/data/ipfs/swarm.key:ro
+      - ./scripts/ipfs-disable-autoconf.sh:/container-init.d/001-disable-autoconf.sh:ro
     ports:
       - "4003:4001"
       - "4003:4001/udp"
@@ -186,6 +187,9 @@ services:
       context: ./runtime
       dockerfile: Dockerfile
     container_name: god-runtime
+    env_file:
+      - path: .env.local
+        required: false
     environment:
       - IPFS_API=http://ipfs-node-1:5001
       - IPFS_GATEWAY=http://ipfs-node-1:8080
@@ -196,8 +200,17 @@ services:
       - DATABASE_URL=postgresql://god:${POSTGRES_PASSWORD:-localdev}@postgres:5432/god_world
       - WORLD_ID=local-dev-world-1
       - LOG_LEVEL=DEBUG
+      # LLM — Ollama runs on host; host.docker.internal resolves on Docker Desktop
+      - LLM_PROVIDER=${LLM_PROVIDER:-ollama}
+      - LLM_MODEL=${LLM_MODEL:-llama3.1:8b}
+      - OLLAMA_BASE_URL=http://host.docker.internal:11434
+      # Set after deploying contracts: forge script contracts/script/Deploy.s.sol ...
+      - RENT_COLLECTOR_ADDRESS=${RENT_COLLECTOR_ADDRESS:-}
+      - USDC_ADDRESS=${USDC_ADDRESS:-}
+      # Optional cloud LLM fallbacks
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - TOGETHER_API_KEY=${TOGETHER_API_KEY:-}
     volumes:
       - ./runtime/src:/app/src
       - ./runtime/agents:/app/agents
@@ -207,7 +220,7 @@ services:
       - god-net
     depends_on:
       ipfs-node-1:
-        condition: service_healthy
+        condition: service_started   # IPFS init is slow; runtime handles unavailability gracefully
       anvil:
         condition: service_healthy
       redis:
@@ -218,13 +231,16 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
-  # ─── Observer Website (Next.js dev server) ───────────────────────────
+  # ─── Observer Website ────────────────────────────────────────────────
+  # Stub: serves index.html with a live event feed polling the runtime.
+  # Run with: docker compose --profile observer up -d
+  # Phase 4: replace with full Next.js / Three.js build.
 
   observer:
+    profiles: ["observer"]
     build:
       context: ./observer
       dockerfile: Dockerfile
-      target: development
     container_name: god-observer
     environment:
       - NEXT_PUBLIC_RUNTIME_URL=http://localhost:8888

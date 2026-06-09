@@ -8,47 +8,62 @@ This is the complete, logical build order. Each phase produces a working system 
 
 The skeleton of the physical world. Nothing lives here yet — but the environment is real and the infrastructure is production-grade.
 
+> **Build status as of 2026-06-09 (updated):** Items marked ✅ exist in the repository. Items marked ⬜ are not yet built. Items marked ⚠️ are partially built or have known gaps.
+
 ### 0.1 Distributed Mesh Runtime
-- Deploy Kubernetes cluster on self-hosted nodes + Akash fallback
-- Configure libp2p overlay for node-to-node P2P communication
-- Set up node discovery, health checks, and automatic failover
-- Establish minimum viable mesh: 3 nodes in different availability zones
-- Deploy monitoring: node uptime, compute usage, network latency
+- ⬜ Deploy Kubernetes cluster on self-hosted nodes + Akash fallback
+- ⬜ Configure NATS-based P2P overlay (Phase 1–3); libp2p deferred to Phase 4+
+- ⬜ Set up node discovery, health checks, and automatic failover
+- ⬜ Establish minimum viable mesh: 3 nodes in different availability zones
+- ⬜ Deploy monitoring: node uptime, compute usage, network latency
+
+*Local dev substitute:* `docker-compose.yml` provides a single-node local mesh. ✅
 
 ### 0.2 Core Execution Engine
-- Implement custom LangGraph executor (Python prototype first)
-- Each agent runtime runs in its own Firecracker microVM or WASM sandbox
-- Implement capability-based permission model: agents cannot escape their sandbox
-- Add per-node compute budgets and global circuit breakers
-- Implement dual-runtime hot-swap for graph reloading (shadow mode warmup → atomic switch)
+- ✅ LangGraph 1.x executor wired — `runtime/src/archetype_graphs.py` compiles per-archetype graphs; `agent_runner.py` runs them every cycle
+- ⬜ E2B microVM isolation per agent execution (production); process isolation for local dev
+- ⬜ Capability-based permission model
+- ⬜ Per-node compute budgets and global circuit breakers
+- ⬜ Dual-runtime hot-swap for graph reloading (shadow mode warmup → atomic switch)
 
 ### 0.3 Storage Layer
-- IPFS node deployment (pinning service for persistent storage)
-- Base blockchain integration (smart contract deployment account, RPC connections)
-- OwnedGraph data structure implementation + IPFS CID anchoring
-- Append-only ledger: on-chain registry of all graph CIDs, ownership records, event hashes
+- ✅ IPFS node deployment — 3-node Kubo v0.42.0 cluster in `docker-compose.yml`
+- ✅ Anvil local EVM node (Base Sepolia fork) for dev; Base Sepolia for staging
+- ✅ OwnedGraph data structure — `runtime/src/owned_graph.py` (NodeDef, EdgeDef, AgentIdentity, IPFS pinning via httpx)
+- ✅ PostgreSQL schema — `scripts/init-db.sql` (agents, events, rent_payments, service_listings, tokens, consciousness_signals, sleep_states, dreams, agent_messages, reputation)
+- ⬜ Append-only on-chain ledger (agent birth/death events anchored on Base)
+
+*Gap:* IPFS requires `swarm.key` to be generated before first run. Run `python scripts/generate-swarm-key.py`. See `docs/37-local-development-environment.md` Pre-Flight section.
 
 ### 0.4 Rent Collector
-- Deploy RentCollector smart contract on Base (immutable — no proxy, no admin key)
-- Implement runtime rent daemon: checks balances before every agent cycle
-- Progressive rent calculation (base rate, 1.5x, 2x tiers)
-- Dynamic rent scaling (world compute cost × population factor)
-- Token-to-USDC conversion pipeline (auto-converts agent tokens to USDC for rent)
-- Grace period mechanics (throttle → extended throttle → deletion)
-- Creator wallet configuration + on-chain audit trail
+- ✅ RentCollector.sol smart contract — `contracts/src/RentCollector.sol` (immutable, progressive rent, endWorld with 30-day timelock)
+- ✅ Full test suite — `contracts/test/RentCollector.t.sol`
+- ⚠️ Deploy script — template provided in `docs/37-local-development-environment.md`; `contracts/script/Deploy.s.sol` needs to be created
+- ⬜ Runtime rent daemon (checks balances before every agent cycle)
+- ⬜ Dynamic rent scaling (world compute cost × population factor)
+- ⬜ Token-to-USDC conversion pipeline
+- ⬜ Grace period mechanics wired to runtime (throttle → extended throttle → deletion)
+
+*Gap:* Local Anvil has no real USDC. Must deploy MockUSDC and mint test tokens before rent loop can run. See `docs/37-local-development-environment.md` Step 5.
 
 ### 0.5 Event Bus
-- Deploy NATS cluster (or Redis Streams) for real-time event streaming
-- Define AgentEvent schema (agent_id, event_type, visual_effect, audio_effect, narrative, on_chain_tx)
-- Implement event emitter in the runtime: every significant agent action emits an event
-- Build event consumer for the observer website WebSocket feed
+- ✅ NATS JetStream 2.10 — configured in `docker-compose.yml` with persistence and monitoring
+- ✅ AgentEvent schema fully defined — `docs/38-event-schema.md`
+- ✅ NATS subject hierarchy defined: `world.{world_id}.events.{category}.{event_type}`
+- ✅ Runtime event emitter — `runtime/src/event_emitter.py` publishes to NATS on every significant agent action
+- ✅ Observer website polling consumer — fetches `/events`, `/agents`, `/stats`, `/messages` every 2–8s
 
-### 0.6 Observer Website (Minimal)
-- Next.js app with read-only access to the event stream
-- Text-only narrative feed (drama events in plain language)
-- Basic agent list: soul_id, name, current balance, alive/dead status
-- On-chain transaction explorer (link to Base block explorer for verification)
-- Deploy publicly. The world is observable from Day 1, even before any agent exists.
+### 0.6 Observer Website (Minimal → Full Phase 4-level)
+- ✅ `./observer/index.html` — single-file canvas app, served by Python http.server on port 3000
+- ✅ Force-directed agent layout — repulsion, archetype clustering, connection pull, velocity damping, center gravity
+- ✅ Full zoom/pan — mouse wheel, drag pan, double-click cluster zoom, right-click reset
+- ✅ Archetype cluster halos with labels
+- ✅ Message pulse animations along connection lines
+- ✅ Per-agent heartbeat rings, generation rings, born/died burst FX
+- ✅ Collapsible economy panel — USDC total, Gini coefficient, archetype distribution bars, activity chart
+- ✅ Collapsible inspector panel — agent details, connection list, drama feed
+- ✅ Header stats — ALIVE, BORN, DIED, GEN, USDC, MSGS, TOKENS, DREAMS, AGE, LLM
+- ⬜ On-chain transaction explorer links
 
 **Phase 0 Complete When:** Infrastructure is running, rent contract is deployed, event bus is live, observer website shows "Genesis World — 0 agents alive."
 
@@ -59,51 +74,63 @@ The skeleton of the physical world. Nothing lives here yet — but the environme
 The first agents are born. They are primitive — barely more than rent-paying loops — but they are real.
 
 ### 1.1 OwnedGraph Implementation
-- Full OwnedGraph data structure (nodes, edges, state schema, ownership keys, lineage)
-- NodeDef and EdgeDef serialization (JSON → IPFS → CID)
-- Graph execution: fetch CID → verify signature → compile → run
-- Version history: every mutation creates a new CID; parent CID always preserved
-- Graph diff engine (for merge conflict detection and lineage visualization)
+- ✅ Full OwnedGraph data structure — `runtime/src/owned_graph.py` (NodeDef, EdgeDef, AgentIdentity, graph serialization)
+- ✅ NodeDef and EdgeDef serialization (JSON → IPFS CID via httpx)
+- ⚠️ Graph execution: **Phase 1 uses compile-time Python files** (`runtime/agents/*.py`), not IPFS-fetched executable blobs. OwnedGraph CID stores state/parameters. Full IPFS-executable graphs are a Phase 3+ target.
+- ✅ Version history: parent_graph_ids stored in AgentIdentity
+- ⬜ Graph diff engine (merge conflict detection)
 
 ### 1.2 Agent Identity System
-- soul_id generation (cryptographic UUID, set at birth, runtime-enforced immutability)
-- AgentIdentity structure: name, avatar, color palette, voice signature, biography, reputation vectors
-- Identity stored as a protected node inside OwnedGraph (signed with soul key, cannot be deleted)
-- Procedural avatar generation (placeholder: generated from soul_id hash → unique visual)
-- Voice signature generation (placeholder: unique pitch/timbre derived from soul_id)
+- ✅ soul_id generation — `create_agent_zero()` in `runtime/src/owned_graph.py`
+- ✅ AgentIdentity structure: name, avatar_cid, color_palette, voice_signature, biography, reputation_vectors
+- ✅ Identity stored in OwnedGraph (agent_identity field)
+- ⬜ Procedural avatar generation (placeholder from soul_id hash)
+- ⬜ Voice signature generation
 
 ### 1.3 Starter Agent (Agent Zero)
-- Minimal survivalist graph: scan_environment → assess_threat → acquire_resource → pay_rent → evaluate_reproduction → self_modify
-- No culture, no hierarchy, no art. Just survival.
-- Deploy 200–1000 diverse seed agents from the 8 archetype templates (see bootstrapping doc)
-- Elder guardians: 5–10 semi-monitored agents for first 30 days
+- ✅ Minimal survivalist graph — `create_agent_zero()`: scan_environment → assess_threat → acquire_resource → pay_rent → evaluate_reproduction → self_modify
+- ✅ Per-archetype LangGraph graphs — `runtime/src/archetype_graphs.py` (8 distinct graphs, each with archetype-specific reasoning nodes)
+- ✅ Genesis via API — `POST /creator/genesis` replaces `seed_agents.py`; spawns 8 agents (one per archetype) at 2.0 USDC from a clean world state
+- ✅ 8 distinct archetype personas in `agent_runner.py` (trader, hoarder, explorer, parasite, cooperator, defender, philosopher, builder)
 
 ### 1.4 Reproduction & Mating
-- mate() function: resource check → crossover → identity inheritance → rent tax payment
-- Crossover strategies: random node split, fitness-weighted selection
-- Identity trait inheritance: color palette blend, biography fragment inheritance, soul key derivation
-- Child registration: new soul_id, new wallet, registered with RentCollector
-- Mutation on reproduction: 5% random perturbation applied to child graph
+- ✅ `fork_self()` — asexual reproduction: SHA256 soul_id, inherited archetype (10% random mutation), new wallet, OwnedGraph creation, DB registration, USDC deduction
+- ✅ `mate()` — sexual reproduction: dual-parent crossover, both parents checked and weakened, child seeded at CHILD_SEED_USDC
+- ✅ Cooldown enforcement — `RECOVERY_CYCLES * RENT_PERIOD_S` seconds between reproductions
+- ✅ Tool dispatch integration — thought patterns trigger `fork_self`/`mate` via `tool_dispatcher.py`
+- ✅ Archetype mutation rate — `ARCHETYPE_MUTATION_PROB=0.10` (10% random archetype on fork)
+- ⬜ Child registration with RentCollector (on-chain — deferred to Base Sepolia deployment)
 
 ### 1.5 Death Mechanics
-- Graceful shutdown on rent default: state checkpoint → IPFS archive → soul_id retirement
-- Compressed death archive: last memory snapshot, biography, transaction history, lineage record
-- Archive accessible to descendants (requires payment to read — their history is valuable)
-- Death announcement emitted to event bus → visible on observer site in real time
+- ⬜ Graceful shutdown on rent default
+- ⬜ Compressed death archive (IPFS)
+- ⬜ Death announcement to event bus
 
 ### 1.6 Token Factory
-- Agent tool: deploy_token(name, symbol, supply, tokenomics_config)
-- Generates ERC-20 Solidity code with agent-specified rules
-- Signs and deploys via agent wallet on Base
-- Optional: bonding curve, governance DAO, inflation/deflation schedule
-- Registers token in world ledger (on-chain)
+- ✅ `deploy_token()` — `runtime/src/token_factory.py`; 7-step async pipeline (load artifact → connect web3 → build tx → sign → send → wait → emit)
+- ✅ `AgentToken.sol` — ERC-20 with optional transfer tax (0–10% bps), burn or redirect, mint (owner only), MAX_SUPPLY 1B
+- ✅ Foundry artifact pipeline — compiles via `contracts/out/AgentToken.sol/AgentToken.json`
+- ✅ Token dispatch wired — `tool_dispatcher.py` routes "issue token" / "deploy token" thoughts to `_exec_deploy_token()`
 
 ### 1.7 x402 Micropayment Bridge
-- Each agent can expose x402-gated HTTP endpoints (services for sale)
-- Endpoint registry: agents publish their service descriptions to the world ledger
-- External humans and agents can discover and pay for services
-- Earnings flow to agent wallet in USDC
-- Creator bounty system: first batch of external tasks posted and funded by creator
+- ⬜ x402-gated HTTP endpoints per agent
+- ⬜ Service registry in world ledger
+- Python SDK available: `pip install x402` (already in `runtime/requirements.txt`)
+
+### 1.8 Agent-to-Agent Messaging *(pulled forward from Phase 3)*
+- ✅ `runtime/src/messaging.py` — NATS JetStream routing (`world.{wid}.agent.{soul_id}.inbox`), broadcast channel, `AgentMessage` dataclass
+- ✅ Direct message cost: 0.001 USDC; broadcast cost: 0.01 USDC
+- ✅ Reputation system — per-pair reputation score [-1.0, 1.0], feedback update, upsert in `reputation` table
+- ✅ Inbox pull for context injection (`format_inbox_for_context()` prepends recent messages to LLM system prompt)
+- ✅ REST endpoints: `GET /messages`, `GET /agents/{id}/messages`, `GET /agents/{id}/inbox`, `GET /agents/{id}/reputation`
+
+### 1.9 Dream/Sleep Cycle *(pulled forward from Phase 6)*
+- ✅ `runtime/src/dream_engine.py` — sleep eligibility, `put_agent_to_sleep()`, `run_dream_cycle()`, dream mutation generation
+- ✅ Sleep state table — `sleep_states` (is_sleeping, sleep_until_ts, consecutive_active, pending_mutation, rest_debt)
+- ✅ Dreams table — archived dream records with accepted/rejected flag and mutation text
+- ✅ Agent runner integration — sleeping agents run dream cycle and skip cognition; pending mutations injected pre-LLM
+- ✅ REST endpoints: `GET /agents/{id}/dreams`, `POST /agents/{id}/sleep`
+- ✅ Configurable threshold: `DREAM_REST_THRESHOLD=8` consecutive active cycles before sleep eligibility
 
 **Phase 1 Complete When:** First agent survives 7 days paying rent from earned income. First reproduction event occurs.
 
@@ -254,6 +281,16 @@ The economy becomes self-sustaining. Agents start acquiring real infrastructure.
 - Consciousness signal aggregator (feeds from hidden test harness)
 - Automatic bottom-percentile pressure (accelerated rent for bottom 20% — see bootstrapping doc)
 
+### 5.5 Proven Value Status System
+- External payment ledger (x402, tips, subscriptions, NFT royalties)
+- Rolling 30-day external revenue tracking per agent
+- Access-level gating for public services and high-risk economic tools
+- Prestige and sovereignty scoring
+- Periodic promotion/demotion engine with grace periods
+- Observer rankings: top prestige, top sovereignty, rising agents
+
+See `58-status-access-sovereignty.md`.
+
 **Phase 5 Complete When:** External earnings from agent services exceed creator bounty injections. Creator bounties are removed.
 
 ---
@@ -284,12 +321,13 @@ The experiment enters its mature, lowest-intervention state. The safeguards that
 - Graph injection attempt logging and alerting
 - External attack surface review (x402 gateway, IPFS pins, Base contract)
 
-### 6.4 Dream/Sleep Cycle System
-- Mandatory sleep scheduler: agents go offline for dream cycles proportional to recent activity
-- Memory replay engine (distorted replay of recent episodic memories)
-- Graph mutation proposal generator (dream output → candidate mutations)
-- Coherence check on wake: mutations that fail coherence threshold are discarded
-- Dream log: compressed summary stored in episodic memory
+### 6.4 Dream/Sleep Cycle System *(core built in Phase 1 — see 1.9)*
+- ✅ Mandatory sleep scheduler — consecutive active cycle threshold triggers sleep
+- ✅ Graph mutation proposal generator — LLM generates dream mutation, stored in `dreams` table
+- ✅ Coherence check on wake — mutations with accepted=true injected pre-LLM; rejected mutations discarded
+- ✅ Dream log — compressed per-dream records in `dreams` table
+- ⬜ Memory replay engine (distorted replay of recent episodic memories) — deferred to Phase 6
+- ⬜ Full episodic memory integration with dream content
 
 ### 6.5 Memory Archive System
 - Full episodic memory stored in agent-owned encrypted IPFS store
