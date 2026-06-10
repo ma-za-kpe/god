@@ -68,7 +68,7 @@
 | P | Task | Issue |
 |---|------|-------|
 | P0 | T-5000-01 Phase A scale test (field) | #4 — after local stable |
-| P1 | Observer perf / lag at scale | #16 — cluster LOD + snapshot path |
+| P1 | Observer perf / lag at scale | #16 — LITE mode default, cluster layout, deferred hydrate |
 | P1 | Episodic memory commit pipeline | #25 — `episodic_memory.py` |
 | P1 | Money in circulation + top-earner monitor | R23 — x402 credit, genesis services, observer panel |
 | P1 | Hallucination post-fix field soak | R5 — merge PR #26, field grep |

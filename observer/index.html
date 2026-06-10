@@ -181,6 +181,7 @@
     </div>
   </div>
   <span class="pill" id="world-id-pill">…</span>
+  <span class="pill" id="perf-pill" title="Observer render mode">LITE</span>
   <div id="live-dot"></div>
   <div id="buzz-meter" title="world activity">BUZZ —</div>
   <div class="sg">
@@ -298,7 +299,25 @@
 const RUNTIME    = 'http://localhost:8888';
 const POLL_SNAP  = 3000;
 const CLUSTER_MODE_THRESHOLD = 50;
-const SIM_INTERVAL_MS = 100;
+
+// Field-first performance — default LITE on low-RAM hosts. Add ?full=1 for rich FX.
+function detectLiteMode() {
+  const q = new URLSearchParams(location.search);
+  if (q.get('full') === '1') return false;
+  if (q.has('lite')) return q.get('lite') !== '0';
+  return true;
+}
+const OBS_LITE = detectLiteMode();
+const PERF = {
+  lite: OBS_LITE,
+  eventsLimit: OBS_LITE ? 18 : 50,
+  messagesLimit: OBS_LITE ? 24 : 80,
+  maxFeedHydrate: OBS_LITE ? 18 : 50,
+  frameMs: OBS_LITE ? 33 : 16,
+  simIntervalMs: OBS_LITE ? 180 : 100,
+  clusterAlways: OBS_LITE,
+};
+const SIM_INTERVAL_MS = PERF.simIntervalMs;
 
 // ═══════════════════════════════════════════════════════════════════════════
 // State
@@ -321,6 +340,8 @@ const S = {
   totalUsdc:   null,
   logs:        [],
   feedTab:     'drama',
+  hydrating:   false,
+  snapshotReady: false,
   // Force simulation
   sim:         {},        // soul_id → {vx, vy}
   // Zoom / pan state
@@ -504,6 +525,7 @@ function aliveCount() {
 }
 
 function useClusterLayout() {
+  if (PERF.clusterAlways) return aliveCount() > 0;
   return aliveCount() > CLUSTER_MODE_THRESHOLD;
 }
 
@@ -602,22 +624,21 @@ function drawBg() {
   ctx.fillStyle = '#02020e';
   ctx.fillRect(0,0,W,H);
 
-  // Subtle hex grid in world space
-  applyTransform();
-  const gs = 60;
-  ctx.strokeStyle = 'rgba(40,40,140,0.05)'; ctx.lineWidth = 0.5/S.view.scale;
-  const worldR = Math.max(W,H) / S.view.scale + 200;
-  for (let q = -30; q <= 30; q++) for (let r = -30; r <= 30; r++) {
-    const hx = gs*(Math.sqrt(3)*q + Math.sqrt(3)/2*r);
-    const hy = gs*1.5*r;
-    if (Math.abs(hx) > worldR || Math.abs(hy) > worldR) continue;
-    hexPath(hx, hy, gs*0.52); ctx.stroke();
+  if (!PERF.lite) {
+    applyTransform();
+    const gs = 60;
+    ctx.strokeStyle = 'rgba(40,40,140,0.05)'; ctx.lineWidth = 0.5/S.view.scale;
+    const worldR = Math.max(W,H) / S.view.scale + 200;
+    for (let q = -30; q <= 30; q++) for (let r = -30; r <= 30; r++) {
+      const hx = gs*(Math.sqrt(3)*q + Math.sqrt(3)/2*r);
+      const hy = gs*1.5*r;
+      if (Math.abs(hx) > worldR || Math.abs(hy) > worldR) continue;
+      hexPath(hx, hy, gs*0.52); ctx.stroke();
+    }
+    const gr = ctx.createRadialGradient(0,0,0,0,0,320);
+    gr.addColorStop(0,'rgba(20,20,80,0.12)'); gr.addColorStop(1,'rgba(0,0,0,0)');
+    ctx.fillStyle=gr; ctx.fillRect(-5000,-5000,10000,10000);
   }
-
-  // Radial glow from origin
-  const gr = ctx.createRadialGradient(0,0,0,0,0,320);
-  gr.addColorStop(0,'rgba(20,20,80,0.12)'); gr.addColorStop(1,'rgba(0,0,0,0)');
-  ctx.fillStyle=gr; ctx.fillRect(-5000,-5000,10000,10000);
 }
 
 function hexPath(x, y, r) {
@@ -628,6 +649,7 @@ function hexPath(x, y, r) {
 
 // ── Archetype cluster halos ──────────────────────────────────────────────
 function drawClusterHalos() {
+  if (PERF.lite && S.view.scale < 0.35) return;
   const byArch = {};
   for (const a of Object.values(S.agents)) {
     if (!a.is_alive || a._wx===undefined) continue;
@@ -656,6 +678,7 @@ function drawClusterHalos() {
 
 // ── Cluster-to-cluster bridge arcs ────────────────────────────────────────
 function drawClusterBridges() {
+  if (PERF.lite) return;
   const now = Date.now()/1000;
 
   // Compute cluster centers
@@ -720,8 +743,10 @@ function drawConnections(t) {
     const isCross = a.archetype !== b.archetype;
     const isSelected = S.selected && (S.selected===idA||S.selected===idB);
 
-    // Cross-cluster: visible 90s; intra: only if selected or very recent
-    if (!isCross && !isSelected && age > 20) continue;
+    if (PERF.lite) {
+      if (!isCross && !isSelected) continue;
+      if (!isSelected && age > 45) continue;
+    } else if (!isCross && !isSelected && age > 20) continue;
     const baseAlpha = isCross ? Math.max(0, 0.5 - age/90) : Math.max(0, 0.2 - age/20);
     const alpha = isSelected ? Math.max(baseAlpha, 0.75) : baseAlpha;
     if (alpha < 0.02) continue;
@@ -768,7 +793,7 @@ function drawPulses() {
     const x=a._wx+(b._wx-a._wx)*ease, y=a._wy+(b._wy-a._wy)*ease;
     const alpha=Math.sin(p.t*Math.PI)*0.95;
     const r=5/Math.max(0.5,S.view.scale);
-    ctx.shadowColor=p.col; ctx.shadowBlur=18/S.view.scale;
+    if (!PERF.lite) { ctx.shadowColor=p.col; ctx.shadowBlur=18/S.view.scale; }
     ctx.fillStyle=p.col; ctx.globalAlpha=alpha;
     ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2); ctx.fill();
     ctx.globalAlpha=1; ctx.shadowBlur=0;
@@ -814,8 +839,7 @@ function drawXfers() {
     const py = a._wy + (b._wy - a._wy) * ease;
     const alpha = Math.sin(x.t * Math.PI) * 0.95;
     const r = 7 / Math.max(0.5, S.view.scale);
-    ctx.shadowColor = '#ffcc44';
-    ctx.shadowBlur = 22 / S.view.scale;
+    if (!PERF.lite) { ctx.shadowColor = '#ffcc44'; ctx.shadowBlur = 22 / S.view.scale; }
     ctx.fillStyle = '#ffcc44';
     ctx.globalAlpha = alpha;
     ctx.beginPath();
@@ -837,16 +861,34 @@ function drawAgent(a, t) {
   const x=a._wx, y=a._wy;
   const hue=soulHue(a.soul_id), phase=soulPhase(a.soul_id);
   const buzz = S.buzz[a.soul_id] || 0;
-  const breathe=1+0.07*Math.sin(t*0.0018+phase)+buzz*0.12*Math.sin(t*0.012+phase);
-  const flicker = buzz > 0.05 ? 0.85 + 0.15 * Math.sin(t * 0.025 + phase) : 1;
+  const breathe=PERF.lite ? 1 : 1+0.07*Math.sin(t*0.0018+phase)+buzz*0.12*Math.sin(t*0.012+phase);
+  const flicker = PERF.lite ? 1 : (buzz > 0.05 ? 0.85 + 0.15 * Math.sin(t * 0.025 + phase) : 1);
   const misses=a.rent_miss_count||0;
-  const jx=misses>0?(Math.random()-.5)*Math.min(misses*1.5,5):0;
-  const jy=misses>0?(Math.random()-.5)*Math.min(misses*1.5,5):0;
+  const jx=PERF.lite ? 0 : (misses>0?(Math.random()-.5)*Math.min(misses*1.5,5):0);
+  const jy=PERF.lite ? 0 : (misses>0?(Math.random()-.5)*Math.min(misses*1.5,5):0);
   const R=agentR(a)*breathe;
   const px=x+jx, py=y+jy;
   ctx.globalAlpha = flicker;
   const isSleeping=a.is_sleeping||false;
   const isSelected=S.selected===a.soul_id;
+
+  if (PERF.lite) {
+    const col = ARCH_COL[a.archetype] || soulCol(a.soul_id);
+    ctx.fillStyle = col + (isSleeping ? '99' : 'dd');
+    ctx.beginPath(); ctx.arc(px, py, R, 0, Math.PI * 2); ctx.fill();
+    if (isSelected) {
+      ctx.strokeStyle = 'rgba(255,255,255,0.85)'; ctx.lineWidth = 1.5 / S.view.scale;
+      ctx.beginPath(); ctx.arc(px, py, R + 4 / S.view.scale, 0, Math.PI * 2); ctx.stroke();
+    }
+    if (S.view.scale > 0.55) {
+      ctx.fillStyle = 'rgba(255,255,255,0.85)';
+      ctx.font = `${Math.max(7, 8 / S.view.scale)}px sans-serif`;
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(ICONS[a.archetype] || '○', px, py);
+    }
+    ctx.globalAlpha = 1;
+    return;
+  }
 
   // Sleeping dashed ring
   if (isSleeping) {
@@ -954,6 +996,7 @@ function heartbeat(soul_id, intensity=1) {
 }
 
 function triggerFx(ev) {
+  if (PERF.lite || S.hydrating) return;
   const aid = evAgentId(ev);
   const a = aid ? S.agents[aid] : null;
   if (!a || a._wx === undefined) return;
@@ -993,16 +1036,22 @@ function triggerFx(ev) {
 // ═══════════════════════════════════════════════════════════════════════════
 // Render loop
 // ═══════════════════════════════════════════════════════════════════════════
-let lastT = 0, lastSimT = 0;
+let lastT = 0, lastSimT = 0, lastFrameT = 0;
 function drainDeltaQueue(maxPerFrame = 80) {
+  const cap = PERF.lite ? 24 : maxPerFrame;
   let n = 0;
-  while (S.deltaQueue.length && n < maxPerFrame) {
+  while (S.deltaQueue.length && n < cap) {
     applyDeltaMsg(S.deltaQueue.shift());
     n++;
   }
 }
 
 function render(t) {
+  if (PERF.lite && t - lastFrameT < PERF.frameMs) {
+    requestAnimationFrame(render);
+    return;
+  }
+  lastFrameT = t;
   const dt = Math.min(0.05, (t - lastT)/1000); lastT = t;
   drainDeltaQueue();
   decayBuzz(dt);
@@ -1127,7 +1176,8 @@ function setFeedTab(tab) {
   if (tab === 'log') renderLogList();
 }
 
-function applyEventLive(ev) {
+function applyEventLive(ev, opts = {}) {
+  const silent = opts.silent || S.hydrating;
   const et = ev.event_type || '';
   const aid = evAgentId(ev);
   if (et === 'economy.agent.transfer') {
@@ -1146,17 +1196,21 @@ function applyEventLive(ev) {
     }
   } else if (et === 'social.agent.message_sent') {
     const rid = ev.recipient_id;
-    if (aid && rid === 'BROADCAST') {
-      bumpBuzz(aid, 0.45);
-      for (const id of Object.keys(S.agents)) {
-        if (id !== aid && S.agents[id].is_alive !== false) addPulse(aid, id);
-      }
-    } else if (aid && rid) {
+    if (aid && rid) {
       const key = [aid, rid].sort().join(':');
       if (!S.conns[key]) S.conns[key] = { count: 0, lastSeen: 0 };
       S.conns[key].count++;
       S.conns[key].lastSeen = ev.timestamp || Date.now() / 1000;
-      addPulse(aid, rid);
+    }
+    if (!silent) {
+      if (aid && rid === 'BROADCAST') {
+        bumpBuzz(aid, 0.45);
+        for (const id of Object.keys(S.agents)) {
+          if (id !== aid && S.agents[id].is_alive !== false) addPulse(aid, id);
+        }
+      } else if (aid && rid) {
+        addPulse(aid, rid);
+      }
     }
   } else if (et === 'cognitive.agent.thought' && aid && S.agents[aid]) {
     const thought = ev.thought || ev.payload?.thought;
@@ -1188,24 +1242,31 @@ function applyEventLive(ev) {
   }
 }
 
-function feedItem(ev) {
+function feedItem(ev, opts = {}) {
   if(S.seenEv.has(ev.event_id)) return;
   S.seenEv.add(ev.event_id);
-  pushWorldLog(ev);
-  applyEventLive(ev);
-  S.actBins[S.actTick % S.actBins.length]++;
-  const list=document.getElementById('feed-list');
-  const div=document.createElement('div');
-  const ts=ev.timestamp?new Date(ev.timestamp*1000).toISOString().slice(11,19):'—';
-  let cat=evCat(ev.event_type);
-  const mt=(ev.message_type||ev.payload?.message_type||'').toLowerCase();
-  if(mt==='threat') cat='threat';
-  else if(mt==='manifesto'||mt==='propaganda') cat='manifesto';
-  div.className='feed-item' + (cat==='economy'?' flash-econ':cat==='social'||cat==='threat'||cat==='manifesto'?' flash-social':'');
-  div.innerHTML=`<span class="f-ts">${ts} · ${ev.event_type}${mt?` · ${mt}`:''}</span><span class="f-text c-${cat}">${ev.narrative||ev.event_type}</span>`;
-  list.insertBefore(div,list.firstChild);
-  while(list.children.length>200) list.removeChild(list.lastChild);
-  triggerFx(ev);
+  if (S.seenEv.size > 3000) {
+    const drop = [...S.seenEv].slice(0, 1000);
+    drop.forEach(id => S.seenEv.delete(id));
+  }
+  const silent = opts.silent || S.hydrating;
+  if (!silent) pushWorldLog(ev);
+  applyEventLive(ev, { silent });
+  if (!silent) {
+    S.actBins[S.actTick % S.actBins.length]++;
+    const list=document.getElementById('feed-list');
+    const div=document.createElement('div');
+    const ts=ev.timestamp?new Date(ev.timestamp*1000).toISOString().slice(11,19):'—';
+    let cat=evCat(ev.event_type);
+    const mt=(ev.message_type||ev.payload?.message_type||'').toLowerCase();
+    if(mt==='threat') cat='threat';
+    else if(mt==='manifesto'||mt==='propaganda') cat='manifesto';
+    div.className='feed-item' + (cat==='economy'?' flash-econ':cat==='social'||cat==='threat'||cat==='manifesto'?' flash-social':'');
+    div.innerHTML=`<span class="f-ts">${ts} · ${ev.event_type}${mt?` · ${mt}`:''}</span><span class="f-text c-${cat}">${ev.narrative||ev.event_type}</span>`;
+    list.insertBefore(div,list.firstChild);
+    while(list.children.length>120) list.removeChild(list.lastChild);
+    triggerFx(ev);
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -1317,8 +1378,9 @@ function applyAgents(agents, replace=false) {
   if (S.selected) showInspector(S.agents[S.selected] || null);
 }
 
-function applyMessages(messages) {
+function applyMessages(messages, opts = {}) {
   if (!messages) return;
+  const silent = opts.silent || S.hydrating;
   for (const msg of messages) {
     if (S.seenMsg.has(msg.message_id)) continue;
     S.seenMsg.add(msg.message_id);
@@ -1328,13 +1390,17 @@ function applyMessages(messages) {
     if (!S.conns[key]) S.conns[key] = { count: 0, lastSeen: 0 };
     S.conns[key].count++;
     S.conns[key].lastSeen = msg.sent_at || Date.now() / 1000;
-    if (S.agents[sId] && S.agents[rId]) addPulse(sId, rId);
+    if (!silent && S.agents[sId] && S.agents[rId]) addPulse(sId, rId);
   }
+}
+
+function snapshotQuery() {
+  return `events_limit=${PERF.eventsLimit}&messages_limit=${PERF.messagesLimit}`;
 }
 
 async function fetchSnapshot() {
   try {
-    const snap = await (await fetch(`${RUNTIME}/world/snapshot`)).json();
+    const snap = await (await fetch(`${RUNTIME}/world/snapshot?${snapshotQuery()}`)).json();
     if (snap.error) return;
     applySnapshotMsg(snap);
   } catch {}
@@ -1387,8 +1453,10 @@ function applyDeltaMsg(msg) {
 }
 
 function applySnapshotMsg(snap) {
+  S.snapshotReady = true;
+  S.hydrating = true;
   applyAgents(snap.agents, true);
-  applyMessages(snap.messages);
+  applyMessages(snap.messages, { silent: true });
   const d = snap.stats || {};
   if (d.world_start_ts && (!S.worldStart || d.world_start_ts < S.worldStart)) S.worldStart = d.world_start_ts;
   document.getElementById('s-born').textContent   = d.total_born || '0';
@@ -1402,23 +1470,45 @@ function applySnapshotMsg(snap) {
   document.getElementById('s-llm').textContent    = d.llm_model || '—';
   const mode = useClusterLayout() ? ' · CLUSTER' : '';
   const live = wsConnected ? ' · LIVE' : '';
-  document.getElementById('world-id-pill').textContent = (snap.world_id || d.world_id || '—') + mode + live;
+  const perfTag = PERF.lite ? ' · LITE' : ' · FULL';
+  document.getElementById('world-id-pill').textContent = (snap.world_id || d.world_id || '—') + mode + live + perfTag;
+  document.getElementById('perf-pill').textContent = PERF.lite ? 'LITE' : 'FULL';
+  document.getElementById('perf-pill').title = PERF.lite
+    ? 'Low-RAM mode: cluster layout, 30fps, no load FX. Add ?full=1 for rich graphics.'
+    : 'Full graphics mode';
   updateEcon(d);
   if (snap.events) {
-    [...snap.events].reverse().forEach(ev => {
-      if (!S.seenEv.has(ev.event_id)) feedItem(ev);
+    const slice = snap.events.slice(0, PERF.maxFeedHydrate);
+    const isDrama = (ev) => {
+      const et = ev.event_type || '';
+      return et.includes('died') || et.includes('born') || et.includes('transfer')
+        || et.includes('reproduced') || et.startsWith('economy') || et.startsWith('social');
+    };
+    let dramaShown = 0;
+    [...slice].reverse().forEach(ev => {
+      if (S.seenEv.has(ev.event_id)) return;
+      const show = isDrama(ev) && dramaShown < 12;
+      if (show) dramaShown++;
+      feedItem(ev, { silent: !show });
     });
     S.actTick++;
   }
+  S.hydrating = false;
+  tickClusterLayout();
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Boot
 // ═══════════════════════════════════════════════════════════════════════════
-pushSystemLog('SYS', 'info', 'Observer online — an ecology, not a nursery');
+pushSystemLog('SYS', 'info', PERF.lite
+  ? 'Observer LITE — cluster layout, reduced FX (add ?full=1 for rich mode)'
+  : 'Observer FULL — rich graphics enabled');
+document.getElementById('perf-pill').textContent = PERF.lite ? 'LITE' : 'FULL';
 connectStream();
-fetchSnapshot();
-setInterval(() => { if (!wsConnected) fetchSnapshot(); }, POLL_SNAP * 3);
+setTimeout(() => {
+  if (!S.snapshotReady) fetchSnapshot();
+}, PERF.lite ? 4000 : 2000);
+setInterval(() => { if (!wsConnected) fetchSnapshot(); }, POLL_SNAP * (PERF.lite ? 4 : 3));
 </script>
 </body>
 </html>
