@@ -30,5 +30,11 @@ fi
 
 gh run view "$RUN_ID" --json status,conclusion,url --jq '"status=" + .status + " conclusion=" + (.conclusion // "pending") + " url=" + .url'
 
-timeout "$TIMEOUT" gh run watch "$RUN_ID" --exit-status
+if command -v timeout >/dev/null 2>&1; then
+  timeout "$TIMEOUT" gh run watch "$RUN_ID" --exit-status
+elif command -v gtimeout >/dev/null 2>&1; then
+  gtimeout "$TIMEOUT" gh run watch "$RUN_ID" --exit-status
+else
+  gh run watch "$RUN_ID" --exit-status
+fi
 echo "CI finished: run ${RUN_ID}"

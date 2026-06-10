@@ -45,6 +45,8 @@ python3 -m pre_commit run --all-files
 
 If pre-commit fails, fix locally. Do not push or report `[FIELD-PASS]` until it passes.
 
+**Never commit field dumps** (`agent_data_full.json`, `messages_data_full.json`, `recent_runtime_logs.txt`, etc.) — paste excerpts into PR comments only. Committed artifacts fail lint and waste CI minutes.
+
 Agent requests include:
 
 ```

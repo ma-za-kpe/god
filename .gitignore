@@ -51,5 +51,12 @@ coverage/
 .coverage
 htmlcov/
 
+# Field operator dumps — paste in PR comments, never commit
+agent_data_full.json
+messages_data_full.json
+hallucination_examples.txt
+recent_runtime_logs.txt
+*_field_data.json
+
 # Documentation release build output
 dist/
