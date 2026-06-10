@@ -112,7 +112,7 @@ async def _fetch_inbox(soul_id: str) -> list[dict]:
         cur.execute(
             """
             SELECT m.sender_id, m.body AS content, m.sent_at,
-                   a.current_name AS sender_name
+                   a.current_name AS sender_name, a.archetype AS sender_archetype
             FROM agent_messages m
             LEFT JOIN agents a ON a.soul_id = m.sender_id
             WHERE m.recipient_id = %s
