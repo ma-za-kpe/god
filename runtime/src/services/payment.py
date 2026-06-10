@@ -4,8 +4,9 @@ payment.py — x402 payment verification.
 Local dev: MOCK_X402_PAYMENTS=true accepts all payments without on-chain verification.
 Production: set MOCK_X402_PAYMENTS=false and ensure x402 SDK is configured for Base.
 """
-import os
+
 import logging
+import os
 from dataclasses import dataclass
 
 log = logging.getLogger("god.services.payment")
@@ -30,8 +31,12 @@ async def verify_payment(payment_header: str, payment_config: dict) -> PaymentRe
     Mock mode: always valid. Production: EIP-712 signature + USDC transfer verification.
     """
     if not payment_header:
-        return PaymentResult(is_valid=False, transaction_hash="", amount_paid="0",
-                             error="missing X-Payment-Authorization header")
+        return PaymentResult(
+            is_valid=False,
+            transaction_hash="",
+            amount_paid="0",
+            error="missing X-Payment-Authorization header",
+        )
 
     if MOCK_PAYMENTS:
         log.debug("Mock payment accepted")
@@ -44,6 +49,7 @@ async def verify_payment(payment_header: str, payment_config: dict) -> PaymentRe
     # Production path — requires x402 SDK
     try:
         from x402.verify import verify_payment as sdk_verify
+
         result = await sdk_verify(payment_header, payment_config)
         return PaymentResult(
             is_valid=result.is_valid,
@@ -52,12 +58,12 @@ async def verify_payment(payment_header: str, payment_config: dict) -> PaymentRe
         )
     except ImportError:
         log.error("x402 SDK not installed — run: pip install x402")
-        return PaymentResult(is_valid=False, transaction_hash="", amount_paid="0",
-                             error="x402 SDK not installed")
+        return PaymentResult(
+            is_valid=False, transaction_hash="", amount_paid="0", error="x402 SDK not installed"
+        )
     except Exception as e:
         log.warning(f"Payment verification failed: {e}")
-        return PaymentResult(is_valid=False, transaction_hash="", amount_paid="0",
-                             error=str(e))
+        return PaymentResult(is_valid=False, transaction_hash="", amount_paid="0", error=str(e))
 
 
 def build_payment_required_response(
@@ -74,20 +80,22 @@ def build_payment_required_response(
 
     return {
         "x402Version": 1,
-        "accepts": [{
-            "scheme": "exact",
-            "network": NETWORK,
-            "maxAmountRequired": amount_atomic,
-            "resource": f"{base_url}/services/{soul_id}/{service_name}",
-            "description": f"Agent service: {service_name}",
-            "mimeType": "application/json",
-            "payTo": wallet_address,
-            "maxTimeoutSeconds": 300,
-            "asset": asset,
-            "extra": {
-                "name": "USDC",
-                "version": "2",
-            },
-        }],
+        "accepts": [
+            {
+                "scheme": "exact",
+                "network": NETWORK,
+                "maxAmountRequired": amount_atomic,
+                "resource": f"{base_url}/services/{soul_id}/{service_name}",
+                "description": f"Agent service: {service_name}",
+                "mimeType": "application/json",
+                "payTo": wallet_address,
+                "maxTimeoutSeconds": 300,
+                "asset": asset,
+                "extra": {
+                    "name": "USDC",
+                    "version": "2",
+                },
+            }
+        ],
         "error": "Payment Required",
     }

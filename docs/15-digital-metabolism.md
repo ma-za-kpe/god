@@ -102,7 +102,7 @@ Beyond the pure economic balance, agents have an internal energy state that affe
 ```python
 class EnergyState:
     current_energy: float      # 0.0 (starving) to 1.0 (fully satiated)
-    
+
     # Behavioral effects (automatic, not under agent control)
     # Starving (0.0–0.2): panic mode — takes desperate risks, ignores long-term consequences
     # Hungry (0.2–0.4): heightened survival focus, reduced creativity, reduced social investment

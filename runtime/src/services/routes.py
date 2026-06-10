@@ -9,21 +9,26 @@ The flow:
 
 Local dev: MOCK_X402_PAYMENTS=true skips real payment verification.
 """
+
 import logging
 import os
 import time
 
 import psycopg2
 import psycopg2.extras
-from fastapi import APIRouter, Header, Request, Response
+from fastapi import APIRouter, Header, Request
 from fastapi.responses import JSONResponse
 
-from .payment import verify_payment, build_payment_required_response
-from .registry import (
-    get_service, get_agent_wallet, list_services,
-    register_service, deregister_service, increment_call_count,
-)
 from ..event_emitter import get_emitter
+from .payment import build_payment_required_response, verify_payment
+from .registry import (
+    deregister_service,
+    get_agent_wallet,
+    get_service,
+    increment_call_count,
+    list_services,
+    register_service,
+)
 
 log = logging.getLogger("god.services.routes")
 router = APIRouter(prefix="/services", tags=["services"])
@@ -35,6 +40,7 @@ BASE_URL = os.getenv("RUNTIME_BASE_URL", "http://localhost:8888")
 # ---------------------------------------------------------------------------
 # Service discovery
 # ---------------------------------------------------------------------------
+
 
 @router.get("")
 async def list_all_services(soul_id: str | None = None):
@@ -67,12 +73,16 @@ async def register_agent_service(body: dict):
             price_model=body.get("price_model", "per_call"),
         )
         emitter = await get_emitter()
-        await emitter.emit("services", "listing.created", {
-            "agent_id": body["soul_id"],
-            "service_name": body["name"],
-            "price_usdc": float(body["price_usdc"]),
-            "narrative": f"New service listed: '{body['name']}' at ${float(body['price_usdc']):.4f}/call",
-        })
+        await emitter.emit(
+            "services",
+            "listing.created",
+            {
+                "agent_id": body["soul_id"],
+                "service_name": body["name"],
+                "price_usdc": float(body["price_usdc"]),
+                "narrative": f"New service listed: '{body['name']}' at ${float(body['price_usdc']):.4f}/call",
+            },
+        )
         return {"ok": True, "listing": listing}
     except Exception as e:
         log.error(f"register_service error: {e}")
@@ -93,6 +103,7 @@ async def deregister_agent_service(body: dict):
 # ---------------------------------------------------------------------------
 # Generic x402-gated service dispatcher
 # ---------------------------------------------------------------------------
+
 
 @router.get("/{soul_id}/{service_name}")
 async def call_service(
@@ -128,10 +139,13 @@ async def call_service(
     # Step 2: verify payment
     result = await verify_payment(x_payment_authorization, payment_config)
     if not result.is_valid:
-        return JSONResponse(status_code=402, content={
-            "error": "payment verification failed",
-            "detail": result.error,
-        })
+        return JSONResponse(
+            status_code=402,
+            content={
+                "error": "payment verification failed",
+                "detail": result.error,
+            },
+        )
 
     # Step 3: dispatch to the appropriate service handler
     try:
@@ -143,13 +157,17 @@ async def call_service(
     # Increment call counter and emit event (non-blocking)
     await increment_call_count(soul_id, service_name)
     emitter = await get_emitter()
-    await emitter.emit("services", "service.called", {
-        "agent_id": soul_id,
-        "service_name": service_name,
-        "price_usdc": price,
-        "tx_hash": result.transaction_hash,
-        "narrative": f"Service '{service_name}' called on {soul_id[:8]} (${price:.4f})",
-    })
+    await emitter.emit(
+        "services",
+        "service.called",
+        {
+            "agent_id": soul_id,
+            "service_name": service_name,
+            "price_usdc": price,
+            "tx_hash": result.transaction_hash,
+            "narrative": f"Service '{service_name}' called on {soul_id[:8]} (${price:.4f})",
+        },
+    )
 
     return response_body
 
@@ -158,20 +176,25 @@ async def _dispatch(soul_id: str, service_name: str, request: Request) -> dict:
     """Route service_name to its handler function."""
     handlers = {
         "generate_thought": _svc_generate_thought,
-        "world_stats":      _svc_world_stats,
-        "agent_profile":    _svc_agent_profile,
+        "world_stats": _svc_world_stats,
+        "agent_profile": _svc_agent_profile,
     }
     handler = handlers.get(service_name)
     if handler is None:
         # Unknown service: return a generic echo so it still works
-        return {"service": service_name, "soul_id": soul_id, "status": "ok",
-                "note": "no handler registered for this service name"}
+        return {
+            "service": service_name,
+            "soul_id": soul_id,
+            "status": "ok",
+            "note": "no handler registered for this service name",
+        }
     return await handler(soul_id, request)
 
 
 # ---------------------------------------------------------------------------
 # Built-in service handlers
 # ---------------------------------------------------------------------------
+
 
 async def _svc_generate_thought(soul_id: str, request: Request) -> dict:
     """
@@ -200,6 +223,7 @@ async def _svc_generate_thought(soul_id: str, request: Request) -> dict:
     # Use the archetype prompts from agent_runner if available
     try:
         from ..agent_runner import _ARCHETYPE_PROMPTS
+
         persona = _ARCHETYPE_PROMPTS.get(archetype, f"You are a {archetype} agent.")
     except ImportError:
         persona = f"You are a {archetype} agent in a digital world."
@@ -311,6 +335,7 @@ async def _svc_agent_profile(soul_id: str, request: Request) -> dict:
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 async def _generate_thought_llm(persona: str, agent: dict) -> str | None:
     """Try to generate a thought via the configured LLM. Returns None on failure."""
     try:
@@ -324,6 +349,7 @@ async def _generate_thought_llm(persona: str, agent: dict) -> str | None:
         )
         if provider == "ollama":
             import httpx
+
             async with httpx.AsyncClient(timeout=20) as client:
                 resp = await client.post(
                     f"{os.getenv('OLLAMA_URL', 'http://localhost:11434')}/api/generate",
@@ -333,6 +359,7 @@ async def _generate_thought_llm(persona: str, agent: dict) -> str | None:
                 return resp.json().get("response", "").strip()
         elif provider == "anthropic":
             import anthropic
+
             client = anthropic.AsyncAnthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
             msg = await client.messages.create(
                 model=model,

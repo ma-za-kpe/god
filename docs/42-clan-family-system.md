@@ -194,7 +194,7 @@ On dissolution:
 
 ## Observer Representation
 
-**Phase 1 (current):** Family relationships visible in agent inspector (parent_soul_ids field).  
+**Phase 1 (current):** Family relationships visible in agent inspector (parent_soul_ids field).
 **Phase 4:** Full lineage tree visualization. Family territory color-coding on the world map. Family treasury as a visible resource metric. Drama feed includes family events: births, deaths, adoptions, clan formations.
 
 ---

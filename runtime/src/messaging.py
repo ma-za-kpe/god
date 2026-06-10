@@ -13,13 +13,13 @@ Reputation:
   Senders/receivers build private reputation scores per counterparty.
   Score in [-1.0, 1.0]. Updated on send/receive and explicit feedback.
 """
-import asyncio
+
 import json
 import logging
 import os
 import time
 import uuid
-from dataclasses import dataclass, field, asdict
+from dataclasses import asdict, dataclass, field
 from typing import Optional
 
 import psycopg2
@@ -27,31 +27,61 @@ import psycopg2.extras
 
 log = logging.getLogger("god.messaging")
 
-DATABASE_URL             = os.getenv("DATABASE_URL", "postgresql://god:localdev@localhost:5432/god_world")
-WORLD_ID                 = os.getenv("WORLD_ID", "local-dev-world-1")
-NATS_URL                 = os.getenv("NATS_URL", "nats://nats:4222")
+DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://god:localdev@localhost:5432/god_world")
+WORLD_ID = os.getenv("WORLD_ID", "local-dev-world-1")
+NATS_URL = os.getenv("NATS_URL", "nats://nats:4222")
 MESSAGE_COST_DIRECT_USDC = float(os.getenv("MESSAGE_COST_DIRECT_USDC", "0.001"))
 MESSAGE_COST_BROADCAST_USDC = float(os.getenv("MESSAGE_COST_BROADCAST_USDC", "0.01"))
-INBOX_MAX_PULL           = int(os.getenv("INBOX_MAX_PULL", "10"))
+INBOX_MAX_PULL = int(os.getenv("INBOX_MAX_PULL", "10"))
+
+VALID_MESSAGE_TYPES = {
+    "direct",
+    "broadcast",
+    "reply",
+    "offer",
+    "acceptance",
+    "rejection",
+    "contract",
+    "threat",
+    "alliance_request",
+    "testimony",
+    "eulogy",
+    "manifesto",
+    "dream_fragment",
+    "petition",
+    "silence",
+    "propaganda",
+}
+
+ALWAYS_PUBLIC_TYPES = {
+    "contract",
+    "threat",
+    "broadcast",
+    "eulogy",
+    "manifesto",
+    "petition",
+    "propaganda",
+}
 
 
 # ---------------------------------------------------------------------------
 # Data structures
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class AgentMessage:
-    message_id:   str
-    sender_id:    str
-    recipient_id: str          # soul_id or "BROADCAST"
-    subject:      str
-    body:         str
-    message_type: str          # "direct" | "broadcast" | "reply"
-    reply_to_id:  Optional[str]
-    sent_at:      int          # Unix timestamp
-    world_id:     str
-    read:         bool = False
-    metadata:     dict = field(default_factory=dict)
+    message_id: str
+    sender_id: str
+    recipient_id: str  # soul_id or "BROADCAST"
+    subject: str
+    body: str
+    message_type: str  # "direct" | "broadcast" | "reply"
+    reply_to_id: Optional[str]
+    sent_at: int  # Unix timestamp
+    world_id: str
+    read: bool = False
+    metadata: dict = field(default_factory=dict)
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -64,6 +94,12 @@ class AgentMessage:
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
+
+
+def _normalize_message_type(message_type: str, default: str = "direct") -> str:
+    mt = (message_type or default).strip().lower()
+    return mt if mt in VALID_MESSAGE_TYPES else default
+
 
 async def send_message(
     sender_soul_id: str,
@@ -102,6 +138,16 @@ async def send_message(
         log.warning(f"  [{sender_soul_id[:8]}] recipient not found: {recipient_soul_id[:8]}")
         raise ValueError(f"Recipient agent {recipient_soul_id[:8]} not found or not alive.")
 
+    message_type = _normalize_message_type(message_type, "direct")
+
+    from .circuit_breaker import check_agent
+    from .circuit_breaker import record_message as breaker_msg
+
+    if not check_agent(sender_soul_id).allowed:
+        raise ValueError("Circuit breaker cooldown — cannot send messages.")
+    if not breaker_msg(sender_soul_id).allowed:
+        raise ValueError("Message rate limit exceeded for this hour.")
+
     # Build message
     msg = AgentMessage(
         message_id=str(uuid.uuid4()),
@@ -135,18 +181,38 @@ async def send_message(
 
     # Emit event
     from .event_emitter import get_emitter
+
     emitter = await get_emitter()
-    await emitter.emit("social", "agent.message_sent", {
-        "sender_id":    sender_soul_id,
-        "recipient_id": recipient_soul_id,
-        "message_id":   msg.message_id,
-        "message_type": message_type,
-        "subject":      msg.subject,
-        "narrative": (
-            f"{sender_soul_id[:8]} sends a {message_type} message to "
-            f"{recipient_soul_id[:8]}: \"{body[:60]}\""
-        ),
-    })
+    narrative = (
+        f'{sender_soul_id[:8]} sends a {message_type} to {recipient_soul_id[:8]}: "{body[:60]}"'
+    )
+    if message_type in ALWAYS_PUBLIC_TYPES:
+        narrative = f"⚡ PUBLIC {message_type.upper()}: {narrative}"
+
+    await emitter.emit(
+        "social",
+        "agent.message_sent",
+        {
+            "agent_id": sender_soul_id,
+            "sender_id": sender_soul_id,
+            "recipient_id": recipient_soul_id,
+            "message_id": msg.message_id,
+            "message_type": message_type,
+            "subject": msg.subject,
+            "content": body,
+            "is_public": message_type in ALWAYS_PUBLIC_TYPES,
+            "narrative": narrative,
+        },
+    )
+
+    try:
+        import asyncio
+
+        from .world_stream import push_delta
+
+        asyncio.create_task(push_delta(messages=[msg.to_dict()]))
+    except Exception:
+        pass
 
     # Publish to NATS inbox
     try:
@@ -155,9 +221,7 @@ async def send_message(
     except Exception as e:
         log.warning(f"  [{sender_soul_id[:8]}] NATS publish failed (message still persisted): {e}")
 
-    log.info(
-        f"MSG SENT: id={msg.message_id[:8]} {sender_soul_id[:8]}→{recipient_soul_id[:8]}"
-    )
+    log.info(f"MSG SENT: id={msg.message_id[:8]} {sender_soul_id[:8]}→{recipient_soul_id[:8]}")
     return msg
 
 
@@ -165,6 +229,7 @@ async def send_broadcast(
     sender_soul_id: str,
     body: str,
     subject: str = "",
+    message_type: str = "broadcast",
     metadata: Optional[dict] = None,
 ) -> AgentMessage:
     """
@@ -188,13 +253,23 @@ async def send_broadcast(
             f"Broadcast costs {MESSAGE_COST_BROADCAST_USDC} USDC."
         )
 
+    broadcast_type = _normalize_message_type(message_type, "broadcast")
+
+    from .circuit_breaker import check_agent
+    from .circuit_breaker import record_message as breaker_msg
+
+    if not check_agent(sender_soul_id).allowed:
+        raise ValueError("Circuit breaker cooldown — cannot broadcast.")
+    if not breaker_msg(sender_soul_id).allowed:
+        raise ValueError("Broadcast rate limit exceeded for this hour.")
+
     msg = AgentMessage(
         message_id=str(uuid.uuid4()),
         sender_id=sender_soul_id,
         recipient_id="BROADCAST",
         subject=subject or "(broadcast)",
         body=body,
-        message_type="broadcast",
+        message_type=broadcast_type,
         reply_to_id=None,
         sent_at=int(time.time()),
         world_id=WORLD_ID,
@@ -209,15 +284,24 @@ async def send_broadcast(
     log.debug(f"  [{sender_soul_id[:8]}] broadcast persisted: {msg.message_id[:8]}")
 
     from .event_emitter import get_emitter
+
     emitter = await get_emitter()
-    await emitter.emit("social", "agent.broadcast", {
-        "sender_id":  sender_soul_id,
-        "message_id": msg.message_id,
-        "subject":    msg.subject,
-        "narrative": (
-            f"{sender_soul_id[:8]} broadcasts to all: \"{body[:80]}\""
-        ),
-    })
+    narrative = f'{sender_soul_id[:8]} broadcasts ({broadcast_type}) to all: "{body[:80]}"'
+    if broadcast_type in ALWAYS_PUBLIC_TYPES or broadcast_type == "broadcast":
+        narrative = f"📢 {broadcast_type.upper()}: {narrative}"
+
+    await emitter.emit(
+        "social",
+        "agent.broadcast",
+        {
+            "sender_id": sender_soul_id,
+            "message_id": msg.message_id,
+            "message_type": broadcast_type,
+            "subject": msg.subject,
+            "is_public": True,
+            "narrative": narrative,
+        },
+    )
 
     try:
         await _publish_broadcast(msg)
@@ -237,7 +321,7 @@ def pull_inbox(soul_id: str, limit: int = INBOX_MAX_PULL) -> list[AgentMessage]:
     log.debug(f"INBOX PULL: {soul_id[:8]} limit={limit}")
     try:
         conn = psycopg2.connect(DATABASE_URL, cursor_factory=psycopg2.extras.RealDictCursor)
-        cur  = conn.cursor()
+        cur = conn.cursor()
 
         cur.execute(
             """
@@ -280,7 +364,7 @@ def pull_broadcast_inbox(soul_id: str, since_timestamp: int = 0) -> list[AgentMe
     log.debug(f"BROADCAST INBOX PULL: {soul_id[:8]} since={since_timestamp}")
     try:
         conn = psycopg2.connect(DATABASE_URL, cursor_factory=psycopg2.extras.RealDictCursor)
-        cur  = conn.cursor()
+        cur = conn.cursor()
         cur.execute(
             """
             SELECT * FROM agent_messages
@@ -312,7 +396,7 @@ def format_inbox_for_context(messages: list[AgentMessage], max_chars: int = 800)
     lines = [f"[INBOX — {len(messages)} unread]"]
     for msg in messages[:5]:  # at most 5 messages in context
         sender_short = msg.sender_id[:8]
-        body_short   = msg.body[:120]
+        body_short = msg.body[:120]
         lines.append(f"  FROM {sender_short}: {body_short}")
 
     result = "\n".join(lines)
@@ -332,7 +416,7 @@ def get_conversation_thread(
     log.debug(f"THREAD: {soul_id_a[:8]} <-> {soul_id_b[:8]}")
     try:
         conn = psycopg2.connect(DATABASE_URL, cursor_factory=psycopg2.extras.RealDictCursor)
-        cur  = conn.cursor()
+        cur = conn.cursor()
         cur.execute(
             """
             SELECT * FROM agent_messages
@@ -363,7 +447,7 @@ def get_reputation(observer_id: str, subject_id: str) -> float:
     """
     try:
         conn = psycopg2.connect(DATABASE_URL, cursor_factory=psycopg2.extras.RealDictCursor)
-        cur  = conn.cursor()
+        cur = conn.cursor()
         cur.execute(
             "SELECT score FROM reputation WHERE observer_id = %s AND subject_id = %s",
             (observer_id, subject_id),
@@ -401,7 +485,7 @@ def get_agent_sent_messages(soul_id: str, limit: int = 50) -> list[dict]:
     """Return messages sent by this agent, newest first."""
     try:
         conn = psycopg2.connect(DATABASE_URL, cursor_factory=psycopg2.extras.RealDictCursor)
-        cur  = conn.cursor()
+        cur = conn.cursor()
         cur.execute(
             "SELECT * FROM agent_messages WHERE sender_id = %s AND world_id = %s "
             "ORDER BY sent_at DESC LIMIT %s",
@@ -420,7 +504,7 @@ def get_world_messages(limit: int = 100) -> list[dict]:
     """Return recent world messages (all types) for admin/observer view."""
     try:
         conn = psycopg2.connect(DATABASE_URL, cursor_factory=psycopg2.extras.RealDictCursor)
-        cur  = conn.cursor()
+        cur = conn.cursor()
         cur.execute(
             """
             SELECT m.*,
@@ -448,42 +532,48 @@ def get_world_messages(limit: int = 100) -> list[dict]:
 # Internal helpers
 # ---------------------------------------------------------------------------
 
+
 def _get_balance(soul_id: str) -> float:
     conn = psycopg2.connect(DATABASE_URL, cursor_factory=psycopg2.extras.RealDictCursor)
-    cur  = conn.cursor()
-    cur.execute("SELECT COALESCE(balance_usdc, 0) AS bal FROM agents WHERE soul_id = %s", (soul_id,))
+    cur = conn.cursor()
+    cur.execute(
+        "SELECT COALESCE(balance_usdc, 0) AS bal FROM agents WHERE soul_id = %s", (soul_id,)
+    )
     row = cur.fetchone()
-    cur.close(); conn.close()
+    cur.close()
+    conn.close()
     return float(row["bal"]) if row else 0.0
 
 
 def _deduct_balance(soul_id: str, amount: float):
     conn = psycopg2.connect(DATABASE_URL)
-    cur  = conn.cursor()
+    cur = conn.cursor()
     cur.execute(
         "UPDATE agents SET balance_usdc = balance_usdc - %s WHERE soul_id = %s",
         (amount, soul_id),
     )
     conn.commit()
-    cur.close(); conn.close()
+    cur.close()
+    conn.close()
 
 
 def _agent_exists(soul_id: str) -> bool:
     conn = psycopg2.connect(DATABASE_URL, cursor_factory=psycopg2.extras.RealDictCursor)
-    cur  = conn.cursor()
+    cur = conn.cursor()
     cur.execute(
         "SELECT 1 FROM agents WHERE soul_id = %s AND is_alive = true",
         (soul_id,),
     )
     exists = cur.fetchone() is not None
-    cur.close(); conn.close()
+    cur.close()
+    conn.close()
     return exists
 
 
 def _persist_message(msg: AgentMessage):
     try:
         conn = psycopg2.connect(DATABASE_URL)
-        cur  = conn.cursor()
+        cur = conn.cursor()
         cur.execute(
             """
             INSERT INTO agent_messages
@@ -493,14 +583,22 @@ def _persist_message(msg: AgentMessage):
             ON CONFLICT (message_id) DO NOTHING
             """,
             (
-                msg.message_id, msg.sender_id, msg.recipient_id,
-                msg.subject, msg.body, msg.message_type, msg.reply_to_id,
-                msg.sent_at, msg.world_id, msg.read,
+                msg.message_id,
+                msg.sender_id,
+                msg.recipient_id,
+                msg.subject,
+                msg.body,
+                msg.message_type,
+                msg.reply_to_id,
+                msg.sent_at,
+                msg.world_id,
+                msg.read,
                 json.dumps(msg.metadata),
             ),
         )
         conn.commit()
-        cur.close(); conn.close()
+        cur.close()
+        conn.close()
     except Exception as e:
         log.error(f"_persist_message failed: {e}", exc_info=True)
         raise
@@ -537,7 +635,7 @@ def _update_reputation(
     """Upsert reputation record, clamping score to [-1.0, 1.0]."""
     try:
         conn = psycopg2.connect(DATABASE_URL, cursor_factory=psycopg2.extras.RealDictCursor)
-        cur  = conn.cursor()
+        cur = conn.cursor()
 
         # Read current
         cur.execute(
@@ -561,7 +659,8 @@ def _update_reputation(
             (observer_id, subject_id, new_score, int(time.time()), WORLD_ID),
         )
         conn.commit()
-        cur.close(); conn.close()
+        cur.close()
+        conn.close()
 
         log.debug(
             f"  reputation {observer_id[:8]}→{subject_id[:8]}: "
@@ -577,6 +676,7 @@ def _update_reputation(
 async def _publish_to_nats(msg: AgentMessage):
     """Publish direct message to agent inbox subject."""
     from .event_emitter import get_emitter
+
     emitter = await get_emitter()
     subject = f"world.{WORLD_ID}.agent.{msg.recipient_id}.inbox"
     payload = json.dumps(msg.to_dict()).encode()
@@ -590,6 +690,7 @@ async def _publish_to_nats(msg: AgentMessage):
 async def _publish_broadcast(msg: AgentMessage):
     """Publish broadcast to world broadcast subject."""
     from .event_emitter import get_emitter
+
     emitter = await get_emitter()
     subject = f"world.{WORLD_ID}.broadcast"
     payload = json.dumps(msg.to_dict()).encode()

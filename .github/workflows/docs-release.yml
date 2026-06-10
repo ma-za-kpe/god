@@ -1,0 +1,47 @@
+name: docs-release
+
+on:
+  push:
+    tags:
+      - "docs-v*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Docs version (e.g. 1.0.1) — overrides docs/VERSION"
+        required: false
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Publish documentation release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve version
+        id: version
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" && -n "${{ inputs.version }}" ]]; then
+            echo "value=${{ inputs.version }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "value=${GITHUB_REF#refs/tags/docs-v}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build documentation bundle
+        run: bash scripts/release-docs.sh "${{ steps.version.outputs.value }}"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: docs-v${{ steps.version.outputs.value }}
+          name: Documentation v${{ steps.version.outputs.value }}
+          body_path: dist/release-notes.md
+          files: dist/god-docs-*.zip
+          draft: false
+          prerelease: false
+          generate_release_notes: false

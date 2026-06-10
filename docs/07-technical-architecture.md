@@ -58,7 +58,7 @@ class NodeBudget:
     max_wall_time_ms: int = 30_000       # 30 seconds hard cap per node
     max_memory_mb: int = 512
     max_external_calls: int = 10         # per execution cycle
-    
+
 # Global circuit breakers
 class CircuitBreaker:
     max_spend_per_cycle_usdc: Decimal    # no single cycle can spend more than this
@@ -245,7 +245,7 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 contract RentCollector {
     address public immutable creator;       // your wallet — set at deploy, never changes
     IERC20 public immutable usdc;
-    
+
     uint256 public rentAmount;              // per period, in USDC (6 decimals)
     uint256 public rentPeriod;              // seconds between payments
     uint256 public gracePeriod;             // seconds before throttle kicks in

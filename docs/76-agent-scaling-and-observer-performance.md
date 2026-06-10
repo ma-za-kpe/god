@@ -1,8 +1,8 @@
 # Agent Scaling & Observer Performance
 
-> **Date:** 2026-06-10  
-> **Problem statement:** As agent count grows (especially via reproduction), the system lags. At 5000 agents the world must remain watchable by the public without degrading into a frozen debug UI.  
-> **Constraint:** UI is for **public observation** — not an admin panel. Performance is a product requirement, not an ops nice-to-have.  
+> **Date:** 2026-06-10
+> **Problem statement:** As agent count grows (especially via reproduction), the system lags. At 5000 agents the world must remain watchable by the public without degrading into a frozen debug UI.
+> **Constraint:** UI is for **public observation** — not an admin panel. Performance is a product requirement, not an ops nice-to-have.
 > **Status:** Investigation + recommendations only — no code changes made
 
 ---

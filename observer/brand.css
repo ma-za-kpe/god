@@ -1,0 +1,19 @@
+/* GOD — Genesis of Digital Life · Brand tokens (see docs/81-brand-guidelines.md) */
+:root {
+  --god-void: #02040f;
+  --god-surface: rgba(10, 12, 24, 0.92);
+  --god-surface-solid: #0a0c18;
+  --god-border: rgba(30, 34, 64, 0.55);
+  --god-border-bright: rgba(61, 255, 168, 0.22);
+  --god-life: #3dffa8;
+  --god-economy: #f0c040;
+  --god-cognition: #4db8ff;
+  --god-social: #c47aff;
+  --god-threat: #ff3d5c;
+  --god-manifesto: #ff9a2e;
+  --god-muted: #5c6088;
+  --god-text: #c8cae8;
+  --god-font: 'IBM Plex Mono', 'Courier New', monospace;
+  --god-glow-life: 0 0 16px rgba(61, 255, 168, 0.45);
+  --god-glow-econ: 0 0 12px rgba(240, 192, 64, 0.35);
+}

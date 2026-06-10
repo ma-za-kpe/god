@@ -160,7 +160,7 @@ version: '3.8'
 services:
 
   # ─── IPFS Private Network (3 nodes = minimal mesh) ──────────────────
-  
+
   ipfs-node-1:
     image: ipfs/kubo:v0.42.0
     container_name: god-ipfs-1
@@ -221,7 +221,7 @@ services:
     restart: unless-stopped
 
   # ─── Blockchain: Anvil local EVM (Base Sepolia fork) ─────────────────
-  
+
   anvil:
     image: ghcr.io/foundry-rs/foundry:latest
     container_name: god-anvil
@@ -250,7 +250,7 @@ services:
       retries: 5
 
   # ─── Event Bus: NATS ──────────────────────────────────────────────────
-  
+
   nats:
     image: nats:2.10-alpine
     container_name: god-nats
@@ -273,7 +273,7 @@ services:
       retries: 3
 
   # ─── State Persistence: Redis (LangGraph checkpointer) ───────────────
-  
+
   redis:
     image: redis:7-alpine
     container_name: god-redis
@@ -292,7 +292,7 @@ services:
       retries: 5
 
   # ─── Event & Agent Registry: PostgreSQL ──────────────────────────────
-  
+
   postgres:
     image: postgres:16-alpine
     container_name: god-postgres
@@ -315,7 +315,7 @@ services:
       retries: 5
 
   # ─── Agent Runtime (Python + LangGraph) ──────────────────────────────
-  
+
   runtime:
     build:
       context: ./runtime
@@ -348,7 +348,7 @@ services:
     restart: unless-stopped
 
   # ─── Observer Website (Next.js) ───────────────────────────────────────
-  
+
   observer:
     build:
       context: ./observer

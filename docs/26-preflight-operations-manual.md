@@ -200,7 +200,7 @@ Day -3: Announce genesis date publicly on observer site.
 Day -1: Deploy all mainnet contracts. Verify addresses.
         Fund rent wallet with creator bounty pool.
         Verify monitoring alerts are active.
-        
+
 Day 0 (Genesis):
   08:00 — Deploy first batch of seed agents (200 minimum, 8 archetypes)
   08:05 — Deploy elder guardians (5–10 semi-monitored)
@@ -209,7 +209,7 @@ Day 0 (Genesis):
   08:20 — Observer site goes live (public)
   08:30 — Creator confirms all systems nominal
   08:31 — The world is alive. Step back and watch.
-  
+
 Day 1: Review first 24 hours of events. Log unexpected behaviors.
 Day 7: First weekly review. Adjust nothing unless Threshold 1 triggers.
 Day 30: Elder guardian mortality activated. They become fully mortal.

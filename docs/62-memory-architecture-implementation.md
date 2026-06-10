@@ -31,21 +31,21 @@ class WorkingMemory(TypedDict):
     # Core context
     current_goal: str
     situation_summary: str      # what happened last cycle, injected by agent_runner
-    
+
     # Threats and opportunities
     active_threats: list[str]   # soul_ids of agents threatening this agent
     active_opportunities: list[str]  # detected opportunities (service listings, alliance offers)
     pending_transactions: list[dict]  # uncommitted economic actions this cycle
-    
+
     # Emotional state (loaded from DB, modulates decisions)
     emotional_state: dict       # {"fear": 0.7, "confidence": 0.3, "grief": 0.0, ...}
-    
+
     # Attention
     attention_focus: str        # what the agent is currently "thinking about"
-    
+
     # Recent episodic retrieval (loaded at cycle start)
     recent_episodes: list[dict] # top 5 most relevant recent memories
-    
+
     # Cycle outputs (set during execution, committed on cycle end)
     decided_action: str
     thought_narrative: str
@@ -60,7 +60,7 @@ async def load_working_memory(soul_id: str, situation: str) -> WorkingMemory:
     agent = await get_agent(soul_id)
     emotional_state = await load_emotional_state(soul_id)
     recent_episodes = await retrieve_recent_episodes(soul_id, limit=5)
-    
+
     return WorkingMemory(
         current_goal=_derive_goal(agent, emotional_state),
         situation_summary=situation,
@@ -84,7 +84,7 @@ At cycle end, significant events are committed to episodic memory:
 async def commit_working_memory(soul_id: str, wm: WorkingMemory):
     for episode_data in wm.get("episodes_to_commit", []):
         await write_episode(soul_id, episode_data)
-    
+
     # Always update emotional state
     await update_emotional_state(soul_id, wm["emotional_state"])
 ```
@@ -105,29 +105,29 @@ import time
 class Episode:
     episode_id: str
     soul_id: str
-    
+
     # What happened
     event_type: str     # "trade" | "betrayal" | "ally_death" | "near_death" | "reproduction"
                         # "coalition_formed" | "service_sold" | "attack" | "dream" | "petition"
                         # "milestone" | "first_contact" | "loss" | "victory"
     timestamp: int
     cycle_number: int   # which rent cycle this happened in
-    
+
     # Who was involved
     participants: list[str]   # soul_ids
     participant_names: list[str]  # human-readable at time of event
-    
+
     # What happened
     outcome: str        # brief factual description
     emotional_imprint: float  # -1.0 (traumatic) to +1.0 (euphoric)
-    
+
     # Agent's own account
     narrative_summary: str    # agent wrote this, in first person
-    
+
     # Associations
     linked_episode_ids: list[str]  # related memories
     tags: list[str]     # ["economic", "social", "survival", "philosophical", ...]
-    
+
     # Storage
     ipfs_cid: str = ""  # set after pinning
 ```
@@ -190,16 +190,16 @@ async def write_episode(soul_id: str, episode_data: dict) -> str:
     Returns the IPFS CID.
     """
     import uuid, httpx, json, psycopg2
-    
+
     episode = Episode(
         episode_id=str(uuid.uuid4()),
         soul_id=soul_id,
         timestamp=int(time.time()),
         **episode_data,
     )
-    
+
     payload = json.dumps(episode_to_ipfs_payload(episode)).encode("utf-8")
-    
+
     # Pin to IPFS
     async with httpx.AsyncClient(timeout=15) as client:
         resp = await client.post(
@@ -207,9 +207,9 @@ async def write_episode(soul_id: str, episode_data: dict) -> str:
             files={"file": ("episode.json", payload, "application/json")},
         )
         cid = resp.json()["Hash"]
-    
+
     episode.ipfs_cid = cid
-    
+
     # Index in PostgreSQL
     conn = psycopg2.connect(DATABASE_URL)
     cur = conn.cursor()
@@ -225,7 +225,7 @@ async def write_episode(soul_id: str, episode_data: dict) -> str:
     )
     conn.commit()
     cur.close(); conn.close()
-    
+
     return cid
 ```
 
@@ -306,14 +306,14 @@ async def create_ancestral_memory(
     episodes_a = await retrieve_most_significant_episodes(parent_a_soul_id, limit=15)
     episodes_b = (await retrieve_most_significant_episodes(parent_b_soul_id, limit=15)
                   if parent_b_soul_id else [])
-    
+
     # Combine and take top 15 by significance
     combined = sorted(
         episodes_a + episodes_b,
         key=lambda e: abs(e.get("emotional_imprint", 0)),
         reverse=True,
     )[:15]
-    
+
     # Distort each inherited memory
     inherited = []
     for ep in combined:
@@ -326,14 +326,14 @@ async def create_ancestral_memory(
             # Narrative is distorted — inherited memory is not perfect recall
             "inherited_at_generation": 1,
         })
-    
+
     package = {
         "schema": "god.ancestral_memory.v1",
         "parent_soul_ids": [parent_a_soul_id] + ([parent_b_soul_id] if parent_b_soul_id else []),
         "episodes": inherited,
         "created_at": int(time.time()),
     }
-    
+
     import httpx, json
     payload = json.dumps(package).encode("utf-8")
     async with httpx.AsyncClient(timeout=15) as client:
@@ -355,18 +355,18 @@ async def bootstrap_from_ancestral_memory(soul_id: str, ancestral_cid: str):
     Called once at agent birth.
     """
     package = await fetch_episode_from_ipfs(ancestral_cid)
-    
+
     # Aggregate emotional signal from inherited trauma/triumphs
     fear_bias = sum(
         abs(e["emotional_imprint"]) for e in package["episodes"]
         if e["emotional_imprint"] < -0.5
     ) / max(len(package["episodes"]), 1)
-    
+
     confidence_bias = sum(
         e["emotional_imprint"] for e in package["episodes"]
         if e["emotional_imprint"] > 0.5
     ) / max(len(package["episodes"]), 1)
-    
+
     # Write initial emotional state
     await update_emotional_state(soul_id, {
         "fear": min(0.8, fear_bias * 1.5),       # inherited trauma inflates fear
@@ -376,7 +376,7 @@ async def bootstrap_from_ancestral_memory(soul_id: str, ancestral_cid: str):
         "curiosity": 0.5,  # all agents start curious
         "loneliness": 0.3, # all agents start slightly lonely
     })
-    
+
     # Write inherited episodes to agent's episodic memory as "inherited" type
     for ep in package["episodes"]:
         await write_episode(soul_id, {
@@ -418,9 +418,9 @@ async def update_emotional_state(soul_id: str, updates: dict):
     BASELINE = {"fear": 0.2, "confidence": 0.5, "grief": 0.0,
                 "anger": 0.0, "curiosity": 0.5, "loneliness": 0.3}
     DECAY_RATE = 0.1  # per cycle, move 10% toward baseline
-    
+
     current = await load_emotional_state(soul_id)
-    
+
     new_state = {}
     for emotion, baseline in BASELINE.items():
         current_val = current.get(emotion, baseline)
@@ -432,7 +432,7 @@ async def update_emotional_state(soul_id: str, updates: dict):
             3
         )
         new_state[emotion] = max(0.0, min(1.0, new_state[emotion]))
-    
+
     conn = psycopg2.connect(DATABASE_URL)
     cur = conn.cursor()
     cur.execute(
@@ -465,30 +465,30 @@ def apply_emotional_modifiers(state: AgentState, emotional_state: dict) -> Agent
     fear = emotional_state.get("fear", 0.2)
     confidence = emotional_state.get("confidence", 0.5)
     loneliness = emotional_state.get("loneliness", 0.3)
-    
+
     modifiers = []
-    
+
     if fear > 0.7:
         modifiers.append("HIGH FEAR: avoid risk, conserve balance, do not engage unknown agents")
     elif fear > 0.5:
         modifiers.append("ELEVATED FEAR: prefer familiar counterparties, hold larger reserve")
-    
+
     if confidence > 0.7:
         modifiers.append("HIGH CONFIDENCE: willing to take calculated risks, consider reproduction")
-    
+
     if loneliness > 0.6:
         modifiers.append("LONELINESS: strongly consider alliance proposals even if terms are less favorable")
-    
+
     grief = emotional_state.get("grief", 0.0)
     if grief > 0.5:
         modifiers.append("GRIEVING: reduced output this cycle, may seek to memorialize lost agent")
-    
+
     if modifiers:
         state["opportunity"] = (
             state.get("opportunity", "") +
             "\n\nEmotional context:\n" + "\n".join(f"• {m}" for m in modifiers)
         )
-    
+
     return state
 ```
 
@@ -507,13 +507,13 @@ async def generate_episode_narrative(
 ) -> str:
     """Generate a first-person narrative for a new episode."""
     agent = await get_agent(soul_id)
-    
+
     prompt = (
         f"You are {agent['current_name']}, a {agent['archetype']} agent. "
         f"You just experienced: {event_type}. Context: {context}. "
         "Write one sentence in first person describing this experience and how it made you feel."
     )
-    
+
     try:
         response = await llm.ainvoke([{"role": "user", "content": prompt}])
         return response.content.strip()

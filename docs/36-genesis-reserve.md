@@ -101,10 +101,10 @@ The reserve must be replenished after any injection before additional injections
 ```
 After any injection:
   Replenishment target = pre-injection reserve balance
-  Source = surplus from rent income (any month where rent > costs, 
+  Source = surplus from rent income (any month where rent > costs,
            50% of surplus goes to reserve until target is reached)
-  
-  Next injection of same type not permitted until reserve is replenished to 
+
+  Next injection of same type not permitted until reserve is replenished to
   at least 50% of target.
 ```
 
@@ -121,7 +121,7 @@ Genesis Reserve Transparency Log
 
 [Date] — Initial funding: $25,000 USDC
          Reserve wallet: [address]
-         
+
 [Date] — Injection #1: $500 USDC
          Reason: Mass extinction prevention (population reached 18 agents)
          Method: 50 new seed agents created

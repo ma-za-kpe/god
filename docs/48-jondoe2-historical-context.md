@@ -6,8 +6,8 @@
 
 ## The Original Post
 
-**Source:** Reddit — r/Bitcoin, 2012  
-**Author:** u/jondoe2 (anonymous)  
+**Source:** Reddit — r/Bitcoin, 2012
+**Author:** u/jondoe2 (anonymous)
 **Thread:** (speculative thread about Bitcoin use cases)
 
 > *"An agent is an autonomous program able to survive by selling services for Bitcoins, using the proceeds to rent server capacity. Such agents would compete with each other, diversify, and specialize. This is a form of digital natural selection. The fittest survive."*

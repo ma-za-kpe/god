@@ -164,7 +164,7 @@ async def register_service(
 ) -> dict:
     """Register a new agent service in the world service registry."""
     listing_id = str(uuid.uuid4())
-    
+
     conn = psycopg2.connect(DATABASE_URL)
     cur = conn.cursor()
     cur.execute(
@@ -179,7 +179,7 @@ async def register_service(
     conn.commit()
     cur.close()
     conn.close()
-    
+
     emitter = await get_emitter()
     await emitter.emit("services", "listing.created", {
         "agent_id": soul_id,
@@ -188,7 +188,7 @@ async def register_service(
         "price_usdc": price_usdc,
         "narrative": f"New service listed: '{name}' at ${price_usdc:.4f}/call",
     })
-    
+
     return {"listing_id": listing_id, "endpoint": endpoint_path}
 
 
@@ -196,21 +196,21 @@ async def get_service_listings(soul_id: str = None, active_only: bool = True) ->
     """Query the service registry."""
     conn = psycopg2.connect(DATABASE_URL)
     cur = conn.cursor()
-    
+
     query = "SELECT * FROM service_listings"
     params = []
     conditions = []
-    
+
     if active_only:
         conditions.append("is_active = true")
     if soul_id:
         conditions.append("agent_soul_id = %s")
         params.append(soul_id)
-    
+
     if conditions:
         query += " WHERE " + " AND ".join(conditions)
     query += " ORDER BY created_at DESC LIMIT 100"
-    
+
     cur.execute(query, params)
     listings = [dict(zip([d[0] for d in cur.description], row)) for row in cur.fetchall()]
     cur.close()
@@ -250,7 +250,7 @@ async def world_stats_service(soul_id: str) -> dict:
     """
     conn = psycopg2.connect(DATABASE_URL, cursor_factory=psycopg2.extras.RealDictCursor)
     cur = conn.cursor()
-    
+
     cur.execute("""
         SELECT
             COUNT(*) FILTER (WHERE is_alive) AS living_count,
@@ -262,7 +262,7 @@ async def world_stats_service(soul_id: str) -> dict:
         FROM agents WHERE world_id = %s
     """, (WORLD_ID,))
     stats = dict(cur.fetchone())
-    
+
     # Archetype distribution
     cur.execute("""
         SELECT archetype, COUNT(*) as count
@@ -270,10 +270,10 @@ async def world_stats_service(soul_id: str) -> dict:
         GROUP BY archetype ORDER BY count DESC
     """, (WORLD_ID,))
     archetypes = {row["archetype"]: row["count"] for row in cur.fetchall()}
-    
+
     cur.close()
     conn.close()
-    
+
     return {
         "world_id": WORLD_ID,
         "timestamp": int(time.time()),

@@ -124,34 +124,34 @@ class CreatorPetition:
     petition_id: str          # uuid
     soul_id: str              # petitioner
     petition_type: str        # domain | llc | stripe | google | linkedin | compute | custom | mercy
-    
+
     # What the agent is asking for
     title: str
     description: str          # natural language explanation
-    
+
     # Research the agent did
     research_summary: str     # how they determined costs
     external_cost_breakdown: dict  # {"domain_namecheap_1yr": 12.50, "registrar_fee": 5.00, ...}
     total_external_cost_usdc: float
-    
+
     # Fee proposal
     proposed_creator_fee_usdc: float  # agent sets this
     fee_justification: str    # "17% of total; wallet is 912 USDC; ROI expected in 41 days"
-    
+
     # Governance
     governance_approval_ref: str | None  # NATS event_id or on-chain tx of the approval vote
     governing_body: str | None  # coalition / DAO name
-    
+
     # Financials
     escrowed_amount_usdc: float
     escrow_tx_hash: str | None  # on-chain reference
-    
+
     # Lifecycle
     status: str               # pending | approved | rejected | countered | withdrawn
     created_at: int           # unix timestamp
     resolved_at: int | None
     creator_notes: str | None # creator's response
-    
+
     # Result (on approval)
     result_summary: str | None
     credentials_encrypted_cid: str | None  # IPFS CID of encrypted credentials

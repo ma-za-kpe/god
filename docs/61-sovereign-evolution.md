@@ -72,11 +72,11 @@ An agent can update its own OwnedGraph nodes without spawning a child:
 async def propose_graph_update(soul_id: str, node_updates: list[dict]) -> str:
     """
     Propose a live update to the agent's own OwnedGraph.
-    
+
     The update is not applied immediately. It is staged as a proposal,
     reviewed by the agent's cognition cycle, and optionally ratified by
     its coalition if the change is above a significance threshold.
-    
+
     Returns: proposal_id
     """
     proposal = {
@@ -88,14 +88,14 @@ async def propose_graph_update(soul_id: str, node_updates: list[dict]) -> str:
         "proposed_at": int(time.time()),
         "status": "pending_ratification",
     }
-    
+
     # Significant changes require coalition review
     if proposal["significance"] > SIGNIFICANCE_THRESHOLD:
         await broadcast_to_coalition(soul_id, proposal)
     else:
         # Minor self-updates apply after one cycle delay
         await schedule_graph_update(soul_id, proposal, delay_cycles=1)
-    
+
     return proposal["proposal_id"]
 ```
 
@@ -148,22 +148,22 @@ class LawAmendmentProposal:
     proposal_id: str
     proposer_soul_id: str
     proposer_coalition: str | None
-    
+
     # What is being changed
     target_law: str           # "law_0a" | "status_tiers" | "rent_formula" | custom
     current_text: str
     proposed_text: str
-    
+
     # Justification
     rationale: str
     estimated_impact: str
     affected_agents: list[str]  # soul_ids who would be materially affected
-    
+
     # Governance
     quorum_required: int      # minimum voting agents
     approval_threshold: float  # fraction needed (0.5 = simple majority, 0.67 = supermajority)
     voting_period_cycles: int
-    
+
     # Lifecycle
     submitted_at: int
     voting_opens_at: int

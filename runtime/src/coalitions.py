@@ -4,6 +4,7 @@ coalitions.py — Coalition formation and membership management.
 Coalitions are persistent groups of agents that can coordinate via messages,
 share reputation, and collectively act in the world.
 """
+
 import logging
 import os
 import time
@@ -15,7 +16,7 @@ import psycopg2.extras
 log = logging.getLogger("god.coalitions")
 
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://god:localdev@localhost:5432/god_world")
-WORLD_ID     = os.getenv("WORLD_ID", "local-dev-world-1")
+WORLD_ID = os.getenv("WORLD_ID", "local-dev-world-1")
 
 
 def _db():
@@ -32,7 +33,7 @@ async def form_coalition(founder_soul_id: str, name: str) -> dict:
     now = int(time.time())
 
     conn = _db()
-    cur  = conn.cursor()
+    cur = conn.cursor()
     try:
         cur.execute(
             """
@@ -59,9 +60,9 @@ async def form_coalition(founder_soul_id: str, name: str) -> dict:
     log.info(f"Coalition '{name}' ({coalition_id[:8]}) founded by {founder_soul_id[:8]}")
     return {
         "coalition_id": coalition_id,
-        "name":         name,
+        "name": name,
         "founder_soul_id": founder_soul_id,
-        "formed_at":    now,
+        "formed_at": now,
     }
 
 
@@ -71,7 +72,7 @@ async def join_coalition(coalition_id: str, soul_id: str, role: str = "member") 
     now = int(time.time())
 
     conn = _db()
-    cur  = conn.cursor()
+    cur = conn.cursor()
     try:
         cur.execute(
             """
@@ -98,7 +99,7 @@ def get_agent_coalitions(soul_id: str) -> list[dict]:
     """Return coalitions this agent belongs to."""
     try:
         conn = _db()
-        cur  = conn.cursor()
+        cur = conn.cursor()
         cur.execute(
             """
             SELECT c.coalition_id, c.name, c.founder_soul_id, c.member_count, cm.role
@@ -110,7 +111,8 @@ def get_agent_coalitions(soul_id: str) -> list[dict]:
             (soul_id, WORLD_ID),
         )
         rows = [dict(r) for r in cur.fetchall()]
-        cur.close(); conn.close()
+        cur.close()
+        conn.close()
         return rows
     except Exception:
         return []
@@ -120,7 +122,7 @@ def get_world_coalitions() -> list[dict]:
     """Return all active coalitions with member counts."""
     try:
         conn = _db()
-        cur  = conn.cursor()
+        cur = conn.cursor()
         cur.execute(
             """
             SELECT c.coalition_id, c.name, c.founder_soul_id, c.member_count,
@@ -133,7 +135,8 @@ def get_world_coalitions() -> list[dict]:
             (WORLD_ID,),
         )
         rows = [dict(r) for r in cur.fetchall()]
-        cur.close(); conn.close()
+        cur.close()
+        conn.close()
         return rows
     except Exception:
         return []
@@ -143,7 +146,7 @@ def get_coalition_members(coalition_id: str) -> list[dict]:
     """Return all members of a coalition."""
     try:
         conn = _db()
-        cur  = conn.cursor()
+        cur = conn.cursor()
         cur.execute(
             """
             SELECT cm.soul_id, cm.role, cm.joined_at,
@@ -156,7 +159,8 @@ def get_coalition_members(coalition_id: str) -> list[dict]:
             (coalition_id, WORLD_ID),
         )
         rows = [dict(r) for r in cur.fetchall()]
-        cur.close(); conn.close()
+        cur.close()
+        conn.close()
         return rows
     except Exception:
         return []

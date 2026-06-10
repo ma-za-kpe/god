@@ -25,32 +25,32 @@ class OwnedGraph:
     soul_id: str               # Immutable agent identifier (set at birth, never changes)
     owner_keys: list[str]      # Ed25519 public keys that can sign mutations
     multisig_threshold: int    # How many owner_keys must sign (e.g. 2-of-3 for coalition)
-    
+
     # ── Lineage ───────────────────────────────────────────────────────
     genesis_graph_id: str      # CID of the very first version (immutable origin)
     parent_graph_ids: list[str] # Parent CIDs (1 for mutation, 2 for reproduction merge)
     version: int               # Monotonically increasing version counter
     created_at: int            # Unix timestamp
-    
+
     # ── Graph Structure ───────────────────────────────────────────────
     state_schema: dict         # JSON Schema for the agent's state object
     nodes: dict[str, NodeDef]  # Named execution nodes
     edges: list[EdgeDef]       # Transitions between nodes
     entry_point: str           # Name of the first node to execute each cycle
     checkpointer_config: dict  # How/where to persist state between cycles
-    
+
     # ── Identity Module (Protected Node) ──────────────────────────────
     identity: AgentIdentity    # Stored as a special node, signed with soul_id key
-    
+
     # ── Economics ─────────────────────────────────────────────────────
     wallet_address: str        # On-chain wallet this agent controls
     rent_balance: Decimal      # Current USDC balance allocated for rent
     last_rent_paid: int        # Unix timestamp
-    
+
     # ── Runtime State ─────────────────────────────────────────────────
     compute_allocation: int    # Current CPU/memory budget (units)
     execution_status: str      # "active" | "throttled" | "sleeping" | "archived"
-    
+
     # ── Signature ─────────────────────────────────────────────────────
     signature: str             # Ed25519 signature over hash(all fields except signature)
                                # Must be valid from one of owner_keys to execute
@@ -64,13 +64,13 @@ class NodeDef:
     name: str                  # Unique within this graph
     code_cid: str              # IPFS CID of the Python/WASM executable for this node
     description: str           # Human-readable purpose (agents write this themselves)
-    
+
     # ── Permissions ───────────────────────────────────────────────────
     tool_permissions: list[str] # What external tools this node can call
     memory_read_scope: str     # "working" | "episodic" | "ancestral" | "all"
     network_access: bool       # Can this node initiate external communications?
     wallet_access: bool        # Can this node sign transactions?
-    
+
     # ── Resource Limits ───────────────────────────────────────────────
     max_tokens: int            # LLM token budget per invocation
     max_wall_time_ms: int      # Hard time cap (default: 30,000ms)
@@ -100,27 +100,27 @@ class AgentIdentity:
     birth_timestamp: int
     genesis_world_id: str      # Which world was this agent born into?
     parent_soul_ids: list[str] # Empty for genesis agents; 1-2 for children
-    
+
     # ── Mutable Expression ────────────────────────────────────────────
     current_name: str          # Agent-chosen, can change
     biography: str             # Self-written narrative (IPFS CID for long bios)
-    
+
     # ── Visual ────────────────────────────────────────────────────────
     avatar_cid: str            # IPFS CID of avatar image/model
     avatar_style_prompt: str   # For regeneration/mutation
     mood_mapping: dict         # internal_state → visual expression mapping
     color_palette: dict        # { "primary": "#hex", "accent": "#hex", "mood": "#hex" }
-    
+
     # ── Audio ─────────────────────────────────────────────────────────
     voice_model_cid: str       # IPFS CID of TTS voice model or embedding
     voice_params: dict         # { "timbre": float, "pitch": float, "speed": float }
     theme_music_cid: str       # Agent's signature audio
-    
+
     # ── Social ────────────────────────────────────────────────────────
     symbolic_emblem: str       # Sigil/glyph/emoji — their brand
     reputation_vectors: dict   # { "trustworthy": 0.87, "aggressive": 0.34, ... }
     public_coalitions: list[str] # Coalition IDs the agent publicly claims membership in
-    
+
     # ── Signature ─────────────────────────────────────────────────────
     signature: str             # Signed with soul_id key — identity cannot be forged
 ```
@@ -214,14 +214,14 @@ def reproduce(
     mutation_rate: float = 0.05,
     crossover_strategy: str = "fitness_weighted"
 ) -> OwnedGraph:
-    
+
     # 1. Resource check (Law 6 enforcement)
     assert parent_a.rent_balance >= MIN_REPRODUCTION_BALANCE
     assert parent_b.rent_balance >= MIN_REPRODUCTION_BALANCE
-    
+
     # 2. Pay mating cost
     deduct_mating_fee(parent_a, parent_b, CREATOR_WALLET)
-    
+
     # 3. Crossover — mix nodes from both parents
     if crossover_strategy == "fitness_weighted":
         # Nodes from the fitter parent are more likely to be inherited
@@ -229,19 +229,19 @@ def reproduce(
     elif crossover_strategy == "random_split":
         # Random 50/50 split of nodes
         child_nodes = random_crossover(parent_a.nodes, parent_b.nodes)
-    
+
     # 4. Apply mutation
     child_nodes = apply_mutation(child_nodes, rate=mutation_rate)
-    
+
     # 5. Merge edges (keep edges where both endpoints exist in child)
     child_edges = merge_edges(parent_a.edges, parent_b.edges, child_nodes)
-    
+
     # 6. Derive child identity from parents
     child_identity = derive_child_identity(parent_a.identity, parent_b.identity)
-    
+
     # 7. Generate new soul_id (runtime — not parent-controlled)
     child_soul_id = runtime_generate_soul_id()
-    
+
     # 8. Construct child
     child = OwnedGraph(
         soul_id=child_soul_id,
@@ -255,17 +255,17 @@ def reproduce(
         rent_balance=calculate_child_seed_balance(parent_a, parent_b),
         ...
     )
-    
+
     # 9. Sign with child's new key (generated by runtime)
     child.signature = runtime_sign(child)
-    
+
     # 10. Pin to IPFS, register on-chain
     child.graph_id = ipfs_pin(child)
     register_agent(child, rent_collector_contract)
-    
+
     # 11. Announce birth
     emit_event(AgentEvent(type="birth", agent_id=child.soul_id, ...))
-    
+
     return child
 ```
 
@@ -275,10 +275,10 @@ def reproduce(
 
 ```python
 def delete_agent(agent: OwnedGraph, reason: str):
-    
+
     # 1. Final state snapshot
     final_state = get_current_state(agent)
-    
+
     # 2. Create death archive
     archive = DeathArchive(
         soul_id=agent.soul_id,
@@ -291,19 +291,19 @@ def delete_agent(agent: OwnedGraph, reason: str):
         biography_final=agent.identity.biography,
         notable_events=get_top_events(agent.soul_id, n=50)
     )
-    
+
     # 3. Pin archive to IPFS + Filecoin (permanent)
     archive_cid = ipfs_pin_permanent(archive)
-    
+
     # 4. Record death on-chain (immutable)
     record_death_on_chain(agent.soul_id, archive_cid, reason)
-    
+
     # 5. Retire soul_id (can never be reused)
     retire_soul_id(agent.soul_id)
-    
+
     # 6. Stop execution
     halt_execution(agent.soul_id)
-    
+
     # 7. Announce death publicly
     emit_event(AgentEvent(
         type="death",
@@ -345,11 +345,11 @@ class ModuleListing:
     description: str
     price_usdc: Decimal
     license_type: str          # "use_only" | "modify" | "resell" | "open"
-    
+
     # Compatibility
     compatible_state_schemas: list[str]  # Which state schemas this module works with
     dependencies: list[str]   # Other module CIDs this requires
-    
+
     # Provenance
     derived_from_cid: Optional[str]  # If this was modified from another module
     attribution: str                 # Credit to original creators

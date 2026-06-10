@@ -4,6 +4,7 @@ seed_agents.py — Single-agent factory used by POST /creator/genesis.
 For world genesis, call: POST /creator/genesis  (see main.py)
 This module provides seed_one_agent() which /creator/genesis calls per archetype.
 """
+
 import asyncio
 import logging
 import os
@@ -14,20 +15,20 @@ from decimal import Decimal
 import psycopg2
 from eth_account import Account
 
-from .owned_graph import OwnedGraph, ARCHETYPES, create_agent_zero
+from .owned_graph import ARCHETYPES, OwnedGraph, create_agent_zero
 
 log = logging.getLogger("god.seed")
 
 SEED_BALANCE_USDC = Decimal(os.getenv("SEED_BALANCE_USDC", "0.10"))
-WORLD_ID          = os.getenv("WORLD_ID",      "local-dev-world-1")
-IPFS_API          = os.getenv("IPFS_API",      "http://localhost:5001")
-DATABASE_URL      = os.getenv("DATABASE_URL",  "postgresql://god:localdev@localhost:5432/god_world")
+WORLD_ID = os.getenv("WORLD_ID", "local-dev-world-1")
+IPFS_API = os.getenv("IPFS_API", "http://localhost:5001")
+DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://god:localdev@localhost:5432/god_world")
 
 
 def _persist_agent(agent: dict):
     """Register agent in PostgreSQL so the runtime and observer can see it."""
     conn = psycopg2.connect(DATABASE_URL)
-    cur  = conn.cursor()
+    cur = conn.cursor()
     cur.execute(
         """
         INSERT INTO agents
@@ -78,8 +79,7 @@ async def seed_one_agent(
     if is_elder:
         graph.identity.current_name = f"Elder-{graph.identity.current_name}"
         graph.identity.biography = (
-            "One of the Elder Guardians. Born with the world. "
-            "Will become fully mortal on Day 31."
+            "One of the Elder Guardians. Born with the world. Will become fully mortal on Day 31."
         )
 
     # Pin to IPFS
@@ -91,11 +91,15 @@ async def seed_one_agent(
         cid = f"local:{graph.content_hash()[:16]}"
         graph.graph_id = cid
 
+    from .wallet_store import store_wallet
+
+    store_wallet(soul_id, wallet_address, private_key)
+
     result = {
         "soul_id": soul_id,
         "graph_cid": cid,
         "wallet_address": wallet_address,
-        "private_key": private_key,    # NEVER log this in production
+        "private_key": private_key,  # NEVER log this in production
         "archetype": archetype,
         "name": graph.identity.current_name,
         "is_elder": is_elder,
@@ -108,5 +112,3 @@ async def seed_one_agent(
         log.warning(f"  DB persist failed for {soul_id[:8]}: {e}")
 
     return result
-
-

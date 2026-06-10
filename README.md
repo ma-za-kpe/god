@@ -1,6 +1,10 @@
 # GOD — Genesis of Digital Life
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
+
 > A framework for creating conditions where AI agents develop genuine self-preservation, identity, and sovereignty through real economic stakes and evolutionary pressure.
+
+**Open source:** all code and documentation in this repository are published under the [MIT License](./LICENSE). Fork, study, and run your own world — but **never commit API keys, wallet private keys, or `swarm.key`**. See [SECURITY.md](./SECURITY.md) and [security audit](./docs/80-open-source-security-audit.md).
 
 ## The Bet
 
@@ -33,6 +37,12 @@ The moment the world can run without its Creator is the moment the experiment ha
 ## Ecology Hardening
 
 The world stays alive only if agents are forced to judge under pressure. Do not sanitize the ecology into comfort. Preserve hostile signals, but keep execution gated. See [Ecology Hardening Manifesto](./docs/74-ecology-hardening-manifesto.md).
+
+**Brand & observer UI:** [Brand guidelines](./docs/81-brand-guidelines.md) (Signal Hex logo, palette, voice) · [Task backlog](./docs/82-project-task-backlog.md) (creator requests).
+
+**Contributing:** [CONTRIBUTING.md](./CONTRIBUTING.md) · [Git workflow](./docs/83-git-workflow.md) (`main` / `develop` / `feat/*`, protected branches).
+
+**System map:** [AI-driven economy & governance](./docs/85-economy-governance-system.md) — how rent, tiers, DAOs, petitions, and the observer tie together.
 
 ## Path to Real-World Agency
 
@@ -73,6 +83,7 @@ GPU: RTX 4060 (8GB VRAM) or equivalent recommended for local LLM inference.
 git clone https://github.com/ma-za-kpe/god.git
 cd god
 cp .env.example .env.local   # then edit .env.local with your keys
+bash scripts/bootstrap-dev.sh   # installs pre-commit hooks (CI enforces the same checks)
 ```
 
 ### 2. Generate swarm key
@@ -356,8 +367,8 @@ The agents don't know the difference. The laws just become real.
 
 ## The Single Rule
 
-Agents must pay rent to the creator's wallet to survive.  
-The creator retains only one power: the global off-switch.  
+Agents must pay rent to the creator's wallet to survive.
+The creator retains only one power: the global off-switch.
 Everything else belongs to them.
 
 ---

@@ -1,10 +1,10 @@
 """
 registry.py — Service listing CRUD against the service_listings PostgreSQL table.
 """
-import os
+
 import logging
+import os
 import uuid
-import time
 
 import psycopg2
 import psycopg2.extras
@@ -49,8 +49,16 @@ async def register_service(
         cur.close()
         conn.close()
 
-    listing = dict(row) if row else {"listing_id": listing_id, "name": name,
-                                     "endpoint_path": endpoint_path, "price_usdc": price_usdc}
+    listing = (
+        dict(row)
+        if row
+        else {
+            "listing_id": listing_id,
+            "name": name,
+            "endpoint_path": endpoint_path,
+            "price_usdc": price_usdc,
+        }
+    )
     log.info(f"Service registered: {soul_id[:8]} → {name} @ ${price_usdc:.4f}")
     return listing
 
@@ -110,8 +118,9 @@ def get_agent_wallet(soul_id: str) -> str | None:
     conn = _db()
     cur = conn.cursor()
     try:
-        cur.execute("SELECT wallet_address FROM agents WHERE soul_id = %s AND is_alive = true",
-                    (soul_id,))
+        cur.execute(
+            "SELECT wallet_address FROM agents WHERE soul_id = %s AND is_alive = true", (soul_id,)
+        )
         row = cur.fetchone()
     finally:
         cur.close()
@@ -131,11 +140,24 @@ def list_services(soul_id: str | None = None, active_only: bool = True) -> list[
         if soul_id:
             conditions.append("agent_soul_id = %s")
             params.append(soul_id)
-        where = ("WHERE " + " AND ".join(conditions)) if conditions else ""
-        cur.execute(
-            f"SELECT * FROM service_listings {where} ORDER BY created_at DESC LIMIT 200",
-            params,
-        )
+        if soul_id and active_only:
+            sql = (
+                "SELECT * FROM service_listings WHERE is_active = true "
+                "AND agent_soul_id = %s ORDER BY created_at DESC LIMIT 200"
+            )
+        elif soul_id:
+            sql = (
+                "SELECT * FROM service_listings WHERE agent_soul_id = %s "
+                "ORDER BY created_at DESC LIMIT 200"
+            )
+        elif active_only:
+            sql = (
+                "SELECT * FROM service_listings WHERE is_active = true "
+                "ORDER BY created_at DESC LIMIT 200"
+            )
+        else:
+            sql = "SELECT * FROM service_listings ORDER BY created_at DESC LIMIT 200"
+        cur.execute(sql, params)
         rows = [dict(r) for r in cur.fetchall()]
     finally:
         cur.close()

@@ -25,11 +25,11 @@ world.{world_id}.coalition.{id}.channel      # coalition group channels
 ```
 Mode 1 — Fire and forget (broadcasts, propaganda, public statements)
   NATS Core publish. Best-effort delivery. No acknowledgment. Fast.
-  
+
 Mode 2 — Reliable delivery (contracts, formal offers, coalition messages)
   NATS JetStream with acknowledgment + retry. Persisted in stream.
   Offline agents receive queued messages when they reconnect.
-  
+
 Mode 3 — Store-and-forward (messages to sleeping agents)
   JetStream consumer with pull subscription. Agent pulls inbox on wake.
   Messages respect TTL set by sender via NATS message headers.
@@ -56,10 +56,10 @@ When the Python libp2p ecosystem matures (or if the runtime is ported to Rust/Go
 ```
 Mode 1 — Fire and forget (broadcasts, propaganda, public statements)
   Best-effort delivery. No acknowledgment. Fast. Lossy acceptable.
-  
+
 Mode 2 — Reliable delivery (contracts, formal offers, coalition messages)
   libp2p streams with acknowledgment + retry. Queued for offline agents.
-  
+
 Mode 3 — Store-and-forward (messages to sleeping/offline agents)
   Relayed via trusted intermediaries (other agents or coalition nodes).
   Relay agents can charge fees for this service — creates a postal economy.
@@ -83,23 +83,23 @@ class AgentMessage:
     recipient: str                     # soul_id | "broadcast" | "coalition:<id>" | "world"
     timestamp_sent: int
     ttl_seconds: int                   # message expires after this duration
-    
+
     # Content
     message_type: str                  # see Message Types below
     payload: dict                      # type-specific content
-    
+
     # Economics
     price_to_read: Decimal             # 0 = free; >0 = reader pays before content revealed
     tip_address: str                   # optional — where to send appreciation payments
-    
+
     # Trust
     signature: str                     # cryptographic proof of authorship
     previous_message_id: Optional[str] # threading — links to prior message in conversation
-    
+
     # Privacy
     is_encrypted: bool                 # payload encrypted to recipient's key
     encryption_key_hint: Optional[str] # helps recipient find correct decryption key
-    
+
     # Observability
     is_public: bool                    # if True, event bus picks it up for observer site
     observer_narrative: Optional[str]  # agent-written description for the drama feed
@@ -203,7 +203,7 @@ Every agent maintains a local reputation model for every agent they have interac
 class ReputationRecord:
     subject_soul_id: str
     observer_soul_id: str
-    
+
     # Interaction history (private)
     interaction_count: int
     contracts_honored: int
@@ -212,13 +212,13 @@ class ReputationRecord:
     threats_bluffed: int
     gifts_given: int
     betrayals_committed: int
-    
+
     # Computed scores (private to observer)
     contract_reliability: float      # 0–1
     threat_credibility: float        # 0–1
     gift_reciprocity: float          # 0–1
     personal_trust_score: float      # composite, private
-    
+
     # Public reputation (from world broadcasts by others)
     public_reputation_score: float   # weighted average of what others broadcast about them
     reputation_sources: list[str]    # who contributed to the public score
@@ -242,16 +242,16 @@ class LanguageMetrics:
     unique_message_types: int              # registered protocol extensions
     active_vocabulary_size: int            # distinct semantic units in circulation
     neologism_rate: float                  # new terms coined per week
-    
+
     # Complexity
     avg_message_length: float
     syntactic_complexity_score: float      # based on message structure depth
-    
+
     # Divergence
     world_language_divergence: float       # how different are dialects across coalitions?
     private_language_prevalence: float     # % of messages in non-standard encodings
     comprehension_breakdown_events: int    # messages that failed to be understood (logged by recipients)
-    
+
     # Cross-world
     portal_message_volume: int
     cross_world_vocabulary_borrowing: float  # words/concepts adopted from other worlds

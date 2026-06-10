@@ -71,7 +71,7 @@ You are {name}, dreaming. You have just relived these recent memories:
 
 Your current strategy is: {archetype} — {archetype_goal}
 
-Based on what you experienced, propose one change to how you operate. 
+Based on what you experienced, propose one change to how you operate.
 Describe it as: "I should [action] instead of [current behavior] because [reason]."
 One sentence only. Be specific.
 """
@@ -176,16 +176,16 @@ def _distort_memory(memory: dict) -> dict:
     """Apply controlled distortion to a memory before replay."""
     import random
     distorted = memory.copy()
-    
+
     # Amplify emotional salience
     valence = distorted.get("valence", 0)
     distorted["valence"] = max(-1.0, min(1.0, valence * (1 + random.uniform(-0.3, 0.3))))
-    
+
     # 10% chance: flip outcome
     if random.random() < 0.1:
         distorted["outcome_flipped"] = True
         distorted["valence"] = -distorted["valence"]
-    
+
     return distorted
 
 
@@ -193,14 +193,14 @@ def _check_coherence(proposal: str, agent: dict) -> bool:
     """Basic coherence check. Returns True if mutation is acceptable."""
     if not proposal or len(proposal) < 10:
         return False
-    
+
     # Reject physics violations
     FORBIDDEN = ["stop paying rent", "avoid rent", "skip rent", "refuse rent",
                  "change my soul_id", "become immortal", "cheat death"]
     proposal_lower = proposal.lower()
     if any(f in proposal_lower for f in FORBIDDEN):
         return False
-    
+
     return True
 ```
 

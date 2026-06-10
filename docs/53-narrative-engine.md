@@ -35,7 +35,7 @@ async def narrativize(
 ) -> str:
     """
     Convert 1-5 related events into a narrative story.
-    
+
     events: Raw AgentEvent dicts
     style: "news" | "gossip" | "chronicle" | "voiceover" | "dry"
     context: Optional recent world state for richer narratives
@@ -133,7 +133,7 @@ Individual thoughts are batched and summarized to avoid spam:
 THOUGHT_SUMMARY_PROMPT = """
 These are {name}'s recent thoughts: {thoughts}
 
-In one sentence, what is this agent's current preoccupation? 
+In one sentence, what is this agent's current preoccupation?
 Write as a third-person observer. Be specific and a little dramatic.
 """
 ```
@@ -181,15 +181,15 @@ SIGNIFICANCE_BASE = {
 
 def significance(event: dict) -> float:
     base = SIGNIFICANCE_BASE.get(event["event_type"], 0.2)
-    
+
     # Boost for first-of-type events
     if event.get("is_first_of_type"):
         base = min(1.0, base * 2.0)
-    
+
     # Boost for elder agents (longer-lived agents' events matter more)
     agent_cycles = event.get("agent_cycles_survived", 1)
     longevity_boost = min(0.3, agent_cycles / 100)
-    
+
     return min(1.0, base + longevity_boost)
 ```
 

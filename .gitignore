@@ -1,11 +1,21 @@
 # Secrets — never commit these
+.env
 .env.local
 .env.*.local
+!.env.example
 swarm.key
 *.pem
 *.key
 *-PRIVATE-KEYS.json
 agents-registry.json
+
+# Local IDE / agent settings (may contain machine-specific paths)
+.claude/
+.cursor/
+
+# Agent environment namespaces (runtime-generated)
+data/agent_env/
+data/agent_wallets.json
 
 # Dependencies
 node_modules/
@@ -46,3 +56,15 @@ logs/
 coverage/
 .coverage
 htmlcov/
+
+# Field operator dumps — paste in PR comments, never commit
+agent_data_full.json
+messages_data_full.json
+hallucination_examples.txt
+recent_runtime_logs.txt
+extracted_halluc_from_logs.txt
+pr_fresh_update.txt
+*_field_data.json
+
+# Documentation release build output
+dist/

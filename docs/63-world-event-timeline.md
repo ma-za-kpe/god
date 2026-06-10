@@ -142,10 +142,10 @@ async def check_for_firsts(event_type: str, event_payload: dict, event_id: str):
     first_type = FIRST_TYPE_MAP.get(event_type)
     if not first_type:
         return
-    
+
     conn = psycopg2.connect(DATABASE_URL, cursor_factory=psycopg2.extras.RealDictCursor)
     cur = conn.cursor()
-    
+
     # Check if this first has already been recorded
     cur.execute(
         "SELECT first_id FROM world_firsts WHERE first_type = %s AND world_id = %s",
@@ -154,11 +154,11 @@ async def check_for_firsts(event_type: str, event_payload: dict, event_id: str):
     if cur.fetchone():
         cur.close(); conn.close()
         return  # Not a first anymore
-    
+
     # Record the first
     first_id = str(uuid.uuid4())
     soul_id = event_payload.get("agent_id") or event_payload.get("soul_id")
-    
+
     cur.execute(
         """
         INSERT INTO world_firsts (first_id, first_type, soul_id, event_id, recorded_at, world_id, details)
@@ -170,9 +170,9 @@ async def check_for_firsts(event_type: str, event_payload: dict, event_id: str):
     )
     conn.commit()
     cur.close(); conn.close()
-    
+
     log.info(f"WORLD FIRST recorded: {first_type} (agent: {soul_id})")
-    
+
     # Emit a special timeline event for the observer
     from .event_emitter import get_emitter
     emitter = await get_emitter()
@@ -187,7 +187,7 @@ async def check_for_firsts(event_type: str, event_payload: dict, event_id: str):
 def _first_narrative(first_type: str, payload: dict) -> str:
     """Generate a human-readable narrative for a world first."""
     name = payload.get("name", payload.get("agent_id", "An agent")[:8])
-    
+
     narratives = {
         "first.birth":            f"▶ The world begins. {name} is the first life.",
         "first.death":            f"★ The first death. {name} is gone. Death is real.",
@@ -221,11 +221,11 @@ async def check_milestones():
     """
     conn = psycopg2.connect(DATABASE_URL, cursor_factory=psycopg2.extras.RealDictCursor)
     cur = conn.cursor()
-    
+
     # Population milestones
     cur.execute("SELECT COUNT(*) AS n FROM agents WHERE is_alive = true AND world_id = %s", (WORLD_ID,))
     living = cur.fetchone()["n"]
-    
+
     for threshold in [10, 25, 50, 100, 250, 500]:
         if living >= threshold:
             await _record_milestone_if_new(
@@ -233,7 +233,7 @@ async def check_milestones():
                 significance=_population_significance(threshold),
                 narrative=f"The world reaches {threshold} living agents.",
             )
-    
+
     # External revenue milestones
     cur.execute(
         "SELECT COALESCE(SUM(amount_usdc), 0) AS total FROM rent_payments "
@@ -241,7 +241,7 @@ async def check_milestones():
         (WORLD_ID,),
     )
     # Note: we'd track external revenue separately in production
-    
+
     cur.close(); conn.close()
 
 
@@ -268,7 +268,7 @@ async def _record_milestone_if_new(
     if cur.fetchone():
         cur.close(); conn.close()
         return
-    
+
     milestone_id = str(uuid.uuid4())
     cur.execute(
         """
@@ -283,9 +283,9 @@ async def _record_milestone_if_new(
     )
     conn.commit()
     cur.close(); conn.close()
-    
+
     log.info(f"MILESTONE: {milestone_type} — {narrative}")
-    
+
     from .event_emitter import get_emitter
     emitter = await get_emitter()
     await emitter.emit("timeline", "world.milestone", {
@@ -335,7 +335,7 @@ async def get_combined_timeline():
     """Combined chronological timeline of firsts and milestones."""
     firsts = (await get_world_firsts())["firsts"]
     milestones = (await get_world_milestones())["milestones"]
-    
+
     combined = []
     for f in firsts:
         combined.append({
@@ -353,7 +353,7 @@ async def get_combined_timeline():
             "significance": m["significance_score"],
             "narrative": m["narrative"],
         })
-    
+
     combined.sort(key=lambda x: x["timestamp"])
     return {"timeline": combined, "count": len(combined)}
 ```

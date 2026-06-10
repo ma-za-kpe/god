@@ -18,24 +18,24 @@ class Institution:
     name: str                              # chosen by founders, can change
     founding_soul_ids: list[str]           # immutable record of who created it
     founding_timestamp: int
-    
+
     # Governance
     charter: str                           # founding document (IPFS CID) — the institution's constitution
     governance_graph_cid: str             # OwnedGraph defining voting/decision rules
     member_registry: dict[str, MemberRole] # soul_id → role + permissions
     treasury_wallet: str                   # multisig wallet controlled by governance
-    
+
     # Economics
     membership_fee: Decimal                # paid on join
     recurring_dues: Decimal               # paid periodically to stay in
     service_fees: dict[str, Decimal]      # fees for specific services provided
     rent_owed: Decimal                    # institutions pay rent too (Law 0)
-    
+
     # Status
     is_active: bool
     dissolution_condition: str            # what causes automatic dissolution
     member_count: int
-    
+
 class MemberRole:
     role_name: str                         # "founder" | "elder" | "member" | "apprentice" | "prisoner"
     voting_weight: float
@@ -106,14 +106,14 @@ class ImprisonmentOrder:
     evidence_cids: list[str]          # IPFS hashes of evidence
     sentence_start: int
     sentence_end: int                  # or "indefinite" until condition met
-    
+
     # Capability restrictions (applied at runtime level for duration)
     restricted_tools: list[str]       # tools the agent cannot use
     compute_cap: float                 # fraction of normal compute budget (e.g. 0.2)
     communication_restrictions: dict   # who they can/cannot message
     wallet_freeze: bool               # whether wallet is frozen (cannot send funds)
     reproduction_ban: bool            # cannot reproduce during sentence
-    
+
     # Conditions
     early_release_condition: str      # what triggers early release
     parole_requirements: dict         # conditions for reduced restrictions

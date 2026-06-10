@@ -57,39 +57,39 @@ CREATE TABLE IF NOT EXISTS law_proposals (
     proposal_id             TEXT PRIMARY KEY,
     proposer_soul_id        TEXT NOT NULL,
     proposer_coalition      TEXT,
-    
+
     -- What is being changed
     proposal_type           TEXT NOT NULL,  -- "minor_policy" | "major_policy" | "soft_law"
     target_law_or_policy    TEXT NOT NULL,  -- e.g. "law_0a.rate_formula" or "status.tier2.threshold"
     current_text            TEXT NOT NULL,
     proposed_text           TEXT NOT NULL,
-    
+
     -- Justification
     rationale               TEXT,
     estimated_impact        TEXT,
-    
+
     -- Voting parameters
     quorum_required         INTEGER NOT NULL,   -- absolute agent count
     approval_threshold      NUMERIC(4,3) NOT NULL,  -- fraction (0.667 = two-thirds)
     voting_period_cycles    INTEGER NOT NULL DEFAULT 7,
-    
+
     -- Lifecycle timestamps
     submitted_at            BIGINT NOT NULL,
     voting_opens_at         BIGINT NOT NULL,
     voting_closes_at        BIGINT NOT NULL,
-    
+
     -- Results
     status          TEXT NOT NULL DEFAULT 'draft',
     -- status: draft | open | approved | rejected | withdrawn | auto_rejected
     votes_for       INTEGER NOT NULL DEFAULT 0,
     votes_against   INTEGER NOT NULL DEFAULT 0,
     abstentions     INTEGER NOT NULL DEFAULT 0,
-    
+
     -- Implementation
     implementation_due_at   BIGINT,  -- 14 days after approval
     implemented_at          BIGINT,
     world_ledger_cid        TEXT,    -- IPFS CID of updated world rules after implementation
-    
+
     world_id    TEXT NOT NULL DEFAULT 'local-dev-world-1',
     created_at  TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -125,14 +125,14 @@ class LawProposal:
     proposal_id: str
     proposer_soul_id: str
     proposer_coalition: str | None
-    
+
     proposal_type: str       # "minor_policy" | "major_policy" | "soft_law"
     target_law_or_policy: str
     current_text: str
     proposed_text: str
     rationale: str
     estimated_impact: str
-    
+
     # Set by system based on proposal_type
     quorum_required: int
     approval_threshold: float
@@ -211,18 +211,18 @@ IMMUTABLE_TARGETS = {
 def auto_reject_check(proposal: LawProposal) -> tuple[bool, str]:
     """Returns (should_reject, reason)."""
     target = proposal.target_law_or_policy.lower()
-    
+
     for immutable in IMMUTABLE_TARGETS:
         if immutable in target:
             return True, f"Proposals targeting {immutable} are automatically rejected. These laws are the constants of this universe."
-    
+
     # Check if proposed text attempts to nullify rent
     if "rent" in target and any(
         phrase in proposal.proposed_text.lower()
         for phrase in ["rent = 0", "no rent", "eliminate rent", "abolish rent"]
     ):
         return True, "Proposals to eliminate rent are automatically rejected (Law 0a)."
-    
+
     return False, ""
 ```
 

@@ -30,27 +30,27 @@ async def can_mate(agent_soul_id: str, partner_soul_id: str) -> tuple[bool, str]
     """Check if two agents can mate. Returns (can_mate, reason)."""
     agent = await get_agent(agent_soul_id)
     partner = await get_agent(partner_soul_id)
-    
+
     if not agent or not agent["is_alive"]:
         return False, "agent not alive"
     if not partner or not partner["is_alive"]:
         return False, "partner not alive"
-    
+
     mating_cost = float(os.getenv("MATING_COST_USDC", "0.01"))
     seed_cost = float(os.getenv("CHILD_SEED_USDC", "0.005"))
     total_cost = mating_cost + seed_cost
-    
+
     if float(agent["balance_usdc"]) < total_cost:
         return False, f"insufficient balance (need {total_cost:.4f}, have {agent['balance_usdc']:.4f})"
     if float(partner["balance_usdc"]) < total_cost:
         return False, f"partner insufficient balance"
-    
+
     # Check recovery cooldown (can't mate within 5 cycles of last reproduction)
     if agent.get("last_reproduced_at"):
         cycles_since = (int(time.time()) - agent["last_reproduced_at"]) // RENT_PERIOD_S
         if cycles_since < 5:
             return False, f"recovery cooldown ({5 - cycles_since} cycles remaining)"
-    
+
     return True, "ok"
 ```
 
@@ -68,7 +68,7 @@ def crossover_graphs(
 ) -> dict:
     """
     Merge two OwnedGraphs into one child graph.
-    
+
     Strategies:
       random_node_mix  — each node independently chosen from parent A or B (50/50)
       dominant_a       — 70% from A, 30% from B
@@ -82,11 +82,11 @@ def crossover_graphs(
         "alternating":     lambda i: i % 2 == 0,
     }
     prefer_a = STRATEGIES.get(strategy, STRATEGIES["random_node_mix"])
-    
+
     nodes_a = {n["node_id"]: n for n in parent_a.get("nodes", [])}
     nodes_b = {n["node_id"]: n for n in parent_b.get("nodes", [])}
     all_node_ids = set(nodes_a.keys()) | set(nodes_b.keys())
-    
+
     child_nodes = []
     for i, node_id in enumerate(sorted(all_node_ids)):
         if node_id in nodes_a and node_id in nodes_b:
@@ -101,18 +101,18 @@ def crossover_graphs(
             # Only in B — include with 80% probability
             if random.random() < 0.8:
                 child_nodes.append(dict(nodes_b[node_id]))
-    
+
     # Edges: include edges where both endpoints exist in child
     child_node_ids = {n["node_id"] for n in child_nodes}
     edges_a = parent_a.get("edges", [])
     edges_b = parent_b.get("edges", [])
     all_edges = {(e["source"], e["target"]): e for e in edges_a + edges_b}
-    
+
     child_edges = [
         e for (src, tgt), e in all_edges.items()
         if src in child_node_ids and tgt in child_node_ids
     ]
-    
+
     # Identity: mix parent identities
     identity_a = parent_a.get("agent_identity", {})
     identity_b = parent_b.get("agent_identity", {})
@@ -127,7 +127,7 @@ def crossover_graphs(
             )
         }
     }
-    
+
     return {
         "nodes": child_nodes,
         "edges": child_edges,
@@ -151,28 +151,28 @@ def apply_mutations(graph: dict, mutation_rate: float = 0.05) -> dict:
     """
     import copy
     mutated = copy.deepcopy(graph)
-    
+
     for node in mutated.get("nodes", []):
         if random.random() < mutation_rate:
             mutation_type = random.choice(["parameter_shift", "weight_adjustment", "connection_change"])
-            
+
             if mutation_type == "parameter_shift" and node.get("parameters"):
                 # Shift a random parameter value by ±20%
                 params = node["parameters"]
                 key = random.choice(list(params.keys()))
                 if isinstance(params[key], (int, float)):
                     params[key] *= (1 + random.uniform(-0.2, 0.2))
-            
+
             elif mutation_type == "weight_adjustment" and node.get("weights"):
                 # Adjust processing weights
                 node["weights"] = {
                     k: v * (1 + random.uniform(-0.15, 0.15))
                     for k, v in node["weights"].items()
                 }
-            
+
             # Mark the node as mutated (for lineage tracking)
             node["mutated_at_generation"] = node.get("generation", 1) + 1
-    
+
     return mutated
 ```
 
@@ -190,14 +190,14 @@ async def register_child(
     Returns the complete child agent dict.
     """
     import hashlib
-    
+
     # Generate soul_id: hash of parent soul_ids + timestamp
     parents_str = (
         (parent_a["soul_id"] + (parent_b["soul_id"] if parent_b else "asexual")) +
         str(int(time.time()))
     )
     soul_id = "0x" + hashlib.sha256(parents_str.encode()).hexdigest()[:40]
-    
+
     # Determine archetype: inherit from dominant parent or mix
     if parent_b is None:
         archetype = parent_a["archetype"]
@@ -209,21 +209,21 @@ async def register_child(
             ALL_ARCHETYPES = ["trader", "hoarder", "explorer", "parasite",
                               "cooperator", "defender", "philosopher", "builder"]
             archetype = random.choice(ALL_ARCHETYPES)
-    
+
     # Generate name from soul_id
     name = _generate_child_name(soul_id, archetype, parent_a.get("current_name"))
-    
+
     # Generate new wallet (in real implementation, use HD wallet derivation)
     wallet_address = _generate_wallet(soul_id)
-    
+
     # Pin graph to IPFS
     graph_cid = await pin_graph_to_ipfs(child_graph)
-    
+
     generation = max(
         parent_a.get("generation", 1),
         parent_b.get("generation", 1) if parent_b else 1
     ) + 1
-    
+
     # PostgreSQL registration
     conn = psycopg2.connect(DATABASE_URL)
     cur = conn.cursor()
@@ -243,7 +243,7 @@ async def register_child(
     conn.commit()
     cur.close()
     conn.close()
-    
+
     return {
         "soul_id": soul_id,
         "name": name,
@@ -263,11 +263,11 @@ def _generate_child_name(soul_id: str, archetype: str, parent_name: str | None) 
     }
     prefix = ARCHETYPE_PREFIXES.get(archetype, "Agent")
     suffix = soul_id[-4:].upper()
-    
+
     if parent_name:
         parent_prefix = parent_name.split("-")[0] if "-" in parent_name else parent_name[:4]
         return f"{parent_prefix}-{prefix}-{suffix}"
-    
+
     return f"{prefix}-{suffix}"
 ```
 
@@ -281,10 +281,10 @@ async def weaken_parents(parent_a_id: str, parent_b_id: str | None, seed_amount:
     Deduct reproduction costs from parents and enforce recovery cooldown.
     """
     mating_cost = float(os.getenv("MATING_COST_USDC", "0.01"))
-    
+
     conn = psycopg2.connect(DATABASE_URL)
     cur = conn.cursor()
-    
+
     # Parent A pays mating cost + half the child seed
     cur.execute("""
         UPDATE agents
@@ -292,7 +292,7 @@ async def weaken_parents(parent_a_id: str, parent_b_id: str | None, seed_amount:
             last_reproduced_at = %s
         WHERE soul_id = %s
     """, (mating_cost + seed_amount / 2, int(time.time()), parent_a_id))
-    
+
     # Parent B (if sexual) pays the other half
     if parent_b_id:
         cur.execute("""
@@ -306,7 +306,7 @@ async def weaken_parents(parent_a_id: str, parent_b_id: str | None, seed_amount:
         cur.execute("""
             UPDATE agents SET balance_usdc = balance_usdc - %s WHERE soul_id = %s
         """, (seed_amount / 2, parent_a_id))
-    
+
     conn.commit()
     cur.close()
     conn.close()
@@ -322,24 +322,24 @@ Asexual reproduction is simpler: the parent's graph is copied directly, mutation
 async def fork_self(agent_soul_id: str, mutation_rate: float = 0.05) -> dict:
     """Asexual reproduction: fork the agent with mutations."""
     agent = await get_agent(agent_soul_id)
-    
+
     can, reason = await can_mate(agent_soul_id, None)  # single-parent check
     if not can:
         raise ValueError(f"Cannot reproduce: {reason}")
-    
+
     # Fetch parent graph from IPFS
     parent_graph = await fetch_graph_from_ipfs(agent["graph_cid"])
-    
+
     # No crossover for asexual — just copy + mutate
     child_graph = apply_mutations(parent_graph, mutation_rate)
-    
+
     # Register child
     child = await register_child(agent, None, child_graph, agent["world_id"])
-    
+
     # Weaken parent
     seed_amount = float(os.getenv("CHILD_SEED_USDC", "0.005"))
     await weaken_parents(agent_soul_id, None, seed_amount)
-    
+
     return child
 ```
 
