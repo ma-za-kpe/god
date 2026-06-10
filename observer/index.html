@@ -225,6 +225,11 @@
       <div class="p-title" style="margin-top:7px">inequality (gini)</div>
       <div id="gini-bar"><div id="gini-fill"></div></div>
       <div class="p-row"><span class="pk">gini index</span><span class="pv" id="e-gini">—</span></div>
+      <div class="p-title" style="margin-top:7px">circulation (24h)</div>
+      <div class="p-row"><span class="pk">transfers</span><span class="pv hi" id="e-xfers">—</span></div>
+      <div class="p-row"><span class="pk">svc buys</span><span class="pv hi" id="e-svcbuys">—</span></div>
+      <div class="p-row"><span class="pk">ext rev 30d</span><span class="pv gold" id="e-extrev">—</span></div>
+      <div class="p-row"><span class="pk">episodes</span><span class="pv pur" id="e-episodes">—</span></div>
     </div>
     <div class="p-section">
       <div class="p-title">▸ POPULATION</div>
@@ -245,7 +250,7 @@
       <div id="archetype-bars"></div>
     </div>
     <div class="p-section">
-      <div class="p-title">▸ TOP EARNERS</div>
+      <div class="p-title">▸ TOP EARNERS (ext rev)</div>
       <div id="top-earners"></div>
     </div>
   </aside>
@@ -292,7 +297,7 @@
 // ═══════════════════════════════════════════════════════════════════════════
 const RUNTIME    = 'http://localhost:8888';
 const POLL_SNAP  = 3000;
-const CLUSTER_MODE_THRESHOLD = 200;
+const CLUSTER_MODE_THRESHOLD = 50;
 const SIM_INTERVAL_MS = 100;
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -1240,6 +1245,11 @@ function updateEcon(d) {
   const G=gini(bals);
   document.getElementById('e-gini').textContent=G.toFixed(3);
   document.getElementById('gini-fill').style.width=`${Math.round(G*100)}%`;
+  document.getElementById('e-xfers').textContent=d.transfers_24h ?? '0';
+  document.getElementById('e-svcbuys').textContent=d.service_purchases_24h ?? '0';
+  document.getElementById('e-extrev').textContent=d.external_revenue_30d!=null
+    ? parseFloat(d.external_revenue_30d).toFixed(3) : '—';
+  document.getElementById('e-episodes').textContent=d.episodes_total ?? '—';
 
   // Archetype bars
   const counts={};
@@ -1251,12 +1261,18 @@ function updateEcon(d) {
     barsEl.innerHTML+=`<div class="p-row"><span class="pk" style="width:54px;overflow:hidden">${arch}</span><div class="arch-bar-track"><div class="arch-bar-fill" style="width:${pct}%;background:${col}"></div></div><span class="pv" style="width:18px;text-align:right">${cnt}</span></div>`;
   }
 
-  // Top earners
-  const sorted=Object.values(S.agents).filter(a=>a.is_alive).sort((a,b)=>parseFloat(b.balance_usdc||0)-parseFloat(a.balance_usdc||0)).slice(0,5);
+  // Top earners — external revenue first (snapshot leaderboard), balance tie-break
+  const ranked=(d.top_earners&&d.top_earners.length)?d.top_earners
+    :Object.values(S.agents).filter(a=>a.is_alive)
+      .sort((a,b)=>parseFloat(b.balance_usdc||0)-parseFloat(a.balance_usdc||0)).slice(0,5)
+      .map(a=>({...a,external_revenue_30d:0}));
   const teEl=document.getElementById('top-earners'); teEl.innerHTML='';
-  for(const a of sorted) {
+  for(const a of ranked.slice(0,5)) {
     const col=ARCH_COL[a.archetype]||'#9090cc';
-    teEl.innerHTML+=`<div class="p-row"><span class="pk" style="color:${col}88;overflow:hidden;max-width:90px;white-space:nowrap">${a.current_name||a.soul_id.slice(0,8)}</span><span class="pv gold">${parseFloat(a.balance_usdc||0).toFixed(3)}</span></div>`;
+    const ext=parseFloat(a.external_revenue_30d||0);
+    const bal=parseFloat(a.balance_usdc||0);
+    const tier=a.tier!=null?`T${a.tier}`:'';
+    teEl.innerHTML+=`<div class="p-row"><span class="pk" style="color:${col}88;overflow:hidden;max-width:72px;white-space:nowrap" title="${a.current_name||a.soul_id}">${a.current_name||a.soul_id.slice(0,8)}</span><span class="pv gold" style="width:42px;text-align:right">${ext.toFixed(2)}</span><span class="pv" style="width:38px;text-align:right;opacity:0.75">${bal.toFixed(2)}</span><span class="pv pur" style="width:18px;text-align:right;font-size:9px">${tier}</span></div>`;
   }
 
   // Activity chart

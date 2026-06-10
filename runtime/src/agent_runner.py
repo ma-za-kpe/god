@@ -1263,6 +1263,19 @@ async def _run_cycle(
         if structured_action:
             await _execute_action(agent, structured_action, emitter)
 
+        try:
+            from .episodic_memory import commit_cycle_episode
+
+            await commit_cycle_episode(
+                agent,
+                thought=thought,
+                action_type=action_type,
+                structured_action=structured_action,
+                cycle_number=cycle_tick,
+            )
+        except Exception as e:
+            log.debug(f"  {name} episode commit skipped: {e}")
+
         # Legacy free-text tool dispatcher removed — all actions go through structured JSON.
         # See _execute_action() and _grounded_decide() in archetype_graphs.py.
 

@@ -554,6 +554,15 @@ async def get_tool_grants(soul_id: str):
 # ---------------------------------------------------------------------------
 
 
+@app.get("/agents/{soul_id}/episodes")
+async def get_agent_episodes(soul_id: str, limit: int = 20):
+    """Recent episodic memory index rows for an agent (GH #25 debug surface)."""
+    from .episodic_memory import list_episodes
+
+    rows = list_episodes(soul_id, limit=limit)
+    return {"soul_id": soul_id, "episodes": rows, "count": len(rows)}
+
+
 @app.get("/agents/{soul_id}/dreams")
 async def get_agent_dreams(soul_id: str, limit: int = 20):
     """Dream history for a specific agent."""
@@ -775,6 +784,11 @@ async def creator_genesis(
         db = os.getenv("DATABASE_URL", "postgresql://god:localdev@localhost:5432/god_world")
         conn = psycopg2.connect(db)
         cur = conn.cursor()
+        cur.execute(
+            "DELETE FROM service_listings WHERE agent_soul_id IN "
+            "(SELECT soul_id FROM agents WHERE world_id = %s)",
+            (world_id,),
+        )
         cur.execute("DELETE FROM agents WHERE world_id = %s", (world_id,))
         cur.execute("DELETE FROM sleep_states WHERE world_id = %s", (world_id,))
         # rent_payments has no world_id — delete by soul_id of agents just cleared
@@ -782,6 +796,9 @@ async def creator_genesis(
         cur.execute("DELETE FROM events WHERE world_id = %s", (world_id,))
         cur.execute("DELETE FROM agent_messages WHERE world_id = %s", (world_id,))
         cur.execute("DELETE FROM dreams WHERE world_id = %s", (world_id,))
+        cur.execute("DELETE FROM episodes WHERE world_id = %s", (world_id,))
+        cur.execute("DELETE FROM external_payments WHERE world_id = %s", (world_id,))
+        cur.execute("DELETE FROM agent_status WHERE world_id = %s", (world_id,))
         cur.execute("DELETE FROM world_firsts WHERE world_id = %s", (world_id,))
         cur.execute("DELETE FROM world_milestones WHERE world_id = %s", (world_id,))
         conn.commit()
@@ -812,6 +829,24 @@ async def creator_genesis(
             log.info(f"  GENESIS: {agent['name']} ({archetype}) soul={agent['soul_id'][:8]}")
         except Exception as e:
             log.error(f"  Failed to create genesis {archetype}: {e}")
+
+    # Seed starter marketplace so USDC circulates via buy_service / x402 locally
+    try:
+        from .services.registry import register_service
+
+        starter_services = (
+            ("world_stats", "Living agent count and USDC totals", 0.01),
+            ("generate_thought", "One archetype-styled thought from this agent", 0.02),
+        )
+        for agent in genesis_agents:
+            sid = agent["soul_id"]
+            for svc_name, svc_desc, svc_price in starter_services:
+                await register_service(sid, svc_name, svc_desc, svc_price)
+        log.info(
+            f"  Genesis marketplace: {len(starter_services)} services × {len(genesis_agents)} agents"
+        )
+    except Exception as e:
+        log.warning(f"  Genesis service seeding failed: {e}")
 
     # Emit genesis event
     try:
