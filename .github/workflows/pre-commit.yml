@@ -31,4 +31,6 @@ jobs:
         run: pip install pre-commit
 
       - name: Run hooks on all files
+        env:
+          SKIP: no-commit-to-branch
         run: pre-commit run --all-files --show-diff-on-failure
