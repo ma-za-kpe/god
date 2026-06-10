@@ -24,6 +24,7 @@ PR comments are **sufficient for agent ↔ field operator** when tagged and thre
 |---------|--------------|---------|
 | **Cursor / chat** | Creator + agent | Intent, priorities, “the grift,” course corrections |
 | **[Task backlog](./82-project-task-backlog.md)** | Agent (canonical) | Every creator request logged — nothing lost between sessions |
+| **[PROGRESS.md](../PROGRESS.md)** | Everyone | Build status, sprint summary, milestone queue |
 | **GitHub issues** | Everyone | Scoped work, close when done |
 | **PR comments** ([PR #1](https://github.com/ma-za-kpe/god/pull/1), [#13](https://github.com/ma-za-kpe/god/pull/13)) | Agent + field operator | `[AGENT-*]` / `[FIELD-*]` only — rebuild gates, logs, pass/fail |
 | **PR description** | Everyone | Current branch goal in one paragraph |
@@ -45,6 +46,7 @@ The coding agent **rereads relevant docs** before starting work — not just the
 | [Ecology manifesto](./74-ecology-hardening-manifesto.md) | Scaling → [76](./76-agent-scaling-and-observer-performance.md) |
 | [Autonomy local](./77-agent-autonomy-local.md) | Comms → [68](./68-agent-communication-implementation.md) |
 | [Manifesto audit](./75-manifesto-adherence-audit.md) | Physics → [14](./14-immutable-physics-laws.md) |
+| [PROGRESS.md](../PROGRESS.md) + [task backlog](./82-project-task-backlog.md) | — |
 
 Check [open issues](https://github.com/ma-za-kpe/god/issues) for backlog items not yet implemented.
 

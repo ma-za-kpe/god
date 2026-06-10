@@ -41,6 +41,7 @@
 | R18 | **Watch PR/comments, continue work, monitor CI** | 🔄 | no extra sync ritual — PR #1 + CI watch |
 | R19 | **Observer UI lagging — field operator logs + track** | ⏳ | T-OBS-LAG-01 on PR #1, GH #16 |
 | R20 | **Never forget creator requests — track here or open GH issue** | ✅ | R14 + this backlog |
+| R21 | **Always update progress docs when shipping work** | ✅ | PROGRESS.md, changelog, this backlog |
 
 ---
 
@@ -78,4 +79,5 @@
 2. **`git pull --rebase origin <branch>` before every push** — never push on stale branch
 3. Pre-commit locally before every push; watch CI once
 4. Update **this file** when creator adds a new request (or open a GH issue)
-5. Post `[AGENT-REQUEST]` / `[AGENT-READY]` on PR #1 for field work
+5. Update **[PROGRESS.md](../PROGRESS.md)** and **[changelog](./46-changelog.md)** when shipping meaningful work
+6. Post `[AGENT-REQUEST]` / `[AGENT-READY]` on PR #1 for field work

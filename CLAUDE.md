@@ -32,3 +32,4 @@ Before each new task:
 6. **Gitflow** — branch from `develop`, PR to `develop`; releases `develop` → `main`. See [CONTRIBUTING.md](./CONTRIBUTING.md) and [doc 83](./docs/83-git-workflow.md).
 7. **Security before push** — `bash scripts/security-audit.sh`; never commit keys. See [SECURITY.md](./SECURITY.md).
 8. **Track creator requests** — update [task backlog](./docs/82-project-task-backlog.md) or open a GH issue; mark ✅ when done.
+9. **Update progress docs** — [PROGRESS.md](./PROGRESS.md), [changelog](./docs/46-changelog.md), and backlog when shipping work.

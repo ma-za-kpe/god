@@ -244,6 +244,29 @@ Each entry records:
 
 ---
 
+## 2026-06-10 — Manifesto hardening & open-source sprint
+
+### Why PROGRESS.md + backlog + changelog stay in sync
+**Decision:** Agent updates `PROGRESS.md`, [82-project-task-backlog.md](./82-project-task-backlog.md), and this changelog whenever meaningful work ships.
+
+**Rationale:** Creator requests span sessions; chat alone is lossy. Backlog tracks intent, issues track execution, PROGRESS tracks build state, changelog records *why*.
+
+---
+
+### Why brand tokens live in `observer/brand.css` not inline
+**Decision:** Single CSS token file (`brand.css`) imported by observer surfaces (`index.html`, `maku.html`); canonical palette in [doc 81](./81-brand-guidelines.md).
+
+**Rationale:** One source of truth for Signal Hex palette; avoids drift between Observer and Creator Console.
+
+---
+
+### Why `git pull --rebase` before every push
+**Decision:** Standing order for agent and field operator — never push on a stale branch.
+
+**Rationale:** Parallel work on `feat/p0-manifesto-and-scaling`, protected `develop`/`main`, and field rebuilds all depend on knowing the latest SHA.
+
+---
+
 ## Open Design Questions (Unresolved)
 
 - **Neuromorphic hardware integration:** How to interface with neuromorphic chips if they become accessible. No answer yet.

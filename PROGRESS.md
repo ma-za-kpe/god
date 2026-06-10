@@ -1,7 +1,34 @@
 # GOD Project — Build Progress
 
-> Last updated: 2026-06-09
-> Current phase: **Phase 1 — Local Dev Stack** (runtime feature complete, docs in progress)
+> Last updated: 2026-06-10
+> Current phase: **Phase 1 — Local Dev Stack** (runtime feature complete; manifesto hardening + scale path in flight)
+> Active branch: `feat/p0-manifesto-and-scaling` · merged to `develop`/`main` via PR #13/#14
+
+**Also update when shipping work:** [task backlog](./docs/82-project-task-backlog.md) (creator requests), [changelog](./docs/46-changelog.md) (design decisions).
+
+---
+
+## Creator request tracker
+
+Canonical list: [docs/82-project-task-backlog.md](./docs/82-project-task-backlog.md) (R1–R21). GitHub issues for scoped execution.
+
+| Status | Count | Highlights |
+|--------|-------|------------|
+| ✅ Done | R1–R2, R6–R17, R20–R21 | Brand, gitflow, economy map, agentic deals, open source |
+| 🔄 Active | R3, R5, R18 | Pull-before-push, grounding field validation, PR/CI watch |
+| ⏳ Waiting | R4, R19 | T-5000-01 scale test; observer lag [#16](https://github.com/ma-za-kpe/god/issues/16) |
+
+---
+
+## Recent sprint (2026-06-10)
+
+| Area | Shipped | Ref |
+|------|---------|-----|
+| Manifesto hardening | Physics gate, inbox salience, grounding hardening | `physics_gate.py`, `inbox_salience.py`, `grounding.py` |
+| Observer | Live buzz UI, brand theme, WORLD LOG tab, `maku.html` brand pass | `observer/index.html`, `brand.css`, `maku.html` |
+| Economy | Agentic offer/acceptance, `buy_service` settlement | `economic_activity.py`, [doc 85](./docs/85-economy-governance-system.md) |
+| Repo / CI | MIT, CONTRIBUTING, gitflow, pre-commit in Actions, docs release | #12–#15, [doc 83](./docs/83-git-workflow.md) |
+| Brand | Signal Hex logo, palette, guidelines | [doc 81](./docs/81-brand-guidelines.md) |
 
 ---
 
@@ -15,7 +42,7 @@
 | Event bus (NATS JetStream) | ✅ Running | WORLD_EVENTS stream, AGENT_MESSAGES stream (spec'd) |
 | State (Redis + PostgreSQL) | ✅ Running | Full schema applied, all 20+ tables live |
 | Agent runtime (FastAPI) | ✅ Running | 14 API endpoints live |
-| Observer UI | ✅ Running | http://localhost:3000 — Phase 1 hex canvas, drama feed |
+| Observer UI | ✅ Running | http://localhost:3000 — buzz UI, brand theme, drama + WORLD LOG; `maku.html` Creator Console |
 | Smart contracts | ✅ Complete | MockUSDC + RentCollector deployed to Anvil |
 | LLM inference (Ollama) | ✅ Complete | llama3.1:8b on RTX 4060, agents thinking every 30s |
 | Genesis agents | ✅ Complete | 5+ agents alive, drama feed live |
@@ -127,8 +154,16 @@ Last run: 2026-06-09 — **13/13 passing**
 - **⚠️ Redeploy needed**: run `Deploy.s.sol` to get updated addresses after SoulNFT was added
 
 ### Observer UI
-- `observer/index.html` — Phase 1: hex canvas, agent orbs, inspector, drama feed (live)
+- `observer/index.html` — hex canvas, live buzz, drama feed + WORLD LOG tab, brand lockup
+- `observer/maku.html` — Creator Console (brand tokens via `brand.css`)
+- `observer/brand.css` + `observer/assets/logo.svg` — Signal Hex brand system ([doc 81](./docs/81-brand-guidelines.md))
 - `observer/Dockerfile` — Python HTTP server
+
+### Manifesto hardening (feat/p0-manifesto-and-scaling)
+- `runtime/src/physics_gate.py` — rent-before-cognition gate
+- `runtime/src/inbox_salience.py` — salience-ranked inbox at scale
+- `runtime/src/grounding.py` — thought grounding against live world state
+- `runtime/src/economic_activity.py` — structured offer/acceptance + `buy_service`
 
 ### Documentation — 70 docs in `docs/`
 
@@ -174,9 +209,15 @@ These modules have complete implementation specs but the code files don't exist 
 
 ## Next Milestones
 
+### Manifesto & scale (in flight)
+
+1. **T-5000-01** — field scale test on PR #1 ([doc 78](./docs/78-pr-field-test-protocol.md))
+2. **Observer perf** — T-OBS-LAG-01 field data → fixes per [doc 76](./docs/76-agent-scaling-and-observer-performance.md) ([#16](https://github.com/ma-za-kpe/god/issues/16))
+3. **Grounding** — continue field validation; no ungrounded thoughts in production paths
+
 ### Phase 1 Completion (all on localhost)
 
-1. **Dream engine** — implement `dream_engine.py` per doc 67, integrate into `agent_runner.py`
+1. **Dream engine** — `dream_engine.py` exists; deepen integration per doc 67
 2. **Consciousness detection** — implement `runtime/src/consciousness.py` per doc 71 (pending)
 3. **Token factory** — implement `runtime/src/token_factory.py` per doc 72 (pending)
 4. **Observer Phase 4.0** — bootstrap React + R3F observer per doc 70
