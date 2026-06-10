@@ -1060,6 +1060,11 @@ async def _run_cycle(
     # Empirically tuned: agents with ≥8 consecutive active cycles may dream
     REST_THRESHOLD = int(os.getenv("DREAM_REST_THRESHOLD", "8"))
 
+    from .reproduction import compute_reproduction_eligible
+
+    peer_pool = all_agents if all_agents is not None else agents
+    eligible_repro = compute_reproduction_eligible(peer_pool)
+
     batch = _batch_preload_context(agents)
     batch_inboxes = batch["inboxes"]
     batch_reputation = batch["reputation"]
@@ -1161,6 +1166,7 @@ async def _run_cycle(
         # Inject full world context: peers, inbox, services, coalitions
         # ----------------------------------------------------------------
         agent = dict(agent)
+        agent["_repro_eligible"] = soul_id in eligible_repro
         peer_pool = all_agents if all_agents is not None else agents
         agent["_peers"] = _salience_peers(agent, peer_pool)
         agent["_inbox"] = batch_inboxes.get(soul_id) or []
