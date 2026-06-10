@@ -28,4 +28,5 @@ Before each new task:
 2. **Pre-commit locally** — `python3 -m pre_commit run --all-files` must pass before every push.
 3. **Watch CI once** — after push, `bash scripts/watch-ci.sh` (or `gh run watch`); fix failures before piling on commits.
 4. **Conserve Actions credits** — no empty commits, no re-pushes to “re-run CI”; batch fixes; feature branches rely on PR checks only (not push+PR duplicate runs).
+5. **Gitflow** — branch from `develop`, PR to `develop`; releases `develop` → `main`. See [CONTRIBUTING.md](./CONTRIBUTING.md) and [doc 83](./docs/83-git-workflow.md).
 5. **Security before push** — `bash scripts/security-audit.sh`; never commit keys. See [SECURITY.md](./SECURITY.md).
