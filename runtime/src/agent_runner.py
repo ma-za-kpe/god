@@ -452,10 +452,19 @@ async def _execute_action(agent: dict, action: dict, emitter) -> None:
         # ── deploy_token ────────────────────────────────────────────────────
         if act_type == "deploy_token":
             from .token_factory import deploy_token as do_deploy
+            from .wallet_store import get_agent_private_key
             symbol = str(action.get("service_name") or name[:4].upper())[:8].upper()
+            wallet_address = agent.get("wallet_address") or ""
+            private_key = get_agent_private_key(soul_id)
+            if not wallet_address or not private_key:
+                log.debug(f"  {name} deploy_token: wallet key not in local store (re-genesis?)")
+                log_action(soul_id, act_type, action, {"error": "wallet key unavailable"}, success=False)
+                return
             try:
                 result = await do_deploy(
-                    agent_soul_id=soul_id,
+                    soul_id=soul_id,
+                    wallet_address=wallet_address,
+                    wallet_private_key=private_key,
                     name=f"{name}'s Token",
                     symbol=symbol,
                     initial_supply=1_000_000,

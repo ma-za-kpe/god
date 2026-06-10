@@ -100,6 +100,9 @@ async def fork_self(agent: dict) -> dict:
     log.debug(f"  [{name}] child graph CID: {child_graph_cid}")
 
     # --- register child in DB ---
+    from .wallet_store import store_wallet
+    store_wallet(child_soul_id, child_wallet["address"], child_wallet["private_key"])
+
     child = await _register_child(
         soul_id        = child_soul_id,
         graph_cid      = child_graph_cid,
@@ -187,6 +190,9 @@ async def mate(agent_a: dict, agent_b: dict) -> dict:
         child_archetype=child_archetype,
         child_wallet=child_wallet["address"],
     )
+
+    from .wallet_store import store_wallet
+    store_wallet(child_soul_id, child_wallet["address"], child_wallet["private_key"])
 
     child = await _register_child(
         soul_id        = child_soul_id,

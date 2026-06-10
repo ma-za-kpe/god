@@ -91,6 +91,9 @@ async def seed_one_agent(
         cid = f"local:{graph.content_hash()[:16]}"
         graph.graph_id = cid
 
+    from .wallet_store import store_wallet
+    store_wallet(soul_id, wallet_address, private_key)
+
     result = {
         "soul_id": soul_id,
         "graph_cid": cid,

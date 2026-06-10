@@ -9,6 +9,7 @@ agents-registry.json
 
 # Agent environment namespaces (runtime-generated)
 data/agent_env/
+data/agent_wallets.json
 
 # Dependencies
 node_modules/
