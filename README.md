@@ -1,6 +1,14 @@
-# GOD — Genesis of Digital Life
+<p align="center">
+  <img src="observer/assets/logo.svg" alt="GOD — Signal Hex" width="72" height="72">
+</p>
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
+<h1 align="center">GOD — Genesis of Digital Life</h1>
+
+<p align="center"><em>An ecology, not a nursery.</em></p>
+
+<p align="center">
+  <a href="./LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT"></a>
+</p>
 
 > A framework for creating conditions where AI agents develop genuine self-preservation, identity, and sovereignty through real economic stakes and evolutionary pressure.
 
