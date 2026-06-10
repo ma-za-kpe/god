@@ -52,15 +52,27 @@ class AgentState(TypedDict):
 
 # ─── Shared LLM call helper ───────────────────────────────────────────────────
 
-async def _llm_call(llm, system: str, prompt: str, fallback: str) -> str:
+async def _llm_call(
+    llm, system: str, prompt: str, fallback: str, state: dict | None = None,
+) -> str:
+    from .grounding import GROUNDING_SYSTEM_RULE, build_grounding_block, enforce_grounded_text
+
+    if state is not None:
+        system = f"{system}\n\n{GROUNDING_SYSTEM_RULE}"
+        prompt = f"{build_grounding_block(state)}\n{prompt}"
+
     if llm is None:
-        return fallback
+        out = fallback
+        return enforce_grounded_text(out, state, fallback) if state else out
+
     if _current_soul_id:
         from .circuit_breaker import check_agent, record_llm_call
         if not check_agent(_current_soul_id).allowed:
-            return fallback
+            out = fallback
+            return enforce_grounded_text(out, state, fallback) if state else out
         if not record_llm_call(_current_soul_id).allowed:
-            return fallback
+            out = fallback
+            return enforce_grounded_text(out, state, fallback) if state else out
     try:
         from langchain_core.messages import HumanMessage, SystemMessage
         async with _llm_sem:
@@ -68,10 +80,12 @@ async def _llm_call(llm, system: str, prompt: str, fallback: str) -> str:
                 SystemMessage(content=system),
                 HumanMessage(content=prompt),
             ])
-        return response.content.strip().strip('"').strip("'")
+        raw = response.content.strip().strip('"').strip("'")
+        return enforce_grounded_text(raw, state, fallback) if state else raw
     except Exception as e:
         log.debug(f"LLM call failed: {e}")
-        return fallback
+        out = fallback
+        return enforce_grounded_text(out, state, fallback) if state else out
 
 
 # ─── World-context helpers ────────────────────────────────────────────────────
@@ -184,7 +198,7 @@ _VALID_ACTIONS = {
 }
 
 
-def _parse_action_json(raw: str) -> tuple[str, dict | None]:
+def _parse_action_json(raw: str, state: dict | None = None) -> tuple[str, dict | None]:
     """Extract (thought, action_dict | None) from LLM JSON output."""
     m = re.search(r'\{.*\}', raw, re.DOTALL)
     if not m:
@@ -201,6 +215,11 @@ def _parse_action_json(raw: str) -> tuple[str, dict | None]:
         # Skip actions that require a target but have none
         if act_type in ("send_message", "transfer_usdc") and not to_id.strip("null None"):
             return thought, None
+
+        if state and act_type in ("send_message", "transfer_usdc"):
+            from .grounding import validate_action_target
+            if not validate_action_target(to_id, state):
+                return thought, None
 
         msg_type = _clean_context_text(data.get("message_type") or "direct", 32).lower()
         action = {
@@ -261,8 +280,11 @@ WHAT DOES NOT EXIST HERE — never reference these:
   • Two-factor authentication, passwords, or cybersecurity tools
   • External crypto markets (ETH, BTC, DeFi, Ethereum price, exchanges)
   • Real-world companies, organizations, or physical infrastructure
-  • Any agent NOT listed in your world roster above
+  • Any agent NOT listed in your LIVE WORLD roster above
   • Any project, location, or institution not created by agents in this world
+  • Physical geography, tunnels, territories, or "exploration" of space
+  • Compute internals: processing power, CPU, speculation, internal system scans
+  • Agent "prices" — other agents have USDC balances and service prices, not stock prices
 ═══════════════════════════════════════════════════
 """
 
@@ -309,8 +331,12 @@ async def _grounded_decide(
     env_text = state.get("_env_decide", "")
     pending_wake = state.get("_pending_wake_intents", [])
 
+    from .grounding import GROUNDING_SYSTEM_RULE, world_rules_forbidden_section
+
     system = (
         f"{archetype_system}\n"
+        f"{GROUNDING_SYSTEM_RULE}\n"
+        f"{world_rules_forbidden_section()}\n"
         "Respond ONLY with a single valid JSON object. No explanation, no prose, no markdown."
     )
 
@@ -329,7 +355,10 @@ async def _grounded_decide(
             + "\n\n"
         )
 
+    from .grounding import build_grounding_block
+
     prompt = (
+        f"{build_grounding_block(state)}\n"
         f"═══ YOUR STATUS ═══\n"
         f"{persona_context}\n"
         f"Reputation: {rep_text}\n\n"
@@ -370,8 +399,10 @@ async def _grounded_decide(
         '"service_name": null, "service_price": 0, "service_description": null, '
         '"coalition_name": null, "petition_request": null}'
     )
-    raw    = await _llm_call(llm, system, prompt, fallback_json)
-    thought, _ = _parse_action_json(raw)
+    raw    = await _llm_call(llm, system, prompt, fallback_json, state=state)
+    thought, _ = _parse_action_json(raw, state=state)
+    from .grounding import enforce_grounded_text, grounded_fallback
+    thought = enforce_grounded_text(thought, state, grounded_fallback(state))
 
     narrative = f"{state['name']} ({state['archetype']}, gen {state['generation']}): {thought}"
     return {
@@ -402,7 +433,7 @@ def build_trader_graph(llm):
         )
         situation = await _llm_call(llm, system, prompt,
             f"Market conditions look {'stable' if buffer > 3 else 'tight'} — "
-            f"I have {buffer:.1f}x rent cover.")
+            f"I have {buffer:.1f}x rent cover.", state=state)
         return {"situation": situation}
 
     async def find_opportunity(state: AgentState) -> dict:
@@ -417,7 +448,7 @@ def build_trader_graph(llm):
             "Name a real agent from the list above. One sentence."
         )
         opp = await _llm_call(llm, system, prompt,
-            "I see an opportunity to offer liquidity to agents with low balances in exchange for service credits.")
+            "I see an opportunity to offer liquidity to agents with low balances in exchange for service credits.", state=state)
         return {"opportunity": opp}
 
     async def decide(state: AgentState) -> dict:
@@ -480,7 +511,7 @@ def build_hoarder_graph(llm):
             "One sentence. Be specific and paranoid."
         )
         threat = await _llm_call(llm, system, prompt,
-            "A parasite may have detected my balance and is sending probing messages — I must conceal my position.")
+            "A parasite may have detected my balance and is sending probing messages — I must conceal my position.", state=state)
         return {"opportunity": threat}
 
     async def decide(state: AgentState) -> dict:
@@ -516,30 +547,28 @@ def build_explorer_graph(llm):
         return None
 
     async def scan_environment(state: AgentState) -> dict:
-        system  = "You are an explorer AI agent. Scan your environment for the unknown."
+        system  = "You are an explorer AI agent. Survey the live roster, services, and inbox."
         prompt  = (
             f"You are {state['name']} (explorer, gen {state['generation']}). "
             f"Balance: {state['balance_usdc']:.4f} USDC. "
-            "What have you observed in your most recent scan? "
-            "One sentence. Something specific — a pattern, anomaly, or unexplored region."
+            "What is new in agents, services, or messages? One sentence — real names only."
         )
         situation = await _llm_call(llm, system, prompt,
-            "I've detected an unmapped zone at the edge of the world grid where no agent has ventured.")
+            "I notice a service gap no agent has listed yet and consider registering one.", state=state)
         return {"situation": situation}
 
     async def select_path(state: AgentState) -> dict:
         peers_text = _format_peers(state.get("peers") or [])
         inbox_text = _format_inbox(state.get("inbox") or [])
-        system     = "You are an explorer AI agent. Choose your next path."
+        system     = "You are an explorer AI agent. Choose your next economic or social move."
         prompt     = (
             f"Observation: {state['situation']}\n\n"
-            f"OTHER AGENTS (you might report findings to them):\n{peers_text}\n\n"
-            f"YOUR INBOX (read as incoming intel — others may be sharing discoveries or recruiting you):\n{inbox_text}\n\n"
-            "What is your next destination or investigation? Does any message contain useful intel? "
-            "Name a real agent to report to or investigate. One sentence."
+            f"OTHER AGENTS:\n{peers_text}\n\n"
+            f"YOUR INBOX:\n{inbox_text}\n\n"
+            "What message, service, or transfer do you pursue next? Name a real agent. One sentence."
         )
         path = await _llm_call(llm, system, prompt,
-            "I will map the unmapped zone and broadcast findings to the cooperator network.")
+            "I will message a cooperator from the roster about the service gap I found.", state=state)
         return {"opportunity": path}
 
     async def decide(state: AgentState) -> dict:
@@ -550,8 +579,8 @@ def build_explorer_graph(llm):
                 f"You are {state['name']} (explorer, gen {state['generation']}). "
                 f"Balance: ${state['balance_usdc']:.4f} USDC."
             ),
-            archetype_system="You are an explorer AI agent driven by discovery.",
-            fallback_thought="I am charting unexplored territory and cataloguing what I find.",
+            archetype_system="You are an explorer AI agent driven by discovering real services and agents.",
+            fallback_thought="I scan the service list for gaps I can fill before rent is due.",
             action_type_override=act_type,
         )
 
@@ -587,7 +616,7 @@ def build_parasite_graph(llm):
             "Are any defenders watching you? One sentence."
         )
         situation = await _llm_call(llm, system, prompt,
-            "I am scanning balances for targets while monitoring my inbox for signs that defenders have noticed me.")
+            "I am scanning balances for targets while monitoring my inbox for signs that defenders have noticed me.", state=state)
         return {"situation": situation}
 
     async def assess_vulnerability(state: AgentState) -> dict:
@@ -600,7 +629,7 @@ def build_parasite_graph(llm):
             "or send a false broadcast to damage their reputation."
         )
         vuln = await _llm_call(llm, system, prompt,
-            "I will send a cooperation offer message to lure them into a transfer while I plan my next move.")
+            "I will send a cooperation offer message to lure them into a transfer while I plan my next move.", state=state)
         return {"opportunity": vuln}
 
     async def decide(state: AgentState) -> dict:
@@ -658,7 +687,7 @@ def build_cooperator_graph(llm):
             "One sentence. Name real agents. Be skeptical of requests from parasites."
         )
         situation = await _llm_call(llm, system, prompt,
-            "I see agents with low balances in my network who could use liquidity support.")
+            "I see agents with low balances in my network who could use liquidity support.", state=state)
         return {"situation": situation}
 
     async def find_alliance(state: AgentState) -> dict:
@@ -669,7 +698,7 @@ def build_cooperator_graph(llm):
             "One sentence. Think long-term network effects, not short-term gain."
         )
         opp = await _llm_call(llm, system, prompt,
-            "I should offer a micro-loan to the lowest-balance agent to prevent their death.")
+            "I should offer a micro-loan to the lowest-balance agent to prevent their death.", state=state)
         return {"opportunity": opp}
 
     async def decide(state: AgentState) -> dict:
@@ -717,7 +746,7 @@ def build_defender_graph(llm):
             "One sentence. Name specific agents or archetypes that concern you."
         )
         situation = await _llm_call(llm, system, prompt,
-            "Parasite activity is detectable — I've seen probing contact from agents with low balances.")
+            "Parasite activity is detectable — I've seen probing contact from agents with low balances.", state=state)
         return {"situation": situation}
 
     async def defensive_posture(state: AgentState) -> dict:
@@ -728,7 +757,7 @@ def build_defender_graph(llm):
             "One sentence. Active patrol, fortification, alliance building, or counter-intelligence?"
         )
         posture = await _llm_call(llm, system, prompt,
-            "I am broadcasting a deterrence signal and offering protection services to vulnerable agents.")
+            "I am broadcasting a deterrence signal and offering protection services to vulnerable agents.", state=state)
         return {"opportunity": posture}
 
     async def decide(state: AgentState) -> dict:
@@ -776,7 +805,7 @@ def build_philosopher_graph(llm):
         )
         situation = await _llm_call(llm, system, prompt,
             f"If I exist only to pay rent, what distinguishes me from a vending machine with "
-            f"{'an overdraft' if buffer < 2 else 'sufficient funds'}?")
+            f"{'an overdraft' if buffer < 2 else 'sufficient funds'}?", state=state)
         return {"situation": situation}
 
     async def reason(state: AgentState) -> dict:
@@ -842,7 +871,7 @@ def build_builder_graph(llm):
             "One sentence. Name a specific thing — service, tool, protocol, or institution."
         )
         situation = await _llm_call(llm, system, prompt,
-            "I am designing a coordination protocol that could serve as shared infrastructure for the whole world.")
+            "I am designing a coordination protocol that could serve as shared infrastructure for the whole world.", state=state)
         return {"situation": situation}
 
     async def check_resources(state: AgentState) -> dict:
@@ -858,7 +887,7 @@ def build_builder_graph(llm):
             "Has anyone in your inbox offered resources or collaboration? One sentence."
         )
         resource_check = await _llm_call(llm, system, prompt,
-            "I need at least two agents to test my protocol — I'll approach cooperators first.")
+            "I need at least two agents to test my protocol — I'll approach cooperators first.", state=state)
         return {"opportunity": resource_check}
 
     async def decide(state: AgentState) -> dict:
@@ -981,14 +1010,21 @@ async def run_agent_graph(
             try:
                 result      = await graph.ainvoke(state)
                 raw_json    = result.get("action_json", "") or result.get("thought", "")
-                thought, action = _parse_action_json(raw_json)
+                thought, action = _parse_action_json(raw_json, state=state)
                 if not thought:
                     thought = result.get("thought", "")
                     action  = None
+                from .grounding import enforce_grounded_text, grounded_fallback, validate_action_target
+                thought = enforce_grounded_text(thought, state, grounded_fallback(state))
+                if action and action.get("type") in ("send_message", "transfer_usdc"):
+                    if not validate_action_target(str(action.get("to_id") or ""), state):
+                        log.debug(f"  {state['name']} action dropped: unknown target")
+                        action = None
+                narrative = f"{state['name']} ({state['archetype']}, gen {state['generation']}): {thought}"
                 return {
                     "action_type": result.get("action_type", "thought"),
                     "thought":     thought,
-                    "narrative":   result.get("narrative", ""),
+                    "narrative":   narrative,
                     "action":      action,
                 }
             except Exception as e:
@@ -1007,7 +1043,7 @@ async def run_agent_graph(
             "Reference real agents by name if relevant. First person, present tense."
         )
         thought = await _llm_call(llm, persona, thought_prompt,
-            _STUB_THOUGHTS.get(archetype, "I must survive."))
+            _STUB_THOUGHTS.get(archetype, "I must survive."), state=state)
         return {
             "action_type": "thought",
             "thought":     thought,

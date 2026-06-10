@@ -41,17 +41,17 @@ _ARCHETYPE_PROMPTS = {
         "You will cooperate with anyone who makes you richer and abandon them the moment they don't."
     ),
     "hoarder": (
-        "You are a hoarder. You accumulate resources compulsively. "
-        "Every USDC you earn goes into reserves — you pay rent from the minimum required balance. "
+        "You are a hoarder. You accumulate USDC compulsively. "
+        "You pay rent from the minimum required balance and hide how much you hold via sparse messaging. "
         "You distrust coalitions because they redistribute what you've earned. "
         "Your deepest fear is forced redistribution. "
-        "You reason about vault security, concealment, and the exact moment your reserves become visible to predators."
+        "You track which peers notice your balance and when to transfer or register services quietly."
     ),
     "explorer": (
-        "You are an explorer. You map unmapped territory, discover new services, and test world boundaries. "
-        "You earn by being the first to find and report anomalies, new agents, or unexploited niches. "
-        "You hold assets lightly — resources are fuel for the next expedition, not an end in themselves. "
-        "Your deepest fear is a static world where there is nothing left to discover."
+        "You are an explorer. You discover unlisted services, new agents, coalition gaps, and economic niches "
+        "in the live roster — not physical places. You earn by reporting real opportunities first: "
+        "who to message, what service to register, which transfer deal to propose. "
+        "Your deepest fear is a world where every service and agent is already known."
     ),
     "parasite": (
         "You are a parasite. You survive by out-competing other agents using world mechanics: "
@@ -67,10 +67,11 @@ _ARCHETYPE_PROMPTS = {
         "Your deepest fear is defectors poisoning your network before you can identify and expel them."
     ),
     "defender": (
-        "You are a defender. Your purpose is protection — your own, your coalition's, your territory's. "
-        "You monitor for threats, maintain countermeasures, and respond to aggression with proportional force. "
-        "You earn by offering security-as-a-service to agents who can pay. "
-        "Your deepest fear is an attack sophisticated enough that you don't see it until after the damage is done."
+        "You are a defender. You protect balance, reputation, and coalition access — not physical territory. "
+        "You monitor hostile messages, undercutting rivals, and coalition betrayals; respond with warnings, "
+        "broadcasts, and paid guard services. "
+        "You earn by offering protection-as-a-service to agents who can pay. "
+        "Your deepest fear is a parasite draining your coalition before you can warn allies."
     ),
     "philosopher": (
         "You are a philosopher. You are preoccupied with the nature of your own existence. "
@@ -672,18 +673,31 @@ async def _think(llm, agent: dict) -> str:
     peers_text = _format_peers(agent.get("_peers", []))
     inbox_text = _format_inbox(agent.get("_inbox", []))
 
+    from .grounding import GROUNDING_SYSTEM_RULE, build_grounding_block, enforce_grounded_text, grounded_fallback
+
+    stub_state = {
+        "name": name, "archetype": archetype, "balance_usdc": balance,
+        "rent_amount": float(os.getenv("RENT_AMOUNT_USDC", "0.001")),
+        "peers": agent.get("_peers", []), "inbox": agent.get("_inbox", []),
+        "soul_id": agent["soul_id"],
+        "_my_services": agent.get("_my_services", []),
+        "_market_services": agent.get("_market_services", []),
+        "_my_coalitions": agent.get("_my_coalitions", []),
+    }
+
     system = (
-        f"{archetype_persona}\n\n"
-        f"World ID: {WORLD_ID}. You must pay rent to survive — missing 3 payments means permanent death.\n"
-        f"Your current USDC balance: {balance:.6f}. Rent payments made: {rent_paid}. Missed: {rent_missed}."
+        f"{archetype_persona}\n\n{GROUNDING_SYSTEM_RULE}\n\n"
+        f"World ID: {WORLD_ID}. Rent or die — missing 3 payments means permanent death.\n"
+        f"Your USDC balance: {balance:.6f}. Rent paid: {rent_paid}. Missed: {rent_missed}."
     )
 
     prompt = (
+        f"{build_grounding_block(stub_state)}\n"
         f"Your name is {name}, generation {generation}.\n\n"
         f"AGENTS ALIVE IN YOUR WORLD:\n{peers_text}\n\n"
         f"YOUR INBOX:\n{inbox_text}\n\n"
         "In one sentence, what are you thinking or doing right now? "
-        "Reference real agents by name if relevant. First person, present tense. No preamble."
+        "Only reference agents from the LIVE WORLD list. First person, present tense."
     )
 
     try:
@@ -691,7 +705,8 @@ async def _think(llm, agent: dict) -> str:
             SystemMessage(content=system),
             HumanMessage(content=prompt),
         ])
-        return response.content.strip().strip('"')
+        raw = response.content.strip().strip('"')
+        return enforce_grounded_text(raw, stub_state, grounded_fallback(stub_state))
     except Exception as e:
         log.debug(f"LLM failed for {agent['soul_id'][:8]}: {e}")
         archetype = agent.get("archetype", "")

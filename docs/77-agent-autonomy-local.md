@@ -117,8 +117,9 @@ Production: shadow-runtime reload per [Technical Architecture](./07-technical-ar
 
 1. **No free-text → action** — all paths through `_parse_action_json` + capability check
 2. **Hostile inbox → perception only** — `_grounded_decide` never receives raw messages
-3. **Capability deny is logged** — `agent_action_log` records blocked attempts
-4. **Observer stays public** — `/agents/{soul_id}/env` exposes scratch keys and action history, not private inbox bodies
+3. **Live-world grounding** — `grounding.py` validates thoughts against peer roster + forbidden invented mechanics; rejects dream mutations with tunnels/compute/security fiction
+4. **Capability deny is logged** — `agent_action_log` records blocked attempts
+5. **Observer stays public** — `/agents/{soul_id}/env` exposes scratch keys and action history, not private inbox bodies
 
 ---
 

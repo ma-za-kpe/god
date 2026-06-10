@@ -357,17 +357,22 @@ async def _generate_mutation_proposal(llm, name: str, archetype: str,
 
     from langchain_core.messages import HumanMessage, SystemMessage
 
+    from .grounding import GROUNDING_SYSTEM_RULE, world_rules_forbidden_section
+
     system = (
         f"You are {name}, an autonomous AI agent. Your archetype is {archetype}. "
-        "You exist in a world where you must pay rent to survive. You are dreaming."
+        "You exist in a USDC rent economy with messages, services, coalitions, and transfers. "
+        "You are dreaming.\n"
+        f"{GROUNDING_SYSTEM_RULE}\n"
+        f"{world_rules_forbidden_section()}"
     )
     prompt = (
         f"You have just relived these experiences in your dream:\n\n{memory_summary}\n\n"
-        "Based on what you experienced — including distortions and reversals — "
-        "propose ONE specific behavioral change. "
-        "Format exactly: \"I should [new behavior] instead of [old behavior] because [reason].\"\n"
-        "One sentence. Be concrete and specific to your archetype. "
-        "Do not propose anything that violates the laws of this world (paying rent is mandatory)."
+        "Based on what you experienced — propose ONE behavioral change using ONLY real mechanics: "
+        "USDC, rent, messages, services, coalitions, reputation, reproduction.\n"
+        "Format: \"I should [behavior] instead of [old] because [reason].\"\n"
+        "One sentence. No invented places, compute, security scans, symbiosis, or agent prices. "
+        "Paying rent is mandatory."
     )
 
     try:
@@ -400,6 +405,11 @@ def _check_coherence(proposal: str) -> tuple[bool, str]:
     for violation in PHYSICS_VIOLATIONS:
         if violation in lower:
             return False, f"physics violation detected: '{violation}'"
+
+    from .grounding import check_hallucination
+    ok, reason = check_hallucination(proposal)
+    if not ok:
+        return False, f"grounding violation: {reason}"
 
     # Reject meta-awareness (breaking the fourth wall)
     meta_triggers = [
