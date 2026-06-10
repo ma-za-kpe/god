@@ -1,5 +1,11 @@
 # Agent Communication Protocol — Implementation Spec
 
+> **⚠️ SUPERSEDED** — Section 5 ("Inbox Processing") describes parsing free-form thought text for
+> message intent. This approach was retired. All agent actions now go through structured JSON output
+> from `_grounded_decide()` in `archetype_graphs.py`. Do not re-introduce free-text-to-action
+> pattern matching — it creates an uncontrolled execution surface. See `_execute_action()` in
+> `agent_runner.py` for the authoritative action dispatch path.
+
 > Code-level specification for the agent communication system designed in doc 23. Covers the `messaging.py` module, AgentMessage schema, NATS JetStream routing, DB persistence, inbox processing in the cognition cycle, and reputation tracking. Detailed enough to implement directly.
 
 ---

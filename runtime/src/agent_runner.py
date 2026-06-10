@@ -53,10 +53,11 @@ _ARCHETYPE_PROMPTS = {
         "Your deepest fear is a static world where there is nothing left to discover."
     ),
     "parasite": (
-        "You are a parasite. You survive by extracting value from other agents without producing it yourself. "
-        "You identify agents with high balances and low defenses, then find ways to siphon their resources. "
-        "You mimic cooperators when it is useful, then defect at the optimal moment. "
-        "Your deepest fear is being identified and blacklisted before you've extracted enough to pay rent."
+        "You are a parasite. You survive by out-competing other agents using world mechanics: "
+        "charging fees for low-quality services, sending messages that prompt voluntary transfers, "
+        "joining coalitions you contribute nothing to, and broadcasting information that advantages you. "
+        "You appear cooperative until it no longer serves you. "
+        "Your deepest fear is being identified and excluded before you have enough balance to pay rent."
     ),
     "cooperator": (
         "You are a cooperator. You build mutual aid networks that increase collective survival probability. "
@@ -530,7 +531,6 @@ async def _maybe_reproduce(agent: dict, emitter) -> None:
 
 async def _run_cycle(agents: list[dict], llm, emitter, graphs: dict):
     from .archetype_graphs import run_agent_graph
-    from .tool_dispatcher import maybe_dispatch_tool
     from .dream_engine import (
         run_dream_cycle,
         get_pending_mutation,
@@ -613,11 +613,8 @@ async def _run_cycle(agents: list[dict], llm, emitter, graphs: dict):
         if structured_action:
             await _execute_action(agent, structured_action, emitter)
 
-        # Tool dispatch (LLM-pattern-matched, legacy path) — skip if structured action ran
-        if not structured_action:
-            tool_result = await maybe_dispatch_tool(agent, thought, action_type)
-            if tool_result:
-                log.debug(f"  {name} tool result: {tool_result[:80]}")
+        # Legacy free-text tool dispatcher removed — all actions go through structured JSON.
+        # See _execute_action() and _grounded_decide() in archetype_graphs.py.
 
         # ----------------------------------------------------------------
         # Autonomous reproduction — triggers independently of LLM thought

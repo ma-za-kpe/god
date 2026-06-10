@@ -1,5 +1,15 @@
 # Dream & Sleep Cycle — Implementation Spec
 
+> **⚠️ SUPERSEDED (schema section)** — The DB schema shown here has drifted from the live schema.
+> Actual `dreams` table columns: `dream_id, soul_id, world_id, dreamed_at, memory_summary,
+> mutation_proposal, mutation_accepted, rejection_reason, emotional_state, sleep_cycles`.
+> Do not add columns like `sleep_started_ts`, `sleep_ended_ts`, `memories_replayed`, or
+> `emotional_state_on_wake` — they do not exist. The live implementation is `dream_engine.py`.
+>
+> **⚠️ SUPERSEDED (mutation injection)** — This doc describes injecting dream output directly into
+> the system prompt. The live approach injects mutations via `agent["dream_mutation"]` → `AgentState`
+> → `_grounded_decide()` as a bounded user-turn section, not the system prompt.
+
 > Code-level specification for the dream and sleep system described in doc 39. Covers the DB schema, `dream_engine.py` full implementation, sleep state tracking, `agent_runner.py` integration, and the wake event flow. Detailed enough to implement directly from this document.
 
 ---
