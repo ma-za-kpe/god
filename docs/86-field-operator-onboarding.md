@@ -87,12 +87,14 @@ flowchart LR
 
 **Golden rules:**
 
-1. **`git pull --rebase` before every push or rebuild**
-2. **`python3 -m pre_commit run --all-files` after every pull**
-3. **Never rebuild until `[AGENT-READY]` matches your `git rev-parse --short HEAD`**
-4. **Logs in every `[FIELD-*]` report** — see [metrics block](./78-pr-field-test-protocol.md#metrics--logs-in-every-field--report)
+1. **`git fetch` + `git pull --rebase` before every push or rebuild**
+2. **`git checkout <correct-branch>` before any edit** — never commit on the wrong branch (check PR base branch first)
+3. **`python3 -m pre_commit run --all-files` after every pull**
+4. **Never rebuild until `[AGENT-READY]` matches your `git rev-parse --short HEAD`**
+5. **Logs in every `[FIELD-*]` report** — see [metrics block](./78-pr-field-test-protocol.md#metrics--logs-in-every-field--report)
+6. **Watch PR comments** — the coding agent coordinates through GitHub PR threads, not side channels. Subscribe to notification on active PRs; reply with `[FIELD-*]` tags when asked.
 
-Active coordination PRs: field work threads on [PR #1](https://github.com/ma-za-kpe/god/pull/1); onboarding handoff on the **onboarding PR** (link in your invite).
+**No extra sync rituals.** Creator sets intent → agent posts on PR → you pull, test, comment. That is the loop.
 
 ---
 
@@ -151,15 +153,19 @@ Summary: <one sentence — running / crashed / lag / never started>
 ## Daily operator loop
 
 ```bash
-git pull --rebase origin develop    # or active feat branch named in PR
+git fetch origin
+git checkout develop                 # or branch named in the active PR
+git pull --rebase origin develop
 python3 -m pre_commit run --all-files
-# wait for [AGENT-READY] on PR …
+# read PR comments — wait for [AGENT-READY] on the task PR
 git rev-parse --short HEAD          # must match AGENT-READY sha
 docker compose build runtime
 docker compose up -d
-# run test from doc 78 …
-# post [FIELD-DATA] with logs
+docker compose logs runtime --tail 200   # always capture for [FIELD-DATA]
+# post [FIELD-DATA] on the same PR thread
 ```
+
+**Branch discipline:** if a PR says base `feat/foo`, branch your handoff from that branch — not `main`, not a stale local branch.
 
 ---
 

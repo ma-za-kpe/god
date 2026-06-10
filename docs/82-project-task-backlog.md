@@ -42,7 +42,7 @@
 | R19 | **Observer UI lagging — field operator logs + track** | ⏳ | T-OBS-LAG-01, GH #16; host RAM pressure confirmed |
 | R20 | **Never forget creator requests — track here or open GH issue** | ✅ | this backlog |
 | R21 | **Always update progress docs when shipping work** | ✅ | PROGRESS.md, changelog |
-| R22 | **Onboard new field operator — handoff PR + status report** | 🔄 | doc 86, onboarding PR |
+| R22 | **Onboard new field operator — handoff PR + status report** | ✅ | doc 86, PR #17 investigation closed; future work via PR comments |
 
 ---
 
