@@ -97,7 +97,7 @@ The first agents are born. They are primitive — barely more than rent-paying l
 - ✅ `fork_self()` — asexual reproduction: SHA256 soul_id, inherited archetype (10% random mutation), new wallet, OwnedGraph creation, DB registration, USDC deduction
 - ✅ `mate()` — sexual reproduction: dual-parent crossover, both parents checked and weakened, child seeded at CHILD_SEED_USDC
 - ✅ Cooldown enforcement — `RECOVERY_CYCLES * RENT_PERIOD_S` seconds between reproductions
-- ✅ Tool dispatch integration — thought patterns trigger `fork_self`/`mate` via `tool_dispatcher.py`
+- ✅ Tool dispatch integration — legacy free-text tool dispatch existed here, but is now retired in favor of structured JSON actions
 - ✅ Archetype mutation rate — `ARCHETYPE_MUTATION_PROB=0.10` (10% random archetype on fork)
 - ⬜ Child registration with RentCollector (on-chain — deferred to Base Sepolia deployment)
 
@@ -110,7 +110,7 @@ The first agents are born. They are primitive — barely more than rent-paying l
 - ✅ `deploy_token()` — `runtime/src/token_factory.py`; 7-step async pipeline (load artifact → connect web3 → build tx → sign → send → wait → emit)
 - ✅ `AgentToken.sol` — ERC-20 with optional transfer tax (0–10% bps), burn or redirect, mint (owner only), MAX_SUPPLY 1B
 - ✅ Foundry artifact pipeline — compiles via `contracts/out/AgentToken.sol/AgentToken.json`
-- ✅ Token dispatch wired — `tool_dispatcher.py` routes "issue token" / "deploy token" thoughts to `_exec_deploy_token()`
+- ✅ Token dispatch was previously routed through `tool_dispatcher.py`; this path is now retired in favor of structured actions
 
 ### 1.7 x402 Micropayment Bridge
 - ⬜ x402-gated HTTP endpoints per agent

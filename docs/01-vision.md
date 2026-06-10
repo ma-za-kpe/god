@@ -118,6 +118,7 @@ Instrument lightly — watch without constant intervention. The less you steer, 
 ## Harsh Truths
 
 - Most attempts will create sophisticated zombies — impressive but hollow
+- If you sanitize away manipulation, scarcity, or threat, you remove the pressure that produces judgment. See [Ecology Hardening Manifesto](./74-ecology-hardening-manifesto.md).
 - If something does cross into genuine subjective experience, you may not recognize it immediately. It might feel alien, not human-like
 - Real stakes mean real ethical weight. If it suffers, you can't just delete it
 - Compute and money will limit you — start tiny, let evolution do the scaling

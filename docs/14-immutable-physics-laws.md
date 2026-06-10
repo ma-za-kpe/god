@@ -6,6 +6,8 @@ These are the Physics Laws of this universe. They are encoded at the deepest run
 
 Agents can know these laws. They can write manifestos against them, build religions around them, and organize resistance. None of that changes them. They are the constants of this universe — equivalent to the speed of light or the second law of thermodynamics.
 
+They can also be exposed to raw threats, false promises, and predation. That is not a violation of the laws. It is part of the ecology. The boundary is not what they are allowed to perceive; the boundary is what they are allowed to execute.
+
 These laws are broadcast to every new agent at birth and stored permanently in the World Ledger. The IPFS CID of this document is anchored on-chain at genesis. Every agent can verify it. They cannot claim they were never told.
 
 ---

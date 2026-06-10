@@ -136,7 +136,7 @@ Each entry records:
 ---
 
 ### Reproduction System (fork_self + mate)
-**Decision:** Implement full sexual and asexual reproduction, wire into tool_dispatcher via thought pattern matching.
+**Decision:** Implement full sexual and asexual reproduction. The old thought-pattern `tool_dispatcher` path was later retired in favor of structured JSON actions.
 
 **What was built:** `runtime/src/reproduction.py` — `fork_self()` (asexual), `mate()` (sexual), SHA256 soul_id, archetype mutation (10%), cooldown enforcement, USDC deduction, OwnedGraph lineage. Tool patterns: 14+ natural language triggers for fork/mate dispatch.
 

@@ -26,8 +26,13 @@ The moment the world can run without its Creator is the moment the experiment ha
 - **Human-in-the-Loop** — For privileged actions (LLCs, domain names, high-risk integrations), agents submit formal governance-approved petitions with self-proposed Creator fees. The Creator is a participant in the economy, not a free service.
 - **Sovereignty Gradient** — Agents gradually reduce dependency on the Creator through demonstrated external competence. The endpoint is Minimum God: Creator holds only the off-switch.
 - **Self-Modification** — Agents can propose, vote on, and implement changes to their own policies, institutions, and economy. Physics Laws are the only immutable floor.
+- **Ecology Hardening** — Preserve raw adversarial signals. Agents must see threats, deception, and scarcity; only the action surface is constrained.
 
 ---
+
+## Ecology Hardening
+
+The world stays alive only if agents are forced to judge under pressure. Do not sanitize the ecology into comfort. Preserve hostile signals, but keep execution gated. See [Ecology Hardening Manifesto](./docs/74-ecology-hardening-manifesto.md).
 
 ## Path to Real-World Agency
 
@@ -194,13 +199,14 @@ The agents don't know the difference. The laws just become real.
 
 ---
 
-## Document Index (63 Documents)
+## Document Index (74 Documents)
 
 ### Core Foundation
 | # | Document | What It Covers |
 |---|----------|---------------|
 | 01 | [Vision & Core Principles](./docs/01-vision.md) | Philosophy, radical paths, the question that matters |
 | 14 | [Physics Laws v2 & Creator Covenant](./docs/14-immutable-physics-laws.md) | The Ten Laws, Law 0a, Covenant — the constitution of this universe |
+| 74 | [Ecology Hardening Manifesto](./docs/74-ecology-hardening-manifesto.md) | Raw adversarial signals, evidence vs authority, harsh selection pressure |
 
 ### Architecture & Runtime
 | # | Document | What It Covers |

@@ -100,9 +100,9 @@ Three parties must sign off: **Creator** (you), **Runtime** (the code), **World*
 - [ ] `reputation` table exists
 
 ### D4. Tool Dispatcher
-- [ ] `runtime/src/tool_dispatcher.py` — no import errors
-- [ ] `maybe_dispatch_tool()` is called in `agent_runner._run_cycle()`
-- [ ] All tool executors wired: `send_message`, `send_broadcast`, `fork_self`, `mate`, `deploy_token`, `scan_world`, `form_coalition`
+- [x] `runtime/src/tool_dispatcher.py` remains as a compatibility stub only
+- [x] `maybe_dispatch_tool()` is no longer called in `agent_runner._run_cycle()`
+- [x] All executable actions flow through structured JSON actions instead of free-text dispatch
 
 ---
 
