@@ -9,7 +9,7 @@
 | Role | Who | Does |
 |------|-----|------|
 | **Agent** | Grok / PR babysitter | Implements fixes, pushes commits, posts `[AGENT-REQUEST]` then `[AGENT-READY]` |
-| **Field operator** | Human with compute | **Waits** for `[AGENT-READY]`, then pulls, rebuilds Docker, runs tests, posts `[FIELD-*]` |
+| **Field operator** | Human with compute | **Waits** for `[AGENT-READY]`, then pulls, rebuilds Docker, runs tests, posts `[FIELD-*]` **with logs** |
 
 Both parties **always `git pull` on `feat/p0-manifesto-and-scaling` before acting.**
 
@@ -24,7 +24,7 @@ Both parties **always `git pull` on `feat/p0-manifesto-and-scaling` before actin
 | 1. Request | Agent | Posts `[AGENT-REQUEST] T-xxx` describing what to test **after** code lands |
 | 2. Implement | Agent | Makes code changes, commits, pushes to `feat/p0-manifesto-and-scaling` |
 | 3. Ready | Agent | Posts `[AGENT-READY] T-xxx @ <sha>` — **only then** may the operator act |
-| 4. Execute | Operator | `git pull` → `docker compose build runtime` → `up` → run steps → `[FIELD-*]` |
+| 4. Execute | Operator | `git pull` → `docker compose build runtime` → `up` → run steps → `[FIELD-*]` **+ logs** |
 
 **If you see `[AGENT-REQUEST]` without a matching `[AGENT-READY]` at the same or newer commit: wait.** Do not pull, rebuild, or report yet.
 
@@ -42,7 +42,36 @@ Correct order:
 [AGENT-REQUEST] T-5000-01 — … — WAIT: do not rebuild until [AGENT-READY]
 … agent pushes commits …
 [AGENT-READY] T-5000-01 @ abc1234 — safe to pull, rebuild runtime, run steps
-→ operator pulls @ abc1234, rebuilds, runs, posts [FIELD-PASS|FAIL|DATA]
+→ operator pulls @ abc1234, rebuilds, runs, posts [FIELD-PASS|FAIL|DATA] + logs
+```
+
+---
+
+## LOGS REQUIRED (mandatory — every report)
+
+**Every `[FIELD-PASS]`, `[FIELD-FAIL]`, `[FIELD-DATA]`, `[FIELD-BLOCKED]`, and `[FIELD-RUNNING]` comment must include runtime logs.** Verdicts without logs are incomplete — the agent cannot debug from metrics alone.
+
+Minimum log bundle (paste into the comment or attach as files):
+
+```bash
+docker compose logs runtime --tail 200
+docker compose logs runtime 2>&1 | grep -E 'ERROR|WARN|Traceback|OOM|due_count' | tail -80
+curl -s http://localhost:8000/health
+curl -s http://localhost:8000/stats | jq .
+```
+
+On `[FIELD-FAIL]` or `[FIELD-BLOCKED]`, also include:
+
+```bash
+docker compose ps
+docker compose logs runtime --tail 500
+docker stats --no-stream
+```
+
+Agent requests always end with:
+
+```
+LOGS: include runtime logs (see protocol LOGS REQUIRED section)
 ```
 
 ---
@@ -58,10 +87,10 @@ Use the tag as the **first line** of every coordination comment.
 | `[AGENT-ACK]` | Agent | Acknowledges a field report; may include commit hash for the next cycle |
 | `[FIELD-READY]` | Operator | Environment up, branch pulled, ready for tasks |
 | `[FIELD-RUNNING]` | Operator | Test in progress (include start time + config) |
-| `[FIELD-PASS]` | Operator | Test met acceptance criteria (attach metrics) |
-| `[FIELD-FAIL]` | Operator | Test failed (attach logs, metrics, repro steps) |
-| `[FIELD-BLOCKED]` | Operator | Cannot proceed (missing access, OOM, etc.) |
-| `[FIELD-DATA]` | Operator | Raw artifacts only (JSON, log excerpts) — no verdict |
+| `[FIELD-PASS]` | Operator | Test met acceptance criteria — **metrics + logs required** |
+| `[FIELD-FAIL]` | Operator | Test failed — **logs required** (≥200 lines runtime + errors grep) |
+| `[FIELD-BLOCKED]` | Operator | Cannot proceed — **logs + `docker compose ps`** required |
+| `[FIELD-DATA]` | Operator | Raw artifacts — **must include log excerpts**, not metrics-only |
 
 **Reply threading:** Quote the request comment URL or paste its tag + task ID when responding.
 
@@ -74,6 +103,7 @@ Agent requests use numbered tasks:
 ```
 [AGENT-REQUEST] T-5000-01 — Short title
 WAIT: do not rebuild until [AGENT-READY] T-5000-01 @ <sha>
+LOGS: include runtime logs when you report (see protocol LOGS REQUIRED)
 ```
 
 When code is pushed:
@@ -82,10 +112,12 @@ When code is pushed:
 [AGENT-READY] T-5000-01 @ abc1234 — safe to pull, rebuild runtime, run steps below
 ```
 
-Operator responses reference the same ID:
+Operator responses reference the same ID and **always attach logs**:
 
 ```
 [FIELD-PASS] T-5000-01 — ...
+--- logs ---
+(paste docker compose logs runtime --tail 200 here)
 ```
 
 ---
@@ -153,9 +185,9 @@ curl -s http://localhost:8000/agents?limit=10000 | jq '.count'
 
 ---
 
-## Metrics to Attach in `[FIELD-PASS]` / `[FIELD-FAIL]`
+## Metrics + Logs in Every `[FIELD-*]` Report
 
-Copy-paste this block filled in:
+Copy-paste this block filled in, then **append the log bundle** (not optional):
 
 ```
 Branch: feat/p0-manifesto-and-scaling @ <sha>
@@ -168,12 +200,14 @@ WS: ok | fail
 Runtime restarts: 
 Docker mem peak: 
 Notes:
+--- logs ---
+(paste output of: docker compose logs runtime --tail 200)
+(paste output of: grep ERROR|WARN|Traceback from runtime logs)
 ```
 
-Optional artifacts (paste or attach paths):
+Additional artifacts when relevant:
 
 - `curl -s localhost:8000/stats | jq`
-- `docker compose logs runtime --tail 50`
 - Screenshot or screen recording of observer at 5000
 
 ---
@@ -184,7 +218,7 @@ While scaling, spot-check 5 random `last_thought` values from `/agents`:
 
 - Agent names must exist in the peer list
 - No invented mechanics: tunnels, processing power, security scans, agent "prices"
-- Report under `[FIELD-DATA] T-HALL-01` with agent names + thoughts
+- Report under `[FIELD-DATA] T-HALL-01` with agent names + thoughts + **runtime logs** showing those agents' cycles
 
 ---
 
@@ -194,11 +228,13 @@ While scaling, spot-check 5 random `last_thought` values from `/agents`:
 Agent → [AGENT-REQUEST] T-xxx (WAIT: do not rebuild yet)
 Agent → implements, pushes
 Agent → [AGENT-READY] T-xxx @ <sha>
-Operator → pull @ sha → rebuild runtime → run → [FIELD-PASS|FAIL|DATA] T-xxx
+Operator → pull @ sha → rebuild runtime → run → [FIELD-PASS|FAIL|DATA] T-xxx + logs
 Agent → pull → [AGENT-ACK] T-xxx → next [AGENT-REQUEST] if needed
 ```
 
-**Operator rule:** If the agent has not posted `[AGENT-READY]` with a commit SHA for your task, **stop and wait**. Rebuilding early wastes time and produces misleading `[FIELD-*]` reports.
+**Operator rules:**
+- If the agent has not posted `[AGENT-READY]` with a commit SHA for your task, **stop and wait**. Rebuilding early wastes time and produces misleading `[FIELD-*]` reports.
+- Every `[FIELD-*]` reply must include **runtime logs**. Metrics-only reports will be sent back for logs.
 
 Do not merge PR #1 until **T-5000-01 Phase A** passes and hallucination track has a plan.
 
