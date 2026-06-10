@@ -169,8 +169,6 @@ async def world_stats():
             (os.getenv("WORLD_ID", "local-dev-world-1"),),
         )
         row["events_total"] = cur.fetchone()["n"]
-        cur.close(); conn.close()
-        # Extended economy stats
         world_id = os.getenv("WORLD_ID", "local-dev-world-1")
         cur.execute(
             """

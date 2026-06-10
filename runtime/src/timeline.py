@@ -29,7 +29,7 @@ FIRST_TYPE_MAP = {
     "social.institution.founded":        "first.institution_founded",
     "governance.law.proposed":           "first.law_proposed",
     "creator.petition.submitted":        "first.petition_submitted",
-    "creator.petition.approvedd":        "first.petition_approved",
+    "creator.petition.approved":         "first.petition_approved",
     "status.tier_promoted":              "first.tier_promoted",
     "cognitive.consciousness_signal":    "first.consciousness_signal",
     "lifecycle.creator_update.rejected": "first.creator_update_rejected",
