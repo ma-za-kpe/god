@@ -140,11 +140,24 @@ def list_services(soul_id: str | None = None, active_only: bool = True) -> list[
         if soul_id:
             conditions.append("agent_soul_id = %s")
             params.append(soul_id)
-        where = ("WHERE " + " AND ".join(conditions)) if conditions else ""
-        cur.execute(
-            f"SELECT * FROM service_listings {where} ORDER BY created_at DESC LIMIT 200",
-            params,
-        )
+        if soul_id and active_only:
+            sql = (
+                "SELECT * FROM service_listings WHERE is_active = true "
+                "AND agent_soul_id = %s ORDER BY created_at DESC LIMIT 200"
+            )
+        elif soul_id:
+            sql = (
+                "SELECT * FROM service_listings WHERE agent_soul_id = %s "
+                "ORDER BY created_at DESC LIMIT 200"
+            )
+        elif active_only:
+            sql = (
+                "SELECT * FROM service_listings WHERE is_active = true "
+                "ORDER BY created_at DESC LIMIT 200"
+            )
+        else:
+            sql = "SELECT * FROM service_listings ORDER BY created_at DESC LIMIT 200"
+        cur.execute(sql, params)
         rows = [dict(r) for r in cur.fetchall()]
     finally:
         cur.close()

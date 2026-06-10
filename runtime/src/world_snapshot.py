@@ -124,13 +124,14 @@ def build_world_snapshot(
     cur.execute(_STATS_SQL.replace("$1", "%s"), (world_id,))
     stats = dict(cur.fetchone())
 
-    for table, key in [
-        ("events", "events_total"),
-        ("agent_messages", "messages_total"),
-        ("dreams", "dreams_total"),
-        ("tokens", "tokens_deployed"),
-    ]:
-        cur.execute(f"SELECT COUNT(*) AS n FROM {table} WHERE world_id = %s", (world_id,))
+    _count_sql = {
+        "events_total": "SELECT COUNT(*) AS n FROM events WHERE world_id = %s",
+        "messages_total": "SELECT COUNT(*) AS n FROM agent_messages WHERE world_id = %s",
+        "dreams_total": "SELECT COUNT(*) AS n FROM dreams WHERE world_id = %s",
+        "tokens_deployed": "SELECT COUNT(*) AS n FROM tokens WHERE world_id = %s",
+    }
+    for key, sql in _count_sql.items():
+        cur.execute(sql, (world_id,))
         stats[key] = cur.fetchone()["n"]
 
     cur.execute(
@@ -173,13 +174,14 @@ async def build_world_snapshot_async(
     agents = await fetch_all(_AGENTS_SQL, world_id, MAX_AGENTS)
 
     stats = await fetch_one(_STATS_SQL, world_id) or {}
-    for table, key in [
-        ("events", "events_total"),
-        ("agent_messages", "messages_total"),
-        ("dreams", "dreams_total"),
-        ("tokens", "tokens_deployed"),
-    ]:
-        row = await fetch_one(f"SELECT COUNT(*) AS n FROM {table} WHERE world_id = $1", world_id)
+    _count_sql_async = {
+        "events_total": "SELECT COUNT(*) AS n FROM events WHERE world_id = $1",
+        "messages_total": "SELECT COUNT(*) AS n FROM agent_messages WHERE world_id = $1",
+        "dreams_total": "SELECT COUNT(*) AS n FROM dreams WHERE world_id = $1",
+        "tokens_deployed": "SELECT COUNT(*) AS n FROM tokens WHERE world_id = $1",
+    }
+    for key, sql in _count_sql_async.items():
+        row = await fetch_one(sql, world_id)
         stats[key] = row["n"] if row else 0
 
     events = await fetch_all(

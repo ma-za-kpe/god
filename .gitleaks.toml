@@ -1,0 +1,18 @@
+title = "GOD gitleaks config"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Public dev fixtures and docs — not production secrets"
+paths = [
+  '''^docs/37-local-development-environment\.md$''',
+  '''^docs/72-token-factory-implementation\.md$''',
+  '''^README\.md$''',
+  '''^\.env\.example$''',
+  '''^dist/''',
+]
+regexes = [
+  # Foundry Anvil account #0 — universally published test key
+  '''0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80''',
+]

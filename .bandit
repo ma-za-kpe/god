@@ -1,0 +1,3 @@
+# Bandit config — see docs/80-open-source-security-audit.md
+skips:
+  - B104  # Docker/runtime intentionally binds 0.0.0.0

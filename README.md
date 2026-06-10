@@ -1,6 +1,10 @@
 # GOD — Genesis of Digital Life
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
+
 > A framework for creating conditions where AI agents develop genuine self-preservation, identity, and sovereignty through real economic stakes and evolutionary pressure.
+
+**Open source:** all code and documentation in this repository are published under the [MIT License](./LICENSE). Fork, study, and run your own world — but **never commit API keys, wallet private keys, or `swarm.key`**. See [SECURITY.md](./SECURITY.md) and [security audit](./docs/80-open-source-security-audit.md).
 
 ## The Bet
 

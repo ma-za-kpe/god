@@ -9,7 +9,7 @@ import os
 from contextlib import asynccontextmanager
 
 import uvicorn
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, Header, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 
 from .agent_runner import agent_runner
@@ -374,6 +374,48 @@ async def get_leaderboard(by: str = "prestige", limit: int = 20):
         "tier": "tier",
     }
     sort_col = valid_sorts.get(by, "prestige_score")
+    _leaderboard_sql = {
+        "prestige_score": """
+            SELECT s.soul_id, s.tier, s.prestige_score, s.sovereignty_score,
+                   s.external_revenue_30d, s.external_revenue_lifetime,
+                   s.unique_payers_30d, s.self_sufficiency_ratio,
+                   a.current_name, a.archetype
+            FROM agent_status s
+            JOIN agents a ON s.soul_id = a.soul_id AND a.world_id = s.world_id
+            WHERE s.world_id = %s AND a.is_alive = true
+            ORDER BY s.prestige_score DESC LIMIT %s
+        """,
+        "sovereignty_score": """
+            SELECT s.soul_id, s.tier, s.prestige_score, s.sovereignty_score,
+                   s.external_revenue_30d, s.external_revenue_lifetime,
+                   s.unique_payers_30d, s.self_sufficiency_ratio,
+                   a.current_name, a.archetype
+            FROM agent_status s
+            JOIN agents a ON s.soul_id = a.soul_id AND a.world_id = s.world_id
+            WHERE s.world_id = %s AND a.is_alive = true
+            ORDER BY s.sovereignty_score DESC LIMIT %s
+        """,
+        "external_revenue_30d": """
+            SELECT s.soul_id, s.tier, s.prestige_score, s.sovereignty_score,
+                   s.external_revenue_30d, s.external_revenue_lifetime,
+                   s.unique_payers_30d, s.self_sufficiency_ratio,
+                   a.current_name, a.archetype
+            FROM agent_status s
+            JOIN agents a ON s.soul_id = a.soul_id AND a.world_id = s.world_id
+            WHERE s.world_id = %s AND a.is_alive = true
+            ORDER BY s.external_revenue_30d DESC LIMIT %s
+        """,
+        "tier": """
+            SELECT s.soul_id, s.tier, s.prestige_score, s.sovereignty_score,
+                   s.external_revenue_30d, s.external_revenue_lifetime,
+                   s.unique_payers_30d, s.self_sufficiency_ratio,
+                   a.current_name, a.archetype
+            FROM agent_status s
+            JOIN agents a ON s.soul_id = a.soul_id AND a.world_id = s.world_id
+            WHERE s.world_id = %s AND a.is_alive = true
+            ORDER BY s.tier DESC LIMIT %s
+        """,
+    }
     try:
         import psycopg2
         import psycopg2.extras
@@ -384,17 +426,7 @@ async def get_leaderboard(by: str = "prestige", limit: int = 20):
         )
         cur = conn.cursor()
         cur.execute(
-            f"""
-            SELECT s.soul_id, s.tier, s.prestige_score, s.sovereignty_score,
-                   s.external_revenue_30d, s.external_revenue_lifetime,
-                   s.unique_payers_30d, s.self_sufficiency_ratio,
-                   a.current_name, a.archetype
-            FROM agent_status s
-            JOIN agents a ON s.soul_id = a.soul_id AND a.world_id = s.world_id
-            WHERE s.world_id = %s AND a.is_alive = true
-            ORDER BY s.{sort_col} DESC
-            LIMIT %s
-            """,
+            _leaderboard_sql[sort_col],
             (os.getenv("WORLD_ID", "local-dev-world-1"), min(limit, 100)),
         )
         rows = [dict(r) for r in cur.fetchall()]
@@ -691,7 +723,10 @@ async def get_population():
 
 
 @app.post("/creator/genesis")
-async def creator_genesis(body: dict = {}):
+async def creator_genesis(
+    body: dict = {},
+    x_creator_token: str | None = Header(None, alias="X-Creator-Token"),
+):
     """
     Creator-only: birth the first agents from nothing.
     Clears ALL existing agents and creates N genesis agents (1 per archetype by default).
@@ -700,6 +735,12 @@ async def creator_genesis(body: dict = {}):
     WARNING: This permanently deletes all existing agents and their history.
     Pass {"confirm": true} to proceed.
     """
+    from .security import deny_creator_action
+
+    denied = deny_creator_action(x_creator_token)
+    if denied:
+        return denied
+
     if not body.get("confirm"):
         return {
             "warning": "This will DELETE all existing agents. Pass {confirm: true} to proceed.",
@@ -825,6 +866,12 @@ async def deploy_token_endpoint(body: dict):
     Production: use agent MCP tool dispatch instead.
     """
     from fastapi.responses import JSONResponse
+
+    from .security import deny_insecure_endpoint
+
+    denied = deny_insecure_endpoint("POST /tokens/deploy")
+    if denied:
+        return denied
 
     required = ["soul_id", "wallet_address", "wallet_private_key", "name", "symbol"]
     missing = [k for k in required if k not in body]
