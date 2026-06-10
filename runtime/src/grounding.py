@@ -159,32 +159,42 @@ def enforce_grounded_text(text: str, state: dict, fallback: Optional[str] = None
     return fallback or grounded_fallback(state)
 
 
-def validate_action_target(to_id: str, state: dict) -> bool:
-    """True if action target resolves to exactly one real peer."""
+_UUIDISH_RE = re.compile(r"^[0-9a-fA-F-]{8,36}$")
+
+
+def resolve_target_peer(to_id: str, state: dict) -> Optional[dict]:
+    """
+    Resolve send_message / transfer target to one live peer from state roster.
+    Exact agent name or unambiguous soul_id only — no fuzzy name prefixes.
+    """
     if not to_id or not str(to_id).strip():
-        return False
+        return None
     tid = str(to_id).strip()
     tid_l = tid.lower()
-    valid_names = peer_names(state)
+    peers = state.get("peers") or []
 
-    exact = [n for n in valid_names if n.lower() == tid_l]
-    if len(exact) == 1:
-        return True
+    for p in peers:
+        n = (p.get("name") or p.get("current_name") or "").strip()
+        if n and n.lower() == tid_l:
+            return p
 
-    # Prefix match only when specific enough (avoids Elder-Mu → Elder-Muse)
-    if len(tid) >= 10:
-        prefix = [n for n in valid_names if n.lower().startswith(tid_l)]
-        if len(prefix) == 1:
-            return True
+    if len(tid) >= 36:
+        for p in peers:
+            ps = str(p.get("soul_id") or "")
+            if ps == tid:
+                return p
 
-    valid_ids = peer_soul_ids(state)
-    if tid in valid_ids:
-        return True
-    if len(tid) >= 8:
-        id_hits = [vid for vid in valid_ids if vid.startswith(tid) or tid.startswith(vid[:8])]
-        if len(id_hits) >= 1:
-            return True
-    return False
+    if _UUIDISH_RE.match(tid) and len(tid) >= 8:
+        hits = [p for p in peers if str(p.get("soul_id") or "").lower().startswith(tid_l)]
+        if len(hits) == 1:
+            return hits[0]
+
+    return None
+
+
+def validate_action_target(to_id: str, state: dict) -> bool:
+    """True if action target resolves to exactly one real peer."""
+    return resolve_target_peer(to_id, state) is not None
 
 
 def world_rules_forbidden_section() -> str:
