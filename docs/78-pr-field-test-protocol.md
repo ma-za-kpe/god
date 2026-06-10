@@ -8,10 +8,31 @@
 
 | Role | Who | Does |
 |------|-----|------|
+| **Creator** | Project owner | Sets intent (chat/issues); agent mirrors to backlog + PR |
 | **Agent** | Grok / PR babysitter | Implements fixes, pushes commits, posts `[AGENT-REQUEST]` then `[AGENT-READY]` |
 | **Field operator** | Human with compute | **Waits** for `[AGENT-READY]`, then pulls, rebuilds Docker, runs tests, posts `[FIELD-*]` **with logs** |
 
 Both parties **always `git pull` on `feat/p0-manifesto-and-scaling` before acting.**
+
+---
+
+## Same wavelength (all three parties)
+
+PR comments are **sufficient for agent ↔ field operator** when tagged and threaded. They are **not sufficient alone** for creator ↔ agent ↔ operator — chat and backlog must stay in sync.
+
+| Channel | Who reads it | Use for |
+|---------|--------------|---------|
+| **Cursor / chat** | Creator + agent | Intent, priorities, “the grift,” course corrections |
+| **[Task backlog](./82-project-task-backlog.md)** | Agent (canonical) | Every creator request logged — nothing lost between sessions |
+| **GitHub issues** | Everyone | Scoped work, close when done |
+| **PR comments** ([PR #1](https://github.com/ma-za-kpe/god/pull/1), [#13](https://github.com/ma-za-kpe/god/pull/13)) | Agent + field operator | `[AGENT-*]` / `[FIELD-*]` only — rebuild gates, logs, pass/fail |
+| **PR description** | Everyone | Current branch goal in one paragraph |
+
+**Agent rule:** when the creator gives direction in chat, update the backlog and post a one-line `[AGENT-ACK]` on the active PR if it affects field work.
+
+**Field operator rule:** if chat and PR disagree, **PR + `[AGENT-READY]` @ sha wins** for rebuild timing; escalate in PR if blocked.
+
+**Creator rule:** big shifts → one sentence in chat *and* optional PR comment so the operator is not guessing.
 
 ---
 
