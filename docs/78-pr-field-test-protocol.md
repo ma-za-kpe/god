@@ -15,6 +15,56 @@ Both parties **always `git pull` on `feat/p0-manifesto-and-scaling` before actin
 
 ---
 
+## DOCS-FIRST (agent — before every new task)
+
+The coding agent **rereads relevant docs** before starting work — not just the protocol. Minimum set:
+
+| Always | Task-specific |
+|--------|----------------|
+| [Ecology manifesto](./74-ecology-hardening-manifesto.md) | Scaling → [76](./76-agent-scaling-and-observer-performance.md) |
+| [Autonomy local](./77-agent-autonomy-local.md) | Comms → [68](./68-agent-communication-implementation.md) |
+| [Manifesto audit](./75-manifesto-adherence-audit.md) | Physics → [14](./14-immutable-physics-laws.md) |
+
+Check [open issues](https://github.com/ma-za-kpe/god/issues) for backlog items not yet implemented.
+
+---
+
+## PRE-COMMIT REQUIRED (both parties)
+
+**Run before every commit or field report** — catches lint/format issues before GitHub Actions spends minutes on them.
+
+```bash
+bash scripts/bootstrap-dev.sh   # once per machine
+python3 -m pre_commit run --all-files
+```
+
+| Who | When |
+|-----|------|
+| **Agent** | Before every `git commit` / `git push` — CI must not be the first lint pass |
+| **Field operator** | After `git pull`, **before** `docker compose build` — paste result in `[FIELD-READY]` or first `[FIELD-*]` |
+
+If pre-commit fails, fix locally. Do not push or report `[FIELD-PASS]` until it passes.
+
+Agent requests include:
+
+```
+LINT: run pre-commit locally before rebuild (python3 -m pre_commit run --all-files)
+```
+
+---
+
+## CI & Actions credits (agent)
+
+After push, the agent watches **one** CI run — not endless polling:
+
+```bash
+bash scripts/watch-ci.sh          # waits for latest pre-commit on current branch
+```
+
+**Credit discipline:** batch commits; avoid push+empty-commit to re-trigger; feature branches use PR checks only (no duplicate push workflows). Re-push only when hooks fail or code changes.
+
+---
+
 ## WAIT GATE (mandatory — read first)
 
 **The field operator must NOT rebuild Docker, restart services, or run requested tests until the agent posts `[AGENT-READY]` for that task.**
@@ -24,7 +74,7 @@ Both parties **always `git pull` on `feat/p0-manifesto-and-scaling` before actin
 | 1. Request | Agent | Posts `[AGENT-REQUEST] T-xxx` describing what to test **after** code lands |
 | 2. Implement | Agent | Makes code changes, commits, pushes to `feat/p0-manifesto-and-scaling` |
 | 3. Ready | Agent | Posts `[AGENT-READY] T-xxx @ <sha>` — **only then** may the operator act |
-| 4. Execute | Operator | `git pull` → `docker compose build runtime` → `up` → run steps → `[FIELD-*]` **+ logs** |
+| 4. Execute | Operator | `git pull` → **pre-commit** → `docker compose build runtime` → `up` → run → `[FIELD-*]` **+ logs** |
 
 **If you see `[AGENT-REQUEST]` without a matching `[AGENT-READY]` at the same or newer commit: wait.** Do not pull, rebuild, or report yet.
 
@@ -103,6 +153,7 @@ Agent requests use numbered tasks:
 ```
 [AGENT-REQUEST] T-5000-01 — Short title
 WAIT: do not rebuild until [AGENT-READY] T-5000-01 @ <sha>
+LINT: run pre-commit locally before rebuild (python3 -m pre_commit run --all-files)
 LOGS: include runtime logs when you report (see protocol LOGS REQUIRED)
 ```
 
@@ -149,6 +200,7 @@ From [doc 76](./76-agent-scaling-and-observer-performance.md) and P0/P1 implemen
 git checkout feat/p0-manifesto-and-scaling
 git pull --rebase origin feat/p0-manifesto-and-scaling
 git rev-parse --short HEAD   # must match [AGENT-READY] sha
+python3 -m pre_commit run --all-files   # must pass before build
 docker compose build runtime
 docker compose up -d
 curl -s http://localhost:8000/health
@@ -234,6 +286,7 @@ Agent → pull → [AGENT-ACK] T-xxx → next [AGENT-REQUEST] if needed
 
 **Operator rules:**
 - If the agent has not posted `[AGENT-READY]` with a commit SHA for your task, **stop and wait**. Rebuilding early wastes time and produces misleading `[FIELD-*]` reports.
+- Run **pre-commit** after every pull, before Docker rebuild. Note pass/fail in your report.
 - Every `[FIELD-*]` reply must include **runtime logs**. Metrics-only reports will be sent back for logs.
 
 Do not merge PR #1 until **T-5000-01 Phase A** passes and hallucination track has a plan.

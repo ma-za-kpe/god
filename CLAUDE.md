@@ -19,3 +19,12 @@ This repository is an ecology, not a toy demo.
 ## Current Tone
 
 The world should stay harsh enough to reward judgment, memory, and adaptation.
+
+## Agent Engineering Loop
+
+Before each new task:
+
+1. **Reread docs** — [manifesto](./docs/74-ecology-hardening-manifesto.md), [autonomy](./docs/77-agent-autonomy-local.md), [audit](./docs/75-manifesto-adherence-audit.md), and the task-specific spec. Do not rely on conversation memory alone.
+2. **Pre-commit locally** — `python3 -m pre_commit run --all-files` must pass before every push.
+3. **Watch CI once** — after push, `bash scripts/watch-ci.sh` (or `gh run watch`); fix failures before piling on commits.
+4. **Conserve Actions credits** — no empty commits, no re-pushes to “re-run CI”; batch fixes; feature branches rely on PR checks only (not push+PR duplicate runs).

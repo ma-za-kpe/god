@@ -1,11 +1,12 @@
 name: pre-commit
 
+# PRs only on feature branches — avoids duplicate push+PR runs (saves Actions minutes).
+# Maintainers: run `python3 -m pre_commit run --all-files` locally before every push.
 on:
   pull_request:
   push:
     branches:
       - main
-      - feat/**
 
 concurrency:
   group: pre-commit-${{ github.ref }}
