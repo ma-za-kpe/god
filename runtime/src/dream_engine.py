@@ -247,6 +247,12 @@ def get_pending_mutation(soul_id: str) -> str | None:
         conn.commit()
         cur.close(); cur2.close(); conn.close()
 
+        from .grounding import check_hallucination
+        ok, reason = check_hallucination(mutation)
+        if not ok:
+            log.info(f"  {soul_id[:8]} discarded ungrounded mutation: {reason}")
+            return None
+
         log.debug(f"get_pending_mutation: {soul_id[:8]} → '{mutation[:60]}'")
         return mutation
     except Exception as e:
