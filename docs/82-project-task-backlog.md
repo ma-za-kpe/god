@@ -37,6 +37,7 @@
 | R14 | **Keep all requests in this task list** | ✅ | this file |
 | R15 | **Open-source contribution guidelines + airtight git workflow; protect branches; close all issues** | ✅ | CONTRIBUTING.md, doc 83, protection on main+develop |
 | R16 | **Tie AI-driven economy + governance; refresh memory from docs** | ✅ | doc 85 system map |
+| R17 | **Agentic economic activity — transact, negotiate, settle deals** | ✅ | economic_activity.py, buy_service, offer/acceptance |
 
 ---
 

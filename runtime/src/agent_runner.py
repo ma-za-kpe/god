@@ -115,7 +115,8 @@ async def _fetch_inbox(soul_id: str) -> list[dict]:
         cur = conn.cursor()
         cur.execute(
             """
-            SELECT m.sender_id, m.recipient_id, m.body AS content, m.sent_at, m.message_type,
+            SELECT m.message_id, m.sender_id, m.recipient_id, m.body AS content, m.sent_at,
+                   m.message_type, m.metadata,
                    a.current_name AS sender_name, a.archetype AS sender_archetype
             FROM agent_messages m
             LEFT JOIN agents a ON a.soul_id = m.sender_id
@@ -166,8 +167,8 @@ def _batch_preload_context(agents: list[dict]) -> dict:
         cur.execute(
             """
             WITH ranked AS (
-                SELECT m.sender_id, m.recipient_id, m.body AS content, m.sent_at,
-                       m.message_type,
+                SELECT m.message_id, m.sender_id, m.recipient_id, m.body AS content, m.sent_at,
+                       m.message_type, m.metadata,
                        a.current_name AS sender_name, a.archetype AS sender_archetype,
                        ROW_NUMBER() OVER (
                            PARTITION BY m.recipient_id ORDER BY m.sent_at DESC
@@ -176,8 +177,8 @@ def _batch_preload_context(agents: list[dict]) -> dict:
                 LEFT JOIN agents a ON a.soul_id = m.sender_id
                 WHERE m.recipient_id = ANY(%s)
             )
-            SELECT sender_id, recipient_id, content, sent_at, message_type,
-                   sender_name, sender_archetype
+            SELECT message_id, sender_id, recipient_id, content, sent_at, message_type,
+                   metadata, sender_name, sender_archetype
             FROM ranked WHERE rn <= %s
             """,
             (soul_ids, INBOX_CANDIDATE_LIMIT),
@@ -359,15 +360,34 @@ async def _execute_action(agent: dict, action: dict, emitter) -> None:
         if act_type == "send_message":
             to_id = action.get("to_id", "")
             content = str(action.get("content") or "...")[:500]
+            msg_type = str(action.get("message_type") or "direct")
+            amount = float(action.get("amount") or 0)
+            reply_to = action.get("reply_to_id") or action.get("offer_id")
+            metadata: dict = {}
+            if msg_type == "offer" and amount >= 0.0001:
+                from .economic_activity import build_offer_metadata
+
+                metadata = build_offer_metadata(
+                    amount,
+                    str(action.get("payer_on_accept") or "recipient"),
+                    content,
+                )
             from .messaging import send_message as do_send
 
             try:
+                recipient = to_id if len(to_id) >= 36 else _resolve_full_id(to_id)
                 msg = await do_send(
                     sender_soul_id=soul_id,
-                    recipient_soul_id=to_id if len(to_id) >= 36 else _resolve_full_id(to_id),
+                    recipient_soul_id=recipient,
                     body=content,
-                    message_type=str(action.get("message_type") or "direct"),
+                    message_type=msg_type,
+                    reply_to_id=str(reply_to) if reply_to else None,
+                    metadata=metadata or None,
                 )
+                if msg_type == "acceptance" and reply_to:
+                    from .economic_activity import try_settle_acceptance
+
+                    await try_settle_acceptance(soul_id, msg.message_id, str(reply_to), emitter)
                 target_name = msg.recipient_id[:8]
                 conn = _db()
                 cur = conn.cursor()
@@ -495,6 +515,30 @@ async def _execute_action(agent: dict, action: dict, emitter) -> None:
                 },
             )
             log.info(f"  {name} registered service '{svc_name}' @ ${svc_price:.4f}")
+            return
+
+        # ── buy_service ─────────────────────────────────────────────────────
+        if act_type == "buy_service":
+            from .economic_activity import buy_service as do_buy
+
+            seller_id = action.get("to_id", "")
+            svc = str(action.get("service_name") or "").strip().lower().replace(" ", "_")
+            if not seller_id or not svc:
+                return
+            conn = _db()
+            cur = conn.cursor()
+            target = _resolve_target(cur, seller_id)
+            cur.close()
+            conn.close()
+            if not target:
+                log.debug(f"  {name}: buy_service seller '{seller_id[:8]}' not found")
+                return
+            result = await do_buy(soul_id, target["soul_id"], svc, emitter)
+            if result.get("ok"):
+                log.info(f"  {name} bought '{svc}' from {target['soul_id'][:8]}")
+            else:
+                log.debug(f"  {name} buy_service failed: {result.get('error')}")
+            log_action(soul_id, act_type, action, result, success=bool(result.get("ok")))
             return
 
         # ── send_broadcast ──────────────────────────────────────────────────

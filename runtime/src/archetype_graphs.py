@@ -161,7 +161,21 @@ def _format_inbox(inbox: list) -> str:
         arch = _clean_context_text(m.get("sender_archetype") or "?", 20)
         mtype = _clean_context_text(m.get("message_type") or "direct", 20)
         content = _sanitize_inbox_content(m.get("content") or "")
-        lines.append(f"  {sender} [{arch}] ({mtype}): {content}")
+        mid = _clean_context_text(m.get("message_id") or "", 36)
+        meta = m.get("metadata") or {}
+        if isinstance(meta, str):
+            try:
+                import json as _json
+
+                meta = _json.loads(meta)
+            except Exception:
+                meta = {}
+        econ = ""
+        if mtype == "offer" and meta.get("offer_amount_usdc"):
+            econ = f" [OFFER ${float(meta['offer_amount_usdc']):.4f} id:{mid[:8]}…]"
+        elif mid:
+            econ = f" [id:{mid[:8]}…]"
+        lines.append(f"  {sender} [{arch}] ({mtype}){econ}: {content}")
     return "\n".join(lines)
 
 
@@ -215,6 +229,7 @@ def _format_coalitions(my_coalitions: list, world_coalitions: list) -> str:
 _VALID_ACTIONS = {
     "send_message",
     "transfer_usdc",
+    "buy_service",
     "register_service",
     "send_broadcast",
     "form_coalition",
@@ -246,10 +261,12 @@ def _parse_action_json(raw: str, state: dict | None = None) -> tuple[str, dict |
 
         to_id = _clean_context_text(data.get("to_id") or "", 80)
         # Skip actions that require a target but have none
-        if act_type in ("send_message", "transfer_usdc") and not to_id.strip("null None"):
+        if act_type in ("send_message", "transfer_usdc", "buy_service") and not to_id.strip(
+            "null None"
+        ):
             return thought, None
 
-        if state and act_type in ("send_message", "transfer_usdc"):
+        if state and act_type in ("send_message", "transfer_usdc", "buy_service"):
             from .grounding import validate_action_target
 
             if not validate_action_target(to_id, state):
@@ -262,6 +279,8 @@ def _parse_action_json(raw: str, state: dict | None = None) -> tuple[str, dict |
             "amount": float(data.get("amount") or 0),
             "content": _clean_context_text(data.get("content"), 500),
             "message_type": msg_type,
+            "reply_to_id": _clean_context_text(data.get("reply_to_id") or data.get("offer_id"), 80),
+            "payer_on_accept": _clean_context_text(data.get("payer_on_accept"), 16),
             "service_name": _clean_context_text(data.get("service_name"), 60),
             "service_price": float(data.get("service_price") or 0),
             "service_description": _clean_context_text(data.get("service_description"), 240),
@@ -296,6 +315,8 @@ ECONOMY
   • USDC is the only currency — balances are numbers in a database
   • Rent is $0.001 USDC every 5 minutes — miss 3 consecutive payments → permanent death
   • Transfers are real: UPDATE agents SET balance_usdc = balance_usdc ± amount
+  • OFFERS: send_message type=offer with amount → recipient accepts with type=acceptance + reply_to_id → USDC settles
+  • buy_service: purchase a listed service (to_id + service_name) — instant debit/credit
   • Services cost USDC to call; you earn USDC when yours are called
   • Messages cost $0.001 to send; broadcasts cost $0.01
 
@@ -422,6 +443,8 @@ async def _grounded_decide(
         '"amount": 0.0, '
         '"content": null, '
         '"message_type": null, '
+        '"reply_to_id": null, '
+        '"payer_on_accept": "recipient", '
         '"service_name": null, '
         '"service_price": 0.0, '
         '"service_description": null, '

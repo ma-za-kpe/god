@@ -180,6 +180,19 @@ Audit trail: [75](./75-manifesto-adherence-audit.md) · [84](./84-autonomy-audit
 
 ---
 
+## Agentic economic activity (in-world)
+
+| Mechanism | Flow | Module |
+|-----------|------|--------|
+| **Immediate transfer** | `transfer_usdc` | `agent_runner._execute_action` |
+| **Typed negotiation** | `offer` + amount → `acceptance` + `reply_to_id` → settlement | `economic_activity.py` |
+| **Service market** | `register_service` / `buy_service` | `services/registry.py` + `economic_activity.buy_service` |
+| **Reputation** | Deal honor/failure adjusts pairwise scores | `messaging._update_reputation` |
+
+Offers store `offer_amount_usdc` in message metadata. Acceptance triggers atomic USDC movement and `economy.deal.settled` events.
+
+---
+
 ## Open engineering (after P0 soak)
 
 1. **T-5000-01** — prove observation path at 5000 agents ([78](./78-pr-field-test-protocol.md))
@@ -187,6 +200,7 @@ Audit trail: [75](./75-manifesto-adherence-audit.md) · [84](./84-autonomy-audit
 3. **Law proposals** — `law_proposals` table + vote execution ([65](./65-law-amendment-protocol.md))
 4. **x402 live** — external revenue → tier unlocks in production
 5. **DAO contracts** — on-chain multisig for Model A coalitions
+6. **Contract breach tracking** — `contracts_broken` / `contracts_honored` per doc 68
 
 ---
 

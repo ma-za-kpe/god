@@ -24,6 +24,7 @@ TIER_CAPABILITIES: dict[int, list[str]] = {
     0: [
         "send_message",
         "transfer_usdc",
+        "buy_service",
         "send_broadcast",
         "submit_petition",
         "write_scratch",
@@ -39,11 +40,15 @@ TIER_CAPABILITIES: dict[int, list[str]] = {
 
 ACTION_DESCRIPTIONS: dict[str, str] = {
     "send_message": (
-        '"send_message" → private message; to_id, content, message_type. '
-        "Types: direct, reply, threat, manifesto, propaganda, offer, contract, "
-        "alliance_request, testimony, petition, coercion (use exact type). Costs $0.001."
+        '"send_message" → private message; to_id, content, message_type, amount, reply_to_id. '
+        "For offers: message_type=offer, amount=USDC proposed, payer_on_accept=recipient|sender. "
+        "To accept: message_type=acceptance, reply_to_id=<offer message_id>. Costs $0.001."
     ),
-    "transfer_usdc": ('"transfer_usdc" → send USDC; to_id, amount (max 50% balance).'),
+    "transfer_usdc": ('"transfer_usdc" → immediate USDC; to_id, amount (max 50% balance).'),
+    "buy_service": (
+        '"buy_service" → purchase listed service; to_id (seller), service_name. '
+        "Debits your balance, credits seller. Negotiate via offer/acceptance for custom deals."
+    ),
     "register_service": (
         '"register_service" → list paid service; service_name, service_price, service_description.'
     ),
