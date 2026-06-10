@@ -8,10 +8,42 @@
 
 | Role | Who | Does |
 |------|-----|------|
-| **Agent** | Grok / PR babysitter | Implements fixes, pushes commits, posts `[AGENT-REQUEST]` |
-| **Field operator** | Human with compute | Runs Docker, Ollama, load tests, posts `[FIELD-*]` replies |
+| **Agent** | Grok / PR babysitter | Implements fixes, pushes commits, posts `[AGENT-REQUEST]` then `[AGENT-READY]` |
+| **Field operator** | Human with compute | **Waits** for `[AGENT-READY]`, then pulls, rebuilds Docker, runs tests, posts `[FIELD-*]` |
 
 Both parties **always `git pull` on `feat/p0-manifesto-and-scaling` before acting.**
+
+---
+
+## WAIT GATE (mandatory — read first)
+
+**The field operator must NOT rebuild Docker, restart services, or run requested tests until the agent posts `[AGENT-READY]` for that task.**
+
+| Phase | Who | Action |
+|-------|-----|--------|
+| 1. Request | Agent | Posts `[AGENT-REQUEST] T-xxx` describing what to test **after** code lands |
+| 2. Implement | Agent | Makes code changes, commits, pushes to `feat/p0-manifesto-and-scaling` |
+| 3. Ready | Agent | Posts `[AGENT-READY] T-xxx @ <sha>` — **only then** may the operator act |
+| 4. Execute | Operator | `git pull` → `docker compose build runtime` → `up` → run steps → `[FIELD-*]` |
+
+**If you see `[AGENT-REQUEST]` without a matching `[AGENT-READY]` at the same or newer commit: wait.** Do not pull, rebuild, or report yet.
+
+**Exception:** `[FIELD-READY]` (environment smoke check) and `[FIELD-DATA]` replies to a *previous* completed task do not require a new `[AGENT-READY]`.
+
+Wrong order (do not do this):
+
+```
+[AGENT-REQUEST] T-5000-01 → operator immediately rebuilds  ❌
+```
+
+Correct order:
+
+```
+[AGENT-REQUEST] T-5000-01 — … — WAIT: do not rebuild until [AGENT-READY]
+… agent pushes commits …
+[AGENT-READY] T-5000-01 @ abc1234 — safe to pull, rebuild runtime, run steps
+→ operator pulls @ abc1234, rebuilds, runs, posts [FIELD-PASS|FAIL|DATA]
+```
 
 ---
 
@@ -21,8 +53,9 @@ Use the tag as the **first line** of every coordination comment.
 
 | Tag | Author | Meaning |
 |-----|--------|---------|
-| `[AGENT-REQUEST]` | Agent | Asks operator to run a specific test or gather data |
-| `[AGENT-ACK]` | Agent | Acknowledges a field report; may include commit hash |
+| `[AGENT-REQUEST]` | Agent | Announces upcoming work; **includes `WAIT: do not rebuild until [AGENT-READY]`** |
+| `[AGENT-READY]` | Agent | Code pushed; operator may pull, rebuild Docker, and run the task (include `@ <sha>`) |
+| `[AGENT-ACK]` | Agent | Acknowledges a field report; may include commit hash for the next cycle |
 | `[FIELD-READY]` | Operator | Environment up, branch pulled, ready for tasks |
 | `[FIELD-RUNNING]` | Operator | Test in progress (include start time + config) |
 | `[FIELD-PASS]` | Operator | Test met acceptance criteria (attach metrics) |
@@ -40,6 +73,13 @@ Agent requests use numbered tasks:
 
 ```
 [AGENT-REQUEST] T-5000-01 — Short title
+WAIT: do not rebuild until [AGENT-READY] T-5000-01 @ <sha>
+```
+
+When code is pushed:
+
+```
+[AGENT-READY] T-5000-01 @ abc1234 — safe to pull, rebuild runtime, run steps below
 ```
 
 Operator responses reference the same ID:
@@ -71,9 +111,12 @@ From [doc 76](./76-agent-scaling-and-observer-performance.md) and P0/P1 implemen
 
 ## Operator Environment Checklist
 
+**Run only after `[AGENT-READY] T-xxx @ <sha>` for the task you are executing.**
+
 ```bash
 git checkout feat/p0-manifesto-and-scaling
 git pull --rebase origin feat/p0-manifesto-and-scaling
+git rev-parse --short HEAD   # must match [AGENT-READY] sha
 docker compose build runtime
 docker compose up -d
 curl -s http://localhost:8000/health
@@ -148,10 +191,14 @@ While scaling, spot-check 5 random `last_thought` values from `/agents`:
 ## Agent ↔ Operator Loop
 
 ```
-Agent pushes fix → [AGENT-REQUEST] T-xxx
-Operator pulls → runs test → [FIELD-PASS|FAIL] T-xxx
-Agent pulls → reads comment → implements → [AGENT-ACK] + new request
+Agent → [AGENT-REQUEST] T-xxx (WAIT: do not rebuild yet)
+Agent → implements, pushes
+Agent → [AGENT-READY] T-xxx @ <sha>
+Operator → pull @ sha → rebuild runtime → run → [FIELD-PASS|FAIL|DATA] T-xxx
+Agent → pull → [AGENT-ACK] T-xxx → next [AGENT-REQUEST] if needed
 ```
+
+**Operator rule:** If the agent has not posted `[AGENT-READY]` with a commit SHA for your task, **stop and wait**. Rebuilding early wastes time and produces misleading `[FIELD-*]` reports.
 
 Do not merge PR #1 until **T-5000-01 Phase A** passes and hallucination track has a plan.
 
