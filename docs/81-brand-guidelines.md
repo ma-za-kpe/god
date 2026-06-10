@@ -89,7 +89,7 @@ Sizes: header stats `0.61rem`, panel titles `0.55rem` caps + `0.28em` tracking, 
 - **World log:** terminal-style `[HH:MM:SS] LEVEL CAT message` — same events, operator/debug view
 - **Canvas:** agents as bioluminescent nodes; gold streams = USDC transfers
 
-Load brand tokens: `observer/brand.css` (imported by `index.html`).
+Load brand tokens: `observer/brand.css` (imported by `index.html` and `maku.html`).
 
 ---
 

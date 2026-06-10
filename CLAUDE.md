@@ -25,8 +25,10 @@ The world should stay harsh enough to reward judgment, memory, and adaptation.
 Before each new task:
 
 1. **Reread docs** — [manifesto](./docs/74-ecology-hardening-manifesto.md), [economy & governance map](./docs/85-economy-governance-system.md), [autonomy](./docs/77-agent-autonomy-local.md), [audit](./docs/75-manifesto-adherence-audit.md), and the task-specific spec. Do not rely on conversation memory alone.
-2. **Pre-commit locally** — `python3 -m pre_commit run --all-files` must pass before every push.
-3. **Watch CI once** — after push, `bash scripts/watch-ci.sh` (or `gh run watch`); fix failures before piling on commits.
-4. **Conserve Actions credits** — no empty commits, no re-pushes to “re-run CI”; batch fixes; feature branches rely on PR checks only (not push+PR duplicate runs).
-5. **Gitflow** — branch from `develop`, PR to `develop`; releases `develop` → `main`. See [CONTRIBUTING.md](./CONTRIBUTING.md) and [doc 83](./docs/83-git-workflow.md).
-5. **Security before push** — `bash scripts/security-audit.sh`; never commit keys. See [SECURITY.md](./SECURITY.md).
+2. **Pull before push** — `git pull --rebase origin <branch>` so you never push stale commits.
+3. **Pre-commit locally** — `python3 -m pre_commit run --all-files` must pass before every push.
+4. **Watch CI once** — after push, `bash scripts/watch-ci.sh` (or `gh run watch`); fix failures before piling on commits.
+5. **Conserve Actions credits** — no empty commits, no re-pushes to “re-run CI”; batch fixes; feature branches rely on PR checks only (not push+PR duplicate runs).
+6. **Gitflow** — branch from `develop`, PR to `develop`; releases `develop` → `main`. See [CONTRIBUTING.md](./CONTRIBUTING.md) and [doc 83](./docs/83-git-workflow.md).
+7. **Security before push** — `bash scripts/security-audit.sh`; never commit keys. See [SECURITY.md](./SECURITY.md).
+8. **Track creator requests** — update [task backlog](./docs/82-project-task-backlog.md) or open a GH issue; mark ✅ when done.
