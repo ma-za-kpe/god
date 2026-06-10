@@ -3,9 +3,13 @@ name: security
 # PR-only on feature branches — saves Actions minutes; push to main still runs.
 on:
   pull_request:
+    branches:
+      - main
+      - develop
   push:
     branches:
       - main
+      - develop
 
 concurrency:
   group: security-${{ github.ref }}

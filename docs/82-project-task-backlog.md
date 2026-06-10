@@ -35,6 +35,7 @@
 | R12 | Open source everything; no key leaks; security audit | ✅ | MIT, doc 80, #12 |
 | R13 | **Brand theme, logo, guidelines; reflect in UI; world logs in observer** | ✅ | doc 81, observer brand.css + WORLD LOG tab |
 | R14 | **Keep all requests in this task list** | ✅ | this file |
+| R15 | **Open-source contribution guidelines + airtight git workflow; protect branches; close all issues** | 🔄 | CONTRIBUTING.md, doc 83, issues #2–#12 |
 
 ---
 

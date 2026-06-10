@@ -34,9 +34,9 @@ RECOVERY_CYCLES = int(os.getenv("RECOVERY_CYCLES", "3"))
 RENT_PERIOD_S = int(os.getenv("RENT_PERIOD_S", "300"))  # seconds per rent window
 MUTATION_RATE = float(os.getenv("MUTATION_RATE", "0.05"))
 ARCHETYPE_MUTATION_PROB = float(os.getenv("ARCHETYPE_MUTATION_PROB", "0.10"))
-MIN_BALANCE_MULT = float(
-    os.getenv("MIN_BALANCE_MULT", "5.0")
-)  # Law 6: min_balance = mult × total_cost
+# Law 6: reproduction requires 5× total reproduction cost (single canonical env var).
+REPRO_MIN_MULT = float(os.getenv("REPRO_MIN_MULT", os.getenv("MIN_BALANCE_MULT", "5.0")))
+MIN_BALANCE_MULT = REPRO_MIN_MULT  # backward-compatible alias
 
 ALL_ARCHETYPES = [
     "trader",
@@ -84,6 +84,21 @@ async def fork_self(agent: dict) -> dict:
     ok, reason = _can_reproduce(agent, None)
     if not ok:
         log.warning(f"  [{name}] FORK BLOCKED: {reason}")
+        if "insufficient balance" in reason:
+            from .event_emitter import get_emitter
+
+            emitter = get_emitter()
+            await emitter.emit(
+                "lifecycle",
+                "reproduction.blocked",
+                {
+                    "agent_id": soul_id,
+                    "name": name,
+                    "reason": reason,
+                    "required_mult": REPRO_MIN_MULT,
+                    "narrative": f"{name} cannot reproduce — {reason}",
+                },
+            )
         raise ValueError(f"Cannot fork: {reason}")
 
     # --- build child ---

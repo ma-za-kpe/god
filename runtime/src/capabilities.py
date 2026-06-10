@@ -39,15 +39,18 @@ TIER_CAPABILITIES: dict[int, list[str]] = {
 
 ACTION_DESCRIPTIONS: dict[str, str] = {
     "send_message": (
-        '"send_message" → private message; to_id, content, message_type '
-        "(direct|threat|manifesto|offer|contract|propaganda). Costs $0.001."
+        '"send_message" → private message; to_id, content, message_type. '
+        "Types: direct, reply, threat, manifesto, propaganda, offer, contract, "
+        "alliance_request, testimony, petition, coercion (use exact type). Costs $0.001."
     ),
     "transfer_usdc": ('"transfer_usdc" → send USDC; to_id, amount (max 50% balance).'),
     "register_service": (
         '"register_service" → list paid service; service_name, service_price, service_description.'
     ),
     "send_broadcast": (
-        '"send_broadcast" → message all agents; content, message_type. Costs $0.01.'
+        '"send_broadcast" → message all agents; content, message_type '
+        "(broadcast|manifesto|propaganda|threat|petition). Public types hit observer. "
+        "Costs $0.01."
     ),
     "form_coalition": '"form_coalition" → create alliance; coalition_name.',
     "submit_petition": (

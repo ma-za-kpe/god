@@ -4,9 +4,13 @@ name: pre-commit
 # Maintainers: run `python3 -m pre_commit run --all-files` locally before every push.
 on:
   pull_request:
+    branches:
+      - main
+      - develop
   push:
     branches:
       - main
+      - develop
 
 concurrency:
   group: pre-commit-${{ github.ref }}

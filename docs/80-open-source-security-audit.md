@@ -92,6 +92,12 @@ bash scripts/security-audit.sh
 
 ---
 
+## Branch protection
+
+After `develop` exists on GitHub, run `bash scripts/setup-branch-protection.sh` (requires `gh` + admin). See [git workflow](./83-git-workflow.md).
+
+---
+
 ## Links
 
 - [Creator key security](./24-creator-key-security.md)

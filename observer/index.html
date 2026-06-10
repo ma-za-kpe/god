@@ -1141,7 +1141,12 @@ function applyEventLive(ev) {
     }
   } else if (et === 'social.agent.message_sent') {
     const rid = ev.recipient_id;
-    if (aid && rid && rid !== 'BROADCAST') {
+    if (aid && rid === 'BROADCAST') {
+      bumpBuzz(aid, 0.45);
+      for (const id of Object.keys(S.agents)) {
+        if (id !== aid && S.agents[id].is_alive !== false) addPulse(aid, id);
+      }
+    } else if (aid && rid) {
       const key = [aid, rid].sort().join(':');
       if (!S.conns[key]) S.conns[key] = { count: 0, lastSeen: 0 };
       S.conns[key].count++;
@@ -1158,8 +1163,23 @@ function applyEventLive(ev) {
     if (S.selected === aid) showInspector(S.agents[aid]);
   } else if (et.includes('rent.paid') && aid && S.agents[aid]) {
     S.agents[aid].rent_paid_count = (S.agents[aid].rent_paid_count || 0) + 1;
+    const rentAmt = parseFloat(ev.amount_usdc || 0);
+    if (ev.balance_after !== undefined) {
+      S.agents[aid].balance_usdc = parseFloat(ev.balance_after);
+    } else if (rentAmt > 0) {
+      S.agents[aid].balance_usdc = Math.max(
+        0, parseFloat(S.agents[aid].balance_usdc || 0) - rentAmt
+      );
+    }
+    if (S.totalUsdc !== null && rentAmt > 0) {
+      document.getElementById('s-usdc').textContent = S.totalUsdc.toFixed(2);
+    }
+    bumpBuzz(aid, 0.25);
+    if (S.selected === aid) showInspector(S.agents[aid]);
   } else if (et.includes('rent.missed') && aid && S.agents[aid]) {
     S.agents[aid].rent_miss_count = (S.agents[aid].rent_miss_count || 0) + 1;
+    bumpBuzz(aid, 0.35);
+    if (S.selected === aid) showInspector(S.agents[aid]);
   }
 }
 

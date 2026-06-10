@@ -20,7 +20,9 @@ import psycopg2
 import psycopg2.extras
 
 from .event_emitter import get_emitter
+from .inbox_salience import INBOX_CANDIDATE_LIMIT, INBOX_DISPLAY_LIMIT, rank_inbox
 from .physics_gate import effective_llm, evaluate_physics_gate
+from .reproduction import REPRO_MIN_MULT
 
 log = logging.getLogger("god.runner")
 
@@ -107,25 +109,40 @@ def _db():
 
 
 async def _fetch_inbox(soul_id: str) -> list[dict]:
-    """Fetch last 5 messages received by this agent from real senders."""
+    """Fetch salience-ranked inbox (top 5 from recent candidate pool)."""
     try:
         conn = _db()
         cur = conn.cursor()
         cur.execute(
             """
-            SELECT m.sender_id, m.body AS content, m.sent_at, m.message_type,
+            SELECT m.sender_id, m.recipient_id, m.body AS content, m.sent_at, m.message_type,
                    a.current_name AS sender_name, a.archetype AS sender_archetype
             FROM agent_messages m
             LEFT JOIN agents a ON a.soul_id = m.sender_id
             WHERE m.recipient_id = %s
-            ORDER BY m.sent_at DESC LIMIT 5
+            ORDER BY m.sent_at DESC LIMIT %s
             """,
-            (soul_id,),
+            (soul_id, INBOX_CANDIDATE_LIMIT),
         )
         rows = [dict(r) for r in cur.fetchall()]
+        sender_ids = list({r["sender_id"] for r in rows if r.get("sender_id")})
+        pairwise: dict[tuple[str, str], float] = {}
+        if sender_ids:
+            cur.execute(
+                """
+                SELECT observer_id, subject_id, score
+                FROM reputation
+                WHERE observer_id = %s AND subject_id = ANY(%s)
+                """,
+                (soul_id, sender_ids),
+            )
+            for rep_row in cur.fetchall():
+                pairwise[(rep_row["observer_id"], rep_row["subject_id"])] = float(
+                    rep_row["score"] or 0.0
+                )
         cur.close()
         conn.close()
-        return rows
+        return rank_inbox(rows, soul_id, pairwise, INBOX_DISPLAY_LIMIT)
     except Exception:
         return []
 
@@ -159,13 +176,37 @@ def _batch_preload_context(agents: list[dict]) -> dict:
                 LEFT JOIN agents a ON a.soul_id = m.sender_id
                 WHERE m.recipient_id = ANY(%s)
             )
-            SELECT * FROM ranked WHERE rn <= 5
+            SELECT sender_id, recipient_id, content, sent_at, message_type,
+                   sender_name, sender_archetype
+            FROM ranked WHERE rn <= %s
             """,
-            (soul_ids,),
+            (soul_ids, INBOX_CANDIDATE_LIMIT),
         )
+        raw_by_recipient: dict[str, list[dict]] = {sid: [] for sid in soul_ids}
+        all_senders: set[str] = set()
         for row in cur.fetchall():
             rid = row["recipient_id"]
-            inboxes.setdefault(rid, []).append(dict(row))
+            raw_by_recipient.setdefault(rid, []).append(dict(row))
+            if row.get("sender_id"):
+                all_senders.add(row["sender_id"])
+
+        pairwise: dict[tuple[str, str], float] = {}
+        if soul_ids and all_senders:
+            cur.execute(
+                """
+                SELECT observer_id, subject_id, score
+                FROM reputation
+                WHERE observer_id = ANY(%s) AND subject_id = ANY(%s)
+                """,
+                (soul_ids, list(all_senders)),
+            )
+            for rep_row in cur.fetchall():
+                pairwise[(rep_row["observer_id"], rep_row["subject_id"])] = float(
+                    rep_row["score"] or 0.0
+                )
+
+        for rid, msgs in raw_by_recipient.items():
+            inboxes[rid] = rank_inbox(msgs, rid, pairwise, INBOX_DISPLAY_LIMIT)
 
         cur.execute(
             """
@@ -885,7 +926,6 @@ async def _think(llm, agent: dict) -> str:
 
 
 REPRO_PROB = float(os.getenv("REPRO_PROB", "0.08"))  # 8% per active cycle
-REPRO_MIN_MULT = float(os.getenv("REPRO_MIN_BALANCE_MULT", "5.0"))  # need 5x cost to trigger
 MATING_COST = float(os.getenv("MATING_COST_USDC", "0.001"))
 CHILD_SEED = float(os.getenv("CHILD_SEED_USDC", "0.002"))
 REPRO_THRESHOLD = (MATING_COST + CHILD_SEED) * REPRO_MIN_MULT  # default 0.015 USDC

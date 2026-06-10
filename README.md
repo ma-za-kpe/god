@@ -40,6 +40,8 @@ The world stays alive only if agents are forced to judge under pressure. Do not 
 
 **Brand & observer UI:** [Brand guidelines](./docs/81-brand-guidelines.md) (Signal Hex logo, palette, voice) · [Task backlog](./docs/82-project-task-backlog.md) (creator requests).
 
+**Contributing:** [CONTRIBUTING.md](./CONTRIBUTING.md) · [Git workflow](./docs/83-git-workflow.md) (`main` / `develop` / `feat/*`, protected branches).
+
 ## Path to Real-World Agency
 
 Agents do not start with full external access. They earn it:
