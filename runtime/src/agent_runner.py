@@ -103,6 +103,298 @@ def _db():
     return psycopg2.connect(DATABASE_URL, cursor_factory=psycopg2.extras.RealDictCursor)
 
 
+async def _fetch_inbox(soul_id: str) -> list[dict]:
+    """Fetch last 5 messages received by this agent from real senders."""
+    try:
+        conn = _db()
+        cur  = conn.cursor()
+        cur.execute(
+            """
+            SELECT m.sender_id, m.body AS content, m.sent_at,
+                   a.current_name AS sender_name
+            FROM agent_messages m
+            LEFT JOIN agents a ON a.soul_id = m.sender_id
+            WHERE m.recipient_id = %s
+            ORDER BY m.sent_at DESC LIMIT 5
+            """,
+            (soul_id,),
+        )
+        rows = [dict(r) for r in cur.fetchall()]
+        cur.close(); conn.close()
+        return rows
+    except Exception:
+        return []
+
+
+async def _fetch_services_context(soul_id: str) -> tuple[list, list]:
+    """Fetch my own service listings and the market (other agents' services)."""
+    try:
+        conn = _db()
+        cur  = conn.cursor()
+        cur.execute(
+            "SELECT name, price_usdc, calls_served, description FROM service_listings "
+            "WHERE agent_soul_id = %s AND is_active = true ORDER BY calls_served DESC LIMIT 5",
+            (soul_id,),
+        )
+        my_services = [dict(r) for r in cur.fetchall()]
+        cur.execute(
+            """
+            SELECT sl.name, sl.price_usdc, sl.agent_soul_id,
+                   a.current_name AS seller_name, a.archetype AS seller_arch
+            FROM service_listings sl
+            JOIN agents a ON a.soul_id = sl.agent_soul_id
+            WHERE sl.agent_soul_id != %s AND sl.is_active = true AND a.is_alive = true
+            ORDER BY sl.calls_served DESC LIMIT 8
+            """,
+            (soul_id,),
+        )
+        market = [dict(r) for r in cur.fetchall()]
+        cur.close(); conn.close()
+        return my_services, market
+    except Exception:
+        return [], []
+
+
+async def _fetch_coalitions_context(soul_id: str) -> tuple[list, list]:
+    """Fetch my coalitions and all world coalitions."""
+    try:
+        from .coalitions import get_agent_coalitions, get_world_coalitions
+        my = get_agent_coalitions(soul_id)
+        world = get_world_coalitions()
+        return my, world
+    except Exception:
+        return [], []
+
+
+async def _fetch_reputation_avg(soul_id: str) -> float:
+    """Fetch this agent's average reputation score across all observers."""
+    try:
+        conn = _db()
+        cur  = conn.cursor()
+        cur.execute(
+            "SELECT AVG(score) AS avg_score FROM reputation WHERE subject_id = %s",
+            (soul_id,),
+        )
+        row = cur.fetchone()
+        cur.close(); conn.close()
+        val = (row or {}).get("avg_score")
+        return float(val) if val is not None else 0.0
+    except Exception:
+        return 0.0
+
+
+def _resolve_target(cur, to_id: str):
+    """Resolve a full UUID or 8-char prefix to a live agent row. Returns row or None."""
+    if not to_id:
+        return None
+    if len(to_id) < 36:
+        cur.execute(
+            "SELECT soul_id, current_name FROM agents WHERE soul_id LIKE %s AND is_alive = true LIMIT 1",
+            (to_id + "%",),
+        )
+    else:
+        cur.execute(
+            "SELECT soul_id, current_name FROM agents WHERE soul_id = %s AND is_alive = true",
+            (to_id,),
+        )
+    return cur.fetchone()
+
+
+async def _execute_action(agent: dict, action: dict, emitter) -> None:
+    """Execute any real-world action chosen by the agent's structured LLM output."""
+    if not action:
+        return
+    soul_id  = agent["soul_id"]
+    name     = agent.get("current_name") or soul_id[:8]
+    act_type = action.get("type")
+
+    try:
+        # ── send_message ────────────────────────────────────────────────────
+        if act_type == "send_message":
+            to_id   = action.get("to_id", "")
+            content = str(action.get("content") or "...")[:500]
+            from .messaging import send_message as do_send
+            try:
+                msg = await do_send(
+                    sender_soul_id=soul_id,
+                    recipient_soul_id=to_id if len(to_id) >= 36 else _resolve_full_id(to_id),
+                    body=content,
+                )
+                target_name = msg.recipient_id[:8]
+                conn = _db(); cur = conn.cursor()
+                cur.execute("SELECT current_name FROM agents WHERE soul_id = %s", (msg.recipient_id,))
+                row = cur.fetchone()
+                cur.close(); conn.close()
+                if row: target_name = row["current_name"] or target_name
+                await emitter.emit("social", "agent.message_sent", {
+                    "agent_id": soul_id, "name": name,
+                    "recipient_id": msg.recipient_id, "recipient_name": target_name,
+                    "content": content,
+                    "narrative": f"{name} → {target_name}: \"{content[:80]}\"",
+                })
+                log.info(f"  {name} → {target_name}: \"{content[:55]}\"")
+            except Exception as e:
+                log.debug(f"  {name} send_message failed: {e}")
+            return
+
+        # ── transfer_usdc ───────────────────────────────────────────────────
+        if act_type == "transfer_usdc":
+            to_id  = action.get("to_id", "")
+            amount = float(action.get("amount") or 0)
+            if amount <= 0:
+                return
+            conn = _db(); cur = conn.cursor()
+            target = _resolve_target(cur, to_id)
+            if not target:
+                cur.close(); conn.close()
+                log.debug(f"  {name}: transfer target '{to_id[:8]}' not found")
+                return
+            target_name = target["current_name"] or target["soul_id"][:8]
+            to_full     = target["soul_id"]
+            cur.execute("SELECT balance_usdc FROM agents WHERE soul_id = %s", (soul_id,))
+            row = cur.fetchone()
+            if not row:
+                cur.close(); conn.close(); return
+            current_bal = float(row["balance_usdc"] or 0)
+            amount = min(amount, current_bal * 0.5)
+            if amount < 0.0001:
+                cur.close(); conn.close(); return
+            cur.execute("UPDATE agents SET balance_usdc = balance_usdc - %s WHERE soul_id = %s", (amount, soul_id))
+            cur.execute("UPDATE agents SET balance_usdc = balance_usdc + %s WHERE soul_id = %s", (amount, to_full))
+            conn.commit(); cur.close(); conn.close()
+            await emitter.emit("economy", "agent.transfer", {
+                "agent_id": soul_id, "name": name,
+                "recipient_id": to_full, "recipient_name": target_name,
+                "amount_usdc": amount,
+                "narrative": f"{name} transferred ${amount:.4f} USDC to {target_name}",
+            })
+            log.info(f"  {name} → {target_name}: ${amount:.4f} USDC")
+            return
+
+        # ── register_service ────────────────────────────────────────────────
+        if act_type == "register_service":
+            from .services.registry import register_service as do_register
+            svc_name  = str(action.get("service_name") or "service")[:40].lower().replace(" ", "_")
+            svc_price = max(0.001, float(action.get("service_price") or 0.005))
+            svc_desc  = str(action.get("service_description") or "")[:200]
+            listing   = await do_register(
+                soul_id=soul_id, name=svc_name,
+                description=svc_desc, price_usdc=svc_price,
+            )
+            await emitter.emit("economy", "service.registered", {
+                "agent_id": soul_id, "name": name,
+                "service_name": svc_name, "price_usdc": svc_price,
+                "narrative": f"{name} listed service '{svc_name}' at ${svc_price:.4f}/call",
+            })
+            log.info(f"  {name} registered service '{svc_name}' @ ${svc_price:.4f}")
+            return
+
+        # ── send_broadcast ──────────────────────────────────────────────────
+        if act_type == "send_broadcast":
+            from .messaging import send_broadcast as do_broadcast
+            content = str(action.get("content") or "...")[:500]
+            try:
+                await do_broadcast(sender_soul_id=soul_id, body=content)
+                await emitter.emit("social", "agent.broadcast", {
+                    "agent_id": soul_id, "name": name, "content": content,
+                    "narrative": f"{name} broadcasts to all: \"{content[:80]}\"",
+                })
+                log.info(f"  {name} BROADCAST: \"{content[:55]}\"")
+            except Exception as e:
+                log.debug(f"  {name} broadcast failed: {e}")
+            return
+
+        # ── form_coalition ──────────────────────────────────────────────────
+        if act_type == "form_coalition":
+            from .coalitions import form_coalition as do_form
+            cname  = str(action.get("coalition_name") or f"{name}'s Alliance")[:60]
+            result = await do_form(founder_soul_id=soul_id, name=cname)
+            await emitter.emit("social", "coalition.formed", {
+                "agent_id": soul_id, "name": name,
+                "coalition_id": result["coalition_id"], "coalition_name": cname,
+                "narrative": f"{name} founded coalition '{cname}'",
+            })
+            log.info(f"  {name} formed coalition '{cname}'")
+            return
+
+        # ── submit_petition ─────────────────────────────────────────────────
+        if act_type == "submit_petition":
+            import uuid as _uuid
+            request = str(action.get("petition_request") or "")[:500]
+            escrow  = max(0.01, float(action.get("amount") or 0.05))
+            conn = _db(); cur = conn.cursor()
+            cur.execute("SELECT balance_usdc FROM agents WHERE soul_id = %s", (soul_id,))
+            row = cur.fetchone()
+            if not row or float(row["balance_usdc"] or 0) < escrow:
+                cur.close(); conn.close()
+                log.debug(f"  {name}: insufficient balance for petition")
+                return
+            petition_id = str(_uuid.uuid4())
+            cur.execute(
+                "INSERT INTO creator_petitions (petition_id, soul_id, petition_type, title, "
+                "description, escrowed_amount_usdc, proposed_creator_fee_usdc, status, world_id, created_at) "
+                "VALUES (%s, %s, 'general', %s, %s, %s, 0, 'pending', %s, %s)",
+                (petition_id, soul_id, request[:80], request, escrow, WORLD_ID, int(time.time())),
+            )
+            cur.execute("UPDATE agents SET balance_usdc = balance_usdc - %s WHERE soul_id = %s", (escrow, soul_id))
+            conn.commit(); cur.close(); conn.close()
+            await emitter.emit("social", "petition.submitted", {
+                "agent_id": soul_id, "name": name,
+                "petition_id": petition_id, "request": request[:80], "escrow": escrow,
+                "narrative": f"{name} petitioned Creator: \"{request[:80]}\" (escrow ${escrow:.4f})",
+            })
+            log.info(f"  {name} petition: \"{request[:50]}\"")
+            return
+
+        # ── deploy_token ────────────────────────────────────────────────────
+        if act_type == "deploy_token":
+            from .token_factory import deploy_token as do_deploy
+            symbol = str(action.get("service_name") or name[:4].upper())[:8].upper()
+            try:
+                result = await do_deploy(
+                    agent_soul_id=soul_id,
+                    name=f"{name}'s Token",
+                    symbol=symbol,
+                    initial_supply=1_000_000,
+                )
+                await emitter.emit("economy", "token.deployed", {
+                    "agent_id": soul_id, "name": name,
+                    "token_address": result.get("token_address", ""),
+                    "symbol": symbol,
+                    "narrative": f"{name} deployed token ${symbol} on-chain",
+                })
+                log.info(f"  {name} deployed token ${symbol}")
+            except Exception as e:
+                log.debug(f"  {name} deploy_token failed: {e}")
+            return
+
+        # ── fork_self ───────────────────────────────────────────────────────
+        if act_type == "fork_self":
+            from .reproduction import fork_self as do_fork
+            try:
+                child = await do_fork(agent)
+                log.info(f"  {name} forked → {child.get('name', '?')}")
+            except Exception as e:
+                log.debug(f"  {name} fork_self failed: {e}")
+            return
+
+    except Exception as e:
+        log.warning(f"  {name} _execute_action({act_type}) failed: {e}")
+
+
+def _resolve_full_id(prefix: str) -> str:
+    """Resolve an 8-char soul_id prefix to the full UUID. Returns prefix on failure."""
+    try:
+        conn = _db()
+        cur  = conn.cursor()
+        cur.execute("SELECT soul_id FROM agents WHERE soul_id LIKE %s AND is_alive = true LIMIT 1", (prefix + "%",))
+        row = cur.fetchone()
+        cur.close(); conn.close()
+        return (row or {}).get("soul_id") or prefix
+    except Exception:
+        return prefix
+
+
 def _build_llm():
     """Attempt to build the LLM client. Returns None for stub mode."""
     if LLM_PROVIDER == "ollama":
@@ -163,6 +455,10 @@ async def _think(llm, agent: dict) -> str:
     rent_missed = agent.get("rent_miss_count", 0)
     generation = agent.get("generation", 1)
 
+    from .archetype_graphs import _format_peers, _format_inbox
+    peers_text = _format_peers(agent.get("_peers", []))
+    inbox_text = _format_inbox(agent.get("_inbox", []))
+
     system = (
         f"{archetype_persona}\n\n"
         f"World ID: {WORLD_ID}. You must pay rent to survive — missing 3 payments means permanent death.\n"
@@ -170,9 +466,11 @@ async def _think(llm, agent: dict) -> str:
     )
 
     prompt = (
-        f"Your name is {name}, generation {generation}.\n"
+        f"Your name is {name}, generation {generation}.\n\n"
+        f"AGENTS ALIVE IN YOUR WORLD:\n{peers_text}\n\n"
+        f"YOUR INBOX:\n{inbox_text}\n\n"
         "In one sentence, what are you thinking or doing right now? "
-        "Be concrete, first-person, present tense. No preamble or quotation marks."
+        "Reference real agents by name if relevant. First person, present tense. No preamble."
     )
 
     try:
@@ -282,7 +580,19 @@ async def _run_cycle(agents: list[dict], llm, emitter, graphs: dict):
 
         # ----------------------------------------------------------------
         # Normal cognition cycle
+        # Inject full world context: peers, inbox, services, coalitions
         # ----------------------------------------------------------------
+        agent = dict(agent)
+        agent["_peers"]  = [a for a in agents if a["soul_id"] != soul_id]
+        agent["_inbox"]  = await _fetch_inbox(soul_id)
+        my_svcs, market  = await _fetch_services_context(soul_id)
+        my_coal, world_coal = await _fetch_coalitions_context(soul_id)
+        agent["_my_services"]      = my_svcs
+        agent["_market_services"]  = market
+        agent["_my_coalitions"]    = my_coal
+        agent["_world_coalitions"] = world_coal
+        agent["_reputation_avg"]   = await _fetch_reputation_avg(soul_id)
+
         result      = await run_agent_graph(graphs, agent, llm)
         thought     = result["thought"] or await _think(llm, agent)
         action_type = result.get("action_type", "thought")
@@ -298,10 +608,16 @@ async def _run_cycle(agents: list[dict], llm, emitter, graphs: dict):
         })
         log.debug(f"  {name} [{archetype}/{action_type}]: {thought[:80]}")
 
-        # Tool dispatch (LLM-pattern-matched)
-        tool_result = await maybe_dispatch_tool(agent, thought, action_type)
-        if tool_result:
-            log.debug(f"  {name} tool result: {tool_result[:80]}")
+        # Execute structured action if LLM chose one (send_message / transfer_usdc)
+        structured_action = result.get("action")
+        if structured_action:
+            await _execute_action(agent, structured_action, emitter)
+
+        # Tool dispatch (LLM-pattern-matched, legacy path) — skip if structured action ran
+        if not structured_action:
+            tool_result = await maybe_dispatch_tool(agent, thought, action_type)
+            if tool_result:
+                log.debug(f"  {name} tool result: {tool_result[:80]}")
 
         # ----------------------------------------------------------------
         # Autonomous reproduction — triggers independently of LLM thought

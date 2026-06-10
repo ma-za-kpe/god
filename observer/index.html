@@ -532,6 +532,61 @@ function drawClusterHalos() {
   }
 }
 
+// ── Cluster-to-cluster bridge arcs ────────────────────────────────────────
+function drawClusterBridges() {
+  const now = Date.now()/1000;
+
+  // Compute cluster centers
+  const centers={}, cnts={};
+  for (const a of Object.values(S.agents)) {
+    if (!a.is_alive||a._wx===undefined) continue;
+    if (!centers[a.archetype]) { centers[a.archetype]={cx:0,cy:0}; cnts[a.archetype]=0; }
+    centers[a.archetype].cx+=a._wx; centers[a.archetype].cy+=a._wy; cnts[a.archetype]++;
+  }
+  for (const arch in centers) { centers[arch].cx/=cnts[arch]; centers[arch].cy/=cnts[arch]; }
+
+  // Aggregate cross-cluster connections by archetype pair
+  const bridges={};
+  for (const [key,info] of Object.entries(S.conns)) {
+    const [idA,idB]=key.split(':');
+    const a=S.agents[idA],b=S.agents[idB];
+    if (!a||!b||a.archetype===b.archetype) continue;
+    if (now-info.lastSeen > 300) continue;
+    const pair=[a.archetype,b.archetype].sort().join(':');
+    if (!bridges[pair]) { const [aa,ab]=pair.split(':'); bridges[pair]={archA:aa,archB:ab,count:0,lastSeen:0,links:0}; }
+    bridges[pair].count+=info.count; bridges[pair].lastSeen=Math.max(bridges[pair].lastSeen,info.lastSeen); bridges[pair].links++;
+  }
+
+  for (const br of Object.values(bridges)) {
+    const cA=centers[br.archA],cB=centers[br.archB];
+    if (!cA||!cB) continue;
+    const age=now-br.lastSeen;
+    const alpha=Math.max(0,0.65-age/220);
+    if (alpha<0.03) continue;
+
+    const dx=cB.cx-cA.cx,dy=cB.cy-cA.cy,len=Math.sqrt(dx*dx+dy*dy);
+    if (len<1) continue;
+    const off=Math.min(len*0.3,90);
+    const cpx=(cA.cx+cB.cx)/2-dy/len*off, cpy=(cA.cy+cB.cy)/2+dx/len*off;
+
+    const w=Math.min(5,1.5+Math.log(br.count+1)*0.9)/S.view.scale;
+    const toHex=v=>Math.round(v).toString(16).padStart(2,'0');
+    const aHex=toHex(alpha*200);
+    const colA=(ARCH_COL[br.archA]||'#6666ff')+aHex, colB=(ARCH_COL[br.archB]||'#6666ff')+aHex;
+    const grad=ctx.createLinearGradient(cA.cx,cA.cy,cB.cx,cB.cy);
+    grad.addColorStop(0,colA); grad.addColorStop(1,colB);
+    ctx.strokeStyle=grad; ctx.lineWidth=w; ctx.setLineDash([]);
+    ctx.beginPath(); ctx.moveTo(cA.cx,cA.cy); ctx.quadraticCurveTo(cpx,cpy,cB.cx,cB.cy); ctx.stroke();
+
+    // Count label at bezier midpoint
+    const lx=0.25*cA.cx+0.5*cpx+0.25*cB.cx, ly=0.25*cA.cy+0.5*cpy+0.25*cB.cy;
+    ctx.fillStyle=`rgba(200,200,255,${alpha*0.85})`;
+    ctx.font=`${Math.max(6,8/S.view.scale)}px Courier New`;
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText(`${br.count}`, lx, ly);
+  }
+}
+
 // ── Connection web ───────────────────────────────────────────────────────
 function drawConnections(t) {
   const now = Date.now()/1000;
@@ -540,22 +595,39 @@ function drawConnections(t) {
     const a=S.agents[idA], b=S.agents[idB];
     if (!a||!b||a._wx===undefined||b._wx===undefined) continue;
     const age = now - info.lastSeen;
-    const alpha = Math.max(0, 0.7 - age/90);
+    const isCross = a.archetype !== b.archetype;
+    const isSelected = S.selected && (S.selected===idA||S.selected===idB);
+
+    // Cross-cluster: visible 90s; intra: only if selected or very recent
+    if (!isCross && !isSelected && age > 20) continue;
+    const baseAlpha = isCross ? Math.max(0, 0.5 - age/90) : Math.max(0, 0.2 - age/20);
+    const alpha = isSelected ? Math.max(baseAlpha, 0.75) : baseAlpha;
     if (alpha < 0.02) continue;
 
-    const grad = ctx.createLinearGradient(a._wx,a._wy,b._wx,b._wy);
-    grad.addColorStop(0, `hsla(${soulHue(idA)},70%,58%,${alpha})`);
-    grad.addColorStop(1, `hsla(${soulHue(idB)},70%,58%,${alpha})`);
-    ctx.strokeStyle=grad;
-    ctx.lineWidth=Math.min(2.5/S.view.scale, (0.6+info.count*0.1)/S.view.scale);
-    ctx.setLineDash([5/S.view.scale, 8/S.view.scale]);
+    if (isCross) {
+      // Solid gradient line: source archetype color → target archetype color
+      const colA=ARCH_COL[a.archetype]||'#6666ff', colB=ARCH_COL[b.archetype]||'#6666ff';
+      const grad=ctx.createLinearGradient(a._wx,a._wy,b._wx,b._wy);
+      grad.addColorStop(0,colA+Math.round(alpha*255).toString(16).padStart(2,'0'));
+      grad.addColorStop(1,colB+Math.round(alpha*255).toString(16).padStart(2,'0'));
+      ctx.strokeStyle=grad;
+      ctx.lineWidth=Math.min(2/S.view.scale,(0.8+info.count*0.15)/S.view.scale);
+      ctx.setLineDash([]);
+    } else {
+      // Intra-cluster: faint short dashes
+      ctx.strokeStyle=`hsla(${soulHue(idA)},40%,55%,${alpha})`;
+      ctx.lineWidth=0.5/S.view.scale;
+      ctx.setLineDash([3/S.view.scale,8/S.view.scale]);
+    }
     ctx.beginPath(); ctx.moveTo(a._wx,a._wy); ctx.lineTo(b._wx,b._wy); ctx.stroke();
     ctx.setLineDash([]);
 
-    // Highlight if selected agent is in this connection
-    if (S.selected && (S.selected===idA||S.selected===idB)) {
-      ctx.strokeStyle = `rgba(255,255,255,${Math.min(0.5,alpha*1.5)})`;
-      ctx.lineWidth   = 2.0/S.view.scale;
+    // Selected cross-cluster highlight: bright archetype-colored outline
+    if (isSelected && isCross) {
+      const otherId=S.selected===idA?idB:idA;
+      const other=S.agents[otherId];
+      ctx.strokeStyle=(other?(ARCH_COL[other.archetype]||'#ffffff'):'#ffffff')+'cc';
+      ctx.lineWidth=2.2/S.view.scale;
       ctx.beginPath(); ctx.moveTo(a._wx,a._wy); ctx.lineTo(b._wx,b._wy); ctx.stroke();
     }
   }
@@ -720,6 +792,7 @@ function render(t) {
   drawBg();
   applyTransform();
   drawClusterHalos();
+  drawClusterBridges();
   drawConnections(t);
   updatePulses(dt);
   Object.values(S.agents).forEach(a=>drawAgent(a,t));
@@ -754,18 +827,26 @@ function showInspector(a) {
   document.getElementById('i-parents').textContent=parents.length?parents.map(p=>p.slice(0,8)).join(', ')+'…':'genesis';
   document.getElementById('insp-thought').textContent=a.last_thought?`"${a.last_thought}"`:'No thoughts yet.';
 
-  // Show connections
+  // Show connections — cross-cluster highlighted
   const connList=document.getElementById('conn-list'); connList.innerHTML='';
-  let connCount=0;
-  for(const [key,info] of Object.entries(S.conns)){
+  let connCount=0, crossCount=0;
+  const crossArches=new Set();
+  // Sort: cross-cluster first
+  const myConns=Object.entries(S.conns).filter(([k])=>{const[x,y]=k.split(':');return x===a.soul_id||y===a.soul_id;});
+  myConns.sort(([,ia],[,ib])=>ib.count-ia.count);
+  for(const [key,info] of myConns){
     const [idA,idB]=key.split(':');
-    if(idA!==a.soul_id&&idB!==a.soul_id) continue;
     const otherId=idA===a.soul_id?idB:idA;
     const other=S.agents[otherId];
-    connList.innerHTML+=`<div class="conn-item">↔ ${other?other.current_name||otherId.slice(0,8):otherId.slice(0,8)} (${info.count} msgs)</div>`;
-    if(++connCount>=5) break;
+    const isCross=other&&other.archetype!==a.archetype;
+    if(isCross){crossCount++;if(other)crossArches.add(other.archetype);}
+    const col=other?(ARCH_COL[other.archetype]||'#6666aa'):'#6666aa';
+    const tag=isCross?`<span style="color:${col};font-size:0.7em">⬡ ${other.archetype}</span> `:' ';
+    connList.innerHTML+=`<div class="conn-item">${tag}${other?other.current_name||otherId.slice(0,8):otherId.slice(0,8)}<span style="color:#333355"> ×${info.count}</span></div>`;
+    if(++connCount>=8) break;
   }
   if(!connCount) connList.innerHTML='<div class="conn-item" style="color:#444466">no connections yet</div>';
+  else if(crossCount>0) connList.innerHTML+=`<div class="conn-item" style="color:#9966ff;margin-top:4px;font-size:0.62rem">↗ bridges ${crossCount} cross-cluster links · ${crossArches.size} archetypes</div>`;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════

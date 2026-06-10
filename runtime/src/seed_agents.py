@@ -44,7 +44,7 @@ def _persist_agent(agent: dict):
             int(time.time()),
             WORLD_ID,
             agent["archetype"],
-            float(SEED_BALANCE_USDC),
+            float(agent.get("seed_balance", SEED_BALANCE_USDC)),
         ),
     )
     conn.commit()
@@ -99,6 +99,7 @@ async def seed_one_agent(
         "archetype": archetype,
         "name": graph.identity.current_name,
         "is_elder": is_elder,
+        "seed_balance": seed_balance,
     }
 
     try:

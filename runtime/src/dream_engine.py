@@ -102,8 +102,8 @@ async def run_dream_cycle(agent: dict, llm) -> dict:
     sleep_cycles = max(1, (now - sleep_started) // max(CYCLE_S, 1))
 
     _persist_dream(
-        dream_id, soul_id, sleep_started, now, sleep_cycles,
-        memories, proposal, accepted, rejection_reason, emo_state
+        dream_id, soul_id, now, sleep_cycles,
+        memory_summary, proposal, accepted, rejection_reason, emo_state
     )
     log.debug(f"  [{name}] dream persisted: {dream_id[:8]}")
 
@@ -416,25 +416,24 @@ def _check_coherence(proposal: str) -> tuple[bool, str]:
 # Internal — DB Persistence
 # ---------------------------------------------------------------------------
 
-def _persist_dream(dream_id, soul_id, sleep_started_ts, sleep_ended_ts,
-                   duration_cycles, memories, proposal, accepted,
+def _persist_dream(dream_id, soul_id, dreamed_at, sleep_cycles,
+                   memory_summary, proposal, accepted,
                    rejection_reason, emotional_state):
     try:
         conn = _db(dict_cursor=False)
         cur  = conn.cursor()
-        memory_ids = [m.get("episode_id") for m in memories if m.get("episode_id")]
         cur.execute(
             """
             INSERT INTO dreams
-                (dream_id, soul_id, sleep_started_ts, sleep_ended_ts, duration_cycles,
-                 memories_replayed, mutation_proposed, mutation_accepted, rejection_reason,
-                 emotional_state_on_sleep, emotional_state_on_wake, world_id)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'neutral', %s)
+                (dream_id, soul_id, world_id, dreamed_at, memory_summary,
+                 mutation_proposal, mutation_accepted, rejection_reason,
+                 emotional_state, sleep_cycles)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             ON CONFLICT (dream_id) DO NOTHING
             """,
-            (dream_id, soul_id, sleep_started_ts, sleep_ended_ts, duration_cycles,
-             memory_ids, proposal, accepted, rejection_reason or None,
-             emotional_state, WORLD_ID),
+            (dream_id, soul_id, WORLD_ID, dreamed_at, memory_summary,
+             proposal, accepted, rejection_reason or None,
+             emotional_state, sleep_cycles),
         )
         conn.commit()
         cur.close(); conn.close()
