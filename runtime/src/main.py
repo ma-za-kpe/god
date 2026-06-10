@@ -587,7 +587,8 @@ async def creator_genesis(body: dict = {}):
         cur  = conn.cursor()
         cur.execute("DELETE FROM agents WHERE world_id = %s", (world_id,))
         cur.execute("DELETE FROM sleep_states WHERE world_id = %s", (world_id,))
-        cur.execute("DELETE FROM rent_payments WHERE world_id = %s", (world_id,))
+        # rent_payments has no world_id — delete by soul_id of agents just cleared
+        cur.execute("DELETE FROM rent_payments WHERE soul_id NOT IN (SELECT soul_id FROM agents)")
         cur.execute("DELETE FROM events WHERE world_id = %s", (world_id,))
         cur.execute("DELETE FROM agent_messages WHERE world_id = %s", (world_id,))
         cur.execute("DELETE FROM dreams WHERE world_id = %s", (world_id,))

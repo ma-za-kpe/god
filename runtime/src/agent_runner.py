@@ -12,6 +12,7 @@ To start local inference:
 import asyncio
 import logging
 import os
+import random
 import time
 from typing import Optional
 
@@ -186,6 +187,49 @@ async def _think(llm, agent: dict) -> str:
         return _STUB_THOUGHTS.get(archetype, "I must survive.")
 
 
+REPRO_PROB      = float(os.getenv("REPRO_PROB", "0.08"))       # 8% per active cycle
+REPRO_MIN_MULT  = float(os.getenv("REPRO_MIN_BALANCE_MULT", "5.0"))  # need 5x cost to trigger
+MATING_COST     = float(os.getenv("MATING_COST_USDC", "0.001"))
+CHILD_SEED      = float(os.getenv("CHILD_SEED_USDC", "0.002"))
+REPRO_THRESHOLD = (MATING_COST + CHILD_SEED) * REPRO_MIN_MULT   # default 0.015 USDC
+
+
+async def _maybe_reproduce(agent: dict, emitter) -> None:
+    """Autonomously trigger fork_self when balance and cooldown conditions are met."""
+    balance = float(agent.get("balance_usdc", 0))
+    if balance < REPRO_THRESHOLD:
+        return
+    if random.random() > REPRO_PROB:
+        return
+
+    soul_id  = agent["soul_id"]
+    name     = agent.get("current_name") or soul_id[:8]
+    archetype = agent.get("archetype", "unknown")
+
+    # Check cooldown (read last_reproduced_at from DB)
+    try:
+        conn = _db()
+        cur  = conn.cursor()
+        cur.execute("SELECT last_reproduced_at FROM agents WHERE soul_id = %s", (soul_id,))
+        row = cur.fetchone()
+        cur.close(); conn.close()
+        last_repro = int((row or {}).get("last_reproduced_at") or 0)
+    except Exception:
+        return
+
+    recovery_s = int(os.getenv("RECOVERY_CYCLES", "3")) * int(os.getenv("RENT_PERIOD_SECONDS", "300"))
+    if time.time() - last_repro < recovery_s:
+        return  # still in cooldown
+
+    log.info(f"  {name} [{archetype}] AUTONOMOUS REPRODUCTION (balance=${balance:.4f})")
+    try:
+        from .reproduction import fork_self
+        child = await fork_self(agent)
+        log.info(f"  {name} forked → {child['name']} ({child['archetype']}) soul={child['soul_id'][:8]}")
+    except Exception as e:
+        log.warning(f"  {name} fork_self failed: {e}")
+
+
 async def _run_cycle(agents: list[dict], llm, emitter, graphs: dict):
     from .archetype_graphs import run_agent_graph
     from .tool_dispatcher import maybe_dispatch_tool
@@ -254,10 +298,17 @@ async def _run_cycle(agents: list[dict], llm, emitter, graphs: dict):
         })
         log.debug(f"  {name} [{archetype}/{action_type}]: {thought[:80]}")
 
-        # Tool dispatch
+        # Tool dispatch (LLM-pattern-matched)
         tool_result = await maybe_dispatch_tool(agent, thought, action_type)
         if tool_result:
             log.debug(f"  {name} tool result: {tool_result[:80]}")
+
+        # ----------------------------------------------------------------
+        # Autonomous reproduction — triggers independently of LLM thought
+        # Fires when: balance > 5x reproduction cost AND cooldown clear
+        # Probability per cycle: REPRO_PROB (default 8% per active cycle)
+        # ----------------------------------------------------------------
+        await _maybe_reproduce(agent, emitter)
 
         # ----------------------------------------------------------------
         # Sleep eligibility check — put agent to sleep if threshold reached

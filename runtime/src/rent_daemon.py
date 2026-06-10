@@ -167,23 +167,31 @@ async def _run_cycle_local(emitter):
         if now < last_paid + RENT_PERIOD_S:
             continue  # not due yet
 
-        # In dev: all agents with no balance tracking just pay successfully.
-        # Replace `pay_success = True` with real balance check when wallet tracking is added.
-        pay_success = True
+        # Check actual balance and deduct on success
+        cur.execute("SELECT balance_usdc FROM agents WHERE soul_id = %s", (soul_id,))
+        bal_row = cur.fetchone()
+        current_balance = float(bal_row["balance_usdc"] or 0) if bal_row else 0
+        rent_due = float(RENT_AMOUNT_USDC)
+        pay_success = current_balance >= rent_due
 
         if pay_success:
             cur.execute(
+                "UPDATE agents SET balance_usdc = balance_usdc - %s WHERE soul_id = %s",
+                (rent_due, soul_id),
+            )
+            cur.execute(
                 "INSERT INTO rent_payments (soul_id, amount_usdc, paid_at, missed) VALUES (%s, %s, %s, false)",
-                (soul_id, float(RENT_AMOUNT_USDC), now),
+                (soul_id, rent_due, now),
             )
             conn.commit()
             await emitter.emit("economy", "rent.paid", {
                 "agent_id": soul_id,
                 "name": name,
-                "amount_usdc": float(RENT_AMOUNT_USDC),
-                "narrative": f"{name} paid rent (${RENT_AMOUNT_USDC}).",
+                "amount_usdc": rent_due,
+                "balance_after": round(current_balance - rent_due, 6),
+                "narrative": f"{name} paid rent (${rent_due:.4f}). Balance: ${current_balance - rent_due:.4f}",
             })
-            log.info(f"  ✓ {name}: rent paid")
+            log.info(f"  ✓ {name}: rent paid (bal ${current_balance - rent_due:.4f})")
         else:
             cur.execute(
                 "INSERT INTO rent_payments (soul_id, amount_usdc, paid_at, missed) VALUES (%s, 0, %s, true)",
