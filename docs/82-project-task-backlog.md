@@ -39,6 +39,7 @@
 | R16 | **Tie AI-driven economy + governance; refresh memory from docs** | ✅ | doc 85 system map |
 | R17 | **Agentic economic activity — transact, negotiate, settle deals** | ✅ | economic_activity.py, buy_service, offer/acceptance |
 | R18 | **Watch PR/comments, continue work, monitor CI** | 🔄 | no extra sync ritual — PR #1 + CI watch |
+| R19 | **Observer UI lagging — field operator logs + track** | ⏳ | T-OBS-LAG-01 on PR #1 |
 
 ---
 
