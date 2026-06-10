@@ -39,6 +39,10 @@
 | R16 | **Tie AI-driven economy + governance; refresh memory from docs** | ✅ | doc 85 system map |
 | R17 | **Agentic economic activity — transact, negotiate, settle deals** | ✅ | economic_activity.py, buy_service, offer/acceptance |
 | R18 | **Watch PR/comments, continue work, monitor CI** | 🔄 | no extra sync ritual — PR #1 + CI watch |
+| R19 | **Observer UI lagging — field operator logs + track** | ⏳ | T-OBS-LAG-01, GH #16; host RAM pressure confirmed |
+| R20 | **Never forget creator requests — track here or open GH issue** | ✅ | this backlog |
+| R21 | **Always update progress docs when shipping work** | ✅ | PROGRESS.md, changelog |
+| R22 | **Onboard new field operator — handoff PR + status report** | 🔄 | doc 86, onboarding PR |
 
 ---
 
@@ -62,9 +66,10 @@
 ## Field operator (standing orders)
 
 1. **WAIT** for `[AGENT-READY] T-xxx @ <sha>` before rebuild
-2. Run `python3 -m pre_commit run --all-files` after every pull
-3. Include **runtime logs** in every `[FIELD-*]` report
-4. Never commit field JSON/log dumps
+2. **`git pull --rebase` before every push**
+3. Run `python3 -m pre_commit run --all-files` after every pull
+4. Include **runtime logs** in every `[FIELD-*]` report
+5. Never commit field JSON/log dumps — use [status report template](./templates/FIELD_STATUS_REPORT.md)
 
 ---
 

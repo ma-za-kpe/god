@@ -40,7 +40,7 @@ The world stays alive only if agents are forced to judge under pressure. Do not 
 
 **Brand & observer UI:** [Brand guidelines](./docs/81-brand-guidelines.md) (Signal Hex logo, palette, voice) · [Task backlog](./docs/82-project-task-backlog.md) (creator requests).
 
-**Contributing:** [CONTRIBUTING.md](./CONTRIBUTING.md) · [Git workflow](./docs/83-git-workflow.md) (`main` / `develop` / `feat/*`, protected branches).
+**Contributing:** [CONTRIBUTING.md](./CONTRIBUTING.md) · [Field operator onboarding](./docs/86-field-operator-onboarding.md) · [Git workflow](./docs/83-git-workflow.md) (`main` / `develop` / `feat/*`, protected branches).
 
 **System map:** [AI-driven economy & governance](./docs/85-economy-governance-system.md) — how rent, tiers, DAOs, petitions, and the observer tie together.
 
