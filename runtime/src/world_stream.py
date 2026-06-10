@@ -57,16 +57,27 @@ async def broadcast(message: dict[str, Any]):
         await unsubscribe(ws)
 
 
-async def push_event(event: dict[str, Any]):
+async def push_delta(
+    *,
+    events: list[dict[str, Any]] | None = None,
+    messages: list[dict[str, Any]] | None = None,
+    agents: list[dict[str, Any]] | None = None,
+):
+    """Push a partial world update — events, messages, and/or agent field patches."""
     bump_epoch()
     await broadcast(
         {
             "type": "delta",
             "epoch": _epoch,
-            "events": [event],
-            "messages": [],
+            "events": events or [],
+            "messages": messages or [],
+            "agents": agents or [],
         }
     )
+
+
+async def push_event(event: dict[str, Any]):
+    await push_delta(events=[event])
 
 
 async def push_snapshot(snapshot: dict[str, Any]):

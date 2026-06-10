@@ -391,6 +391,10 @@ async def _execute_action(agent: dict, action: dict, emitter) -> None:
                 "UPDATE agents SET balance_usdc = balance_usdc + %s WHERE soul_id = %s",
                 (amount, to_full),
             )
+            cur.execute("SELECT balance_usdc FROM agents WHERE soul_id = %s", (soul_id,))
+            sender_bal = float(cur.fetchone()["balance_usdc"] or 0)
+            cur.execute("SELECT balance_usdc FROM agents WHERE soul_id = %s", (to_full,))
+            recipient_bal = float(cur.fetchone()["balance_usdc"] or 0)
             conn.commit()
             cur.close()
             conn.close()
@@ -406,6 +410,21 @@ async def _execute_action(agent: dict, action: dict, emitter) -> None:
                     "narrative": f"{name} transferred ${amount:.4f} USDC to {target_name}",
                 },
             )
+            try:
+                import asyncio
+
+                from .world_stream import push_delta
+
+                asyncio.create_task(
+                    push_delta(
+                        agents=[
+                            {"soul_id": soul_id, "balance_usdc": sender_bal},
+                            {"soul_id": to_full, "balance_usdc": recipient_bal},
+                        ]
+                    )
+                )
+            except Exception:
+                pass
             log.info(f"  {name} → {target_name}: ${amount:.4f} USDC")
             return
 

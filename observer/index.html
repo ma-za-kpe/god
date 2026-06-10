@@ -12,8 +12,12 @@
     #hdr { height: 42px; background: rgba(2,2,16,0.95); border-bottom: 1px solid rgba(60,60,180,0.2); display: flex; align-items: center; padding: 0 16px; gap: 14px; flex-shrink: 0; backdrop-filter: blur(16px); z-index: 20; }
     #logo { color: #60ffaa; font-size: 0.78rem; letter-spacing: 0.4em; font-weight: bold; text-shadow: 0 0 16px rgba(60,255,140,0.7); }
     .pill  { font-size: 0.58rem; padding: 2px 8px; border-radius: 8px; border: 1px solid rgba(80,80,200,0.4); color: #8888cc; white-space: nowrap; }
-    #live-dot { width: 6px; height: 6px; border-radius: 50%; background: #40ff80; box-shadow: 0 0 10px #40ff80; flex-shrink: 0; animation: blink 2.4s ease-in-out infinite; }
+    #live-dot { width: 6px; height: 6px; border-radius: 50%; background: #40ff80; box-shadow: 0 0 10px #40ff80; flex-shrink: 0; animation: blink 2.4s ease-in-out infinite; transition: box-shadow 0.15s; }
+    #live-dot.buzz { animation: buzz-pulse 0.35s ease-in-out infinite; box-shadow: 0 0 18px #ffcc44, 0 0 8px #40ff80; }
     @keyframes blink { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.3;transform:scale(.6)} }
+    @keyframes buzz-pulse { 0%,100%{opacity:1;transform:scale(1.2)} 50%{opacity:.85;transform:scale(0.7)} }
+    #buzz-meter { font-size: 0.58rem; color: #ffcc44; min-width: 3.5em; opacity: 0.7; transition: opacity 0.2s; }
+    #buzz-meter.hot { opacity: 1; text-shadow: 0 0 8px rgba(255,200,60,0.6); }
     .sg { display: flex; gap: 12px; margin-left: auto; align-items: center; flex-wrap: wrap; }
     .st { font-size: 0.61rem; color: #606090; white-space: nowrap; }
     .st span     { color: #a0a0d0; }
@@ -119,7 +123,11 @@
     #feed-hdr  { padding: 10px 14px 4px; flex-shrink: 0; }
     #feed-list { flex: 1; overflow-y: auto; padding: 0 14px 12px; scrollbar-width: thin; scrollbar-color: #1a1a55 transparent; }
     .feed-item { padding: 4px 0; border-bottom: 1px solid rgba(50,50,160,0.07); animation: slide-in 0.22s ease-out; }
+    .feed-item.flash-econ { animation: flash-gold 0.6s ease-out, slide-in 0.22s ease-out; }
+    .feed-item.flash-social { animation: flash-pur 0.5s ease-out, slide-in 0.22s ease-out; }
     @keyframes slide-in { from{opacity:0;transform:translateX(8px)} to{opacity:1;transform:none} }
+    @keyframes flash-gold { 0%{background:rgba(255,200,60,0.25)} 100%{background:transparent} }
+    @keyframes flash-pur { 0%{background:rgba(200,100,255,0.2)} 100%{background:transparent} }
     .f-ts   { font-size: 0.56rem; color: #444466; display: block; margin-bottom: 1px; }
     .f-text { font-size: 0.65rem; line-height: 1.4; word-break: break-word; }
     .c-lifecycle { color: #44dd77; }
@@ -138,6 +146,7 @@
   <span id="logo">⬡ GOD</span>
   <span class="pill" id="world-id-pill">…</span>
   <div id="live-dot"></div>
+  <div id="buzz-meter" title="world activity">BUZZ —</div>
   <div class="sg">
     <div class="st">ALIVE  <span id="s-alive" class="hi">—</span></div>
     <div class="st">BORN   <span id="s-born">—</span></div>
@@ -252,13 +261,18 @@ const S = {
   agents:      {},        // soul_id → agent + sim pos
   fx:          [],        // canvas effects
   pulses:      [],        // message pulses in flight
+  xfers:       [],        // USDC transfer streams in flight
   conns:       {},        // "idA:idB" → {count, lastSeen, pulseAlpha}
+  buzz:        {},        // soul_id → intensity 0..1 (decays per frame)
+  worldBuzz:   0,         // global activity 0..1
+  deltaQueue:  [],        // WS deltas drained per animation frame
   selected:    null,
   seenEv:      new Set(),
   seenMsg:     new Set(),
   worldStart:  null,
   actBins:     new Array(24).fill(0),
   actTick:     0,
+  totalUsdc:   null,
   // Force simulation
   sim:         {},        // soul_id → {vx, vy}
   // Zoom / pan state
@@ -281,6 +295,27 @@ const ARCH_COL = { trader:'#ffcc44', hoarder:'#ff8844', explorer:'#44ffcc', para
 
 function evCat(t){ if(t.startsWith('narrative'))return'narrative'; return t.startsWith('lifecycle')?'lifecycle':t.startsWith('economy')?'economy':t.startsWith('cognitive')?'cognitive':t.startsWith('social')?'social':'other'; }
 function evCol(t){ if(t.includes('died'))return'#ff3333';if(t.includes('born')||t.includes('reproduced'))return'#44ff88';if(t.startsWith('economy'))return'#ffcc33';if(t.startsWith('cognitive'))return'#44aaff';if(t.startsWith('social'))return'#dd77ff';return'#888'; }
+function evAgentId(ev) {
+  return ev.agent_id || ev.sender_id || ev.payload?.agent_id || ev.payload?.sender_id || null;
+}
+function bumpBuzz(soul_id, amt=0.55) {
+  if (!soul_id) return;
+  S.buzz[soul_id] = Math.min(1, (S.buzz[soul_id] || 0) + amt);
+  S.worldBuzz = Math.min(1, S.worldBuzz + amt * 0.35);
+}
+function decayBuzz(dt) {
+  const decay = Math.pow(0.04, dt);
+  for (const id of Object.keys(S.buzz)) {
+    S.buzz[id] *= decay;
+    if (S.buzz[id] < 0.02) delete S.buzz[id];
+  }
+  S.worldBuzz *= Math.pow(0.08, dt);
+  const dot = document.getElementById('live-dot');
+  const meter = document.getElementById('buzz-meter');
+  if (S.worldBuzz > 0.12) { dot.classList.add('buzz'); meter.classList.add('hot'); }
+  else { dot.classList.remove('buzz'); meter.classList.remove('hot'); }
+  meter.textContent = 'BUZZ ' + Math.round(S.worldBuzz * 100) + '%';
+}
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Panel toggle
@@ -691,8 +726,61 @@ function drawPulses() {
     ctx.globalAlpha=1; ctx.shadowBlur=0;
   }
 }
-function addPulse(fId, tId) {
-  S.pulses.push({ fId, tId, t:0, speed:0.35+Math.random()*0.25, col:`hsl(${soulHue(fId)},85%,65%)` });
+function nudgeToward(fId, tId, strength=1.2) {
+  const sf = S.sim[fId], st = S.sim[tId];
+  if (!sf || !st) return;
+  const dx = st.x - sf.x, dy = st.y - sf.y;
+  const d = Math.sqrt(dx * dx + dy * dy) || 1;
+  sf.vx += (dx / d) * strength;
+  sf.vy += (dy / d) * strength;
+  st.vx -= (dx / d) * strength * 0.4;
+  st.vy -= (dy / d) * strength * 0.4;
+}
+function addPulse(fId, tId, col=null) {
+  S.pulses.push({ fId, tId, t:0, speed:0.45+Math.random()*0.35, col: col || `hsl(${soulHue(fId)},85%,65%)` });
+  nudgeToward(fId, tId, 0.8);
+}
+function addXfer(fId, tId, amount) {
+  const amt = parseFloat(amount) || 0;
+  S.xfers.push({
+    fId, tId, t:0,
+    speed: 0.55 + Math.min(0.4, amt * 2),
+    col: '#ffcc44',
+    amount: amt,
+  });
+  addPulse(fId, tId, '#ffee88');
+  nudgeToward(fId, tId, 2.5);
+  bumpBuzz(fId, 0.7);
+  bumpBuzz(tId, 0.5);
+}
+function updateXfers(dt) {
+  S.xfers = S.xfers.filter(x => x.t < 1);
+  for (const x of S.xfers) x.t = Math.min(1, x.t + dt * x.speed);
+}
+function drawXfers() {
+  for (const x of S.xfers) {
+    const a = S.agents[x.fId], b = S.agents[x.tId];
+    if (!a || !b || a._wx === undefined || b._wx === undefined) continue;
+    const ease = x.t < 0.5 ? 2 * x.t * x.t : -1 + (4 - 2 * x.t) * x.t;
+    const px = a._wx + (b._wx - a._wx) * ease;
+    const py = a._wy + (b._wy - a._wy) * ease;
+    const alpha = Math.sin(x.t * Math.PI) * 0.95;
+    const r = 7 / Math.max(0.5, S.view.scale);
+    ctx.shadowColor = '#ffcc44';
+    ctx.shadowBlur = 22 / S.view.scale;
+    ctx.fillStyle = '#ffcc44';
+    ctx.globalAlpha = alpha;
+    ctx.beginPath();
+    ctx.arc(px, py, r, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.font = `${Math.max(6, 8 / S.view.scale)}px Courier New`;
+    ctx.fillStyle = '#fff8cc';
+    ctx.textAlign = 'center';
+    ctx.fillText('$', px, py + 0.5 / S.view.scale);
+    ctx.globalAlpha = 1;
+    ctx.shadowBlur = 0;
+    if (x.t > 0.85 && x.t < 0.92) ring(b._wx, b._wy, '#ffcc44', 400);
+  }
 }
 
 // ── Agent drawing ─────────────────────────────────────────────────────────
@@ -700,12 +788,15 @@ function drawAgent(a, t) {
   if (a._wx===undefined) return;
   const x=a._wx, y=a._wy;
   const hue=soulHue(a.soul_id), phase=soulPhase(a.soul_id);
-  const breathe=1+0.07*Math.sin(t*0.0018+phase);
+  const buzz = S.buzz[a.soul_id] || 0;
+  const breathe=1+0.07*Math.sin(t*0.0018+phase)+buzz*0.12*Math.sin(t*0.012+phase);
+  const flicker = buzz > 0.05 ? 0.85 + 0.15 * Math.sin(t * 0.025 + phase) : 1;
   const misses=a.rent_miss_count||0;
   const jx=misses>0?(Math.random()-.5)*Math.min(misses*1.5,5):0;
   const jy=misses>0?(Math.random()-.5)*Math.min(misses*1.5,5):0;
   const R=agentR(a)*breathe;
   const px=x+jx, py=y+jy;
+  ctx.globalAlpha = flicker;
   const isSleeping=a.is_sleeping||false;
   const isSelected=S.selected===a.soul_id;
 
@@ -765,6 +856,14 @@ function drawAgent(a, t) {
     ctx.textBaseline='top';
     ctx.fillText(a.current_name||a.soul_id.slice(0,8), px, py+R+3/S.view.scale);
   }
+  ctx.globalAlpha = 1;
+  if (buzz > 0.15) {
+    ctx.strokeStyle = `rgba(255,220,80,${buzz * 0.5})`;
+    ctx.lineWidth = (1.2 + buzz * 2) / S.view.scale;
+    ctx.beginPath();
+    ctx.arc(px, py, R + 8 / S.view.scale, 0, Math.PI * 2);
+    ctx.stroke();
+  }
 }
 
 // ── Canvas effects ────────────────────────────────────────────────────────
@@ -807,26 +906,58 @@ function heartbeat(soul_id, intensity=1) {
 }
 
 function triggerFx(ev) {
-  const a=ev.agent_id?S.agents[ev.agent_id]:null;
-  if(!a||a._wx===undefined) return;
-  const x=a._wx,y=a._wy;
-  if(ev.event_type.includes('died'))           {burst(x,y,'#ff3333',18);ring(x,y,'#ff2020',1400);ring(x,y,'#cc0000',900,300);}
-  else if(ev.event_type.includes('born'))      {burst(x,y,'#44ff88',12);ring(x,y,'#44ff88',1000);ring(x,y,'#20dd66',1500,200);}
-  else if(ev.event_type.includes('reproduced')){ring(x,y,'#44ff88',1200);ring(x,y,'#88ffcc',900,300);}
-  else if(ev.event_type.includes('rent.paid')) {ring(x,y,'#ffcc33',500);}
-  else if(ev.event_type.includes('rent.missed')){ring(x,y,'#ff6600',800);ring(x,y,'#ff3300',1200,200);}
-  else if(ev.event_type.includes('token.deployed')){burst(x,y,'#ffcc44',8);ring(x,y,'#ffcc33',900);}
-  else if(ev.event_type.startsWith('cognitive')){heartbeat(ev.agent_id,0.55);}
-  else if(ev.event_type.startsWith('social'))  {ring(x,y,'#dd77ff',500);}
-  else                                         {ring(x,y,evCol(ev.event_type),480);}
+  const aid = evAgentId(ev);
+  const a = aid ? S.agents[aid] : null;
+  if (!a || a._wx === undefined) return;
+  const x = a._wx, y = a._wy;
+  const et = ev.event_type || '';
+  if (et.includes('agent.transfer')) {
+    const rid = ev.recipient_id;
+    if (rid && S.agents[rid]) {
+      addXfer(aid, rid, ev.amount_usdc);
+      burst(x, y, '#ffcc44', 10);
+      ring(x, y, '#ffdd66', 700);
+    } else {
+      burst(x, y, '#ffcc44', 8);
+      ring(x, y, '#ffcc33', 600);
+    }
+  } else if (et.includes('message_sent')) {
+    const rid = ev.recipient_id;
+    if (rid && rid !== 'BROADCAST' && S.agents[rid]) addPulse(aid, rid);
+    const mt = (ev.message_type || '').toLowerCase();
+    if (mt === 'threat') { burst(x, y, '#ff4466', 12); ring(x, y, '#ff2244', 900); }
+    else if (mt === 'manifesto' || mt === 'propaganda') { burst(x, y, '#ffaa33', 10); ring(x, y, '#ff8800', 800); }
+    else { ring(x, y, '#dd77ff', 450); heartbeat(aid, 0.45); }
+    bumpBuzz(aid, 0.4);
+    if (rid && S.agents[rid]) bumpBuzz(rid, 0.25);
+  } else if (et.includes('died'))           { burst(x,y,'#ff3333',18); ring(x,y,'#ff2020',1400); ring(x,y,'#cc0000',900,300); }
+  else if (et.includes('born'))             { burst(x,y,'#44ff88',12); ring(x,y,'#44ff88',1000); ring(x,y,'#20dd66',1500,200); }
+  else if (et.includes('reproduced'))       { ring(x,y,'#44ff88',1200); ring(x,y,'#88ffcc',900,300); }
+  else if (et.includes('rent.paid'))        { ring(x,y,'#ffcc33',500); }
+  else if (et.includes('rent.missed'))      { ring(x,y,'#ff6600',800); ring(x,y,'#ff3300',1200,200); }
+  else if (et.includes('token.deployed'))   { burst(x,y,'#ffcc44',8); ring(x,y,'#ffcc33',900); }
+  else if (et.includes('coalition'))        { burst(x,y,'#aa77ff',8); ring(x,y,'#dd77ff',700); }
+  else if (et.startsWith('cognitive'))      { heartbeat(aid, 0.55); bumpBuzz(aid, 0.35); }
+  else if (et.startsWith('social'))         { ring(x,y,'#dd77ff',500); bumpBuzz(aid, 0.3); }
+  else                                      { ring(x,y,evCol(et),480); }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Render loop
 // ═══════════════════════════════════════════════════════════════════════════
 let lastT = 0, lastSimT = 0;
+function drainDeltaQueue(maxPerFrame = 80) {
+  let n = 0;
+  while (S.deltaQueue.length && n < maxPerFrame) {
+    applyDeltaMsg(S.deltaQueue.shift());
+    n++;
+  }
+}
+
 function render(t) {
   const dt = Math.min(0.05, (t - lastT)/1000); lastT = t;
+  drainDeltaQueue();
+  decayBuzz(dt);
   const simInterval = useClusterLayout() ? SIM_INTERVAL_MS : 16;
   if (t - lastSimT >= simInterval) { tickSim(); lastSimT = t; }
   drawBg();
@@ -835,8 +966,10 @@ function render(t) {
   drawClusterBridges();
   drawConnections(t);
   updatePulses(dt);
+  updateXfers(dt);
   Object.values(S.agents).forEach(a=>drawAgent(a,t));
   drawPulses();
+  drawXfers();
   resetTransform();
   drawFx(t);
   document.getElementById('empty-state').style.display = Object.keys(S.agents).length===0?'flex':'none';
@@ -892,17 +1025,60 @@ function showInspector(a) {
 // ═══════════════════════════════════════════════════════════════════════════
 // Drama feed
 // ═══════════════════════════════════════════════════════════════════════════
+function applyEventLive(ev) {
+  const et = ev.event_type || '';
+  const aid = evAgentId(ev);
+  if (et === 'economy.agent.transfer') {
+    const amt = parseFloat(ev.amount_usdc) || 0;
+    const rid = ev.recipient_id;
+    if (aid && S.agents[aid] && ev.sender_balance === undefined) {
+      S.agents[aid].balance_usdc = Math.max(0, parseFloat(S.agents[aid].balance_usdc || 0) - amt);
+    }
+    if (rid && S.agents[rid] && ev.recipient_balance === undefined) {
+      S.agents[rid].balance_usdc = parseFloat(S.agents[rid].balance_usdc || 0) + amt;
+    }
+    if (S.selected === aid || S.selected === rid) showInspector(S.agents[S.selected] || null);
+    if (S.totalUsdc !== null) {
+      S.totalUsdc = Math.max(0, S.totalUsdc);
+      document.getElementById('s-usdc').textContent = S.totalUsdc.toFixed(2);
+    }
+  } else if (et === 'social.agent.message_sent') {
+    const rid = ev.recipient_id;
+    if (aid && rid && rid !== 'BROADCAST') {
+      const key = [aid, rid].sort().join(':');
+      if (!S.conns[key]) S.conns[key] = { count: 0, lastSeen: 0 };
+      S.conns[key].count++;
+      S.conns[key].lastSeen = ev.timestamp || Date.now() / 1000;
+      addPulse(aid, rid);
+    }
+  } else if (et === 'cognitive.agent.thought' && aid && S.agents[aid]) {
+    const thought = ev.thought || ev.payload?.thought;
+    if (thought) S.agents[aid].last_thought = thought;
+    bumpBuzz(aid, 0.3);
+    if (S.selected === aid) showInspector(S.agents[aid]);
+  } else if (et.includes('died') && aid && S.agents[aid]) {
+    S.agents[aid].is_alive = false;
+    if (S.selected === aid) showInspector(S.agents[aid]);
+  } else if (et.includes('rent.paid') && aid && S.agents[aid]) {
+    S.agents[aid].rent_paid_count = (S.agents[aid].rent_paid_count || 0) + 1;
+  } else if (et.includes('rent.missed') && aid && S.agents[aid]) {
+    S.agents[aid].rent_miss_count = (S.agents[aid].rent_miss_count || 0) + 1;
+  }
+}
+
 function feedItem(ev) {
   if(S.seenEv.has(ev.event_id)) return;
   S.seenEv.add(ev.event_id);
+  applyEventLive(ev);
   S.actBins[S.actTick % S.actBins.length]++;
   const list=document.getElementById('feed-list');
-  const div=document.createElement('div'); div.className='feed-item';
+  const div=document.createElement('div');
   const ts=ev.timestamp?new Date(ev.timestamp*1000).toISOString().slice(11,19):'—';
   let cat=evCat(ev.event_type);
   const mt=(ev.message_type||ev.payload?.message_type||'').toLowerCase();
   if(mt==='threat') cat='threat';
   else if(mt==='manifesto'||mt==='propaganda') cat='manifesto';
+  div.className='feed-item' + (cat==='economy'?' flash-econ':cat==='social'||cat==='threat'||cat==='manifesto'?' flash-social':'');
   div.innerHTML=`<span class="f-ts">${ts} · ${ev.event_type}${mt?` · ${mt}`:''}</span><span class="f-text c-${cat}">${ev.narrative||ev.event_type}</span>`;
   list.insertBefore(div,list.firstChild);
   while(list.children.length>200) list.removeChild(list.lastChild);
@@ -974,19 +1150,36 @@ function updateEcon(d) {
 // ═══════════════════════════════════════════════════════════════════════════
 // API — single snapshot poll (replaces 4 parallel pollers)
 // ═══════════════════════════════════════════════════════════════════════════
-function applyAgents(agents) {
-  if (!agents) return;
-  const next = {};
-  agents.forEach(a => {
-    next[a.soul_id] = { ...(S.agents[a.soul_id] || {}), ...a };
-    if (a._wx === undefined && S.sim[a.soul_id]) {
-      next[a.soul_id]._wx = S.sim[a.soul_id].x;
-      next[a.soul_id]._wy = S.sim[a.soul_id].y;
-    }
-    if (!S.worldStart || a.birth_timestamp < S.worldStart) S.worldStart = a.birth_timestamp;
-  });
-  S.agents = next;
-  document.getElementById('s-alive').textContent = agents.length;
+function mergeAgent(a) {
+  const prev = S.agents[a.soul_id] || {};
+  const merged = { ...prev, ...a };
+  if (a._wx === undefined && S.sim[a.soul_id]) {
+    merged._wx = S.sim[a.soul_id].x;
+    merged._wy = S.sim[a.soul_id].y;
+  } else if (a._wx === undefined && prev._wx !== undefined) {
+    merged._wx = prev._wx;
+    merged._wy = prev._wy;
+  }
+  if (a.birth_timestamp && (!S.worldStart || a.birth_timestamp < S.worldStart)) {
+    S.worldStart = a.birth_timestamp;
+  }
+  S.agents[a.soul_id] = merged;
+}
+
+function applyAgents(agents, replace=false) {
+  if (!agents || !agents.length) return;
+  if (replace) {
+    const next = {};
+    agents.forEach(a => {
+      mergeAgent(a);
+      next[a.soul_id] = S.agents[a.soul_id];
+    });
+    S.agents = next;
+    document.getElementById('s-alive').textContent = agents.length;
+  } else {
+    agents.forEach(a => mergeAgent(a));
+    document.getElementById('s-alive').textContent = Object.values(S.agents).filter(x => x.is_alive !== false).length;
+  }
   if (S.selected) showInspector(S.agents[S.selected] || null);
 }
 
@@ -1030,10 +1223,7 @@ function connectStream() {
       try {
         const msg = JSON.parse(e.data);
         if (msg.type === 'snapshot') applySnapshotMsg(msg);
-        else if (msg.type === 'delta') {
-          if (msg.events) [...msg.events].reverse().forEach(feedItem);
-          if (msg.messages) applyMessages(msg.messages);
-        }
+        else if (msg.type === 'delta') S.deltaQueue.push(msg);
       } catch {}
     };
     ws.onclose = () => {
@@ -1046,15 +1236,27 @@ function connectStream() {
   }
 }
 
+function applyDeltaMsg(msg) {
+  if (!msg) return;
+  if (msg.agents && msg.agents.length) applyAgents(msg.agents, false);
+  if (msg.messages && msg.messages.length) applyMessages(msg.messages);
+  if (msg.events && msg.events.length) {
+    msg.events.forEach(ev => feedItem(ev));
+    S.actTick++;
+  }
+  if (msg.stats) updateEcon(msg.stats);
+}
+
 function applySnapshotMsg(snap) {
-  applyAgents(snap.agents);
+  applyAgents(snap.agents, true);
   applyMessages(snap.messages);
   const d = snap.stats || {};
   if (d.world_start_ts && (!S.worldStart || d.world_start_ts < S.worldStart)) S.worldStart = d.world_start_ts;
   document.getElementById('s-born').textContent   = d.total_born || '0';
   document.getElementById('s-died').textContent   = d.total_died || '0';
   document.getElementById('s-gen').textContent    = d.max_generation || '1';
-  document.getElementById('s-usdc').textContent   = d.total_usdc_in_world ? parseFloat(d.total_usdc_in_world).toFixed(2) : '—';
+  S.totalUsdc = d.total_usdc_in_world ? parseFloat(d.total_usdc_in_world) : null;
+  document.getElementById('s-usdc').textContent   = S.totalUsdc !== null ? S.totalUsdc.toFixed(2) : '—';
   document.getElementById('s-msgs').textContent   = d.messages_total || '0';
   document.getElementById('s-tokens').textContent = d.tokens_deployed || '0';
   document.getElementById('s-dreams').textContent = d.dreams_total || '0';
@@ -1064,7 +1266,9 @@ function applySnapshotMsg(snap) {
   document.getElementById('world-id-pill').textContent = (snap.world_id || d.world_id || '—') + mode + live;
   updateEcon(d);
   if (snap.events) {
-    [...snap.events].reverse().forEach(feedItem);
+    [...snap.events].reverse().forEach(ev => {
+      if (!S.seenEv.has(ev.event_id)) feedItem(ev);
+    });
     S.actTick++;
   }
 }

@@ -193,15 +193,26 @@ async def send_message(
         "social",
         "agent.message_sent",
         {
+            "agent_id": sender_soul_id,
             "sender_id": sender_soul_id,
             "recipient_id": recipient_soul_id,
             "message_id": msg.message_id,
             "message_type": message_type,
             "subject": msg.subject,
+            "content": body,
             "is_public": message_type in ALWAYS_PUBLIC_TYPES,
             "narrative": narrative,
         },
     )
+
+    try:
+        import asyncio
+
+        from .world_stream import push_delta
+
+        asyncio.create_task(push_delta(messages=[msg.to_dict()]))
+    except Exception:
+        pass
 
     # Publish to NATS inbox
     try:
