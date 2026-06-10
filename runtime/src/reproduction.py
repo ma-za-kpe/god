@@ -35,7 +35,7 @@ RECOVERY_CYCLES   = int(os.getenv("RECOVERY_CYCLES", "3"))
 RENT_PERIOD_S     = int(os.getenv("RENT_PERIOD_S", "300"))   # seconds per rent window
 MUTATION_RATE     = float(os.getenv("MUTATION_RATE", "0.05"))
 ARCHETYPE_MUTATION_PROB = float(os.getenv("ARCHETYPE_MUTATION_PROB", "0.10"))
-MIN_BALANCE_MULT  = float(os.getenv("MIN_BALANCE_MULT", "3.0"))  # min_balance = mult × total_cost
+MIN_BALANCE_MULT  = float(os.getenv("MIN_BALANCE_MULT", "5.0"))  # Law 6: min_balance = mult × total_cost
 
 ALL_ARCHETYPES = [
     "trader", "hoarder", "explorer", "parasite",

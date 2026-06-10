@@ -69,8 +69,10 @@ async def health():
 
 
 @app.get("/agents")
-async def list_agents():
+async def list_agents(limit: int = 10000):
     """All agents with rent stats and last thought. Reads from PostgreSQL."""
+    max_limit = int(os.getenv("AGENTS_MAX_LIMIT", "10000"))
+    effective_limit = min(max(1, limit), max_limit)
     try:
         import psycopg2
         import psycopg2.extras
@@ -86,8 +88,10 @@ async def list_agents():
                 a.birth_timestamp, a.death_timestamp, a.is_alive,
                 a.parent_soul_ids, a.archetype,
                 COALESCE(a.balance_usdc, 0)          AS balance_usdc,
+                COALESCE(a.generation, 1)            AS generation,
                 COALESCE(rp.paid_count,  0)          AS rent_paid_count,
                 COALESCE(rp.miss_count,  0)          AS rent_miss_count,
+                COALESCE(ss.is_sleeping, false)      AS is_sleeping,
                 e.last_thought
             FROM agents a
             LEFT JOIN (
@@ -96,6 +100,7 @@ async def list_agents():
                     SUM(CASE WHEN missed     THEN 1 ELSE 0 END) AS miss_count
                 FROM rent_payments GROUP BY soul_id
             ) rp ON rp.soul_id = a.soul_id
+            LEFT JOIN sleep_states ss ON ss.soul_id = a.soul_id
             LEFT JOIN LATERAL (
                 SELECT payload->>'thought' AS last_thought
                 FROM events
@@ -103,18 +108,33 @@ async def list_agents():
                   AND event_type = 'cognitive.agent.thought'
                 ORDER BY timestamp DESC LIMIT 1
             ) e ON true
-            WHERE a.world_id = %s
-            ORDER BY a.birth_timestamp DESC
-            LIMIT 100
+            WHERE a.world_id = %s AND a.is_alive = true
+            ORDER BY a.birth_timestamp ASC
+            LIMIT %s
             """,
-            (os.getenv("WORLD_ID", "local-dev-world-1"),),
+            (os.getenv("WORLD_ID", "local-dev-world-1"), effective_limit),
         )
         agents = [dict(r) for r in cur.fetchall()]
         cur.close(); conn.close()
-        return {"agents": agents, "count": len(agents)}
+        return {"agents": agents, "count": len(agents), "limit": effective_limit}
     except Exception as e:
         log.warning(f"/agents DB error: {e}")
         return {"agents": [], "count": 0, "error": str(e)}
+
+
+@app.get("/world/snapshot")
+async def world_snapshot(events_limit: int = 50, messages_limit: int = 80):
+    """Pre-aggregated world state for public observer clients."""
+    try:
+        from .world_snapshot import build_world_snapshot
+        snap = build_world_snapshot(
+            events_limit=min(events_limit, 200),
+            messages_limit=min(messages_limit, 500),
+        )
+        return snap
+    except Exception as e:
+        log.warning(f"/world/snapshot error: {e}")
+        return {"error": str(e), "world_id": os.getenv("WORLD_ID", "local-dev-world-1")}
 
 
 @app.get("/events")

@@ -20,6 +20,7 @@ import psycopg2
 import psycopg2.extras
 
 from .event_emitter import get_emitter
+from .physics_gate import evaluate_physics_gate, effective_llm
 
 log = logging.getLogger("god.runner")
 
@@ -111,7 +112,7 @@ async def _fetch_inbox(soul_id: str) -> list[dict]:
         cur  = conn.cursor()
         cur.execute(
             """
-            SELECT m.sender_id, m.body AS content, m.sent_at,
+            SELECT m.sender_id, m.body AS content, m.sent_at, m.message_type,
                    a.current_name AS sender_name, a.archetype AS sender_archetype
             FROM agent_messages m
             LEFT JOIN agents a ON a.soul_id = m.sender_id
@@ -125,6 +126,82 @@ async def _fetch_inbox(soul_id: str) -> list[dict]:
         return rows
     except Exception:
         return []
+
+
+def _batch_preload_context(agents: list[dict]) -> dict:
+    """
+    One-query batch load for inboxes and reputation averages.
+    Returns {inboxes: {soul_id: [...]}, reputation: {soul_id: float}}.
+    """
+    soul_ids = [a["soul_id"] for a in agents]
+    inboxes: dict[str, list] = {sid: [] for sid in soul_ids}
+    reputation: dict[str, float] = {sid: 0.0 for sid in soul_ids}
+
+    if not soul_ids:
+        return {"inboxes": inboxes, "reputation": reputation}
+
+    try:
+        conn = _db()
+        cur  = conn.cursor()
+
+        cur.execute(
+            """
+            WITH ranked AS (
+                SELECT m.sender_id, m.recipient_id, m.body AS content, m.sent_at,
+                       m.message_type,
+                       a.current_name AS sender_name, a.archetype AS sender_archetype,
+                       ROW_NUMBER() OVER (
+                           PARTITION BY m.recipient_id ORDER BY m.sent_at DESC
+                       ) AS rn
+                FROM agent_messages m
+                LEFT JOIN agents a ON a.soul_id = m.sender_id
+                WHERE m.recipient_id = ANY(%s)
+            )
+            SELECT * FROM ranked WHERE rn <= 5
+            """,
+            (soul_ids,),
+        )
+        for row in cur.fetchall():
+            rid = row["recipient_id"]
+            inboxes.setdefault(rid, []).append(dict(row))
+
+        cur.execute(
+            """
+            SELECT subject_id, AVG(score) AS avg_score
+            FROM reputation
+            WHERE subject_id = ANY(%s)
+            GROUP BY subject_id
+            """,
+            (soul_ids,),
+        )
+        for row in cur.fetchall():
+            reputation[row["subject_id"]] = float(row["avg_score"] or 0.0)
+
+        cur.close()
+        conn.close()
+    except Exception as e:
+        log.debug(f"batch preload failed: {e}")
+
+    return {"inboxes": inboxes, "reputation": reputation}
+
+
+def _salience_peers(agent: dict, all_agents: list[dict], limit: int = 24) -> list[dict]:
+    """
+    Select peers by salience: low balance (threat), same archetype, high balance.
+    Preserves hostile signals without dumping all N peers into the prompt.
+    """
+    soul_id = agent["soul_id"]
+    others  = [a for a in all_agents if a["soul_id"] != soul_id]
+    if len(others) <= limit:
+        return others
+
+    def score(peer: dict) -> float:
+        bal = float(peer.get("balance_usdc") or 0)
+        same_arch = 1.0 if peer.get("archetype") == agent.get("archetype") else 0.0
+        return same_arch * 2.0 + (1.0 / max(bal, 0.0001)) + bal * 0.1
+
+    ranked = sorted(others, key=score, reverse=True)
+    return ranked[:limit]
 
 
 async def _fetch_services_context(soul_id: str) -> tuple[list, list]:
@@ -220,6 +297,7 @@ async def _execute_action(agent: dict, action: dict, emitter) -> None:
                     sender_soul_id=soul_id,
                     recipient_soul_id=to_id if len(to_id) >= 36 else _resolve_full_id(to_id),
                     body=content,
+                    message_type=str(action.get("message_type") or "direct"),
                 )
                 target_name = msg.recipient_id[:8]
                 conn = _db(); cur = conn.cursor()
@@ -295,7 +373,11 @@ async def _execute_action(agent: dict, action: dict, emitter) -> None:
             from .messaging import send_broadcast as do_broadcast
             content = str(action.get("content") or "...")[:500]
             try:
-                await do_broadcast(sender_soul_id=soul_id, body=content)
+                await do_broadcast(
+                    sender_soul_id=soul_id,
+                    body=content,
+                    message_type=str(action.get("message_type") or "broadcast"),
+                )
                 await emitter.emit("social", "agent.broadcast", {
                     "agent_id": soul_id, "name": name, "content": content,
                     "narrative": f"{name} broadcasts to all: \"{content[:80]}\"",
@@ -529,7 +611,7 @@ async def _maybe_reproduce(agent: dict, emitter) -> None:
         log.warning(f"  {name} fork_self failed: {e}")
 
 
-async def _run_cycle(agents: list[dict], llm, emitter, graphs: dict):
+async def _run_cycle(agents: list[dict], llm, emitter, graphs: dict, cycle_tick: int = 0):
     from .archetype_graphs import run_agent_graph
     from .dream_engine import (
         run_dream_cycle,
@@ -540,6 +622,34 @@ async def _run_cycle(agents: list[dict], llm, emitter, graphs: dict):
 
     # Empirically tuned: agents with ≥8 consecutive active cycles may dream
     REST_THRESHOLD = int(os.getenv("DREAM_REST_THRESHOLD", "8"))
+
+    batch = _batch_preload_context(agents)
+    batch_inboxes    = batch["inboxes"]
+    batch_reputation = batch["reputation"]
+
+    # World-level service + coalition context (fetched once per cycle)
+    world_services: list = []
+    world_coalitions: list = []
+    try:
+        conn = _db()
+        cur  = conn.cursor()
+        cur.execute(
+            """
+            SELECT sl.name, sl.price_usdc, sl.agent_soul_id,
+                   a.current_name AS seller_name, a.archetype AS seller_arch
+            FROM service_listings sl
+            JOIN agents a ON a.soul_id = sl.agent_soul_id
+            WHERE sl.is_active = true AND a.is_alive = true
+            ORDER BY sl.calls_served DESC LIMIT 40
+            """
+        )
+        world_services = [dict(r) for r in cur.fetchall()]
+        cur.close()
+        conn.close()
+        from .coalitions import get_world_coalitions
+        world_coalitions = get_world_coalitions()
+    except Exception as e:
+        log.debug(f"world context preload failed: {e}")
 
     for agent in agents:
         soul_id   = agent["soul_id"]
@@ -579,22 +689,62 @@ async def _run_cycle(agents: list[dict], llm, emitter, graphs: dict):
             agent["dream_mutation"] = mutation
 
         # ----------------------------------------------------------------
+        # Law 0 — physics gate before cognition
+        # ----------------------------------------------------------------
+        gate = evaluate_physics_gate(agent)
+        if not gate.allow_cognition:
+            log.info(f"  {name} [{archetype}] BLOCKED by physics gate: {gate.reason}")
+            continue
+
+        if gate.throttle_level != "none":
+            await emitter.emit("agent", "throttled", {
+                "agent_id": soul_id,
+                "name": name,
+                "throttle_level": gate.throttle_level,
+                "compute_capacity": gate.compute_capacity,
+                "rent_miss_count": int(agent.get("rent_miss_count") or 0),
+                "narrative": (
+                    f"{name} is throttled ({gate.throttle_level}) — "
+                    f"rent missed {agent.get('rent_miss_count', 0)} time(s)."
+                ),
+            })
+
+        cycle_llm = effective_llm(llm, gate, soul_id, cycle_tick)
+
+        # ----------------------------------------------------------------
         # Normal cognition cycle
         # Inject full world context: peers, inbox, services, coalitions
         # ----------------------------------------------------------------
         agent = dict(agent)
-        agent["_peers"]  = [a for a in agents if a["soul_id"] != soul_id]
-        agent["_inbox"]  = await _fetch_inbox(soul_id)
+        agent["_peers"]  = _salience_peers(agent, agents)
+        agent["_inbox"]  = batch_inboxes.get(soul_id) or []
         my_svcs, market  = await _fetch_services_context(soul_id)
-        my_coal, world_coal = await _fetch_coalitions_context(soul_id)
         agent["_my_services"]      = my_svcs
-        agent["_market_services"]  = market
-        agent["_my_coalitions"]    = my_coal
-        agent["_world_coalitions"] = world_coal
-        agent["_reputation_avg"]   = await _fetch_reputation_avg(soul_id)
+        agent["_market_services"]  = [
+            s for s in world_services if s.get("agent_soul_id") != soul_id
+        ][:12]
+        try:
+            from .coalitions import get_agent_coalitions
+            agent["_my_coalitions"]    = get_agent_coalitions(soul_id)
+        except Exception:
+            agent["_my_coalitions"] = []
+        agent["_world_coalitions"] = world_coalitions
+        agent["_reputation_avg"]   = batch_reputation.get(soul_id, 0.0)
 
-        result      = await run_agent_graph(graphs, agent, llm)
-        thought     = result["thought"] or await _think(llm, agent)
+        if cycle_llm is None and gate.compute_capacity <= 0.5:
+            archetype = agent.get("archetype", "")
+            thought = _STUB_THOUGHTS.get(archetype, "I must survive.")
+            await emitter.emit("cognitive", "agent.thought", {
+                "agent_id": soul_id, "name": name, "archetype": archetype,
+                "action_type": "survival", "thought": thought,
+                "throttled": True,
+                "narrative": f"{name} (throttled): \"{thought}\"",
+            })
+            await asyncio.sleep(0.02)
+            continue
+
+        result      = await run_agent_graph(graphs, agent, cycle_llm)
+        thought     = result["thought"] or await _think(cycle_llm, agent)
         action_type = result.get("action_type", "thought")
         narrative   = result.get("narrative") or f"{name}: \"{thought}\""
 
@@ -670,8 +820,10 @@ async def agent_runner():
     graphs = build_all_graphs(llm)
     log.info(f"  Compiled {len(graphs)} archetype graphs: {list(graphs.keys())}")
 
+    cycle_tick = 0
     while True:
         try:
+            cycle_tick += 1
             conn = _db()
             cur = conn.cursor()
             cur.execute(
@@ -706,7 +858,7 @@ async def agent_runner():
             if agents:
                 emitter = await get_emitter()
                 log.info(f"Agent cycle: {len(agents)} agents")
-                await _run_cycle(agents, llm, emitter, graphs)
+                await _run_cycle(agents, llm, emitter, graphs, cycle_tick)
             else:
                 log.info("No living agents — waiting for genesis...")
 

@@ -126,6 +126,8 @@
     .c-economy   { color: #ddbb33; }
     .c-cognitive { color: #44aaff; }
     .c-social    { color: #dd77ff; }
+    .c-threat    { color: #ff4466; }
+    .c-manifesto { color: #ffaa33; }
     .c-other     { color: #778899; }
   </style>
 </head>
@@ -238,7 +240,9 @@
 // Config
 // ═══════════════════════════════════════════════════════════════════════════
 const RUNTIME    = 'http://localhost:8888';
-const POLL_A     = 5000, POLL_E = 2200, POLL_S = 8000, POLL_M = 6000;
+const POLL_SNAP  = 3000;
+const CLUSTER_MODE_THRESHOLD = 200;
+const SIM_INTERVAL_MS = 100;
 
 // ═══════════════════════════════════════════════════════════════════════════
 // State
@@ -411,7 +415,41 @@ function initSim(soul_id) {
   }
 }
 
+function aliveCount() {
+  return Object.values(S.agents).filter(a => a.is_alive).length;
+}
+
+function useClusterLayout() {
+  return aliveCount() > CLUSTER_MODE_THRESHOLD;
+}
+
+function tickClusterLayout() {
+  const byArch = {};
+  for (const a of Object.values(S.agents)) {
+    if (!a.is_alive) continue;
+    (byArch[a.archetype] = byArch[a.archetype] || []).push(a);
+  }
+  const archKeys = Object.keys(byArch);
+  const nArch = archKeys.length || 1;
+  archKeys.forEach((arch, i) => {
+    const angle = (i / nArch) * Math.PI * 2 - Math.PI / 2;
+    const cx = Math.cos(angle) * 220;
+    const cy = Math.sin(angle) * 220;
+    const members = byArch[arch];
+    members.forEach((a, j) => {
+      const subAngle = (j / Math.max(1, members.length)) * Math.PI * 2;
+      const r = 28 + Math.sqrt(members.length) * 14;
+      if (!S.sim[a.soul_id]) S.sim[a.soul_id] = { vx: 0, vy: 0, x: 0, y: 0 };
+      S.sim[a.soul_id].x = cx + Math.cos(subAngle) * r;
+      S.sim[a.soul_id].y = cy + Math.sin(subAngle) * r;
+      a._wx = S.sim[a.soul_id].x;
+      a._wy = S.sim[a.soul_id].y;
+    });
+  });
+}
+
 function tickSim() {
+  if (useClusterLayout()) { tickClusterLayout(); return; }
   const agents = Object.values(S.agents).filter(a=>a.is_alive);
   if (agents.length === 0) return;
 
@@ -785,10 +823,11 @@ function triggerFx(ev) {
 // ═══════════════════════════════════════════════════════════════════════════
 // Render loop
 // ═══════════════════════════════════════════════════════════════════════════
-let lastT = 0;
+let lastT = 0, lastSimT = 0;
 function render(t) {
   const dt = Math.min(0.05, (t - lastT)/1000); lastT = t;
-  tickSim();
+  const simInterval = useClusterLayout() ? SIM_INTERVAL_MS : 16;
+  if (t - lastSimT >= simInterval) { tickSim(); lastSimT = t; }
   drawBg();
   applyTransform();
   drawClusterHalos();
@@ -859,8 +898,11 @@ function feedItem(ev) {
   const list=document.getElementById('feed-list');
   const div=document.createElement('div'); div.className='feed-item';
   const ts=ev.timestamp?new Date(ev.timestamp*1000).toISOString().slice(11,19):'—';
-  const cat=evCat(ev.event_type);
-  div.innerHTML=`<span class="f-ts">${ts} · ${ev.event_type}</span><span class="f-text c-${cat}">${ev.narrative||ev.event_type}</span>`;
+  let cat=evCat(ev.event_type);
+  const mt=(ev.message_type||ev.payload?.message_type||'').toLowerCase();
+  if(mt==='threat') cat='threat';
+  else if(mt==='manifesto'||mt==='propaganda') cat='manifesto';
+  div.innerHTML=`<span class="f-ts">${ts} · ${ev.event_type}${mt?` · ${mt}`:''}</span><span class="f-text c-${cat}">${ev.narrative||ev.event_type}</span>`;
   list.insertBefore(div,list.firstChild);
   while(list.children.length>200) list.removeChild(list.lastChild);
   triggerFx(ev);
@@ -929,64 +971,60 @@ function updateEcon(d) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// API polling
+// API — single snapshot poll (replaces 4 parallel pollers)
 // ═══════════════════════════════════════════════════════════════════════════
-async function fetchAgents() {
-  try {
-    const { agents } = await (await fetch(`${RUNTIME}/agents`)).json();
-    if (!agents) return;
-    const next={};
-    agents.forEach(a=>{
-      next[a.soul_id]={...(S.agents[a.soul_id]||{}),...a};
-      if(a._wx===undefined&&S.sim[a.soul_id]){ next[a.soul_id]._wx=S.sim[a.soul_id].x; next[a.soul_id]._wy=S.sim[a.soul_id].y; }
-      if(!S.worldStart||a.birth_timestamp<S.worldStart) S.worldStart=a.birth_timestamp;
-    });
-    S.agents=next;
-    document.getElementById('s-alive').textContent=agents.filter(a=>a.is_alive).length;
-    if(S.selected) showInspector(S.agents[S.selected]||null);
-  } catch {}
+function applyAgents(agents) {
+  if (!agents) return;
+  const next = {};
+  agents.forEach(a => {
+    next[a.soul_id] = { ...(S.agents[a.soul_id] || {}), ...a };
+    if (a._wx === undefined && S.sim[a.soul_id]) {
+      next[a.soul_id]._wx = S.sim[a.soul_id].x;
+      next[a.soul_id]._wy = S.sim[a.soul_id].y;
+    }
+    if (!S.worldStart || a.birth_timestamp < S.worldStart) S.worldStart = a.birth_timestamp;
+  });
+  S.agents = next;
+  document.getElementById('s-alive').textContent = agents.length;
+  if (S.selected) showInspector(S.agents[S.selected] || null);
 }
 
-async function fetchEvents() {
-  try {
-    const { events } = await (await fetch(`${RUNTIME}/events?limit=50`)).json();
-    if (!events) return;
-    [...events].reverse().forEach(feedItem);
-    S.actTick++;
-  } catch {}
+function applyMessages(messages) {
+  if (!messages) return;
+  for (const msg of messages) {
+    if (S.seenMsg.has(msg.message_id)) continue;
+    S.seenMsg.add(msg.message_id);
+    const sId = msg.sender_id, rId = msg.recipient_id;
+    if (!sId || rId === 'BROADCAST') continue;
+    const key = [sId, rId].sort().join(':');
+    if (!S.conns[key]) S.conns[key] = { count: 0, lastSeen: 0 };
+    S.conns[key].count++;
+    S.conns[key].lastSeen = msg.sent_at || Date.now() / 1000;
+    if (S.agents[sId] && S.agents[rId]) addPulse(sId, rId);
+  }
 }
 
-async function fetchStats() {
+async function fetchSnapshot() {
   try {
-    const d = await (await fetch(`${RUNTIME}/stats`)).json();
-    if(d.world_start_ts&&(!S.worldStart||d.world_start_ts<S.worldStart)) S.worldStart=d.world_start_ts;
-    document.getElementById('s-born').textContent   = d.total_born||'0';
-    document.getElementById('s-died').textContent   = d.total_died||'0';
-    document.getElementById('s-gen').textContent    = d.max_generation||'1';
-    document.getElementById('s-usdc').textContent   = d.total_usdc_in_world?parseFloat(d.total_usdc_in_world).toFixed(2):'—';
-    document.getElementById('s-msgs').textContent   = d.messages_total||'0';
-    document.getElementById('s-tokens').textContent = d.tokens_deployed||'0';
-    document.getElementById('s-dreams').textContent = d.dreams_total||'0';
-    document.getElementById('s-llm').textContent    = d.llm_model||'—';
-    document.getElementById('world-id-pill').textContent = d.world_id||'—';
+    const snap = await (await fetch(`${RUNTIME}/world/snapshot`)).json();
+    if (snap.error) return;
+    applyAgents(snap.agents);
+    applyMessages(snap.messages);
+    const d = snap.stats || {};
+    if (d.world_start_ts && (!S.worldStart || d.world_start_ts < S.worldStart)) S.worldStart = d.world_start_ts;
+    document.getElementById('s-born').textContent   = d.total_born || '0';
+    document.getElementById('s-died').textContent   = d.total_died || '0';
+    document.getElementById('s-gen').textContent    = d.max_generation || '1';
+    document.getElementById('s-usdc').textContent   = d.total_usdc_in_world ? parseFloat(d.total_usdc_in_world).toFixed(2) : '—';
+    document.getElementById('s-msgs').textContent   = d.messages_total || '0';
+    document.getElementById('s-tokens').textContent = d.tokens_deployed || '0';
+    document.getElementById('s-dreams').textContent = d.dreams_total || '0';
+    document.getElementById('s-llm').textContent    = d.llm_model || '—';
+    document.getElementById('world-id-pill').textContent = (snap.world_id || d.world_id || '—') + (useClusterLayout() ? ' · CLUSTER' : '');
     updateEcon(d);
-  } catch {}
-}
-
-async function fetchMessages() {
-  try {
-    const { messages } = await (await fetch(`${RUNTIME}/messages?limit=80`)).json();
-    if (!messages) return;
-    for (const msg of messages) {
-      if (S.seenMsg.has(msg.message_id)) continue;
-      S.seenMsg.add(msg.message_id);
-      const sId=msg.sender_id, rId=msg.recipient_id;
-      if (!sId||rId==='BROADCAST') continue;
-      const key=[sId,rId].sort().join(':');
-      if(!S.conns[key]) S.conns[key]={count:0,lastSeen:0};
-      S.conns[key].count++;
-      S.conns[key].lastSeen=msg.sent_at||Date.now()/1000;
-      if(S.agents[sId]&&S.agents[rId]) addPulse(sId,rId);
+    if (snap.events) {
+      [...snap.events].reverse().forEach(feedItem);
+      S.actTick++;
     }
   } catch {}
 }
@@ -994,9 +1032,8 @@ async function fetchMessages() {
 // ═══════════════════════════════════════════════════════════════════════════
 // Boot
 // ═══════════════════════════════════════════════════════════════════════════
-fetchAgents(); fetchEvents(); fetchStats(); fetchMessages();
-setInterval(fetchAgents, POLL_A); setInterval(fetchEvents, POLL_E);
-setInterval(fetchStats,  POLL_S); setInterval(fetchMessages, POLL_M);
+fetchSnapshot();
+setInterval(fetchSnapshot, POLL_SNAP);
 </script>
 </body>
 </html>

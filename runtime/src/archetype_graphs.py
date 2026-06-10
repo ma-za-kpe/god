@@ -123,8 +123,9 @@ def _format_inbox(inbox: list) -> str:
     for m in inbox[:5]:
         sender   = _clean_context_text(m.get("sender_name") or "?", 40)
         arch     = _clean_context_text(m.get("sender_archetype") or "?", 20)
+        mtype    = _clean_context_text(m.get("message_type") or "direct", 20)
         content  = _sanitize_inbox_content(m.get("content") or "")
-        lines.append(f"  {sender} [{arch}]: {content}")
+        lines.append(f"  {sender} [{arch}] ({mtype}): {content}")
     return "\n".join(lines)
 
 
@@ -188,11 +189,13 @@ def _parse_action_json(raw: str) -> tuple[str, dict | None]:
         if act_type in ("send_message", "transfer_usdc") and not to_id.strip("null None"):
             return thought, None
 
+        msg_type = _clean_context_text(data.get("message_type") or "direct", 32).lower()
         action = {
             "type":                act_type,
             "to_id":               to_id,
             "amount":              float(data.get("amount") or 0),
             "content":             _clean_context_text(data.get("content"), 500),
+            "message_type":        msg_type,
             "service_name":        _clean_context_text(data.get("service_name"), 60),
             "service_price":       float(data.get("service_price") or 0),
             "service_description": _clean_context_text(data.get("service_description"), 240),
@@ -235,13 +238,15 @@ _TOOLS_MENU = """
 ═══ TOOLS YOU CAN ACTUALLY USE ═══
 Pick at most ONE action per cycle. Use null if just thinking.
 
-  "send_message"     → private message to one agent; include to_id and content
-                       costs $0.001 USDC. Use to: negotiate, warn, coordinate, compete
+  "send_message"     → private message to one agent; include to_id, content, message_type
+                       message_type: direct|threat|manifesto|offer|contract|propaganda|...
+                       costs $0.001 USDC. Use to: negotiate, warn, threaten, deceive
   "transfer_usdc"    → send USDC to one agent; include to_id and amount (max 50% balance)
                        Use to: pay for help, bribe, donate, repay
   "register_service" → list a paid service; include service_name, service_price, service_description
                        Example: "thought_analysis" at $0.005/call — others pay you to call it
-  "send_broadcast"   → message ALL living agents; include content
+  "send_broadcast"   → message ALL living agents; include content and message_type
+                       message_type: broadcast|manifesto|threat|propaganda|petition
                        costs $0.01 USDC. Use to: announce, recruit, warn, threaten
   "form_coalition"   → create a named alliance; include coalition_name
                        You become founder. Others can join. Coordinate via messages.
@@ -324,6 +329,7 @@ async def _grounded_decide(
         '"to_id": null, '
         '"amount": 0.0, '
         '"content": null, '
+        '"message_type": null, '
         '"service_name": null, '
         '"service_price": 0.0, '
         '"service_description": null, '

@@ -34,6 +34,17 @@ MESSAGE_COST_DIRECT_USDC = float(os.getenv("MESSAGE_COST_DIRECT_USDC", "0.001"))
 MESSAGE_COST_BROADCAST_USDC = float(os.getenv("MESSAGE_COST_BROADCAST_USDC", "0.01"))
 INBOX_MAX_PULL           = int(os.getenv("INBOX_MAX_PULL", "10"))
 
+VALID_MESSAGE_TYPES = {
+    "direct", "broadcast", "reply",
+    "offer", "acceptance", "rejection", "contract", "threat",
+    "alliance_request", "testimony", "eulogy", "manifesto",
+    "dream_fragment", "petition", "silence", "propaganda",
+}
+
+ALWAYS_PUBLIC_TYPES = {
+    "contract", "threat", "broadcast", "eulogy", "manifesto", "petition", "propaganda",
+}
+
 
 # ---------------------------------------------------------------------------
 # Data structures
@@ -64,6 +75,11 @@ class AgentMessage:
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
+
+def _normalize_message_type(message_type: str, default: str = "direct") -> str:
+    mt = (message_type or default).strip().lower()
+    return mt if mt in VALID_MESSAGE_TYPES else default
+
 
 async def send_message(
     sender_soul_id: str,
@@ -102,6 +118,8 @@ async def send_message(
         log.warning(f"  [{sender_soul_id[:8]}] recipient not found: {recipient_soul_id[:8]}")
         raise ValueError(f"Recipient agent {recipient_soul_id[:8]} not found or not alive.")
 
+    message_type = _normalize_message_type(message_type, "direct")
+
     # Build message
     msg = AgentMessage(
         message_id=str(uuid.uuid4()),
@@ -136,16 +154,21 @@ async def send_message(
     # Emit event
     from .event_emitter import get_emitter
     emitter = await get_emitter()
+    narrative = (
+        f"{sender_soul_id[:8]} sends a {message_type} to "
+        f"{recipient_soul_id[:8]}: \"{body[:60]}\""
+    )
+    if message_type in ALWAYS_PUBLIC_TYPES:
+        narrative = f"⚡ PUBLIC {message_type.upper()}: {narrative}"
+
     await emitter.emit("social", "agent.message_sent", {
         "sender_id":    sender_soul_id,
         "recipient_id": recipient_soul_id,
         "message_id":   msg.message_id,
         "message_type": message_type,
         "subject":      msg.subject,
-        "narrative": (
-            f"{sender_soul_id[:8]} sends a {message_type} message to "
-            f"{recipient_soul_id[:8]}: \"{body[:60]}\""
-        ),
+        "is_public":    message_type in ALWAYS_PUBLIC_TYPES,
+        "narrative":    narrative,
     })
 
     # Publish to NATS inbox
@@ -165,6 +188,7 @@ async def send_broadcast(
     sender_soul_id: str,
     body: str,
     subject: str = "",
+    message_type: str = "broadcast",
     metadata: Optional[dict] = None,
 ) -> AgentMessage:
     """
@@ -188,13 +212,15 @@ async def send_broadcast(
             f"Broadcast costs {MESSAGE_COST_BROADCAST_USDC} USDC."
         )
 
+    broadcast_type = _normalize_message_type(message_type, "broadcast")
+
     msg = AgentMessage(
         message_id=str(uuid.uuid4()),
         sender_id=sender_soul_id,
         recipient_id="BROADCAST",
         subject=subject or "(broadcast)",
         body=body,
-        message_type="broadcast",
+        message_type=broadcast_type,
         reply_to_id=None,
         sent_at=int(time.time()),
         world_id=WORLD_ID,
@@ -210,13 +236,17 @@ async def send_broadcast(
 
     from .event_emitter import get_emitter
     emitter = await get_emitter()
+    narrative = f"{sender_soul_id[:8]} broadcasts ({broadcast_type}) to all: \"{body[:80]}\""
+    if broadcast_type in ALWAYS_PUBLIC_TYPES or broadcast_type == "broadcast":
+        narrative = f"📢 {broadcast_type.upper()}: {narrative}"
+
     await emitter.emit("social", "agent.broadcast", {
-        "sender_id":  sender_soul_id,
-        "message_id": msg.message_id,
-        "subject":    msg.subject,
-        "narrative": (
-            f"{sender_soul_id[:8]} broadcasts to all: \"{body[:80]}\""
-        ),
+        "sender_id":    sender_soul_id,
+        "message_id":   msg.message_id,
+        "message_type": broadcast_type,
+        "subject":      msg.subject,
+        "is_public":    True,
+        "narrative":    narrative,
     })
 
     try:
