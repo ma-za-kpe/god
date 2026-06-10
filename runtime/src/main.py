@@ -76,7 +76,9 @@ async def lifespan(app: FastAPI):
     )
 
     from .db_pool import close_pool, init_pool
+    from .db_schema import ensure_schema
 
+    ensure_schema()
     await init_pool()
 
     _background_tasks.append(asyncio.create_task(rent_daemon(), name="rent_daemon"))

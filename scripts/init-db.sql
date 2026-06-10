@@ -61,9 +61,10 @@ CREATE TABLE IF NOT EXISTS tokens (
     owner_soul_id       TEXT NOT NULL,
     name                TEXT NOT NULL,
     symbol              TEXT NOT NULL,
-    initial_supply      NUMERIC(36, 0),
+    initial_supply      BIGINT NOT NULL DEFAULT 0,
     deployed_at         BIGINT NOT NULL,
     on_chain_tx         TEXT,
+    world_id            TEXT NOT NULL DEFAULT 'local-dev-world-1',
     created_at          TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
@@ -385,18 +386,6 @@ CREATE TABLE IF NOT EXISTS reputation (
     interaction_count   INTEGER NOT NULL DEFAULT 0,
     world_id            TEXT NOT NULL DEFAULT 'local-dev-world-1',
     PRIMARY KEY (observer_id, subject_id)
-);
-
--- Tokens table (may already exist; safe to re-run)
-CREATE TABLE IF NOT EXISTS tokens (
-    contract_address    TEXT PRIMARY KEY,
-    owner_soul_id       TEXT NOT NULL,
-    name                TEXT NOT NULL,
-    symbol              TEXT NOT NULL,
-    initial_supply      BIGINT NOT NULL,
-    deployed_at         BIGINT NOT NULL,
-    on_chain_tx         TEXT,
-    world_id            TEXT NOT NULL DEFAULT 'local-dev-world-1'
 );
 
 -- Indexes for new tables
