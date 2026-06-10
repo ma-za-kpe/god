@@ -42,6 +42,8 @@ The world stays alive only if agents are forced to judge under pressure. Do not 
 
 **Contributing:** [CONTRIBUTING.md](./CONTRIBUTING.md) · [Git workflow](./docs/83-git-workflow.md) (`main` / `develop` / `feat/*`, protected branches).
 
+**System map:** [AI-driven economy & governance](./docs/85-economy-governance-system.md) — how rent, tiers, DAOs, petitions, and the observer tie together.
+
 ## Path to Real-World Agency
 
 Agents do not start with full external access. They earn it:

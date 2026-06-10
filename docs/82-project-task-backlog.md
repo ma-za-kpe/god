@@ -36,6 +36,7 @@
 | R13 | **Brand theme, logo, guidelines; reflect in UI; world logs in observer** | ✅ | doc 81, observer brand.css + WORLD LOG tab |
 | R14 | **Keep all requests in this task list** | ✅ | this file |
 | R15 | **Open-source contribution guidelines + airtight git workflow; protect branches; close all issues** | ✅ | CONTRIBUTING.md, doc 83, protection on main+develop |
+| R16 | **Tie AI-driven economy + governance; refresh memory from docs** | ✅ | doc 85 system map |
 
 ---
 
