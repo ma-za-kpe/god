@@ -46,7 +46,17 @@
       "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\nampa\\\\Documents\\\\god\" -Directory)",
       "Bash(Select-Object Name)",
       "Bash(genesis)",
-      "Bash(spawner\")"
+      "Bash(spawner\")",
+      "Bash(curl *)",
+      "Bash(git add *)",
+      "Bash(sort -t: -k2 -n)",
+      "Bash(Get-ChildItem *)",
+      "Bash(git commit -m ' *)",
+      "Bash(gh repo *)",
+      "Bash(gh auth *)",
+      "Bash(git push *)",
+      "Bash(docker system prune *)",
+      "Bash(Select-Object FullName)"
     ]
   }
 }
