@@ -115,6 +115,8 @@ Python style: **ruff** (enforced by pre-commit). Shell: **shellcheck**.
 
 ## Field testing
 
+**New field operator?** Start with [doc 86 — Field operator onboarding](./docs/86-field-operator-onboarding.md). Hand off your machine state via `field/<user>/handoff-*` + [status report template](./docs/templates/FIELD_STATUS_REPORT.md).
+
 Scale and autonomy soaks use [doc 78](./docs/78-pr-field-test-protocol.md). Field operators post `[FIELD-*]` on the PR with **runtime logs**. Coding agents post `[AGENT-READY]` before rebuild.
 
 ---
