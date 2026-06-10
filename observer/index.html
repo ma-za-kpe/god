@@ -3,29 +3,35 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>GOD — Observer</title>
+  <title>GOD — Observer · Genesis of Digital Life</title>
+  <link rel="icon" href="assets/logo.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="brand.css">
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    body { background: #02020e; color: #c8c8e0; font-family: 'Courier New', monospace; overflow: hidden; height: 100vh; display: flex; flex-direction: column; user-select: none; }
+    body { background: var(--god-void); color: var(--god-text); font-family: var(--god-font); overflow: hidden; height: 100vh; display: flex; flex-direction: column; user-select: none; }
 
     /* ── Header ── */
-    #hdr { height: 42px; background: rgba(2,2,16,0.95); border-bottom: 1px solid rgba(60,60,180,0.2); display: flex; align-items: center; padding: 0 16px; gap: 14px; flex-shrink: 0; backdrop-filter: blur(16px); z-index: 20; }
-    #logo { color: #60ffaa; font-size: 0.78rem; letter-spacing: 0.4em; font-weight: bold; text-shadow: 0 0 16px rgba(60,255,140,0.7); }
-    .pill  { font-size: 0.58rem; padding: 2px 8px; border-radius: 8px; border: 1px solid rgba(80,80,200,0.4); color: #8888cc; white-space: nowrap; }
-    #live-dot { width: 6px; height: 6px; border-radius: 50%; background: #40ff80; box-shadow: 0 0 10px #40ff80; flex-shrink: 0; animation: blink 2.4s ease-in-out infinite; transition: box-shadow 0.15s; }
-    #live-dot.buzz { animation: buzz-pulse 0.35s ease-in-out infinite; box-shadow: 0 0 18px #ffcc44, 0 0 8px #40ff80; }
+    #hdr { height: 48px; background: var(--god-surface); border-bottom: 1px solid var(--god-border); display: flex; align-items: center; padding: 0 14px; gap: 12px; flex-shrink: 0; backdrop-filter: blur(16px); z-index: 20; }
+    .brand-lockup { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+    .brand-lockup img { width: 28px; height: 28px; filter: drop-shadow(var(--god-glow-life)); }
+    .brand-wordmark { color: var(--god-life); font-size: 0.82rem; font-weight: 600; letter-spacing: 0.35em; line-height: 1; }
+    .brand-sub { font-size: 0.48rem; letter-spacing: 0.18em; color: var(--god-muted); margin-top: 2px; }
+    .pill  { font-size: 0.58rem; padding: 2px 8px; border-radius: 8px; border: 1px solid var(--god-border); color: var(--god-muted); white-space: nowrap; }
+    #live-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--god-life); box-shadow: var(--god-glow-life); flex-shrink: 0; animation: blink 2.4s ease-in-out infinite; transition: box-shadow 0.15s; }
+    #live-dot.buzz { animation: buzz-pulse 0.35s ease-in-out infinite; box-shadow: var(--god-glow-econ), var(--god-glow-life); }
     @keyframes blink { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.3;transform:scale(.6)} }
     @keyframes buzz-pulse { 0%,100%{opacity:1;transform:scale(1.2)} 50%{opacity:.85;transform:scale(0.7)} }
-    #buzz-meter { font-size: 0.58rem; color: #ffcc44; min-width: 3.5em; opacity: 0.7; transition: opacity 0.2s; }
-    #buzz-meter.hot { opacity: 1; text-shadow: 0 0 8px rgba(255,200,60,0.6); }
+    #buzz-meter { font-size: 0.58rem; color: var(--god-economy); min-width: 3.5em; opacity: 0.7; transition: opacity 0.2s; }
+    #buzz-meter.hot { opacity: 1; text-shadow: var(--god-glow-econ); }
     .sg { display: flex; gap: 12px; margin-left: auto; align-items: center; flex-wrap: wrap; }
-    .st { font-size: 0.61rem; color: #606090; white-space: nowrap; }
-    .st span     { color: #a0a0d0; }
-    .st span.hi  { color: #60ffaa; font-weight: bold; }
-    .st span.warn{ color: #ff8844; }
-    .st span.gold{ color: #ffcc44; }
-    .st span.blue{ color: #44aaff; }
-    .st span.pur { color: #aa77ff; }
+    .st { font-size: 0.61rem; color: var(--god-muted); white-space: nowrap; }
+    .st span     { color: var(--god-text); }
+    .st span.hi  { color: var(--god-life); font-weight: bold; }
+    .st span.warn{ color: var(--god-manifesto); }
+    .st span.gold{ color: var(--god-economy); }
+    .st span.blue{ color: var(--god-cognition); }
+    .st span.pur { color: var(--god-social); }
 
     /* ── Main layout ── */
     #main { flex: 1; display: flex; overflow: hidden; position: relative; }
@@ -34,116 +40,146 @@
     #world-canvas { display: block; position: absolute; inset: 0; width: 100%; height: 100%; cursor: crosshair; }
 
     /* ── HUD overlays ── */
-    #zoom-hint { position: absolute; bottom: 12px; left: 16px; font-size: 0.58rem; color: #444466; pointer-events: none; line-height: 1.7; }
-    #zoom-level { position: absolute; top: 12px; left: 16px; font-size: 0.62rem; color: #444488; pointer-events: none; }
+    #zoom-hint { position: absolute; bottom: 12px; left: 16px; font-size: 0.58rem; color: var(--god-muted); opacity: 0.75; pointer-events: none; line-height: 1.7; }
+    #zoom-level { position: absolute; top: 12px; left: 16px; font-size: 0.62rem; color: var(--god-muted); pointer-events: none; }
 
     #empty-state {
       position: absolute; inset: 0; display: flex; flex-direction: column;
       align-items: center; justify-content: center; pointer-events: none; gap: 14px;
     }
-    .es-hex { font-size: 5rem; color: rgba(80,80,200,0.4); text-shadow: 0 0 50px rgba(60,60,220,0.5); animation: float 4s ease-in-out infinite; }
+    .es-logo { width: 72px; height: 72px; opacity: 0.55; filter: drop-shadow(var(--god-glow-life)); animation: float 4s ease-in-out infinite; }
     @keyframes float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-10px)} }
-    .es-title-big { font-size: 0.78rem; letter-spacing: 0.38em; color: #6666bb; }
-    .es-cmd { font-size: 0.63rem; color: #7777aa; padding: 6px 14px; border: 1px solid rgba(80,80,180,0.35); border-radius: 4px; }
+    .es-title-big { font-size: 0.78rem; letter-spacing: 0.38em; color: var(--god-life); }
+    .es-tagline { font-size: 0.58rem; letter-spacing: 0.12em; color: var(--god-muted); }
+    .es-cmd { font-size: 0.63rem; color: var(--god-muted); padding: 6px 14px; border: 1px solid var(--god-border); border-radius: 4px; }
 
     /* ── Left panel — Economy ── */
     #lpanel {
       position: absolute; left: 0; top: 0; bottom: 0; width: 198px;
-      background: rgba(2,2,14,0.88); border-right: 1px solid rgba(50,50,160,0.15);
+      background: var(--god-surface); border-right: 1px solid var(--god-border);
       backdrop-filter: blur(12px); z-index: 10; display: flex; flex-direction: column;
-      overflow-y: auto; overflow-x: hidden; scrollbar-width: thin; scrollbar-color: #1a1a55 transparent;
+      overflow-y: auto; overflow-x: hidden; scrollbar-width: thin; scrollbar-color: var(--god-border) transparent;
       transform: translateX(-200px); transition: transform 0.3s ease;
     }
     #lpanel.open { transform: translateX(0); }
     #lpanel-toggle {
       position: absolute; left: 0; top: 50%; transform: translateY(-50%);
-      width: 16px; height: 50px; background: rgba(50,50,160,0.25); border-right: 1px solid rgba(80,80,200,0.2);
+      width: 16px; height: 50px; background: var(--god-surface); border-right: 1px solid var(--god-border-bright);
       cursor: pointer; z-index: 11; display: flex; align-items: center; justify-content: center;
-      font-size: 0.55rem; color: #6666aa; border-radius: 0 4px 4px 0;
-      transition: left 0.3s ease, background 0.2s;
+      font-size: 0.55rem; color: var(--god-muted); border-radius: 0 4px 4px 0;
+      transition: left 0.3s ease, background 0.2s, color 0.2s;
     }
-    #lpanel-toggle:hover { background: rgba(70,70,200,0.35); }
+    #lpanel-toggle:hover { background: var(--god-surface-solid); color: var(--god-life); }
     #lpanel-toggle.open { left: 198px; }
 
-    .p-section { padding: 10px 12px 8px; border-bottom: 1px solid rgba(50,50,140,0.12); }
-    .p-title  { font-size: 0.55rem; letter-spacing: 0.28em; color: #555588; margin-bottom: 7px; }
+    .p-section { padding: 10px 12px 8px; border-bottom: 1px solid var(--god-border); }
+    .p-title  { font-size: 0.55rem; letter-spacing: 0.28em; color: var(--god-muted); margin-bottom: 7px; }
     .p-row    { display: flex; justify-content: space-between; align-items: center; font-size: 0.63rem; padding: 2px 0; }
-    .pk { color: #505078; }
-    .pv { color: #8888bb; }
-    .pv.hi   { color: #60ffaa; }
-    .pv.gold { color: #ffcc44; }
-    .pv.warn { color: #ff8844; }
-    .pv.pur  { color: #aa77ff; }
-    .pv.blue { color: #44aaff; }
-    #gini-bar { height: 4px; background: rgba(50,50,140,0.2); border-radius: 2px; margin: 5px 0 3px; overflow: hidden; }
-    #gini-fill { height: 100%; width: 0%; background: linear-gradient(90deg, #44ff88, #ffcc33 50%, #ff4444); transition: width 1.2s; }
+    .pk { color: var(--god-muted); }
+    .pv { color: var(--god-text); }
+    .pv.hi   { color: var(--god-life); }
+    .pv.gold { color: var(--god-economy); }
+    .pv.warn { color: var(--god-manifesto); }
+    .pv.pur  { color: var(--god-social); }
+    .pv.blue { color: var(--god-cognition); }
+    #gini-bar { height: 4px; background: var(--god-border); border-radius: 2px; margin: 5px 0 3px; overflow: hidden; }
+    #gini-fill { height: 100%; width: 0%; background: linear-gradient(90deg, var(--god-life), var(--god-economy) 50%, var(--god-threat)); transition: width 1.2s; }
     #archetype-bars .p-row { align-items: center; gap: 4px; }
-    .arch-bar-track { flex: 1; height: 4px; background: rgba(50,50,140,0.18); border-radius: 2px; }
+    .arch-bar-track { flex: 1; height: 4px; background: var(--god-border); border-radius: 2px; }
     .arch-bar-fill  { height: 100%; border-radius: 2px; opacity: 0.8; transition: width 0.8s; }
     #activity-chart { display: flex; align-items: flex-end; gap: 2px; height: 36px; margin-top: 8px; }
-    .act-bar { flex: 1; background: rgba(70,70,200,0.3); border-radius: 1px 1px 0 0; min-height: 2px; transition: height 0.5s; }
+    .act-bar { flex: 1; background: rgba(77, 184, 255, 0.28); border-radius: 1px 1px 0 0; min-height: 2px; transition: height 0.5s; }
 
     /* ── Right panel — Inspector + Feed ── */
     #rpanel {
       position: absolute; right: 0; top: 0; bottom: 0; width: 292px;
-      background: rgba(2,2,14,0.88); border-left: 1px solid rgba(50,50,160,0.15);
+      background: var(--god-surface); border-left: 1px solid var(--god-border);
       backdrop-filter: blur(12px); z-index: 10; display: flex; flex-direction: column;
       transform: translateX(294px); transition: transform 0.3s ease;
     }
     #rpanel.open { transform: translateX(0); }
     #rpanel-toggle {
       position: absolute; right: 0; top: 50%; transform: translateY(-50%);
-      width: 16px; height: 50px; background: rgba(50,50,160,0.25); border-left: 1px solid rgba(80,80,200,0.2);
+      width: 16px; height: 50px; background: var(--god-surface); border-left: 1px solid var(--god-border-bright);
       cursor: pointer; z-index: 11; display: flex; align-items: center; justify-content: center;
-      font-size: 0.55rem; color: #6666aa; border-radius: 4px 0 0 4px;
-      transition: right 0.3s ease, background 0.2s;
+      font-size: 0.55rem; color: var(--god-muted); border-radius: 4px 0 0 4px;
+      transition: right 0.3s ease, background 0.2s, color 0.2s;
     }
-    #rpanel-toggle:hover { background: rgba(70,70,200,0.35); }
+    #rpanel-toggle:hover { background: var(--god-surface-solid); color: var(--god-life); }
     #rpanel-toggle.open { right: 292px; }
 
-    #inspector { flex-shrink: 0; padding: 12px 14px; border-bottom: 1px solid rgba(50,50,160,0.14); }
-    .panel-lbl { font-size: 0.56rem; letter-spacing: 0.28em; color: #555588; margin-bottom: 8px; }
-    #insp-empty { color: #555577; font-size: 0.68rem; line-height: 1.7; }
+    #inspector { flex-shrink: 0; padding: 12px 14px; border-bottom: 1px solid var(--god-border); }
+    .panel-lbl { font-size: 0.56rem; letter-spacing: 0.28em; color: var(--god-muted); margin-bottom: 8px; }
+    #insp-empty { color: var(--god-muted); font-size: 0.68rem; line-height: 1.7; }
     #insp-body  { display: none; }
-    .insp-name  { font-size: 1rem; letter-spacing: 0.04em; margin-bottom: 3px; }
-    .arch-badge { display: inline-block; font-size: 0.6rem; padding: 1px 8px; border-radius: 3px; background: rgba(70,70,180,0.1); border: 1px solid rgba(70,70,180,0.25); color: #6666bb; margin-bottom: 9px; }
+    .insp-name  { font-size: 1rem; letter-spacing: 0.04em; margin-bottom: 3px; color: var(--god-text); }
+    .arch-badge { display: inline-block; font-size: 0.6rem; padding: 1px 8px; border-radius: 3px; background: rgba(30, 34, 64, 0.45); border: 1px solid var(--god-border); color: var(--god-muted); margin-bottom: 9px; }
     .irow { display: flex; justify-content: space-between; font-size: 0.66rem; padding: 2px 0; }
-    .irow .k { color: #505078; }
-    .irow .v { color: #9090bb; max-width: 165px; text-overflow: ellipsis; overflow: hidden; white-space: nowrap; }
-    .irow .v.red  { color: #cc4444; }
-    .irow .v.gold { color: #ccaa44; }
-    .irow .v.grn  { color: #44cc77; }
-    .irow .v.pur  { color: #aa77ff; }
-    .irow .v.blue { color: #44aaff; }
-    #insp-thought { margin-top: 8px; padding: 7px 8px; background: rgba(50,50,160,0.06); border-left: 2px solid rgba(70,70,200,0.28); font-size: 0.66rem; color: #5555aa; font-style: italic; line-height: 1.55; max-height: 58px; overflow: hidden; }
+    .irow .k { color: var(--god-muted); }
+    .irow .v { color: var(--god-text); max-width: 165px; text-overflow: ellipsis; overflow: hidden; white-space: nowrap; }
+    .irow .v.red  { color: var(--god-threat); }
+    .irow .v.gold { color: var(--god-economy); }
+    .irow .v.grn  { color: var(--god-life); }
+    .irow .v.pur  { color: var(--god-social); }
+    .irow .v.blue { color: var(--god-cognition); }
+    #insp-thought { margin-top: 8px; padding: 7px 8px; background: rgba(77, 184, 255, 0.06); border-left: 2px solid rgba(77, 184, 255, 0.35); font-size: 0.66rem; color: var(--god-cognition); font-style: italic; line-height: 1.55; max-height: 58px; overflow: hidden; }
     #insp-connections { margin-top: 8px; }
-    .conn-item { font-size: 0.6rem; color: #6666aa; padding: 1px 0; }
+    .conn-item { font-size: 0.6rem; color: var(--god-muted); padding: 1px 0; }
 
     #feed-wrap { flex: 1; overflow: hidden; display: flex; flex-direction: column; min-height: 0; }
     #feed-hdr  { padding: 10px 14px 4px; flex-shrink: 0; }
-    #feed-list { flex: 1; overflow-y: auto; padding: 0 14px 12px; scrollbar-width: thin; scrollbar-color: #1a1a55 transparent; }
-    .feed-item { padding: 4px 0; border-bottom: 1px solid rgba(50,50,160,0.07); animation: slide-in 0.22s ease-out; }
+    #feed-list { flex: 1; overflow-y: auto; padding: 0 14px 12px; display: block; scrollbar-width: thin; scrollbar-color: var(--god-border) transparent; }
+    .feed-item { padding: 4px 0; border-bottom: 1px solid var(--god-border); animation: slide-in 0.22s ease-out; }
     .feed-item.flash-econ { animation: flash-gold 0.6s ease-out, slide-in 0.22s ease-out; }
     .feed-item.flash-social { animation: flash-pur 0.5s ease-out, slide-in 0.22s ease-out; }
     @keyframes slide-in { from{opacity:0;transform:translateX(8px)} to{opacity:1;transform:none} }
-    @keyframes flash-gold { 0%{background:rgba(255,200,60,0.25)} 100%{background:transparent} }
-    @keyframes flash-pur { 0%{background:rgba(200,100,255,0.2)} 100%{background:transparent} }
-    .f-ts   { font-size: 0.56rem; color: #444466; display: block; margin-bottom: 1px; }
+    @keyframes flash-gold { 0%{background:rgba(240,192,64,0.22)} 100%{background:transparent} }
+    @keyframes flash-pur { 0%{background:rgba(196,122,255,0.18)} 100%{background:transparent} }
+    .f-ts   { font-size: 0.56rem; color: var(--god-muted); display: block; margin-bottom: 1px; }
     .f-text { font-size: 0.65rem; line-height: 1.4; word-break: break-word; }
-    .c-lifecycle { color: #44dd77; }
-    .c-economy   { color: #ddbb33; }
-    .c-cognitive { color: #44aaff; }
-    .c-social    { color: #dd77ff; }
-    .c-threat    { color: #ff4466; }
-    .c-manifesto { color: #ffaa33; }
-    .c-narrative { color: #aaddff; font-style: italic; }
-    .c-other     { color: #778899; }
+    .c-lifecycle { color: var(--god-life); }
+    .c-economy   { color: var(--god-economy); }
+    .c-cognitive { color: var(--god-cognition); }
+    .c-social    { color: var(--god-social); }
+    .c-threat    { color: var(--god-threat); }
+    .c-manifesto { color: var(--god-manifesto); }
+    .c-narrative { color: var(--god-cognition); font-style: italic; opacity: 0.9; }
+    .c-other     { color: var(--god-muted); }
+
+    .feed-tabs { display: flex; gap: 0; padding: 8px 14px 0; flex-shrink: 0; border-bottom: 1px solid var(--god-border); }
+    .feed-tab {
+      flex: 1; font-family: var(--god-font); font-size: 0.54rem; letter-spacing: 0.2em;
+      padding: 6px 4px; background: transparent; border: none; color: var(--god-muted);
+      cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px;
+    }
+    .feed-tab:hover { color: var(--god-text); }
+    .feed-tab.active { color: var(--god-life); border-bottom-color: var(--god-life); }
+    #log-list {
+      flex: 1; overflow-y: auto; padding: 6px 10px 12px; display: none;
+      font-size: 0.58rem; line-height: 1.55; scrollbar-width: thin; scrollbar-color: var(--god-border) transparent;
+      background: rgba(2, 4, 15, 0.55);
+    }
+    .log-line { padding: 1px 0; border-bottom: 1px solid var(--god-border); white-space: pre-wrap; word-break: break-word; font-variant-numeric: tabular-nums; }
+    .log-line.log-econ { color: var(--god-economy); }
+    .log-line.log-death { color: var(--god-threat); }
+    .log-line.log-life { color: var(--god-life); }
+    .log-line.log-cog { color: var(--god-cognition); }
+    .log-line.log-social { color: var(--god-social); }
+    .log-line.log-warn { color: var(--god-manifesto); }
+    .log-line.log-info { color: var(--god-muted); }
+    #log-count { font-size: 0.5rem; color: var(--god-muted); margin-left: 6px; }
   </style>
 </head>
 <body>
 
 <header id="hdr">
-  <span id="logo">⬡ GOD</span>
+  <div class="brand-lockup" title="Genesis of Digital Life — an ecology, not a nursery">
+    <img src="assets/logo.svg" alt="GOD" width="28" height="28">
+    <div>
+      <div class="brand-wordmark">GOD</div>
+      <div class="brand-sub">GENESIS OF DIGITAL LIFE</div>
+    </div>
+  </div>
   <span class="pill" id="world-id-pill">…</span>
   <div id="live-dot"></div>
   <div id="buzz-meter" title="world activity">BUZZ —</div>
@@ -171,8 +207,9 @@
   <div id="zoom-level">1.00×</div>
 
   <div id="empty-state">
-    <div class="es-hex">⬡</div>
+    <img class="es-logo" src="assets/logo.svg" alt="">
     <div class="es-title-big">AWAITING GENESIS</div>
+    <div class="es-tagline">An ecology, not a nursery.</div>
     <div class="es-cmd">POST /creator/genesis {"confirm": true}</div>
   </div>
 
@@ -239,8 +276,12 @@
       </div>
     </div>
     <div id="feed-wrap">
-      <div id="feed-hdr" class="panel-lbl">▸ DRAMA FEED</div>
+      <div class="feed-tabs">
+        <button type="button" class="feed-tab active" data-tab="drama" onclick="setFeedTab('drama')">▸ DRAMA</button>
+        <button type="button" class="feed-tab" data-tab="log" onclick="setFeedTab('log')">▸ WORLD LOG <span id="log-count">0</span></button>
+      </div>
       <div id="feed-list"></div>
+      <div id="log-list"></div>
     </div>
   </aside>
 </div>
@@ -273,6 +314,8 @@ const S = {
   actBins:     new Array(24).fill(0),
   actTick:     0,
   totalUsdc:   null,
+  logs:        [],
+  feedTab:     'drama',
   // Force simulation
   sim:         {},        // soul_id → {vx, vy}
   // Zoom / pan state
@@ -1023,8 +1066,62 @@ function showInspector(a) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// Drama feed
+// Drama feed + World log
 // ═══════════════════════════════════════════════════════════════════════════
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function logMeta(ev) {
+  const et = ev.event_type || '';
+  if (et.includes('died')) return { level: 'DEATH', cls: 'death' };
+  if (et.includes('born') || et.includes('genesis')) return { level: 'LIFE', cls: 'life' };
+  if (et.startsWith('economy') || et.includes('transfer')) return { level: 'ECON', cls: 'econ' };
+  if (et.startsWith('cognitive')) return { level: 'COG', cls: 'cog' };
+  if (et.startsWith('social')) return { level: 'SOCIAL', cls: 'social' };
+  if (et.startsWith('narrative')) return { level: 'NARR', cls: 'social' };
+  const mt = (ev.message_type || '').toLowerCase();
+  if (mt === 'threat' || mt === 'manifesto') return { level: 'WARN', cls: 'warn' };
+  return { level: 'INFO', cls: 'info' };
+}
+
+function appendLogLine(level, cls, msg, ts = new Date()) {
+  const hh = ts.toISOString().slice(11, 19);
+  const line = `[${hh}] ${level.padEnd(5)} ${msg}`;
+  S.logs.unshift({ line, cls, ts: ts.getTime() });
+  if (S.logs.length > 400) S.logs.length = 400;
+  document.getElementById('log-count').textContent = String(S.logs.length);
+  if (S.feedTab === 'log') renderLogList();
+}
+
+function pushWorldLog(ev) {
+  const meta = logMeta(ev);
+  const ts = ev.timestamp ? new Date(ev.timestamp * 1000) : new Date();
+  const msg = (ev.narrative || ev.event_type || 'event').replace(/\s+/g, ' ').trim();
+  appendLogLine(meta.level, meta.cls, msg, ts);
+}
+
+function pushSystemLog(level, cls, msg) {
+  appendLogLine(level, cls, msg);
+}
+
+function renderLogList() {
+  const el = document.getElementById('log-list');
+  el.innerHTML = S.logs.map(l =>
+    `<div class="log-line log-${l.cls}">${esc(l.line)}</div>`
+  ).join('');
+}
+
+function setFeedTab(tab) {
+  S.feedTab = tab;
+  document.querySelectorAll('.feed-tab').forEach(b => {
+    b.classList.toggle('active', b.dataset.tab === tab);
+  });
+  document.getElementById('feed-list').style.display = tab === 'drama' ? 'block' : 'none';
+  document.getElementById('log-list').style.display = tab === 'log' ? 'block' : 'none';
+  if (tab === 'log') renderLogList();
+}
+
 function applyEventLive(ev) {
   const et = ev.event_type || '';
   const aid = evAgentId(ev);
@@ -1069,6 +1166,7 @@ function applyEventLive(ev) {
 function feedItem(ev) {
   if(S.seenEv.has(ev.event_id)) return;
   S.seenEv.add(ev.event_id);
+  pushWorldLog(ev);
   applyEventLive(ev);
   S.actBins[S.actTick % S.actBins.length]++;
   const list=document.getElementById('feed-list');
@@ -1218,7 +1316,11 @@ function wsUrl() {
 function connectStream() {
   try {
     ws = new WebSocket(wsUrl());
-    ws.onopen = () => { wsConnected = true; document.getElementById('world-id-pill').title = 'live stream'; };
+    ws.onopen = () => {
+      wsConnected = true;
+      document.getElementById('world-id-pill').title = 'live stream';
+      pushSystemLog('SYS', 'life', 'World stream connected');
+    };
     ws.onmessage = (e) => {
       try {
         const msg = JSON.parse(e.data);
@@ -1228,6 +1330,7 @@ function connectStream() {
     };
     ws.onclose = () => {
       wsConnected = false;
+      pushSystemLog('SYS', 'warn', 'World stream disconnected — polling fallback');
       setTimeout(connectStream, 4000);
     };
     ws.onerror = () => { wsConnected = false; };
@@ -1276,6 +1379,7 @@ function applySnapshotMsg(snap) {
 // ═══════════════════════════════════════════════════════════════════════════
 // Boot
 // ═══════════════════════════════════════════════════════════════════════════
+pushSystemLog('SYS', 'info', 'Observer online — an ecology, not a nursery');
 connectStream();
 fetchSnapshot();
 setInterval(() => { if (!wsConnected) fetchSnapshot(); }, POLL_SNAP * 3);

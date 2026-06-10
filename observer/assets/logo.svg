@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="GOD Signal Hex">
+  <defs>
+    <radialGradient id="core" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#3dffa8"/>
+      <stop offset="55%" stop-color="#2bc88a"/>
+      <stop offset="100%" stop-color="#0a0c18"/>
+    </radialGradient>
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="2" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <!-- outer hex lattice -->
+  <polygon points="32,4 54,16 54,40 32,52 10,40 10,16" fill="none" stroke="#3dffa8" stroke-width="1.5" opacity="0.85"/>
+  <polygon points="32,10 48,19 48,37 32,46 16,37 16,19" fill="none" stroke="#1e2240" stroke-width="1"/>
+  <!-- living core -->
+  <circle cx="32" cy="28" r="9" fill="url(#core)" filter="url(#glow)"/>
+  <circle cx="32" cy="28" r="3" fill="#e8fff4" opacity="0.9"/>
+</svg>
