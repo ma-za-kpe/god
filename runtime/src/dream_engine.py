@@ -218,6 +218,11 @@ def increment_consecutive(soul_id: str, new_count: int):
         log.debug(f"increment_consecutive error {soul_id[:8]}: {e}")
 
 
+def set_pending_mutation(soul_id: str, proposal: str) -> None:
+    """Store a one-cycle behavioral bias (graph mutation or dream)."""
+    _store_pending_mutation(soul_id, str(proposal or "")[:500])
+
+
 def get_pending_mutation(soul_id: str) -> str | None:
     """Return and clear any pending dream mutation for this agent."""
     try:

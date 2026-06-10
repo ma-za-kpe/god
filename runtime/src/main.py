@@ -26,6 +26,24 @@ log = logging.getLogger("god.runtime")
 _background_tasks: list[asyncio.Task] = []
 
 
+async def _agent_jobs_daemon():
+    """Process scheduled wake jobs and emit events."""
+    interval = int(os.getenv("JOBS_TICK_S", "15"))
+    from .agent_jobs import process_due_jobs
+    from .event_emitter import get_emitter
+    while True:
+        try:
+            await asyncio.sleep(interval)
+            emitter = await get_emitter()
+            n = await process_due_jobs(emitter)
+            if n:
+                log.debug(f"Processed {n} due agent job(s)")
+        except asyncio.CancelledError:
+            break
+        except Exception as e:
+            log.debug(f"agent jobs daemon: {e}")
+
+
 async def _ws_snapshot_daemon():
     """Periodic full snapshot push for WebSocket observers."""
     interval = int(os.getenv("WS_SNAPSHOT_INTERVAL_S", "30"))
@@ -59,6 +77,7 @@ async def lifespan(app: FastAPI):
     _background_tasks.append(asyncio.create_task(agent_runner(), name="agent_runner"))
     _background_tasks.append(asyncio.create_task(status_review_daemon(), name="status_review"))
     _background_tasks.append(asyncio.create_task(_ws_snapshot_daemon(), name="ws_snapshot"))
+    _background_tasks.append(asyncio.create_task(_agent_jobs_daemon(), name="agent_jobs"))
 
     yield
 
@@ -299,6 +318,32 @@ async def get_agent_status(soul_id: str):
     except Exception as e:
         log.warning(f"/status DB error: {e}")
         return {"soul_id": soul_id, "tier": 0, "error": str(e)}
+
+
+@app.get("/tools")
+async def list_tools():
+    """World MCP catalogue + agent-registered tools (discovery surface)."""
+    from .tool_registry import list_world_tools, list_agent_tools
+    return {
+        "world_tools": list_world_tools(),
+        "agent_tools": list_agent_tools(),
+        "world_id": os.getenv("WORLD_ID", "local-dev-world-1"),
+    }
+
+
+@app.get("/agents/{soul_id}/env")
+async def get_agent_env(soul_id: str):
+    """Read-only environment summary for an agent (observer / debug)."""
+    from .agent_env import format_env_for_decide, fetch_recent_actions, read_scratch
+    from .capabilities import format_capabilities_summary, get_granted_capabilities
+    return {
+        "soul_id": soul_id,
+        "capabilities": sorted(get_granted_capabilities(soul_id)),
+        "capabilities_summary": format_capabilities_summary(soul_id),
+        "environment": format_env_for_decide(soul_id),
+        "scratch": read_scratch(soul_id),
+        "recent_actions": fetch_recent_actions(soul_id, limit=12),
+    }
 
 
 @app.get("/leaderboard")

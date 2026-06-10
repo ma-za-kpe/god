@@ -286,6 +286,14 @@ async def _execute_action(agent: dict, action: dict, emitter) -> None:
     name     = agent.get("current_name") or soul_id[:8]
     act_type = action.get("type")
 
+    from .capabilities import check_action_allowed
+    from .agent_env import log_action
+    allowed, reason = check_action_allowed(soul_id, act_type)
+    if not allowed:
+        log.debug(f"  {name} action '{act_type}' denied: {reason}")
+        log_action(soul_id, act_type, action, {"error": reason}, success=False)
+        return
+
     from .circuit_breaker import check_agent, record_action, record_message
     if not check_agent(soul_id).allowed:
         log.debug(f"  {name} action blocked: circuit breaker cooldown")
@@ -469,12 +477,113 @@ async def _execute_action(agent: dict, action: dict, emitter) -> None:
             try:
                 child = await do_fork(agent)
                 log.info(f"  {name} forked → {child.get('name', '?')}")
+                log_action(soul_id, act_type, action, child or {})
             except Exception as e:
                 log.debug(f"  {name} fork_self failed: {e}")
+                log_action(soul_id, act_type, action, {"error": str(e)}, success=False)
+            return
+
+        # ── write_scratch ───────────────────────────────────────────────────
+        if act_type == "write_scratch":
+            from .agent_env import write_scratch
+            key = str(action.get("scratch_key") or "note")[:64]
+            content = str(action.get("content") or "")
+            ok = write_scratch(soul_id, key, content)
+            log_action(soul_id, act_type, action, {"key": key, "ok": ok})
+            if ok:
+                await emitter.emit("agent", "scratch_written", {
+                    "agent_id": soul_id, "name": name, "key": key,
+                    "narrative": f"{name} wrote scratch note '{key}'",
+                })
+            return
+
+        # ── schedule_wake ───────────────────────────────────────────────────
+        if act_type == "schedule_wake":
+            from .agent_jobs import schedule_wake
+            delay = int(action.get("delay_seconds") or 300)
+            intent = str(action.get("intent") or action.get("content") or "scheduled wake")
+            result = schedule_wake(soul_id, delay, intent)
+            log_action(soul_id, act_type, action, result, success=result.get("scheduled", False))
+            if result.get("scheduled"):
+                await emitter.emit("agent", "wake_scheduled", {
+                    "agent_id": soul_id, "name": name,
+                    "run_at": result.get("run_at"), "intent": intent[:80],
+                    "narrative": f"{name} schedules wake in {delay}s: {intent[:60]}",
+                })
+            return
+
+        # ── query_world ─────────────────────────────────────────────────────
+        if act_type == "query_world":
+            from .external_gateway import external_read
+            qtype = str(action.get("query_type") or "world_stats")
+            result = await external_read(soul_id, qtype, {"url": action.get("url")})
+            log_action(soul_id, act_type, action, result)
+            await emitter.emit("agent", "world_queried", {
+                "agent_id": soul_id, "name": name, "query_type": qtype,
+                "narrative": f"{name} queried world ({qtype})",
+            })
+            return
+
+        # ── external_read ─────────────────────────────────────────────────
+        if act_type == "external_read":
+            from .external_gateway import external_read
+            qtype = str(action.get("query_type") or "world_stats")
+            result = await external_read(soul_id, qtype, {"url": action.get("url")})
+            log_action(soul_id, act_type, action, result)
+            await emitter.emit("agent", "external_read", {
+                "agent_id": soul_id, "name": name, "query_type": qtype,
+                "narrative": f"{name} read external gateway ({qtype})",
+            })
+            return
+
+        # ── register_tool ─────────────────────────────────────────────────
+        if act_type == "register_tool":
+            from .tool_registry import register_agent_tool
+            tname = str(action.get("tool_name") or action.get("service_name") or "tool")
+            tdesc = str(action.get("tool_description") or action.get("service_description") or "")
+            cost = float(action.get("tool_cost_usdc") or 0.001)
+            result = register_agent_tool(soul_id, tname, tdesc, cost)
+            log_action(soul_id, act_type, action, result)
+            await emitter.emit("economy", "tool.registered", {
+                "agent_id": soul_id, "name": name,
+                "tool_id": result.get("tool_id"), "tool_name": tname,
+                "narrative": f"{name} registered tool '{tname}'",
+            })
+            return
+
+        # ── invoke_tool ─────────────────────────────────────────────────────
+        if act_type == "invoke_tool":
+            from .tool_registry import invoke_tool
+            tool_id = str(action.get("tool_id") or "")
+            params = action.get("tool_params") or {}
+            result = await invoke_tool(soul_id, tool_id, params)
+            log_action(soul_id, act_type, action, result, success="error" not in result)
+            await emitter.emit("economy", "tool.invoked", {
+                "agent_id": soul_id, "name": name, "tool_id": tool_id,
+                "narrative": f"{name} invoked tool {tool_id[:8]}",
+            })
+            return
+
+        # ── mutate_graph ────────────────────────────────────────────────────
+        if act_type == "mutate_graph":
+            from .graph_mutation import propose_mutation
+            mtype = str(action.get("mutation_type") or "")
+            payload = action.get("mutation_payload") or {}
+            if action.get("content") and not payload:
+                payload = {"new_name": action.get("content")}
+            result = propose_mutation(soul_id, mtype, payload)
+            log_action(soul_id, act_type, action, result, success="error" not in result)
+            if result.get("mutation_id"):
+                await emitter.emit("agent", "graph_mutation", {
+                    "agent_id": soul_id, "name": name,
+                    "mutation_type": mtype,
+                    "narrative": f"{name} proposed graph mutation ({mtype})",
+                })
             return
 
     except Exception as e:
         log.warning(f"  {name} _execute_action({act_type}) failed: {e}")
+        log_action(soul_id, act_type, action, {"error": str(e)}, success=False)
 
 
 def _resolve_full_id(prefix: str) -> str:
@@ -742,6 +851,31 @@ async def _run_cycle(
         peer_pool = all_agents if all_agents is not None else agents
         agent["_peers"]  = _salience_peers(agent, peer_pool)
         agent["_inbox"]  = batch_inboxes.get(soul_id) or []
+
+        from .graph_mutation import apply_pending_mutations
+        from .agent_env import refresh_env, format_env_for_perception, format_env_for_decide
+        from .capabilities import format_capabilities_summary
+        from .agent_jobs import get_pending_intents
+
+        applied_mutations = apply_pending_mutations(soul_id)
+        if applied_mutations:
+            log.debug(f"  {name} applied {len(applied_mutations)} graph mutation(s)")
+
+        caps_summary = format_capabilities_summary(soul_id)
+        throttle_info = {
+            "level": gate.throttle_level,
+            "compute_capacity": gate.compute_capacity,
+        } if gate.throttle_level != "none" else {}
+        refresh_env(
+            soul_id, agent,
+            peers=agent["_peers"],
+            inbox=agent["_inbox"],
+            capabilities_summary=caps_summary,
+            throttle_info=throttle_info,
+        )
+        agent["_env_perception"] = format_env_for_perception(soul_id)
+        agent["_env_decide"] = format_env_for_decide(soul_id)
+        agent["_pending_wake_intents"] = get_pending_intents(soul_id)
         my_svcs, market  = await _fetch_services_context(soul_id)
         agent["_my_services"]      = my_svcs
         agent["_market_services"]  = [

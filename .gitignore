@@ -7,6 +7,9 @@ swarm.key
 *-PRIVATE-KEYS.json
 agents-registry.json
 
+# Agent environment namespaces (runtime-generated)
+data/agent_env/
+
 # Dependencies
 node_modules/
 __pycache__/

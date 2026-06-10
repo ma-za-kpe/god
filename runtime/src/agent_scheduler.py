@@ -48,3 +48,8 @@ def prune_dead(soul_ids: set[str]):
 def due_count(all_soul_ids: list[str], now: Optional[float] = None) -> int:
     t = now if now is not None else time.time()
     return sum(1 for sid in all_soul_ids if is_due(sid, t))
+
+
+def force_wake_at(soul_id: str, wake_at: float):
+    """Override next run time (e.g. scheduled wake job)."""
+    _next_run[soul_id] = float(wake_at)

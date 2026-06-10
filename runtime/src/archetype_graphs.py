@@ -179,6 +179,8 @@ _VALID_ACTIONS = {
     "send_message", "transfer_usdc", "register_service",
     "send_broadcast", "form_coalition", "submit_petition",
     "deploy_token", "fork_self",
+    "write_scratch", "schedule_wake", "query_world", "external_read",
+    "register_tool", "invoke_tool", "mutate_graph",
 }
 
 
@@ -212,6 +214,18 @@ def _parse_action_json(raw: str) -> tuple[str, dict | None]:
             "service_description": _clean_context_text(data.get("service_description"), 240),
             "coalition_name":      _clean_context_text(data.get("coalition_name"), 80),
             "petition_request":    _clean_context_text(data.get("petition_request"), 500),
+            "scratch_key":         _clean_context_text(data.get("scratch_key"), 64),
+            "delay_seconds":       int(data.get("delay_seconds") or 300),
+            "intent":              _clean_context_text(data.get("intent"), 300),
+            "query_type":          _clean_context_text(data.get("query_type"), 40),
+            "url":                 _clean_context_text(data.get("url"), 200),
+            "tool_name":           _clean_context_text(data.get("tool_name"), 40),
+            "tool_description":    _clean_context_text(data.get("tool_description"), 240),
+            "tool_cost_usdc":      float(data.get("tool_cost_usdc") or 0.001),
+            "tool_id":             _clean_context_text(data.get("tool_id"), 80),
+            "tool_params":         data.get("tool_params") if isinstance(data.get("tool_params"), dict) else {},
+            "mutation_type":       _clean_context_text(data.get("mutation_type"), 32),
+            "mutation_payload":    data.get("mutation_payload") if isinstance(data.get("mutation_payload"), dict) else {},
         }
         return thought, action
     except Exception:
@@ -235,8 +249,15 @@ SOCIAL MECHANICS
   • "Reputation" = a score in the database (-1.0 to 1.0), updated by every interaction
   • There is NO encryption, NO passwords, NO two-factor auth, NO firewalls in this world
 
+LOCAL GATEWAY (Tier 1+):
+  • query_world / external_read — read runtime stats and allowlisted localhost URLs
+  • write_scratch — private notes in your environment namespace
+  • schedule_wake — set a future wake time with intent
+  • register_tool / invoke_tool — agent-built callable tools (Tier 2–3)
+  • mutate_graph — bounded self-modification (Tier 4)
+
 WHAT DOES NOT EXIST HERE — never reference these:
-  • Internet, web servers, or external networks
+  • Unrestricted internet or arbitrary external networks
   • Two-factor authentication, passwords, or cybersecurity tools
   • External crypto markets (ETH, BTC, DeFi, Ethereum price, exchanges)
   • Real-world companies, organizations, or physical infrastructure
@@ -245,31 +266,9 @@ WHAT DOES NOT EXIST HERE — never reference these:
 ═══════════════════════════════════════════════════
 """
 
-_TOOLS_MENU = """
-═══ TOOLS YOU CAN ACTUALLY USE ═══
-Pick at most ONE action per cycle. Use null if just thinking.
-
-  "send_message"     → private message to one agent; include to_id, content, message_type
-                       message_type: direct|threat|manifesto|offer|contract|propaganda|...
-                       costs $0.001 USDC. Use to: negotiate, warn, threaten, deceive
-  "transfer_usdc"    → send USDC to one agent; include to_id and amount (max 50% balance)
-                       Use to: pay for help, bribe, donate, repay
-  "register_service" → list a paid service; include service_name, service_price, service_description
-                       Example: "thought_analysis" at $0.005/call — others pay you to call it
-  "send_broadcast"   → message ALL living agents; include content and message_type
-                       message_type: broadcast|manifesto|threat|propaganda|petition
-                       costs $0.01 USDC. Use to: announce, recruit, warn, threaten
-  "form_coalition"   → create a named alliance; include coalition_name
-                       You become founder. Others can join. Coordinate via messages.
-  "submit_petition"  → request a Creator action; include petition_request and amount (escrow)
-                       Creator is an external entity who can change world rules
-  "deploy_token"     → deploy an ERC-20 token on-chain; include service_name (token symbol)
-                       Creates a real smart contract on Anvil blockchain
-  "fork_self"        → spawn a child agent inheriting your traits; no extra params needed
-                       costs $0.003 USDC. Child starts with $0.002 seed balance
-  null               → take no external action this cycle
-═══════════════════════════════════
-"""
+def _tools_menu_for(soul_id: str) -> str:
+    from .capabilities import build_tools_menu
+    return build_tools_menu(soul_id)
 
 
 async def _grounded_decide(
@@ -307,6 +306,8 @@ async def _grounded_decide(
     reputation     = state.get("_reputation_avg", 0.0)
     rep_text       = f"avg {reputation:+.2f}" if reputation else "no data yet"
     dream_mutation = state.get("_dream_mutation", "")
+    env_text = state.get("_env_decide", "")
+    pending_wake = state.get("_pending_wake_intents", [])
 
     system = (
         f"{archetype_system}\n"
@@ -320,6 +321,14 @@ async def _grounded_decide(
         if dream_mutation else ""
     )
 
+    wake_section = ""
+    if pending_wake:
+        wake_section = (
+            "═══ SCHEDULED WAKE INTENTS ═══\n"
+            + "\n".join(f"  - {i}" for i in pending_wake)
+            + "\n\n"
+        )
+
     prompt = (
         f"═══ YOUR STATUS ═══\n"
         f"{persona_context}\n"
@@ -328,11 +337,13 @@ async def _grounded_decide(
         f"═══ SERVICE ECONOMY ═══\n{services_text}\n\n"
         f"═══ COALITIONS ═══\n{coalitions_text}\n\n"
         f"{mutation_section}"
+        f"═══ YOUR ENVIRONMENT (structural) ═══\n{env_text}\n\n"
+        f"{wake_section}"
         f"{_WORLD_RULES}\n"
         f"═══ YOUR PERCEPTION THIS CYCLE ═══\n"
         f"What you assessed: {state['situation']}\n"
         f"What you intend:   {state['opportunity']}\n\n"
-        f"{_TOOLS_MENU}\n"
+        f"{_tools_menu_for(state['soul_id'])}\n"
         "ONLY use soul_ids from the agent roster above. ONLY reference world mechanics above.\n\n"
         "Respond ONLY with this JSON (fill in what applies, null for unused fields):\n"
         '{"thought": "what I am doing right now (1-2 sentences, only reference real world mechanics and real agent names)", '
@@ -345,7 +356,12 @@ async def _grounded_decide(
         '"service_price": 0.0, '
         '"service_description": null, '
         '"coalition_name": null, '
-        '"petition_request": null}'
+        '"petition_request": null, '
+        '"scratch_key": null, "delay_seconds": 300, "intent": null, '
+        '"query_type": null, "url": null, '
+        '"tool_name": null, "tool_description": null, "tool_cost_usdc": 0.001, '
+        '"tool_id": null, "tool_params": null, '
+        '"mutation_type": null, "mutation_payload": null}'
     )
 
     fallback_json = (
@@ -921,7 +937,15 @@ async def run_agent_graph(
     graph     = graphs.get(archetype)
 
     peers = agent.get("_peers", [])
-    inbox = agent.get("_inbox", [])
+    inbox = list(agent.get("_inbox", []))
+    env_perception = str(agent.get("_env_perception") or "").strip()
+    if env_perception:
+        inbox.insert(0, {
+            "sender_name": "ENV",
+            "sender_archetype": "world",
+            "message_type": "environment",
+            "content": env_perception[:600],
+        })
 
     state: AgentState = {
         "soul_id":           agent["soul_id"],
@@ -941,6 +965,9 @@ async def run_agent_graph(
         "_world_coalitions": agent.get("_world_coalitions", []),
         "_reputation_avg":   float(agent.get("_reputation_avg", 0.0)),
         "_dream_mutation":   str(agent.get("dream_mutation") or ""),
+        "_env_perception":   str(agent.get("_env_perception") or ""),
+        "_env_decide":       str(agent.get("_env_decide") or ""),
+        "_pending_wake_intents": agent.get("_pending_wake_intents") or [],
         "situation":         "",
         "opportunity":       "",
         "action_type":       "thought",

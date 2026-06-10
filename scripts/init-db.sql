@@ -409,3 +409,80 @@ CREATE INDEX IF NOT EXISTS idx_messages_broadcast  ON agent_messages(recipient_i
 CREATE INDEX IF NOT EXISTS idx_reputation_observer ON reputation(observer_id, world_id);
 CREATE INDEX IF NOT EXISTS idx_tokens_owner        ON tokens(owner_soul_id, world_id);
 CREATE INDEX IF NOT EXISTS idx_tokens_world        ON tokens(world_id, deployed_at DESC);
+
+-- ============================================================
+-- Agent autonomy — local environment, capabilities, jobs
+-- See docs/77-agent-autonomy-local.md
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS agent_scratch (
+    soul_id         TEXT NOT NULL,
+    scratch_key     TEXT NOT NULL,
+    content         TEXT NOT NULL DEFAULT '',
+    updated_at      BIGINT NOT NULL DEFAULT 0,
+    world_id        TEXT NOT NULL DEFAULT 'local-dev-world-1',
+    PRIMARY KEY (soul_id, scratch_key)
+);
+
+CREATE TABLE IF NOT EXISTS agent_action_log (
+    id              BIGSERIAL PRIMARY KEY,
+    soul_id         TEXT NOT NULL,
+    action_type     TEXT NOT NULL,
+    payload         JSONB NOT NULL DEFAULT '{}',
+    result          JSONB NOT NULL DEFAULT '{}',
+    success         BOOLEAN NOT NULL DEFAULT true,
+    ts              BIGINT NOT NULL,
+    world_id        TEXT NOT NULL DEFAULT 'local-dev-world-1'
+);
+
+CREATE TABLE IF NOT EXISTS agent_scheduled_jobs (
+    job_id          TEXT PRIMARY KEY,
+    soul_id         TEXT NOT NULL,
+    job_type        TEXT NOT NULL,
+    payload         JSONB NOT NULL DEFAULT '{}',
+    run_at          BIGINT NOT NULL,
+    status          TEXT NOT NULL DEFAULT 'pending',
+    created_at      BIGINT NOT NULL,
+    completed_at    BIGINT,
+    world_id        TEXT NOT NULL DEFAULT 'local-dev-world-1'
+);
+
+CREATE TABLE IF NOT EXISTS agent_registered_tools (
+    tool_id         TEXT PRIMARY KEY,
+    owner_soul_id   TEXT NOT NULL,
+    name            TEXT NOT NULL,
+    description     TEXT NOT NULL DEFAULT '',
+    handler_type    TEXT NOT NULL DEFAULT 'local',
+    input_schema    JSONB NOT NULL DEFAULT '{}',
+    cost_usdc       NUMERIC(18,6) NOT NULL DEFAULT 0.001,
+    calls_served    BIGINT NOT NULL DEFAULT 0,
+    is_active       BOOLEAN NOT NULL DEFAULT true,
+    created_at      BIGINT NOT NULL,
+    world_id        TEXT NOT NULL DEFAULT 'local-dev-world-1'
+);
+
+CREATE TABLE IF NOT EXISTS agent_graph_mutations (
+    mutation_id     TEXT PRIMARY KEY,
+    soul_id         TEXT NOT NULL,
+    mutation_type   TEXT NOT NULL,
+    payload         JSONB NOT NULL DEFAULT '{}',
+    status          TEXT NOT NULL DEFAULT 'pending',
+    created_at      BIGINT NOT NULL,
+    applied_at      BIGINT,
+    world_id        TEXT NOT NULL DEFAULT 'local-dev-world-1'
+);
+
+CREATE TABLE IF NOT EXISTS agent_capability_grants (
+    soul_id         TEXT NOT NULL,
+    capability_id   TEXT NOT NULL,
+    granted_at      BIGINT NOT NULL,
+    granted_via     TEXT NOT NULL DEFAULT 'tier',
+    world_id        TEXT NOT NULL DEFAULT 'local-dev-world-1',
+    PRIMARY KEY (soul_id, capability_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_action_log_soul    ON agent_action_log(soul_id, ts DESC);
+CREATE INDEX IF NOT EXISTS idx_jobs_due           ON agent_scheduled_jobs(run_at, status);
+CREATE INDEX IF NOT EXISTS idx_jobs_soul          ON agent_scheduled_jobs(soul_id, status);
+CREATE INDEX IF NOT EXISTS idx_reg_tools_owner    ON agent_registered_tools(owner_soul_id, is_active);
+CREATE INDEX IF NOT EXISTS idx_graph_mut_soul     ON agent_graph_mutations(soul_id, status);
