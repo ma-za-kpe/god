@@ -1183,7 +1183,11 @@ async def run_agent_graph(
                 )
 
                 thought = enforce_grounded_text(thought, state, grounded_fallback(state))
-                if action and action.get("type") in ("send_message", "transfer_usdc"):
+                if action and action.get("type") in (
+                    "send_message",
+                    "transfer_usdc",
+                    "buy_service",
+                ):
                     if not validate_action_target(str(action.get("to_id") or ""), state):
                         log.debug(f"  {state['name']} action dropped: unknown target")
                         action = None

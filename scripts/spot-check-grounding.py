@@ -18,7 +18,8 @@ import urllib.request
 
 _FORBIDDEN = re.compile(
     r"\b(processing\s+power|tunnel\s+system|security\s+vulnerabilit|"
-    r"data\s+center|symbiotic\s+relationship|idle\s+speculation)\b",
+    r"data\s+center|symbiotic\s+relationship|idle\s+speculation|"
+    r"nexus\s+hub|quantum\s*node|deck\s+\d+|quadrants?|kilometers?)\b",
     re.IGNORECASE,
 )
 
