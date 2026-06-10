@@ -4,10 +4,11 @@ grounding.py — Enforce that agent cognition references only the live world.
 Agents perceive raw adversarial signals (manifesto). They must not invent
 mechanics, places, or agents that are not in the provided state snapshot.
 """
+
 from __future__ import annotations
 
 import re
-from typing import Any, Optional
+from typing import Optional
 
 # Invented world elements observed in live runs — reject in output validation.
 _FORBIDDEN_CONCEPTS = re.compile(
@@ -125,11 +126,13 @@ def grounded_fallback(state: dict) -> str:
     rent = float(state.get("rent_amount", 0.001))
     peers = state.get("peers") or []
     if bal < rent * 2:
-        return f"I focus on earning USDC — my balance ${bal:.4f} is too thin before next rent."
+        return f"{name} focuses on earning USDC — balance ${bal:.4f} is too thin before next rent."
     if peers:
-        target = (peers[0].get("name") or peers[0].get("current_name") or "a peer")
-        return f"I watch {target} and consider whether a message or transfer serves my survival."
-    return "I scan the service list and my balance, preparing for the next rent payment."
+        target = peers[0].get("name") or peers[0].get("current_name") or "a peer"
+        return (
+            f"{name} watches {target} and considers whether a message or transfer serves survival."
+        )
+    return f"{name} scans the service list and balance, preparing for the next rent payment."
 
 
 def enforce_grounded_text(text: str, state: dict, fallback: Optional[str] = None) -> str:
@@ -139,6 +142,7 @@ def enforce_grounded_text(text: str, state: dict, fallback: Optional[str] = None
         return str(text).strip()
     log_reason = reason
     import logging
+
     logging.getLogger("god.grounding").debug(
         f"  {state.get('name', '?')[:20]} grounding reject: {log_reason} — '{str(text)[:60]}'"
     )

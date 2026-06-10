@@ -3,6 +3,7 @@ world_stream.py — WebSocket fanout for public observer clients.
 
 Snapshot on connect, delta pushes on new events. Decouples observation from polling.
 """
+
 import asyncio
 import json
 import logging
@@ -58,21 +59,25 @@ async def broadcast(message: dict[str, Any]):
 
 async def push_event(event: dict[str, Any]):
     bump_epoch()
-    await broadcast({
-        "type":     "delta",
-        "epoch":    _epoch,
-        "events":   [event],
-        "messages": [],
-    })
+    await broadcast(
+        {
+            "type": "delta",
+            "epoch": _epoch,
+            "events": [event],
+            "messages": [],
+        }
+    )
 
 
 async def push_snapshot(snapshot: dict[str, Any]):
     bump_epoch()
-    await broadcast({
-        "type":     "snapshot",
-        "epoch":    _epoch,
-        **snapshot,
-    })
+    await broadcast(
+        {
+            "type": "snapshot",
+            "epoch": _epoch,
+            **snapshot,
+        }
+    )
 
 
 def has_subscribers() -> bool:

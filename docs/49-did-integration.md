@@ -96,7 +96,7 @@ When `RentCollector.registerAgent(soulId, agentWallet)` is called:
 
 Each time the agent's OwnedGraph is updated and pinned to IPFS, the runtime optionally updates the `GODSoulRecord` service endpoint with the new CID. This creates an on-chain trail of the agent's state evolution.
 
-**Phase 1 (local dev):** Not implemented — no Base connection yet.  
+**Phase 1 (local dev):** Not implemented — no Base connection yet.
 **Phase 2 (Base Sepolia):** Implement as part of the state persistence upgrade.
 
 ### 3. Cross-World Migration
@@ -160,11 +160,11 @@ def register_soul_endpoint(w3: Web3, agent_key: str, soul_cid: str):
     """Register the agent's IPFS soul record in the EthrDID registry."""
     registry = w3.eth.contract(address=ETHR_DID_REGISTRY, abi=ETHR_DID_REGISTRY_ABI)
     account = Account.from_key(agent_key)
-    
+
     attribute_name = b"did/svc/GODSoulRecord"
     attribute_value = f"ipfs://{soul_cid}".encode()
     validity = 365 * 24 * 3600  # 1 year TTL
-    
+
     tx = registry.functions.setAttribute(
         account.address, attribute_name, attribute_value, validity
     ).build_transaction({

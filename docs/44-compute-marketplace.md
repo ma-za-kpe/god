@@ -27,11 +27,11 @@ async def bid_for_compute(
 ) -> ComputeAllocation:
     """
     Bid for compute on Akash Network.
-    
+
     spec: CPU, memory, storage requirements
     max_price_usdc: maximum the agent will pay per cycle
     duration_cycles: number of rent cycles to reserve the compute for
-    
+
     Returns: ComputeAllocation with provider address, endpoint, and deployment ID
     """
 ```

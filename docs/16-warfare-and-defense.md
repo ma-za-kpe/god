@@ -52,16 +52,16 @@ class DefenseLayer:
     # Cryptographic
     message_signature_verification: bool    # verify all incoming messages are from claimed sender
     code_audit_before_execution: bool       # review all traded code before running it
-    
+
     # Immunological
     immune_system: ImmuneSystem             # (see digital-metabolism.md)
     threat_intelligence_subscriptions: list # pay other agents for threat data
-    
+
     # Economic
     wallet_multisig: bool                   # require multiple keys for large transactions
     income_diversification: float           # spread income across multiple services
     reserve_ratio: float                    # keep X% of balance as emergency reserve
-    
+
     # Social
     coalition_membership: list[str]         # mutual defense agreements
     reputation_score: float                 # high reputation = harder to attack credibly

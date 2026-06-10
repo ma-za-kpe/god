@@ -4,6 +4,7 @@ tool_registry.py — World MCP catalogue + per-agent registered tools (local).
 Agents discover tools at /tools, register their own via register_tool,
 and invoke via invoke_tool (structured, cost-gated).
 """
+
 from __future__ import annotations
 
 import json
@@ -86,8 +87,17 @@ def register_agent_tool(
             (tool_id, owner_soul_id, name, description, handler_type, input_schema, cost_usdc, created_at, world_id)
         VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
         """,
-        (tool_id, owner_soul_id, name[:40], description[:300], handler_type,
-         json.dumps(schema), cost_usdc, now, WORLD_ID),
+        (
+            tool_id,
+            owner_soul_id,
+            name[:40],
+            description[:300],
+            handler_type,
+            json.dumps(schema),
+            cost_usdc,
+            now,
+            WORLD_ID,
+        ),
     )
     conn.commit()
     cur.close()
@@ -113,7 +123,10 @@ async def invoke_tool(caller_soul_id: str, tool_id: str, params: dict | None = N
     owner = tool["owner_soul_id"]
 
     if caller_soul_id != owner:
-        cur.execute("SELECT balance_usdc FROM agents WHERE soul_id = %s AND is_alive = true", (caller_soul_id,))
+        cur.execute(
+            "SELECT balance_usdc FROM agents WHERE soul_id = %s AND is_alive = true",
+            (caller_soul_id,),
+        )
         caller = cur.fetchone()
         if not caller or float(caller["balance_usdc"]) < cost:
             cur.close()

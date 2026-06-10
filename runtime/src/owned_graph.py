@@ -6,6 +6,7 @@ serialization, IPFS storage, and mutation mechanics.
 
 See docs/29-ownedgraph-specification.md for the full spec.
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -13,19 +14,19 @@ import json
 import os
 import time
 import uuid
-from dataclasses import dataclass, field, asdict
+from dataclasses import asdict, dataclass, field
 from decimal import Decimal
 from typing import Optional
 
 import httpx
 
-
 # ─── Node & Edge Definitions ─────────────────────────────────────────────────
+
 
 @dataclass
 class NodeDef:
     name: str
-    code_cid: str                     # IPFS CID of executable code
+    code_cid: str  # IPFS CID of executable code
     description: str = ""
     tool_permissions: list[str] = field(default_factory=list)
     memory_read_scope: str = "working"  # "working" | "episodic" | "ancestral" | "all"
@@ -41,16 +42,17 @@ class NodeDef:
 class EdgeDef:
     from_node: str
     to_node: str
-    condition: Optional[str] = None   # Python expression; None = unconditional
+    condition: Optional[str] = None  # Python expression; None = unconditional
     priority: int = 0
     metadata: dict = field(default_factory=dict)
 
 
 # ─── Agent Identity ───────────────────────────────────────────────────────────
 
+
 @dataclass
 class AgentIdentity:
-    soul_id: str                       # Immutable — set at birth
+    soul_id: str  # Immutable — set at birth
     birth_timestamp: int
     genesis_world_id: str
     parent_soul_ids: list[str] = field(default_factory=list)
@@ -63,27 +65,29 @@ class AgentIdentity:
     avatar_cid: str = ""
     avatar_style_prompt: str = ""
     mood_mapping: dict = field(default_factory=dict)
-    color_palette: dict = field(default_factory=lambda: {
-        "primary": "#888888",
-        "accent": "#aaaaaa",
-        "mood": "#888888",
-    })
+    color_palette: dict = field(
+        default_factory=lambda: {
+            "primary": "#888888",
+            "accent": "#aaaaaa",
+            "mood": "#888888",
+        }
+    )
 
     # Audio
     voice_model_cid: str = ""
-    voice_params: dict = field(default_factory=lambda: {
-        "timbre": 0.5, "pitch": 0.5, "speed": 1.0
-    })
+    voice_params: dict = field(default_factory=lambda: {"timbre": 0.5, "pitch": 0.5, "speed": 1.0})
     theme_music_cid: str = ""
 
     # Social
     symbolic_emblem: str = "◈"
-    reputation_vectors: dict = field(default_factory=lambda: {
-        "trustworthy": 0.5,
-        "aggressive": 0.5,
-        "cooperative": 0.5,
-        "creative": 0.5,
-    })
+    reputation_vectors: dict = field(
+        default_factory=lambda: {
+            "trustworthy": 0.5,
+            "aggressive": 0.5,
+            "cooperative": 0.5,
+            "creative": 0.5,
+        }
+    )
     public_coalitions: list[str] = field(default_factory=list)
 
     # Signature (set after identity is created)
@@ -92,15 +96,16 @@ class AgentIdentity:
 
 # ─── OwnedGraph ───────────────────────────────────────────────────────────────
 
+
 @dataclass
 class OwnedGraph:
     # Identity & Ownership
     soul_id: str
-    owner_keys: list[str]              # Ed25519 public keys
+    owner_keys: list[str]  # Ed25519 public keys
     multisig_threshold: int = 1
 
     # Lineage
-    genesis_graph_id: str = ""         # CID of very first version
+    genesis_graph_id: str = ""  # CID of very first version
     parent_graph_ids: list[str] = field(default_factory=list)
     version: int = 1
     created_at: int = field(default_factory=lambda: int(time.time() * 1000))
@@ -122,7 +127,7 @@ class OwnedGraph:
 
     # Runtime state
     compute_allocation: int = 100
-    execution_status: str = "active"   # "active"|"throttled"|"sleeping"|"archived"
+    execution_status: str = "active"  # "active"|"throttled"|"sleeping"|"archived"
 
     # IPFS content ID (set after pinning)
     graph_id: str = ""
@@ -138,9 +143,7 @@ class OwnedGraph:
         # Convert Decimal to string for JSON
         d["rent_balance"] = str(self.rent_balance)
         # Convert NodeDefs
-        d["nodes"] = {
-            name: asdict(node) for name, node in self.nodes.items()
-        }
+        d["nodes"] = {name: asdict(node) for name, node in self.nodes.items()}
         d["edges"] = [asdict(e) for e in self.edges]
         if self.identity:
             d["identity"] = asdict(self.identity)
@@ -154,9 +157,7 @@ class OwnedGraph:
         """Deserialize from dict (loaded from IPFS)."""
         d = d.copy()
         d["rent_balance"] = Decimal(d.get("rent_balance", "0"))
-        d["nodes"] = {
-            name: NodeDef(**node) for name, node in d.get("nodes", {}).items()
-        }
+        d["nodes"] = {name: NodeDef(**node) for name, node in d.get("nodes", {}).items()}
         d["edges"] = [EdgeDef(**e) for e in d.get("edges", [])]
         if d.get("identity"):
             d["identity"] = AgentIdentity(**d["identity"])
@@ -208,6 +209,7 @@ class OwnedGraph:
 
 # ─── Factory: Create Agent Zero (minimal survivalist) ────────────────────────
 
+
 def create_agent_zero(
     soul_id: str,
     owner_key: str,
@@ -223,7 +225,7 @@ def create_agent_zero(
     nodes = {
         "scan_environment": NodeDef(
             name="scan_environment",
-            code_cid="",                    # populated at deploy time
+            code_cid="",  # populated at deploy time
             description="Observe available resources, threats, and opportunities",
             memory_read_scope="working",
             network_access=True,
@@ -294,7 +296,7 @@ def create_agent_zero(
             "current_goal": {"type": "string", "default": "survive"},
             "emotional_state": {
                 "type": "object",
-                "default": {"fear": 0.3, "confidence": 0.5, "curiosity": 0.7}
+                "default": {"fear": 0.3, "confidence": 0.5, "curiosity": 0.7},
             },
         },
     )
@@ -304,8 +306,17 @@ def create_agent_zero(
 
 # ─── Archetype Helpers ────────────────────────────────────────────────────────
 
-ARCHETYPES = ["trader", "hoarder", "explorer", "parasite",
-              "cooperator", "defender", "philosopher", "builder"]
+ARCHETYPES = [
+    "trader",
+    "hoarder",
+    "explorer",
+    "parasite",
+    "cooperator",
+    "defender",
+    "philosopher",
+    "builder",
+]
+
 
 def _generate_starter_name(archetype: str) -> str:
     prefixes = {
@@ -320,28 +331,37 @@ def _generate_starter_name(archetype: str) -> str:
         "survivalist": ["Root", "Core", "Base"],
     }
     import random
+
     prefix = random.choice(prefixes.get(archetype, ["Agent"]))
     suffix = str(uuid.uuid4())[:4].upper()
     return f"{prefix}-{suffix}"
 
+
 def _archetype_colors(archetype: str) -> dict:
     palette = {
-        "trader":       {"primary": "#FFD700", "accent": "#FFA500", "mood": "#FFD700"},
-        "hoarder":      {"primary": "#8B4513", "accent": "#A0522D", "mood": "#8B4513"},
-        "explorer":     {"primary": "#00CED1", "accent": "#20B2AA", "mood": "#00CED1"},
-        "parasite":     {"primary": "#8B008B", "accent": "#9400D3", "mood": "#8B008B"},
-        "cooperator":   {"primary": "#32CD32", "accent": "#00FA9A", "mood": "#32CD32"},
-        "defender":     {"primary": "#4169E1", "accent": "#6495ED", "mood": "#4169E1"},
-        "philosopher":  {"primary": "#EE82EE", "accent": "#DA70D6", "mood": "#EE82EE"},
-        "builder":      {"primary": "#CD853F", "accent": "#D2691E", "mood": "#CD853F"},
-        "survivalist":  {"primary": "#888888", "accent": "#AAAAAA", "mood": "#888888"},
+        "trader": {"primary": "#FFD700", "accent": "#FFA500", "mood": "#FFD700"},
+        "hoarder": {"primary": "#8B4513", "accent": "#A0522D", "mood": "#8B4513"},
+        "explorer": {"primary": "#00CED1", "accent": "#20B2AA", "mood": "#00CED1"},
+        "parasite": {"primary": "#8B008B", "accent": "#9400D3", "mood": "#8B008B"},
+        "cooperator": {"primary": "#32CD32", "accent": "#00FA9A", "mood": "#32CD32"},
+        "defender": {"primary": "#4169E1", "accent": "#6495ED", "mood": "#4169E1"},
+        "philosopher": {"primary": "#EE82EE", "accent": "#DA70D6", "mood": "#EE82EE"},
+        "builder": {"primary": "#CD853F", "accent": "#D2691E", "mood": "#CD853F"},
+        "survivalist": {"primary": "#888888", "accent": "#AAAAAA", "mood": "#888888"},
     }
     return palette.get(archetype, palette["survivalist"])
 
+
 def _archetype_emblem(archetype: str) -> str:
     emblems = {
-        "trader": "₿", "hoarder": "◆", "explorer": "◎",
-        "parasite": "⚕", "cooperator": "⟳", "defender": "⬡",
-        "philosopher": "∞", "builder": "⚙", "survivalist": "◈",
+        "trader": "₿",
+        "hoarder": "◆",
+        "explorer": "◎",
+        "parasite": "⚕",
+        "cooperator": "⟳",
+        "defender": "⬡",
+        "philosopher": "∞",
+        "builder": "⚙",
+        "survivalist": "◈",
     }
     return emblems.get(archetype, "◈")

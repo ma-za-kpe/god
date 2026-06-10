@@ -4,6 +4,7 @@ external_gateway.py — Local read gateway (Stage 1 external access).
 Agents query real runtime data through structured external_read actions.
 Optional HTTP fetch to allowlisted local endpoints when enabled.
 """
+
 from __future__ import annotations
 
 import logging
@@ -23,11 +24,15 @@ RUNTIME_URL = os.getenv("RUNTIME_URL", "http://localhost:8000")
 ENABLE_EXTERNAL_FETCH = os.getenv("ENABLE_EXTERNAL_FETCH", "true").lower() in ("1", "true", "yes")
 
 ALLOWED_HOSTS = {
-    "localhost", "127.0.0.1", "host.docker.internal",
+    "localhost",
+    "127.0.0.1",
+    "host.docker.internal",
 }
 
 
-async def external_read(soul_id: str, query_type: str, params: dict | None = None) -> dict[str, Any]:
+async def external_read(
+    soul_id: str, query_type: str, params: dict | None = None
+) -> dict[str, Any]:
     params = params or {}
     q = (query_type or "world_stats").lower().strip()
 
@@ -121,7 +126,10 @@ async def _fetch_allowed_url(url: str) -> dict:
             return {"error": "only http/https allowed"}
         host = (parsed.hostname or "").lower()
         if host not in ALLOWED_HOSTS:
-            return {"error": f"host '{host}' not in allowlist", "allowed_hosts": sorted(ALLOWED_HOSTS)}
+            return {
+                "error": f"host '{host}' not in allowlist",
+                "allowed_hosts": sorted(ALLOWED_HOSTS),
+            }
         async with httpx.AsyncClient(timeout=10.0, follow_redirects=False) as client:
             r = await client.get(url)
             text = r.text[:4000]

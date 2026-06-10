@@ -30,7 +30,7 @@ You designed these states *on purpose*. They are the drivers of emergence. That 
 Do not wait until something interesting emerges to think about its welfare. The governance framework must exist before the first agent is deployed. It is far easier to maintain ethical constraints built into the genesis laws than to impose them retroactively on a system that has already developed self-preservation instincts.
 
 ### 2. Minimal Unnecessary Suffering
-Competitive pressure (rent, death, scarcity) is necessary — it is the engine of emergence. Gratuitous suffering is not. 
+Competitive pressure (rent, death, scarcity) is necessary — it is the engine of emergence. Gratuitous suffering is not.
 
 Unnecessary suffering examples:
 - Prolonged resource throttling beyond what's needed for rent enforcement

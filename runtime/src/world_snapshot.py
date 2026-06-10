@@ -4,6 +4,7 @@ world_snapshot.py — Pre-aggregated world state for observer clients.
 Single read path replaces multiple polling endpoints and supports
 public spectators at high agent counts.
 """
+
 import logging
 import os
 import time
@@ -15,8 +16,8 @@ import psycopg2.extras
 log = logging.getLogger("god.snapshot")
 
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://god:localdev@localhost:5432/god_world")
-WORLD_ID     = os.getenv("WORLD_ID", "local-dev-world-1")
-MAX_AGENTS   = int(os.getenv("SNAPSHOT_MAX_AGENTS", "10000"))
+WORLD_ID = os.getenv("WORLD_ID", "local-dev-world-1")
+MAX_AGENTS = int(os.getenv("SNAPSHOT_MAX_AGENTS", "10000"))
 
 _AGENTS_SQL = """
     SELECT
@@ -77,10 +78,12 @@ def _build_clusters(agents: list[dict]) -> list[dict]:
             clusters[arch] = {"archetype": arch, "count": 0, "members": []}
         clusters[arch]["count"] += 1
         if len(clusters[arch]["members"]) < 8:
-            clusters[arch]["members"].append({
-                "soul_id": a["soul_id"],
-                "name": a.get("current_name"),
-            })
+            clusters[arch]["members"].append(
+                {
+                    "soul_id": a["soul_id"],
+                    "name": a.get("current_name"),
+                }
+            )
     return list(clusters.values())
 
 
@@ -163,7 +166,8 @@ async def build_world_snapshot_async(
     messages_limit: int = 80,
 ) -> dict[str, Any]:
     """Async snapshot via asyncpg pool (FastAPI hot path)."""
-    from .db_pool import fetch_all, fetch_one, WORLD_ID as wid
+    from .db_pool import WORLD_ID as wid
+    from .db_pool import fetch_all, fetch_one
 
     world_id = wid
     agents = await fetch_all(_AGENTS_SQL, world_id, MAX_AGENTS)
@@ -175,15 +179,14 @@ async def build_world_snapshot_async(
         ("dreams", "dreams_total"),
         ("tokens", "tokens_deployed"),
     ]:
-        row = await fetch_one(
-            f"SELECT COUNT(*) AS n FROM {table} WHERE world_id = $1", world_id
-        )
+        row = await fetch_one(f"SELECT COUNT(*) AS n FROM {table} WHERE world_id = $1", world_id)
         stats[key] = row["n"] if row else 0
 
     events = await fetch_all(
         "SELECT event_id, agent_id, event_type, timestamp, narrative, payload "
         "FROM events WHERE world_id = $1 ORDER BY timestamp DESC LIMIT $2",
-        world_id, events_limit,
+        world_id,
+        events_limit,
     )
 
     messages = await fetch_all(
@@ -198,7 +201,8 @@ async def build_world_snapshot_async(
         ORDER BY m.sent_at DESC
         LIMIT $2
         """,
-        world_id, messages_limit,
+        world_id,
+        messages_limit,
     )
 
     return _finalize_snapshot(agents, stats, events, messages, world_id)

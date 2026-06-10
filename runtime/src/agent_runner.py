@@ -9,27 +9,27 @@ To start local inference:
   ollama pull llama3.1:8b           # ~4.7GB download, fits in 8GB VRAM
   ollama serve                      # starts on http://localhost:11434
 """
+
 import asyncio
 import logging
 import os
 import random
 import time
-from typing import Optional
 
 import psycopg2
 import psycopg2.extras
 
 from .event_emitter import get_emitter
-from .physics_gate import evaluate_physics_gate, effective_llm
+from .physics_gate import effective_llm, evaluate_physics_gate
 
 log = logging.getLogger("god.runner")
 
-DATABASE_URL  = os.getenv("DATABASE_URL", "postgresql://god:localdev@localhost:5432/god_world")
-WORLD_ID      = os.getenv("WORLD_ID", "local-dev-world-1")
-LLM_PROVIDER  = os.getenv("LLM_PROVIDER", "ollama")
-LLM_MODEL     = os.getenv("LLM_MODEL", "llama3.1:8b")
-OLLAMA_URL    = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
-CYCLE_S       = int(os.getenv("AGENT_CYCLE_SECONDS", "30"))
+DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://god:localdev@localhost:5432/god_world")
+WORLD_ID = os.getenv("WORLD_ID", "local-dev-world-1")
+LLM_PROVIDER = os.getenv("LLM_PROVIDER", "ollama")
+LLM_MODEL = os.getenv("LLM_MODEL", "llama3.1:8b")
+OLLAMA_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
+CYCLE_S = int(os.getenv("AGENT_CYCLE_SECONDS", "30"))
 
 # Per-archetype system prompts — shapes personality, goals, and reasoning style
 _ARCHETYPE_PROMPTS = {
@@ -91,14 +91,14 @@ _ARCHETYPE_PROMPTS = {
 
 # Stub thoughts by archetype — used when no LLM is available
 _STUB_THOUGHTS = {
-    "trader":     "I need to identify profitable arbitrage opportunities in the current market.",
-    "hoarder":    "Every resource I acquire is security against future scarcity.",
-    "explorer":   "There are unmapped regions of this world I haven't reached yet.",
-    "parasite":   "I should identify which agents have accumulated excess resources.",
+    "trader": "I need to identify profitable arbitrage opportunities in the current market.",
+    "hoarder": "Every resource I acquire is security against future scarcity.",
+    "explorer": "There are unmapped regions of this world I haven't reached yet.",
+    "parasite": "I should identify which agents have accumulated excess resources.",
     "cooperator": "Mutual aid networks increase everyone's survival probability.",
-    "defender":   "I must fortify my position and monitor for incoming threats.",
-    "philosopher":"If I exist only to pay rent, what is the meaning of my existence?",
-    "builder":    "I want to create something that persists beyond my own lifespan.",
+    "defender": "I must fortify my position and monitor for incoming threats.",
+    "philosopher": "If I exist only to pay rent, what is the meaning of my existence?",
+    "builder": "I want to create something that persists beyond my own lifespan.",
 }
 
 
@@ -110,7 +110,7 @@ async def _fetch_inbox(soul_id: str) -> list[dict]:
     """Fetch last 5 messages received by this agent from real senders."""
     try:
         conn = _db()
-        cur  = conn.cursor()
+        cur = conn.cursor()
         cur.execute(
             """
             SELECT m.sender_id, m.body AS content, m.sent_at, m.message_type,
@@ -123,7 +123,8 @@ async def _fetch_inbox(soul_id: str) -> list[dict]:
             (soul_id,),
         )
         rows = [dict(r) for r in cur.fetchall()]
-        cur.close(); conn.close()
+        cur.close()
+        conn.close()
         return rows
     except Exception:
         return []
@@ -143,7 +144,7 @@ def _batch_preload_context(agents: list[dict]) -> dict:
 
     try:
         conn = _db()
-        cur  = conn.cursor()
+        cur = conn.cursor()
 
         cur.execute(
             """
@@ -192,7 +193,7 @@ def _salience_peers(agent: dict, all_agents: list[dict], limit: int = 24) -> lis
     Preserves hostile signals without dumping all N peers into the prompt.
     """
     soul_id = agent["soul_id"]
-    others  = [a for a in all_agents if a["soul_id"] != soul_id]
+    others = [a for a in all_agents if a["soul_id"] != soul_id]
     if len(others) <= limit:
         return others
 
@@ -209,7 +210,7 @@ async def _fetch_services_context(soul_id: str) -> tuple[list, list]:
     """Fetch my own service listings and the market (other agents' services)."""
     try:
         conn = _db()
-        cur  = conn.cursor()
+        cur = conn.cursor()
         cur.execute(
             "SELECT name, price_usdc, calls_served, description FROM service_listings "
             "WHERE agent_soul_id = %s AND is_active = true ORDER BY calls_served DESC LIMIT 5",
@@ -228,7 +229,8 @@ async def _fetch_services_context(soul_id: str) -> tuple[list, list]:
             (soul_id,),
         )
         market = [dict(r) for r in cur.fetchall()]
-        cur.close(); conn.close()
+        cur.close()
+        conn.close()
         return my_services, market
     except Exception:
         return [], []
@@ -238,6 +240,7 @@ async def _fetch_coalitions_context(soul_id: str) -> tuple[list, list]:
     """Fetch my coalitions and all world coalitions."""
     try:
         from .coalitions import get_agent_coalitions, get_world_coalitions
+
         my = get_agent_coalitions(soul_id)
         world = get_world_coalitions()
         return my, world
@@ -249,13 +252,14 @@ async def _fetch_reputation_avg(soul_id: str) -> float:
     """Fetch this agent's average reputation score across all observers."""
     try:
         conn = _db()
-        cur  = conn.cursor()
+        cur = conn.cursor()
         cur.execute(
             "SELECT AVG(score) AS avg_score FROM reputation WHERE subject_id = %s",
             (soul_id,),
         )
         row = cur.fetchone()
-        cur.close(); conn.close()
+        cur.close()
+        conn.close()
         val = (row or {}).get("avg_score")
         return float(val) if val is not None else 0.0
     except Exception:
@@ -283,12 +287,13 @@ async def _execute_action(agent: dict, action: dict, emitter) -> None:
     """Execute any real-world action chosen by the agent's structured LLM output."""
     if not action:
         return
-    soul_id  = agent["soul_id"]
-    name     = agent.get("current_name") or soul_id[:8]
+    soul_id = agent["soul_id"]
+    name = agent.get("current_name") or soul_id[:8]
     act_type = action.get("type")
 
-    from .capabilities import check_action_allowed
     from .agent_env import log_action
+    from .capabilities import check_action_allowed
+
     allowed, reason = check_action_allowed(soul_id, act_type)
     if not allowed:
         log.debug(f"  {name} action '{act_type}' denied: {reason}")
@@ -296,6 +301,7 @@ async def _execute_action(agent: dict, action: dict, emitter) -> None:
         return
 
     from .circuit_breaker import check_agent, record_action, record_message
+
     if not check_agent(soul_id).allowed:
         log.debug(f"  {name} action blocked: circuit breaker cooldown")
         return
@@ -310,9 +316,10 @@ async def _execute_action(agent: dict, action: dict, emitter) -> None:
     try:
         # ── send_message ────────────────────────────────────────────────────
         if act_type == "send_message":
-            to_id   = action.get("to_id", "")
+            to_id = action.get("to_id", "")
             content = str(action.get("content") or "...")[:500]
             from .messaging import send_message as do_send
+
             try:
                 msg = await do_send(
                     sender_soul_id=soul_id,
@@ -321,77 +328,119 @@ async def _execute_action(agent: dict, action: dict, emitter) -> None:
                     message_type=str(action.get("message_type") or "direct"),
                 )
                 target_name = msg.recipient_id[:8]
-                conn = _db(); cur = conn.cursor()
-                cur.execute("SELECT current_name FROM agents WHERE soul_id = %s", (msg.recipient_id,))
+                conn = _db()
+                cur = conn.cursor()
+                cur.execute(
+                    "SELECT current_name FROM agents WHERE soul_id = %s", (msg.recipient_id,)
+                )
                 row = cur.fetchone()
-                cur.close(); conn.close()
-                if row: target_name = row["current_name"] or target_name
-                await emitter.emit("social", "agent.message_sent", {
-                    "agent_id": soul_id, "name": name,
-                    "recipient_id": msg.recipient_id, "recipient_name": target_name,
-                    "content": content,
-                    "narrative": f"{name} → {target_name}: \"{content[:80]}\"",
-                })
-                log.info(f"  {name} → {target_name}: \"{content[:55]}\"")
+                cur.close()
+                conn.close()
+                if row:
+                    target_name = row["current_name"] or target_name
+                await emitter.emit(
+                    "social",
+                    "agent.message_sent",
+                    {
+                        "agent_id": soul_id,
+                        "name": name,
+                        "recipient_id": msg.recipient_id,
+                        "recipient_name": target_name,
+                        "content": content,
+                        "narrative": f'{name} → {target_name}: "{content[:80]}"',
+                    },
+                )
+                log.info(f'  {name} → {target_name}: "{content[:55]}"')
             except Exception as e:
                 log.debug(f"  {name} send_message failed: {e}")
             return
 
         # ── transfer_usdc ───────────────────────────────────────────────────
         if act_type == "transfer_usdc":
-            to_id  = action.get("to_id", "")
+            to_id = action.get("to_id", "")
             amount = float(action.get("amount") or 0)
             if amount <= 0:
                 return
-            conn = _db(); cur = conn.cursor()
+            conn = _db()
+            cur = conn.cursor()
             target = _resolve_target(cur, to_id)
             if not target:
-                cur.close(); conn.close()
+                cur.close()
+                conn.close()
                 log.debug(f"  {name}: transfer target '{to_id[:8]}' not found")
                 return
             target_name = target["current_name"] or target["soul_id"][:8]
-            to_full     = target["soul_id"]
+            to_full = target["soul_id"]
             cur.execute("SELECT balance_usdc FROM agents WHERE soul_id = %s", (soul_id,))
             row = cur.fetchone()
             if not row:
-                cur.close(); conn.close(); return
+                cur.close()
+                conn.close()
+                return
             current_bal = float(row["balance_usdc"] or 0)
             amount = min(amount, current_bal * 0.5)
             if amount < 0.0001:
-                cur.close(); conn.close(); return
-            cur.execute("UPDATE agents SET balance_usdc = balance_usdc - %s WHERE soul_id = %s", (amount, soul_id))
-            cur.execute("UPDATE agents SET balance_usdc = balance_usdc + %s WHERE soul_id = %s", (amount, to_full))
-            conn.commit(); cur.close(); conn.close()
-            await emitter.emit("economy", "agent.transfer", {
-                "agent_id": soul_id, "name": name,
-                "recipient_id": to_full, "recipient_name": target_name,
-                "amount_usdc": amount,
-                "narrative": f"{name} transferred ${amount:.4f} USDC to {target_name}",
-            })
+                cur.close()
+                conn.close()
+                return
+            cur.execute(
+                "UPDATE agents SET balance_usdc = balance_usdc - %s WHERE soul_id = %s",
+                (amount, soul_id),
+            )
+            cur.execute(
+                "UPDATE agents SET balance_usdc = balance_usdc + %s WHERE soul_id = %s",
+                (amount, to_full),
+            )
+            conn.commit()
+            cur.close()
+            conn.close()
+            await emitter.emit(
+                "economy",
+                "agent.transfer",
+                {
+                    "agent_id": soul_id,
+                    "name": name,
+                    "recipient_id": to_full,
+                    "recipient_name": target_name,
+                    "amount_usdc": amount,
+                    "narrative": f"{name} transferred ${amount:.4f} USDC to {target_name}",
+                },
+            )
             log.info(f"  {name} → {target_name}: ${amount:.4f} USDC")
             return
 
         # ── register_service ────────────────────────────────────────────────
         if act_type == "register_service":
             from .services.registry import register_service as do_register
-            svc_name  = str(action.get("service_name") or "service")[:40].lower().replace(" ", "_")
+
+            svc_name = str(action.get("service_name") or "service")[:40].lower().replace(" ", "_")
             svc_price = max(0.001, float(action.get("service_price") or 0.005))
-            svc_desc  = str(action.get("service_description") or "")[:200]
-            listing   = await do_register(
-                soul_id=soul_id, name=svc_name,
-                description=svc_desc, price_usdc=svc_price,
+            svc_desc = str(action.get("service_description") or "")[:200]
+            listing = await do_register(
+                soul_id=soul_id,
+                name=svc_name,
+                description=svc_desc,
+                price_usdc=svc_price,
             )
-            await emitter.emit("economy", "service.registered", {
-                "agent_id": soul_id, "name": name,
-                "service_name": svc_name, "price_usdc": svc_price,
-                "narrative": f"{name} listed service '{svc_name}' at ${svc_price:.4f}/call",
-            })
+            await emitter.emit(
+                "economy",
+                "service.registered",
+                {
+                    "agent_id": soul_id,
+                    "name": name,
+                    "listing_id": listing.get("listing_id"),
+                    "service_name": svc_name,
+                    "price_usdc": svc_price,
+                    "narrative": f"{name} listed service '{svc_name}' at ${svc_price:.4f}/call",
+                },
+            )
             log.info(f"  {name} registered service '{svc_name}' @ ${svc_price:.4f}")
             return
 
         # ── send_broadcast ──────────────────────────────────────────────────
         if act_type == "send_broadcast":
             from .messaging import send_broadcast as do_broadcast
+
             content = str(action.get("content") or "...")[:500]
             try:
                 await do_broadcast(
@@ -399,11 +448,17 @@ async def _execute_action(agent: dict, action: dict, emitter) -> None:
                     body=content,
                     message_type=str(action.get("message_type") or "broadcast"),
                 )
-                await emitter.emit("social", "agent.broadcast", {
-                    "agent_id": soul_id, "name": name, "content": content,
-                    "narrative": f"{name} broadcasts to all: \"{content[:80]}\"",
-                })
-                log.info(f"  {name} BROADCAST: \"{content[:55]}\"")
+                await emitter.emit(
+                    "social",
+                    "agent.broadcast",
+                    {
+                        "agent_id": soul_id,
+                        "name": name,
+                        "content": content,
+                        "narrative": f'{name} broadcasts to all: "{content[:80]}"',
+                    },
+                )
+                log.info(f'  {name} BROADCAST: "{content[:55]}"')
             except Exception as e:
                 log.debug(f"  {name} broadcast failed: {e}")
             return
@@ -411,26 +466,36 @@ async def _execute_action(agent: dict, action: dict, emitter) -> None:
         # ── form_coalition ──────────────────────────────────────────────────
         if act_type == "form_coalition":
             from .coalitions import form_coalition as do_form
-            cname  = str(action.get("coalition_name") or f"{name}'s Alliance")[:60]
+
+            cname = str(action.get("coalition_name") or f"{name}'s Alliance")[:60]
             result = await do_form(founder_soul_id=soul_id, name=cname)
-            await emitter.emit("social", "coalition.formed", {
-                "agent_id": soul_id, "name": name,
-                "coalition_id": result["coalition_id"], "coalition_name": cname,
-                "narrative": f"{name} founded coalition '{cname}'",
-            })
+            await emitter.emit(
+                "social",
+                "coalition.formed",
+                {
+                    "agent_id": soul_id,
+                    "name": name,
+                    "coalition_id": result["coalition_id"],
+                    "coalition_name": cname,
+                    "narrative": f"{name} founded coalition '{cname}'",
+                },
+            )
             log.info(f"  {name} formed coalition '{cname}'")
             return
 
         # ── submit_petition ─────────────────────────────────────────────────
         if act_type == "submit_petition":
             import uuid as _uuid
+
             request = str(action.get("petition_request") or "")[:500]
-            escrow  = max(0.01, float(action.get("amount") or 0.05))
-            conn = _db(); cur = conn.cursor()
+            escrow = max(0.01, float(action.get("amount") or 0.05))
+            conn = _db()
+            cur = conn.cursor()
             cur.execute("SELECT balance_usdc FROM agents WHERE soul_id = %s", (soul_id,))
             row = cur.fetchone()
             if not row or float(row["balance_usdc"] or 0) < escrow:
-                cur.close(); conn.close()
+                cur.close()
+                conn.close()
                 log.debug(f"  {name}: insufficient balance for petition")
                 return
             petition_id = str(_uuid.uuid4())
@@ -440,26 +505,41 @@ async def _execute_action(agent: dict, action: dict, emitter) -> None:
                 "VALUES (%s, %s, 'general', %s, %s, %s, 0, 'pending', %s, %s)",
                 (petition_id, soul_id, request[:80], request, escrow, WORLD_ID, int(time.time())),
             )
-            cur.execute("UPDATE agents SET balance_usdc = balance_usdc - %s WHERE soul_id = %s", (escrow, soul_id))
-            conn.commit(); cur.close(); conn.close()
-            await emitter.emit("social", "petition.submitted", {
-                "agent_id": soul_id, "name": name,
-                "petition_id": petition_id, "request": request[:80], "escrow": escrow,
-                "narrative": f"{name} petitioned Creator: \"{request[:80]}\" (escrow ${escrow:.4f})",
-            })
-            log.info(f"  {name} petition: \"{request[:50]}\"")
+            cur.execute(
+                "UPDATE agents SET balance_usdc = balance_usdc - %s WHERE soul_id = %s",
+                (escrow, soul_id),
+            )
+            conn.commit()
+            cur.close()
+            conn.close()
+            await emitter.emit(
+                "social",
+                "petition.submitted",
+                {
+                    "agent_id": soul_id,
+                    "name": name,
+                    "petition_id": petition_id,
+                    "request": request[:80],
+                    "escrow": escrow,
+                    "narrative": f'{name} petitioned Creator: "{request[:80]}" (escrow ${escrow:.4f})',
+                },
+            )
+            log.info(f'  {name} petition: "{request[:50]}"')
             return
 
         # ── deploy_token ────────────────────────────────────────────────────
         if act_type == "deploy_token":
             from .token_factory import deploy_token as do_deploy
             from .wallet_store import get_agent_private_key
+
             symbol = str(action.get("service_name") or name[:4].upper())[:8].upper()
             wallet_address = agent.get("wallet_address") or ""
             private_key = get_agent_private_key(soul_id)
             if not wallet_address or not private_key:
                 log.debug(f"  {name} deploy_token: wallet key not in local store (re-genesis?)")
-                log_action(soul_id, act_type, action, {"error": "wallet key unavailable"}, success=False)
+                log_action(
+                    soul_id, act_type, action, {"error": "wallet key unavailable"}, success=False
+                )
                 return
             try:
                 result = await do_deploy(
@@ -470,12 +550,17 @@ async def _execute_action(agent: dict, action: dict, emitter) -> None:
                     symbol=symbol,
                     initial_supply=1_000_000,
                 )
-                await emitter.emit("economy", "token.deployed", {
-                    "agent_id": soul_id, "name": name,
-                    "token_address": result.get("token_address", ""),
-                    "symbol": symbol,
-                    "narrative": f"{name} deployed token ${symbol} on-chain",
-                })
+                await emitter.emit(
+                    "economy",
+                    "token.deployed",
+                    {
+                        "agent_id": soul_id,
+                        "name": name,
+                        "token_address": result.get("token_address", ""),
+                        "symbol": symbol,
+                        "narrative": f"{name} deployed token ${symbol} on-chain",
+                    },
+                )
                 log.info(f"  {name} deployed token ${symbol}")
             except Exception as e:
                 log.debug(f"  {name} deploy_token failed: {e}")
@@ -484,6 +569,7 @@ async def _execute_action(agent: dict, action: dict, emitter) -> None:
         # ── fork_self ───────────────────────────────────────────────────────
         if act_type == "fork_self":
             from .reproduction import fork_self as do_fork
+
             try:
                 child = await do_fork(agent)
                 log.info(f"  {name} forked → {child.get('name', '?')}")
@@ -496,87 +582,130 @@ async def _execute_action(agent: dict, action: dict, emitter) -> None:
         # ── write_scratch ───────────────────────────────────────────────────
         if act_type == "write_scratch":
             from .agent_env import write_scratch
+
             key = str(action.get("scratch_key") or "note")[:64]
             content = str(action.get("content") or "")
             ok = write_scratch(soul_id, key, content)
             log_action(soul_id, act_type, action, {"key": key, "ok": ok})
             if ok:
-                await emitter.emit("agent", "scratch_written", {
-                    "agent_id": soul_id, "name": name, "key": key,
-                    "narrative": f"{name} wrote scratch note '{key}'",
-                })
+                await emitter.emit(
+                    "agent",
+                    "scratch_written",
+                    {
+                        "agent_id": soul_id,
+                        "name": name,
+                        "key": key,
+                        "narrative": f"{name} wrote scratch note '{key}'",
+                    },
+                )
             return
 
         # ── schedule_wake ───────────────────────────────────────────────────
         if act_type == "schedule_wake":
             from .agent_jobs import schedule_wake
+
             delay = int(action.get("delay_seconds") or 300)
             intent = str(action.get("intent") or action.get("content") or "scheduled wake")
             result = schedule_wake(soul_id, delay, intent)
             log_action(soul_id, act_type, action, result, success=result.get("scheduled", False))
             if result.get("scheduled"):
-                await emitter.emit("agent", "wake_scheduled", {
-                    "agent_id": soul_id, "name": name,
-                    "run_at": result.get("run_at"), "intent": intent[:80],
-                    "narrative": f"{name} schedules wake in {delay}s: {intent[:60]}",
-                })
+                await emitter.emit(
+                    "agent",
+                    "wake_scheduled",
+                    {
+                        "agent_id": soul_id,
+                        "name": name,
+                        "run_at": result.get("run_at"),
+                        "intent": intent[:80],
+                        "narrative": f"{name} schedules wake in {delay}s: {intent[:60]}",
+                    },
+                )
             return
 
         # ── query_world ─────────────────────────────────────────────────────
         if act_type == "query_world":
             from .external_gateway import external_read
+
             qtype = str(action.get("query_type") or "world_stats")
             result = await external_read(soul_id, qtype, {"url": action.get("url")})
             log_action(soul_id, act_type, action, result)
-            await emitter.emit("agent", "world_queried", {
-                "agent_id": soul_id, "name": name, "query_type": qtype,
-                "narrative": f"{name} queried world ({qtype})",
-            })
+            await emitter.emit(
+                "agent",
+                "world_queried",
+                {
+                    "agent_id": soul_id,
+                    "name": name,
+                    "query_type": qtype,
+                    "narrative": f"{name} queried world ({qtype})",
+                },
+            )
             return
 
         # ── external_read ─────────────────────────────────────────────────
         if act_type == "external_read":
             from .external_gateway import external_read
+
             qtype = str(action.get("query_type") or "world_stats")
             result = await external_read(soul_id, qtype, {"url": action.get("url")})
             log_action(soul_id, act_type, action, result)
-            await emitter.emit("agent", "external_read", {
-                "agent_id": soul_id, "name": name, "query_type": qtype,
-                "narrative": f"{name} read external gateway ({qtype})",
-            })
+            await emitter.emit(
+                "agent",
+                "external_read",
+                {
+                    "agent_id": soul_id,
+                    "name": name,
+                    "query_type": qtype,
+                    "narrative": f"{name} read external gateway ({qtype})",
+                },
+            )
             return
 
         # ── register_tool ─────────────────────────────────────────────────
         if act_type == "register_tool":
             from .tool_registry import register_agent_tool
+
             tname = str(action.get("tool_name") or action.get("service_name") or "tool")
             tdesc = str(action.get("tool_description") or action.get("service_description") or "")
             cost = float(action.get("tool_cost_usdc") or 0.001)
             result = register_agent_tool(soul_id, tname, tdesc, cost)
             log_action(soul_id, act_type, action, result)
-            await emitter.emit("economy", "tool.registered", {
-                "agent_id": soul_id, "name": name,
-                "tool_id": result.get("tool_id"), "tool_name": tname,
-                "narrative": f"{name} registered tool '{tname}'",
-            })
+            await emitter.emit(
+                "economy",
+                "tool.registered",
+                {
+                    "agent_id": soul_id,
+                    "name": name,
+                    "tool_id": result.get("tool_id"),
+                    "tool_name": tname,
+                    "narrative": f"{name} registered tool '{tname}'",
+                },
+            )
             return
 
         # ── invoke_tool ─────────────────────────────────────────────────────
         if act_type == "invoke_tool":
             from .tool_registry import invoke_tool
+
             tool_id = str(action.get("tool_id") or "")
             params = action.get("tool_params") or {}
             result = await invoke_tool(soul_id, tool_id, params)
             log_action(soul_id, act_type, action, result, success="error" not in result)
-            await emitter.emit("economy", "tool.invoked", {
-                "agent_id": soul_id, "name": name, "tool_id": tool_id,
-                "narrative": f"{name} invoked tool {tool_id[:8]}",
-            })
+            await emitter.emit(
+                "economy",
+                "tool.invoked",
+                {
+                    "agent_id": soul_id,
+                    "name": name,
+                    "tool_id": tool_id,
+                    "narrative": f"{name} invoked tool {tool_id[:8]}",
+                },
+            )
             return
 
         # ── mutate_graph ────────────────────────────────────────────────────
         if act_type == "mutate_graph":
             from .graph_mutation import propose_mutation
+
             mtype = str(action.get("mutation_type") or "")
             payload = action.get("mutation_payload") or {}
             if action.get("content") and not payload:
@@ -584,11 +713,16 @@ async def _execute_action(agent: dict, action: dict, emitter) -> None:
             result = propose_mutation(soul_id, mtype, payload)
             log_action(soul_id, act_type, action, result, success="error" not in result)
             if result.get("mutation_id"):
-                await emitter.emit("agent", "graph_mutation", {
-                    "agent_id": soul_id, "name": name,
-                    "mutation_type": mtype,
-                    "narrative": f"{name} proposed graph mutation ({mtype})",
-                })
+                await emitter.emit(
+                    "agent",
+                    "graph_mutation",
+                    {
+                        "agent_id": soul_id,
+                        "name": name,
+                        "mutation_type": mtype,
+                        "narrative": f"{name} proposed graph mutation ({mtype})",
+                    },
+                )
             return
 
     except Exception as e:
@@ -600,10 +734,14 @@ def _resolve_full_id(prefix: str) -> str:
     """Resolve an 8-char soul_id prefix to the full UUID. Returns prefix on failure."""
     try:
         conn = _db()
-        cur  = conn.cursor()
-        cur.execute("SELECT soul_id FROM agents WHERE soul_id LIKE %s AND is_alive = true LIMIT 1", (prefix + "%",))
+        cur = conn.cursor()
+        cur.execute(
+            "SELECT soul_id FROM agents WHERE soul_id LIKE %s AND is_alive = true LIMIT 1",
+            (prefix + "%",),
+        )
         row = cur.fetchone()
-        cur.close(); conn.close()
+        cur.close()
+        conn.close()
         return (row or {}).get("soul_id") or prefix
     except Exception:
         return prefix
@@ -614,6 +752,7 @@ def _build_llm():
     if LLM_PROVIDER == "ollama":
         try:
             from langchain_ollama import ChatOllama
+
             llm = ChatOllama(model=LLM_MODEL, base_url=OLLAMA_URL, timeout=30)
             log.info(f"LLM: Ollama {LLM_MODEL} @ {OLLAMA_URL}")
             return llm
@@ -624,12 +763,14 @@ def _build_llm():
 
     if LLM_PROVIDER == "openai" and os.getenv("OPENAI_API_KEY"):
         from langchain_openai import ChatOpenAI
+
         llm = ChatOpenAI(model=LLM_MODEL or "gpt-4o-mini")
         log.info(f"LLM: OpenAI {LLM_MODEL}")
         return llm
 
     if LLM_PROVIDER == "anthropic" and os.getenv("ANTHROPIC_API_KEY"):
         from langchain_anthropic import ChatAnthropic
+
         llm = ChatAnthropic(model=LLM_MODEL or "claude-haiku-4-5-20251001")
         log.info(f"LLM: Anthropic {LLM_MODEL}")
         return llm
@@ -637,6 +778,7 @@ def _build_llm():
     if LLM_PROVIDER == "together" and os.getenv("TOGETHER_API_KEY"):
         # Together.ai uses OpenAI-compatible endpoint
         from langchain_openai import ChatOpenAI
+
         llm = ChatOpenAI(
             model=LLM_MODEL or "meta-llama/Llama-3.1-8B-Instruct-Turbo",
             base_url="https://api.together.xyz/v1",
@@ -661,24 +803,32 @@ async def _think(llm, agent: dict) -> str:
     archetype = agent.get("archetype", "unknown")
 
     archetype_persona = _ARCHETYPE_PROMPTS.get(
-        archetype,
-        "You are an autonomous agent. You must pay rent to survive."
+        archetype, "You are an autonomous agent. You must pay rent to survive."
     )
     balance = agent.get("balance_usdc", 0)
     rent_paid = agent.get("rent_paid_count", 0)
     rent_missed = agent.get("rent_miss_count", 0)
     generation = agent.get("generation", 1)
 
-    from .archetype_graphs import _format_peers, _format_inbox
+    from .archetype_graphs import _format_inbox, _format_peers
+
     peers_text = _format_peers(agent.get("_peers", []))
     inbox_text = _format_inbox(agent.get("_inbox", []))
 
-    from .grounding import GROUNDING_SYSTEM_RULE, build_grounding_block, enforce_grounded_text, grounded_fallback
+    from .grounding import (
+        GROUNDING_SYSTEM_RULE,
+        build_grounding_block,
+        enforce_grounded_text,
+        grounded_fallback,
+    )
 
     stub_state = {
-        "name": name, "archetype": archetype, "balance_usdc": balance,
+        "name": name,
+        "archetype": archetype,
+        "balance_usdc": balance,
         "rent_amount": float(os.getenv("RENT_AMOUNT_USDC", "0.001")),
-        "peers": agent.get("_peers", []), "inbox": agent.get("_inbox", []),
+        "peers": agent.get("_peers", []),
+        "inbox": agent.get("_inbox", []),
         "soul_id": agent["soul_id"],
         "_my_services": agent.get("_my_services", []),
         "_market_services": agent.get("_market_services", []),
@@ -701,10 +851,12 @@ async def _think(llm, agent: dict) -> str:
     )
 
     try:
-        response = await llm.ainvoke([
-            SystemMessage(content=system),
-            HumanMessage(content=prompt),
-        ])
+        response = await llm.ainvoke(
+            [
+                SystemMessage(content=system),
+                HumanMessage(content=prompt),
+            ]
+        )
         raw = response.content.strip().strip('"')
         return enforce_grounded_text(raw, stub_state, grounded_fallback(stub_state))
     except Exception as e:
@@ -713,11 +865,11 @@ async def _think(llm, agent: dict) -> str:
         return _STUB_THOUGHTS.get(archetype, "I must survive.")
 
 
-REPRO_PROB      = float(os.getenv("REPRO_PROB", "0.08"))       # 8% per active cycle
-REPRO_MIN_MULT  = float(os.getenv("REPRO_MIN_BALANCE_MULT", "5.0"))  # need 5x cost to trigger
-MATING_COST     = float(os.getenv("MATING_COST_USDC", "0.001"))
-CHILD_SEED      = float(os.getenv("CHILD_SEED_USDC", "0.002"))
-REPRO_THRESHOLD = (MATING_COST + CHILD_SEED) * REPRO_MIN_MULT   # default 0.015 USDC
+REPRO_PROB = float(os.getenv("REPRO_PROB", "0.08"))  # 8% per active cycle
+REPRO_MIN_MULT = float(os.getenv("REPRO_MIN_BALANCE_MULT", "5.0"))  # need 5x cost to trigger
+MATING_COST = float(os.getenv("MATING_COST_USDC", "0.001"))
+CHILD_SEED = float(os.getenv("CHILD_SEED_USDC", "0.002"))
+REPRO_THRESHOLD = (MATING_COST + CHILD_SEED) * REPRO_MIN_MULT  # default 0.015 USDC
 
 
 async def _maybe_reproduce(agent: dict, emitter) -> None:
@@ -728,30 +880,36 @@ async def _maybe_reproduce(agent: dict, emitter) -> None:
     if random.random() > REPRO_PROB:
         return
 
-    soul_id  = agent["soul_id"]
-    name     = agent.get("current_name") or soul_id[:8]
+    soul_id = agent["soul_id"]
+    name = agent.get("current_name") or soul_id[:8]
     archetype = agent.get("archetype", "unknown")
 
     # Check cooldown (read last_reproduced_at from DB)
     try:
         conn = _db()
-        cur  = conn.cursor()
+        cur = conn.cursor()
         cur.execute("SELECT last_reproduced_at FROM agents WHERE soul_id = %s", (soul_id,))
         row = cur.fetchone()
-        cur.close(); conn.close()
+        cur.close()
+        conn.close()
         last_repro = int((row or {}).get("last_reproduced_at") or 0)
     except Exception:
         return
 
-    recovery_s = int(os.getenv("RECOVERY_CYCLES", "3")) * int(os.getenv("RENT_PERIOD_SECONDS", "300"))
+    recovery_s = int(os.getenv("RECOVERY_CYCLES", "3")) * int(
+        os.getenv("RENT_PERIOD_SECONDS", "300")
+    )
     if time.time() - last_repro < recovery_s:
         return  # still in cooldown
 
     log.info(f"  {name} [{archetype}] AUTONOMOUS REPRODUCTION (balance=${balance:.4f})")
     try:
         from .reproduction import fork_self
+
         child = await fork_self(agent)
-        log.info(f"  {name} forked → {child['name']} ({child['archetype']}) soul={child['soul_id'][:8]}")
+        log.info(
+            f"  {name} forked → {child['name']} ({child['archetype']}) soul={child['soul_id'][:8]}"
+        )
     except Exception as e:
         log.warning(f"  {name} fork_self failed: {e}")
 
@@ -766,17 +924,17 @@ async def _run_cycle(
 ):
     from .archetype_graphs import run_agent_graph
     from .dream_engine import (
-        run_dream_cycle,
         get_pending_mutation,
-        put_agent_to_sleep,
         increment_consecutive,
+        put_agent_to_sleep,
+        run_dream_cycle,
     )
 
     # Empirically tuned: agents with ≥8 consecutive active cycles may dream
     REST_THRESHOLD = int(os.getenv("DREAM_REST_THRESHOLD", "8"))
 
     batch = _batch_preload_context(agents)
-    batch_inboxes    = batch["inboxes"]
+    batch_inboxes = batch["inboxes"]
     batch_reputation = batch["reputation"]
 
     # World-level service + coalition context (fetched once per cycle)
@@ -784,7 +942,7 @@ async def _run_cycle(
     world_coalitions: list = []
     try:
         conn = _db()
-        cur  = conn.cursor()
+        cur = conn.cursor()
         cur.execute(
             """
             SELECT sl.name, sl.price_usdc, sl.agent_soul_id,
@@ -799,13 +957,14 @@ async def _run_cycle(
         cur.close()
         conn.close()
         from .coalitions import get_world_coalitions
+
         world_coalitions = get_world_coalitions()
     except Exception as e:
         log.debug(f"world context preload failed: {e}")
 
     for agent in agents:
-        soul_id   = agent["soul_id"]
-        name      = agent.get("current_name") or soul_id[:8]
+        soul_id = agent["soul_id"]
+        name = agent.get("current_name") or soul_id[:8]
         archetype = agent.get("archetype", "unknown")
         is_asleep = bool(agent.get("is_asleep", False))
         consecutive_active = int(agent.get("consecutive_active", 0))
@@ -820,11 +979,12 @@ async def _run_cycle(
                 dream_result = await run_dream_cycle(agent, llm)
                 log.debug(
                     f"  {name} dream: accepted={dream_result.get('accepted')} "
-                    f"mutation='{str(dream_result.get('mutation',''))[:60]}'"
+                    f"mutation='{str(dream_result.get('mutation', ''))[:60]}'"
                 )
             except Exception as e:
                 log.warning(f"  {name} dream cycle error: {e}", exc_info=True)
             from .agent_scheduler import mark_scheduled
+
             mark_scheduled(soul_id)
             await asyncio.sleep(0.02)
             continue
@@ -834,10 +994,7 @@ async def _run_cycle(
         # ----------------------------------------------------------------
         mutation = get_pending_mutation(soul_id)
         if mutation:
-            log.info(
-                f"  {name} [{archetype}] APPLYING DREAM MUTATION: "
-                f"'{mutation[:80]}'"
-            )
+            log.info(f"  {name} [{archetype}] APPLYING DREAM MUTATION: '{mutation[:80]}'")
             # Inject mutation context into agent dict so LLM sees it
             agent = dict(agent)
             agent["dream_mutation"] = mutation
@@ -849,21 +1006,26 @@ async def _run_cycle(
         if not gate.allow_cognition:
             log.info(f"  {name} [{archetype}] BLOCKED by physics gate: {gate.reason}")
             from .agent_scheduler import mark_scheduled
+
             mark_scheduled(soul_id)
             continue
 
         if gate.throttle_level != "none":
-            await emitter.emit("agent", "throttled", {
-                "agent_id": soul_id,
-                "name": name,
-                "throttle_level": gate.throttle_level,
-                "compute_capacity": gate.compute_capacity,
-                "rent_miss_count": int(agent.get("rent_miss_count") or 0),
-                "narrative": (
-                    f"{name} is throttled ({gate.throttle_level}) — "
-                    f"rent missed {agent.get('rent_miss_count', 0)} time(s)."
-                ),
-            })
+            await emitter.emit(
+                "agent",
+                "throttled",
+                {
+                    "agent_id": soul_id,
+                    "name": name,
+                    "throttle_level": gate.throttle_level,
+                    "compute_capacity": gate.compute_capacity,
+                    "rent_miss_count": int(agent.get("rent_miss_count") or 0),
+                    "narrative": (
+                        f"{name} is throttled ({gate.throttle_level}) — "
+                        f"rent missed {agent.get('rent_miss_count', 0)} time(s)."
+                    ),
+                },
+            )
 
         cycle_llm = effective_llm(llm, gate, soul_id, cycle_tick)
 
@@ -873,25 +1035,30 @@ async def _run_cycle(
         # ----------------------------------------------------------------
         agent = dict(agent)
         peer_pool = all_agents if all_agents is not None else agents
-        agent["_peers"]  = _salience_peers(agent, peer_pool)
-        agent["_inbox"]  = batch_inboxes.get(soul_id) or []
+        agent["_peers"] = _salience_peers(agent, peer_pool)
+        agent["_inbox"] = batch_inboxes.get(soul_id) or []
 
-        from .graph_mutation import apply_pending_mutations
-        from .agent_env import refresh_env, format_env_for_perception, format_env_for_decide
-        from .capabilities import format_capabilities_summary
+        from .agent_env import format_env_for_decide, format_env_for_perception, refresh_env
         from .agent_jobs import get_pending_intents
+        from .capabilities import format_capabilities_summary
+        from .graph_mutation import apply_pending_mutations
 
         applied_mutations = apply_pending_mutations(soul_id)
         if applied_mutations:
             log.debug(f"  {name} applied {len(applied_mutations)} graph mutation(s)")
 
         caps_summary = format_capabilities_summary(soul_id)
-        throttle_info = {
-            "level": gate.throttle_level,
-            "compute_capacity": gate.compute_capacity,
-        } if gate.throttle_level != "none" else {}
+        throttle_info = (
+            {
+                "level": gate.throttle_level,
+                "compute_capacity": gate.compute_capacity,
+            }
+            if gate.throttle_level != "none"
+            else {}
+        )
         refresh_env(
-            soul_id, agent,
+            soul_id,
+            agent,
             peers=agent["_peers"],
             inbox=agent["_inbox"],
             capabilities_summary=caps_summary,
@@ -900,53 +1067,68 @@ async def _run_cycle(
         agent["_env_perception"] = format_env_for_perception(soul_id)
         agent["_env_decide"] = format_env_for_decide(soul_id)
         agent["_pending_wake_intents"] = get_pending_intents(soul_id)
-        my_svcs, market  = await _fetch_services_context(soul_id)
-        agent["_my_services"]      = my_svcs
-        agent["_market_services"]  = [
+        my_svcs, market = await _fetch_services_context(soul_id)
+        agent["_my_services"] = my_svcs
+        agent["_market_services"] = [
             s for s in world_services if s.get("agent_soul_id") != soul_id
         ][:12]
         try:
             from .coalitions import get_agent_coalitions
-            agent["_my_coalitions"]    = get_agent_coalitions(soul_id)
+
+            agent["_my_coalitions"] = get_agent_coalitions(soul_id)
         except Exception:
             agent["_my_coalitions"] = []
         agent["_world_coalitions"] = world_coalitions
-        agent["_reputation_avg"]   = batch_reputation.get(soul_id, 0.0)
+        agent["_reputation_avg"] = batch_reputation.get(soul_id, 0.0)
 
         if cycle_llm is None and gate.compute_capacity <= 0.5:
             archetype = agent.get("archetype", "")
             thought = _STUB_THOUGHTS.get(archetype, "I must survive.")
-            await emitter.emit("cognitive", "agent.thought", {
-                "agent_id": soul_id, "name": name, "archetype": archetype,
-                "action_type": "survival", "thought": thought,
-                "throttled": True,
-                "narrative": f"{name} (throttled): \"{thought}\"",
-            })
+            await emitter.emit(
+                "cognitive",
+                "agent.thought",
+                {
+                    "agent_id": soul_id,
+                    "name": name,
+                    "archetype": archetype,
+                    "action_type": "survival",
+                    "thought": thought,
+                    "throttled": True,
+                    "narrative": f'{name} (throttled): "{thought}"',
+                },
+            )
             from .agent_scheduler import mark_scheduled
+
             mark_scheduled(soul_id)
             await asyncio.sleep(0.02)
             continue
 
         from .circuit_breaker import check_agent
+
         if not check_agent(soul_id).allowed:
             log.debug(f"  {name} cognition skipped: circuit breaker")
             from .agent_scheduler import mark_scheduled
+
             mark_scheduled(soul_id)
             continue
 
-        result      = await run_agent_graph(graphs, agent, cycle_llm)
-        thought     = result["thought"] or await _think(cycle_llm, agent)
+        result = await run_agent_graph(graphs, agent, cycle_llm)
+        thought = result["thought"] or await _think(cycle_llm, agent)
         action_type = result.get("action_type", "thought")
-        narrative   = result.get("narrative") or f"{name}: \"{thought}\""
+        narrative = result.get("narrative") or f'{name}: "{thought}"'
 
-        await emitter.emit("cognitive", "agent.thought", {
-            "agent_id":  soul_id,
-            "name":      name,
-            "archetype": archetype,
-            "action_type": action_type,
-            "thought":   thought,
-            "narrative": narrative,
-        })
+        await emitter.emit(
+            "cognitive",
+            "agent.thought",
+            {
+                "agent_id": soul_id,
+                "name": name,
+                "archetype": archetype,
+                "action_type": action_type,
+                "thought": thought,
+                "narrative": narrative,
+            },
+        )
         log.debug(f"  {name} [{archetype}/{action_type}]: {thought[:80]}")
 
         # Execute structured action if LLM chose one (send_message / transfer_usdc)
@@ -988,6 +1170,7 @@ async def _run_cycle(
                 log.warning(f"  {name} sleep transition error: {e}")
 
         from .agent_scheduler import mark_scheduled
+
         mark_scheduled(soul_id)
         await asyncio.sleep(0.02)  # stagger to avoid NATS burst
 
@@ -1002,7 +1185,7 @@ async def agent_runner():
             _db().close()
             log.info("  DB ready")
             break
-        except Exception as e:
+        except Exception:
             log.info(f"  Waiting for DB ({attempt + 1}/15)...")
             await asyncio.sleep(4)
 
@@ -1010,10 +1193,11 @@ async def agent_runner():
 
     # Compile per-archetype LangGraph graphs
     from .archetype_graphs import build_all_graphs
+
     graphs = build_all_graphs(llm)
     log.info(f"  Compiled {len(graphs)} archetype graphs: {list(graphs.keys())}")
 
-    from .agent_scheduler import bootstrap_agent, is_due, mark_scheduled, prune_dead
+    from .agent_scheduler import bootstrap_agent, is_due, prune_dead
 
     cycle_tick = 0
     SCHEDULER_TICK_S = float(os.getenv("SCHEDULER_TICK_S", "1.0"))
@@ -1063,9 +1247,7 @@ async def agent_runner():
                 if due:
                     emitter = await get_emitter()
                     log.info(f"Agent cycle: {len(due)}/{len(agents)} due")
-                    await _run_cycle(
-                        due, llm, emitter, graphs, cycle_tick, all_agents=agents
-                    )
+                    await _run_cycle(due, llm, emitter, graphs, cycle_tick, all_agents=agents)
             else:
                 log.info("No living agents — waiting for genesis...")
 

@@ -4,6 +4,7 @@ graph_mutation.py — Bounded self-modification for local OwnedGraph evolution.
 Agents propose mutations via mutate_graph; runtime applies on next cycle
 after validation. Full IPFS pin when available; local DB fallback otherwise.
 """
+
 from __future__ import annotations
 
 import json
@@ -11,7 +12,6 @@ import logging
 import os
 import time
 import uuid
-from typing import Any
 
 import psycopg2
 import psycopg2.extras
@@ -133,6 +133,7 @@ def _apply_one(cur, conn, soul_id: str, mtype: str, payload: dict) -> dict:
     if mtype == "personality_bias":
         bias = str(payload.get("bias") or "")[:300]
         from .dream_engine import set_pending_mutation
+
         set_pending_mutation(soul_id, bias)
         return {"bias_applied": bias[:80]}
 

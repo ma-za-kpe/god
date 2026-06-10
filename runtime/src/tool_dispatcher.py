@@ -7,6 +7,7 @@ JSON action surface in `agent_runner._execute_action()`.
 
 This module remains as a compatibility shim so stale imports fail safely.
 """
+
 import logging
 
 log = logging.getLogger("god.tools")

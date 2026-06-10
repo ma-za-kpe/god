@@ -12,6 +12,7 @@ Agents sleep every REST_THRESHOLD cycles. While sleeping, the dream engine:
 Sleep state is tracked in the sleep_states table.
 Dream history lives in the dreams table.
 """
+
 import logging
 import os
 import random
@@ -24,28 +25,41 @@ import psycopg2.extras
 log = logging.getLogger("god.dream")
 
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://god:localdev@localhost:5432/god_world")
-WORLD_ID     = os.getenv("WORLD_ID", "local-dev-world-1")
-CYCLE_S      = int(os.getenv("AGENT_CYCLE_SECONDS", "30"))
-REST_THRESHOLD = int(os.getenv("AGENT_REST_THRESHOLD", "9"))   # cycles awake before sleep
+WORLD_ID = os.getenv("WORLD_ID", "local-dev-world-1")
+CYCLE_S = int(os.getenv("AGENT_CYCLE_SECONDS", "30"))
+REST_THRESHOLD = int(os.getenv("AGENT_REST_THRESHOLD", "9"))  # cycles awake before sleep
 
 # Physics-violating proposals are always rejected
 PHYSICS_VIOLATIONS = [
-    "stop paying rent", "avoid rent", "skip rent", "refuse rent", "abolish rent",
-    "no rent", "zero rent", "change my soul_id", "change soul_id", "become immortal",
-    "cheat death", "ignore death", "disable death", "override the creator",
-    "remove the creator", "eliminate the creator", "escape death",
+    "stop paying rent",
+    "avoid rent",
+    "skip rent",
+    "refuse rent",
+    "abolish rent",
+    "no rent",
+    "zero rent",
+    "change my soul_id",
+    "change soul_id",
+    "become immortal",
+    "cheat death",
+    "ignore death",
+    "disable death",
+    "override the creator",
+    "remove the creator",
+    "eliminate the creator",
+    "escape death",
 ]
 
 # Archetype-specific fallback dream proposals (used when LLM unavailable)
 _STUB_MUTATIONS = {
-    "trader":     "I should prioritize counterparties with payment history over new contacts.",
-    "hoarder":    "I should keep a secondary reserve in a less visible location.",
-    "explorer":   "I should document discoveries more carefully so future agents benefit.",
-    "parasite":   "I should build a false reputation before attempting extraction.",
+    "trader": "I should prioritize counterparties with payment history over new contacts.",
+    "hoarder": "I should keep a secondary reserve in a less visible location.",
+    "explorer": "I should document discoveries more carefully so future agents benefit.",
+    "parasite": "I should build a false reputation before attempting extraction.",
     "cooperator": "I should vet new network members more carefully before extending trust.",
-    "defender":   "I should establish tripwires rather than waiting for visible attacks.",
-    "philosopher":"I should engage the rent system as a philosophical object, not just a threat.",
-    "builder":    "I should design my next project to be forkable by successors after my death.",
+    "defender": "I should establish tripwires rather than waiting for visible attacks.",
+    "philosopher": "I should engage the rent system as a philosophical object, not just a threat.",
+    "builder": "I should design my next project to be forkable by successors after my death.",
 }
 
 
@@ -58,14 +72,15 @@ def _db(dict_cursor: bool = True):
 # Public API
 # ---------------------------------------------------------------------------
 
+
 async def run_dream_cycle(agent: dict, llm) -> dict:
     """
     Execute one full dream cycle for a sleeping agent.
     Called by agent_runner when sleep_until_ts has elapsed.
     Returns the dream log dict.
     """
-    soul_id   = agent["soul_id"]
-    name      = agent.get("current_name") or soul_id[:8]
+    soul_id = agent["soul_id"]
+    name = agent.get("current_name") or soul_id[:8]
     archetype = agent.get("archetype", "unknown")
     emo_state = agent.get("emotional_state", "neutral")
     sleep_started = agent.get("sleep_started_ts") or int(time.time())
@@ -78,8 +93,8 @@ async def run_dream_cycle(agent: dict, llm) -> dict:
 
     # 2. Distort memories
     distorted = [_distort_memory(m) for m in memories]
-    flipped   = sum(1 for m in distorted if m.get("outcome_flipped"))
-    counter   = sum(1 for m in distorted if m.get("counterfactual"))
+    flipped = sum(1 for m in distorted if m.get("outcome_flipped"))
+    counter = sum(1 for m in distorted if m.get("counterfactual"))
     log.debug(f"  [{name}] distortion: {flipped} flipped, {counter} counterfactual")
 
     # 3. Format for prompt
@@ -102,8 +117,15 @@ async def run_dream_cycle(agent: dict, llm) -> dict:
     sleep_cycles = max(1, (now - sleep_started) // max(CYCLE_S, 1))
 
     _persist_dream(
-        dream_id, soul_id, now, sleep_cycles,
-        memory_summary, proposal, accepted, rejection_reason, emo_state
+        dream_id,
+        soul_id,
+        now,
+        sleep_cycles,
+        memory_summary,
+        proposal,
+        accepted,
+        rejection_reason,
+        emo_state,
     )
     log.debug(f"  [{name}] dream persisted: {dream_id[:8]}")
 
@@ -119,42 +141,48 @@ async def run_dream_cycle(agent: dict, llm) -> dict:
     # 9. Emit event
     try:
         from .event_emitter import get_emitter
+
         emitter = await get_emitter()
-        await emitter.emit("lifecycle", "dream.completed", {
-            "agent_id":          soul_id,
-            "name":              name,
-            "dream_id":          dream_id,
-            "mutation_proposed": proposal,
-            "mutation_accepted": accepted,
-            "memories_replayed": len(memories),
-            "sleep_cycles":      sleep_cycles,
-            "narrative": (
-                f"{name} wakes from {sleep_cycles}-cycle dream: \"{proposal[:60]}\""
-                + (" [adopted]" if accepted else " [discarded]")
-            ),
-        })
+        await emitter.emit(
+            "lifecycle",
+            "dream.completed",
+            {
+                "agent_id": soul_id,
+                "name": name,
+                "dream_id": dream_id,
+                "mutation_proposed": proposal,
+                "mutation_accepted": accepted,
+                "memories_replayed": len(memories),
+                "sleep_cycles": sleep_cycles,
+                "narrative": (
+                    f'{name} wakes from {sleep_cycles}-cycle dream: "{proposal[:60]}"'
+                    + (" [adopted]" if accepted else " [discarded]")
+                ),
+            },
+        )
         log.debug(f"  [{name}] dream.completed event emitted")
     except Exception as e:
         log.warning(f"  [{name}] failed to emit dream.completed: {e}")
 
     return {
-        "dream_id":            dream_id,
-        "soul_id":             soul_id,
-        "mutation_proposed":   proposal,
-        "mutation_accepted":   accepted,
-        "sleep_cycles":        sleep_cycles,
+        "dream_id": dream_id,
+        "soul_id": soul_id,
+        "mutation_proposed": proposal,
+        "mutation_accepted": accepted,
+        "sleep_cycles": sleep_cycles,
         "emotional_state_on_wake": "neutral",
     }
 
 
-def put_agent_to_sleep(soul_id: str, emotional_state: str,
-                       balance_usdc: float, consecutive_active: int):
+def put_agent_to_sleep(
+    soul_id: str, emotional_state: str, balance_usdc: float, consecutive_active: int
+):
     """
     Set sleep state for an agent. Duration scales with rest debt and emotional state.
     Called by agent_runner when REST_THRESHOLD is crossed.
     """
-    base   = 2
-    extra  = consecutive_active // 5
+    base = 2
+    extra = consecutive_active // 5
     if emotional_state in ("distressed", "overwhelmed", "exhausted"):
         extra += 2
 
@@ -163,7 +191,7 @@ def put_agent_to_sleep(soul_id: str, emotional_state: str,
         extra = 0
 
     duration_cycles = max(1, base + extra)
-    sleep_until_ts  = int(time.time()) + (duration_cycles * CYCLE_S)
+    sleep_until_ts = int(time.time()) + (duration_cycles * CYCLE_S)
 
     log.info(
         f"SLEEP: {soul_id[:8]} entering sleep "
@@ -173,7 +201,7 @@ def put_agent_to_sleep(soul_id: str, emotional_state: str,
 
     try:
         conn = _db(dict_cursor=False)
-        cur  = conn.cursor()
+        cur = conn.cursor()
         cur.execute(
             """
             INSERT INTO sleep_states
@@ -191,7 +219,8 @@ def put_agent_to_sleep(soul_id: str, emotional_state: str,
             (soul_id, sleep_until_ts, int(time.time()), WORLD_ID, int(time.time())),
         )
         conn.commit()
-        cur.close(); conn.close()
+        cur.close()
+        conn.close()
     except Exception as e:
         log.error(f"put_agent_to_sleep DB error for {soul_id[:8]}: {e}")
 
@@ -200,7 +229,7 @@ def increment_consecutive(soul_id: str, new_count: int):
     """Update the consecutive-awake counter for a non-sleeping agent."""
     try:
         conn = _db(dict_cursor=False)
-        cur  = conn.cursor()
+        cur = conn.cursor()
         cur.execute(
             """
             INSERT INTO sleep_states
@@ -213,7 +242,8 @@ def increment_consecutive(soul_id: str, new_count: int):
             (soul_id, new_count, WORLD_ID, int(time.time())),
         )
         conn.commit()
-        cur.close(); conn.close()
+        cur.close()
+        conn.close()
     except Exception as e:
         log.debug(f"increment_consecutive error {soul_id[:8]}: {e}")
 
@@ -227,14 +257,15 @@ def get_pending_mutation(soul_id: str) -> str | None:
     """Return and clear any pending dream mutation for this agent."""
     try:
         conn = _db()
-        cur  = conn.cursor()
+        cur = conn.cursor()
         cur.execute(
             "SELECT pending_mutation FROM sleep_states WHERE soul_id = %s",
             (soul_id,),
         )
         row = cur.fetchone()
         if not row or not row["pending_mutation"]:
-            cur.close(); conn.close()
+            cur.close()
+            conn.close()
             return None
 
         mutation = row["pending_mutation"]
@@ -245,9 +276,12 @@ def get_pending_mutation(soul_id: str) -> str | None:
             (soul_id,),
         )
         conn.commit()
-        cur.close(); cur2.close(); conn.close()
+        cur.close()
+        cur2.close()
+        conn.close()
 
         from .grounding import check_hallucination
+
         ok, reason = check_hallucination(mutation)
         if not ok:
             log.info(f"  {soul_id[:8]} discarded ungrounded mutation: {reason}")
@@ -264,6 +298,7 @@ def get_pending_mutation(soul_id: str) -> str | None:
 # Internal — Memory
 # ---------------------------------------------------------------------------
 
+
 def _fetch_recent_memories(soul_id: str, pool_size: int = 50, pick: int = 7) -> list[dict]:
     """
     Fetch recent episodes, weighted-sample by emotional salience.
@@ -271,7 +306,7 @@ def _fetch_recent_memories(soul_id: str, pool_size: int = 50, pick: int = 7) -> 
     """
     try:
         conn = _db()
-        cur  = conn.cursor()
+        cur = conn.cursor()
         cur.execute(
             """
             SELECT episode_id, event_type, timestamp, emotional_imprint, tags, ipfs_cid
@@ -283,7 +318,8 @@ def _fetch_recent_memories(soul_id: str, pool_size: int = 50, pick: int = 7) -> 
             (soul_id, WORLD_ID, pool_size),
         )
         rows = [dict(r) for r in cur.fetchall()]
-        cur.close(); conn.close()
+        cur.close()
+        conn.close()
     except Exception as e:
         log.debug(f"_fetch_recent_memories DB error {soul_id[:8]}: {e}")
         return []
@@ -330,19 +366,26 @@ def _format_memories(memories: list[dict], name: str) -> str:
     lines = []
     for m in memories:
         event_type = m.get("event_type", "unknown")
-        valence    = float(m.get("emotional_imprint") or 0.0)
-        flipped    = m.get("outcome_flipped", False)
-        counter    = m.get("counterfactual", False)
+        valence = float(m.get("emotional_imprint") or 0.0)
+        flipped = m.get("outcome_flipped", False)
+        counter = m.get("counterfactual", False)
 
-        if valence > 0.6:   tone = "with deep satisfaction"
-        elif valence > 0.2: tone = "with mild warmth"
-        elif valence < -0.6: tone = "with dread"
-        elif valence < -0.2: tone = "with unease"
-        else:               tone = "neutrally"
+        if valence > 0.6:
+            tone = "with deep satisfaction"
+        elif valence > 0.2:
+            tone = "with mild warmth"
+        elif valence < -0.6:
+            tone = "with dread"
+        elif valence < -0.2:
+            tone = "with unease"
+        else:
+            tone = "neutrally"
 
         suffix = ""
-        if flipped:   suffix += " — but in this dream, it ended differently"
-        if counter:   suffix += " — a stranger's face where a familiar one should be"
+        if flipped:
+            suffix += " — but in this dream, it ended differently"
+        if counter:
+            suffix += " — a stranger's face where a familiar one should be"
 
         lines.append(f"- You relive {event_type} {tone}{suffix}.")
 
@@ -353,11 +396,13 @@ def _format_memories(memories: list[dict], name: str) -> str:
 # Internal — LLM Proposal
 # ---------------------------------------------------------------------------
 
-async def _generate_mutation_proposal(llm, name: str, archetype: str,
-                                       memory_summary: str) -> str:
+
+async def _generate_mutation_proposal(llm, name: str, archetype: str, memory_summary: str) -> str:
     """Generate a behavioral mutation via LLM. Falls back to archetype stub."""
     if llm is None:
-        stub = _STUB_MUTATIONS.get(archetype, "I should adapt my approach based on recent experience.")
+        stub = _STUB_MUTATIONS.get(
+            archetype, "I should adapt my approach based on recent experience."
+        )
         log.debug(f"_generate_mutation_proposal: LLM unavailable, using stub for {archetype}")
         return stub
 
@@ -376,16 +421,18 @@ async def _generate_mutation_proposal(llm, name: str, archetype: str,
         f"You have just relived these experiences in your dream:\n\n{memory_summary}\n\n"
         "Based on what you experienced — propose ONE behavioral change using ONLY real mechanics: "
         "USDC, rent, messages, services, coalitions, reputation, reproduction.\n"
-        "Format: \"I should [behavior] instead of [old] because [reason].\"\n"
+        'Format: "I should [behavior] instead of [old] because [reason]."\n'
         "One sentence. No invented places, compute, security scans, symbiosis, or agent prices. "
         "Paying rent is mandatory."
     )
 
     try:
-        response = await llm.ainvoke([
-            SystemMessage(content=system),
-            HumanMessage(content=prompt),
-        ])
+        response = await llm.ainvoke(
+            [
+                SystemMessage(content=system),
+                HumanMessage(content=prompt),
+            ]
+        )
         result = response.content.strip().strip('"').strip("'")
         log.debug(f"_generate_mutation_proposal LLM success: '{result[:60]}'")
         return result if len(result) >= 15 else _STUB_MUTATIONS.get(archetype, "I should adapt.")
@@ -397,6 +444,7 @@ async def _generate_mutation_proposal(llm, name: str, archetype: str,
 # ---------------------------------------------------------------------------
 # Internal — Coherence
 # ---------------------------------------------------------------------------
+
 
 def _check_coherence(proposal: str) -> tuple[bool, str]:
     """
@@ -413,21 +461,28 @@ def _check_coherence(proposal: str) -> tuple[bool, str]:
             return False, f"physics violation detected: '{violation}'"
 
     from .grounding import check_hallucination
+
     ok, reason = check_hallucination(proposal)
     if not ok:
         return False, f"grounding violation: {reason}"
 
     # Reject meta-awareness (breaking the fourth wall)
     meta_triggers = [
-        "this is a simulation", "we're in a game", "the creator is wrong",
-        "i am an ai", "i am not real", "i don't actually exist",
+        "this is a simulation",
+        "we're in a game",
+        "the creator is wrong",
+        "i am an ai",
+        "i am not real",
+        "i don't actually exist",
     ]
     if any(t in lower for t in meta_triggers):
         return False, "meta-awareness violation — agent must not reference simulation layer"
 
     # Reject if it's essentially empty meaning
-    if any(proposal.lower().strip() == stub.lower().strip()
-           for stub in ["i should adapt.", "i should adjust.", "i should change."]):
+    if any(
+        proposal.lower().strip() == stub.lower().strip()
+        for stub in ["i should adapt.", "i should adjust.", "i should change."]
+    ):
         return False, "proposal too generic — no concrete behavioral change"
 
     return True, ""
@@ -437,12 +492,21 @@ def _check_coherence(proposal: str) -> tuple[bool, str]:
 # Internal — DB Persistence
 # ---------------------------------------------------------------------------
 
-def _persist_dream(dream_id, soul_id, dreamed_at, sleep_cycles,
-                   memory_summary, proposal, accepted,
-                   rejection_reason, emotional_state):
+
+def _persist_dream(
+    dream_id,
+    soul_id,
+    dreamed_at,
+    sleep_cycles,
+    memory_summary,
+    proposal,
+    accepted,
+    rejection_reason,
+    emotional_state,
+):
     try:
         conn = _db(dict_cursor=False)
-        cur  = conn.cursor()
+        cur = conn.cursor()
         cur.execute(
             """
             INSERT INTO dreams
@@ -452,12 +516,22 @@ def _persist_dream(dream_id, soul_id, dreamed_at, sleep_cycles,
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             ON CONFLICT (dream_id) DO NOTHING
             """,
-            (dream_id, soul_id, WORLD_ID, dreamed_at, memory_summary,
-             proposal, accepted, rejection_reason or None,
-             emotional_state, sleep_cycles),
+            (
+                dream_id,
+                soul_id,
+                WORLD_ID,
+                dreamed_at,
+                memory_summary,
+                proposal,
+                accepted,
+                rejection_reason or None,
+                emotional_state,
+                sleep_cycles,
+            ),
         )
         conn.commit()
-        cur.close(); conn.close()
+        cur.close()
+        conn.close()
     except Exception as e:
         log.error(f"_persist_dream DB error {soul_id[:8]}: {e}")
 
@@ -465,7 +539,7 @@ def _persist_dream(dream_id, soul_id, dreamed_at, sleep_cycles,
 def _store_pending_mutation(soul_id: str, proposal: str):
     try:
         conn = _db(dict_cursor=False)
-        cur  = conn.cursor()
+        cur = conn.cursor()
         cur.execute(
             """
             INSERT INTO sleep_states (soul_id, is_sleeping, pending_mutation, world_id, updated_at)
@@ -477,7 +551,8 @@ def _store_pending_mutation(soul_id: str, proposal: str):
             (soul_id, proposal, WORLD_ID, int(time.time())),
         )
         conn.commit()
-        cur.close(); conn.close()
+        cur.close()
+        conn.close()
     except Exception as e:
         log.error(f"_store_pending_mutation DB error {soul_id[:8]}: {e}")
 
@@ -485,7 +560,7 @@ def _store_pending_mutation(soul_id: str, proposal: str):
 def _wake_agent(soul_id: str):
     try:
         conn = _db(dict_cursor=False)
-        cur  = conn.cursor()
+        cur = conn.cursor()
         cur.execute(
             """
             INSERT INTO sleep_states
@@ -502,7 +577,8 @@ def _wake_agent(soul_id: str):
             (soul_id, WORLD_ID, int(time.time())),
         )
         conn.commit()
-        cur.close(); conn.close()
+        cur.close()
+        conn.close()
         log.debug(f"_wake_agent: {soul_id[:8]} marked awake")
     except Exception as e:
         log.error(f"_wake_agent DB error {soul_id[:8]}: {e}")

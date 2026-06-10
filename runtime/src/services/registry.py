@@ -1,10 +1,10 @@
 """
 registry.py — Service listing CRUD against the service_listings PostgreSQL table.
 """
-import os
+
 import logging
+import os
 import uuid
-import time
 
 import psycopg2
 import psycopg2.extras
@@ -49,8 +49,16 @@ async def register_service(
         cur.close()
         conn.close()
 
-    listing = dict(row) if row else {"listing_id": listing_id, "name": name,
-                                     "endpoint_path": endpoint_path, "price_usdc": price_usdc}
+    listing = (
+        dict(row)
+        if row
+        else {
+            "listing_id": listing_id,
+            "name": name,
+            "endpoint_path": endpoint_path,
+            "price_usdc": price_usdc,
+        }
+    )
     log.info(f"Service registered: {soul_id[:8]} → {name} @ ${price_usdc:.4f}")
     return listing
 
@@ -110,8 +118,9 @@ def get_agent_wallet(soul_id: str) -> str | None:
     conn = _db()
     cur = conn.cursor()
     try:
-        cur.execute("SELECT wallet_address FROM agents WHERE soul_id = %s AND is_alive = true",
-                    (soul_id,))
+        cur.execute(
+            "SELECT wallet_address FROM agents WHERE soul_id = %s AND is_alive = true", (soul_id,)
+        )
         row = cur.fetchone()
     finally:
         cur.close()

@@ -1,8 +1,8 @@
 # Manifesto Adherence Audit
 
-> **Date:** 2026-06-10  
-> **Scope:** Ecology Hardening Manifesto (doc 74), Physics Laws v2 + Creator Covenant (doc 14), Vision (doc 01), Observer mandate (doc 06)  
-> **Method:** Full doc index review (74 documents), runtime/observer/contracts audit, `gh repo sync` on `main`  
+> **Date:** 2026-06-10
+> **Scope:** Ecology Hardening Manifesto (doc 74), Physics Laws v2 + Creator Covenant (doc 14), Vision (doc 01), Observer mandate (doc 06)
+> **Method:** Full doc index review (74 documents), runtime/observer/contracts audit, `gh repo sync` on `main`
 > **Status:** Audit only — no code changes made
 
 ---

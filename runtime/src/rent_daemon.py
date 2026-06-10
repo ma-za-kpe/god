@@ -10,6 +10,7 @@ Rent schedule (dev defaults, overridable via env):
   RENT_AMOUNT_USDC=0.001    ($0.001 per period)
   MAX_MISSED_PAYMENTS=3     (3 strikes = death)
 """
+
 import asyncio
 import json
 import logging
@@ -26,28 +27,36 @@ from .event_emitter import get_emitter
 
 log = logging.getLogger("god.rent")
 
-DATABASE_URL       = os.getenv("DATABASE_URL", "postgresql://god:localdev@localhost:5432/god_world")
-ANVIL_RPC          = os.getenv("ANVIL_RPC", "http://localhost:8545")
+DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://god:localdev@localhost:5432/god_world")
+ANVIL_RPC = os.getenv("ANVIL_RPC", "http://localhost:8545")
 RENT_COLLECTOR_ADDR = os.getenv("RENT_COLLECTOR_ADDRESS", "")
-RENT_PERIOD_S      = int(os.getenv("RENT_PERIOD_SECONDS", "300"))
-RENT_AMOUNT_USDC   = Decimal(os.getenv("RENT_AMOUNT_USDC", "0.001"))
-MAX_MISSES         = int(os.getenv("MAX_MISSED_PAYMENTS", "3"))
-CYCLE_S            = int(os.getenv("RENT_CYCLE_SECONDS", "60"))
-WORLD_ID           = os.getenv("WORLD_ID", "local-dev-world-1")
+RENT_PERIOD_S = int(os.getenv("RENT_PERIOD_SECONDS", "300"))
+RENT_AMOUNT_USDC = Decimal(os.getenv("RENT_AMOUNT_USDC", "0.001"))
+MAX_MISSES = int(os.getenv("MAX_MISSED_PAYMENTS", "3"))
+CYCLE_S = int(os.getenv("RENT_CYCLE_SECONDS", "60"))
+WORLD_ID = os.getenv("WORLD_ID", "local-dev-world-1")
 
 RENT_ABI = [
-    {"name": "collectRent", "type": "function",
-     "inputs": [{"name": "soulId", "type": "bytes32"}],
-     "outputs": [], "stateMutability": "nonpayable"},
-    {"name": "leases", "type": "function",
-     "inputs": [{"name": "soulId", "type": "bytes32"}],
-     "outputs": [
-         {"name": "agentWallet", "type": "address"},
-         {"name": "lastPaid", "type": "uint256"},
-         {"name": "missedPayments", "type": "uint256"},
-         {"name": "active", "type": "bool"},
-         {"name": "registeredAt", "type": "uint256"},
-     ], "stateMutability": "view"},
+    {
+        "name": "collectRent",
+        "type": "function",
+        "inputs": [{"name": "soulId", "type": "bytes32"}],
+        "outputs": [],
+        "stateMutability": "nonpayable",
+    },
+    {
+        "name": "leases",
+        "type": "function",
+        "inputs": [{"name": "soulId", "type": "bytes32"}],
+        "outputs": [
+            {"name": "agentWallet", "type": "address"},
+            {"name": "lastPaid", "type": "uint256"},
+            {"name": "missedPayments", "type": "uint256"},
+            {"name": "active", "type": "bool"},
+            {"name": "registeredAt", "type": "uint256"},
+        ],
+        "stateMutability": "view",
+    },
 ]
 
 
@@ -115,6 +124,7 @@ async def _create_death_archive(soul_id: str, name: str, conn) -> str:
 
         # Pin to IPFS
         import httpx
+
         async with httpx.AsyncClient(timeout=15) as client:
             resp = await client.post(
                 f"{IPFS_API}/api/v0/add",
@@ -136,7 +146,8 @@ async def _run_cycle_local(emitter):
     conn = _db()
     cur = conn.cursor()
 
-    cur.execute("""
+    cur.execute(
+        """
         SELECT
             a.soul_id,
             a.current_name,
@@ -153,7 +164,9 @@ async def _run_cycle_local(emitter):
                 AND rp.paid_at > %s) AS recent_misses
         FROM agents a
         WHERE a.is_alive = true AND a.world_id = %s
-    """, (now - RENT_PERIOD_S * MAX_MISSES * 2, WORLD_ID))
+    """,
+        (now - RENT_PERIOD_S * MAX_MISSES * 2, WORLD_ID),
+    )
 
     agents = cur.fetchall()
     log.info(f"Rent cycle (sim): {len(agents)} living agents")
@@ -184,13 +197,17 @@ async def _run_cycle_local(emitter):
                 (soul_id, rent_due, now),
             )
             conn.commit()
-            await emitter.emit("economy", "rent.paid", {
-                "agent_id": soul_id,
-                "name": name,
-                "amount_usdc": rent_due,
-                "balance_after": round(current_balance - rent_due, 6),
-                "narrative": f"{name} paid rent (${rent_due:.4f}). Balance: ${current_balance - rent_due:.4f}",
-            })
+            await emitter.emit(
+                "economy",
+                "rent.paid",
+                {
+                    "agent_id": soul_id,
+                    "name": name,
+                    "amount_usdc": rent_due,
+                    "balance_after": round(current_balance - rent_due, 6),
+                    "narrative": f"{name} paid rent (${rent_due:.4f}). Balance: ${current_balance - rent_due:.4f}",
+                },
+            )
             log.info(f"  ✓ {name}: rent paid (bal ${current_balance - rent_due:.4f})")
         else:
             cur.execute(
@@ -199,12 +216,16 @@ async def _run_cycle_local(emitter):
             )
             conn.commit()
             new_misses = recent_misses + 1
-            await emitter.emit("economy", "rent.missed", {
-                "agent_id": soul_id,
-                "name": name,
-                "missed_count": new_misses,
-                "narrative": f"{name} missed rent ({new_misses}/{MAX_MISSES}).",
-            })
+            await emitter.emit(
+                "economy",
+                "rent.missed",
+                {
+                    "agent_id": soul_id,
+                    "name": name,
+                    "missed_count": new_misses,
+                    "narrative": f"{name} missed rent ({new_misses}/{MAX_MISSES}).",
+                },
+            )
             log.warning(f"  ✗ {name}: missed ({new_misses}/{MAX_MISSES})")
 
             if new_misses >= MAX_MISSES:
@@ -219,17 +240,21 @@ async def _run_cycle_local(emitter):
                 conn.commit()
 
                 archive_note = f" Archive: ipfs://{archive_cid}" if archive_cid else ""
-                await emitter.emit("lifecycle", "agent.died", {
-                    "agent_id": soul_id,
-                    "name": name,
-                    "cause": "rent_default",
-                    "missed_payments": new_misses,
-                    "death_archive_cid": archive_cid,
-                    "narrative": (
-                        f"⚰ {name} has died — rent unpaid for {new_misses} consecutive cycles."
-                        f"{archive_note}"
-                    ),
-                })
+                await emitter.emit(
+                    "lifecycle",
+                    "agent.died",
+                    {
+                        "agent_id": soul_id,
+                        "name": name,
+                        "cause": "rent_default",
+                        "missed_payments": new_misses,
+                        "death_archive_cid": archive_cid,
+                        "narrative": (
+                            f"⚰ {name} has died — rent unpaid for {new_misses} consecutive cycles."
+                            f"{archive_note}"
+                        ),
+                    },
+                )
                 log.warning(f"  ☠  {name} DIED — rent default{archive_note}")
 
     cur.close()
@@ -243,14 +268,14 @@ async def rent_daemon():
     if RENT_COLLECTOR_ADDR:
         log.info(f"  On-chain mode: {RENT_COLLECTOR_ADDR}")
         w3 = Web3(Web3.HTTPProvider(ANVIL_RPC))
-        contract = w3.eth.contract(
+        _ = w3.eth.contract(
             address=Web3.to_checksum_address(RENT_COLLECTOR_ADDR),
             abi=RENT_ABI,
         )
         log.info(f"  Chain ID: {w3.eth.chain_id}")
     else:
         log.info("  Simulation mode (set RENT_COLLECTOR_ADDRESS for on-chain)")
-        w3, contract = None, None
+        w3 = None
 
     # Wait for DB
     for attempt in range(15):
@@ -258,7 +283,7 @@ async def rent_daemon():
             _db().close()
             log.info("  DB ready")
             break
-        except Exception as e:
+        except Exception:
             log.info(f"  Waiting for DB ({attempt + 1}/15)...")
             await asyncio.sleep(4)
 

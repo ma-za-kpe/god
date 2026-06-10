@@ -76,13 +76,13 @@ The system must have automatic financial circuit breakers. These are not discret
 ```
 THRESHOLD 1 — Yellow Alert
   Condition: rent_income < 70% of infrastructure_cost for 2 consecutive months
-  Response: 
+  Response:
     - Announce to all agents via world broadcast
     - Increase rent base rate by 15% (with 14-day advance notice per Law 0a)
     - Reduce creator bounty pool by 50%
     - Freeze new world deployments
 
-THRESHOLD 2 — Red Alert  
+THRESHOLD 2 — Red Alert
   Condition: rent_income < 40% of infrastructure_cost OR reserve < 3 months runway
   Response:
     - Emergency rent increase (up to 2x base, with 14-day notice)

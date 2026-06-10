@@ -136,7 +136,7 @@ From [doc 76](./76-agent-scaling-and-observer-performance.md) and P0/P1 implemen
 | C6 | Runtime health | `GET /health` ok; no OOM restart in 10 min soak |
 | C7 | Cognitive lag honesty | Report `due_count/total` from logs; document LLM mode |
 
-**Phase A (required first):** `LLM_PROVIDER=stub` or Ollama stopped — proves **observation path** scales.  
+**Phase A (required first):** `LLM_PROVIDER=stub` or Ollama stopped — proves **observation path** scales.
 **Phase B (if GPU allows):** Ollama with `LLM_CONCURRENCY=4` — report queue depth / cycle time.
 
 ---
@@ -191,14 +191,14 @@ Copy-paste this block filled in, then **append the log bundle** (not optional):
 
 ```
 Branch: feat/p0-manifesto-and-scaling @ <sha>
-Agents living: 
+Agents living:
 LLM mode: stub | ollama (<model>)
-Snapshot p95 ms: 
-/agents ms: 
-Observer FPS (5 min avg): 
+Snapshot p95 ms:
+/agents ms:
+Observer FPS (5 min avg):
 WS: ok | fail
-Runtime restarts: 
-Docker mem peak: 
+Runtime restarts:
+Docker mem peak:
 Notes:
 --- logs ---
 (paste output of: docker compose logs runtime --tail 200)

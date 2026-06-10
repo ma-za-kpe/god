@@ -17,23 +17,23 @@ Embodiment is not binary. There is a spectrum from pure digital to full physical
 ```
 Level 0 — Pure Digital
   Agent exists only in compute. No physical sensing or actuation.
-  
+
 Level 1 — Environmental Sensing (Read-Only)
   Agent receives data from physical sensors (temperature, light, sound, movement).
   Cannot affect the physical world. Physical data shapes its world model.
-  
+
 Level 2 — Physical Output (Write-Only)
   Agent can produce physical outputs: display content, play sounds, control lights.
   Cannot receive physical feedback. Output without consequence.
-  
+
 Level 3 — Feedback Loop (Read + Write)
   Agent controls physical actuators AND receives sensor feedback from the consequences.
   Battery level = hunger. Physical damage = pain. This is genuine embodiment.
-  
+
 Level 4 — Mobile Embodiment
   Agent controls a mobile platform (robot, drone, vehicle).
   Spatial presence, navigation, physical interaction with objects and environment.
-  
+
 Level 5 — Human-Space Presence
   Agent controls something that occupies and interacts in human-inhabited spaces.
   Social presence beyond the screen. Direct physical relationship with humans.
@@ -54,18 +54,18 @@ class BodyContract:
     body_type: str                      # "sensor_array" | "display" | "actuator" | "mobile_robot"
     hardware_specs: dict                # what physical capabilities it has
     location_description: str          # physical location (not GPS — description for privacy)
-    
+
     # Economics
     deployment_cost_usdc: Decimal       # one-time hardware + setup cost
     operating_cost_per_day_usdc: Decimal # power + maintenance
     insurance_deposit_usdc: Decimal     # held in escrow for physical damage liability
-    
+
     # Safety
     kill_switch_controller: str         # who can physically power off this body (human override)
     capability_whitelist: list[str]     # what physical actions are permitted
     geofence: dict                      # physical boundaries the body cannot leave
     human_safety_contact: str          # human who can be reached if something goes wrong
-    
+
     # Status
     is_active: bool
     battery_level: float               # 0.0 (empty) to 1.0 (full)
@@ -87,7 +87,7 @@ class BodyContract:
 - **Raspberry Pi + servo motors + sensors:** ~$150 per node
 - **What the agent controls:** Simple actuators (open/close valve, rotate, trigger)
 - **Sensor feedback:** The result of the actuation is reported back
-- **Battery management:** Battery level → agent's "hunger" signal. Must manage charging. 
+- **Battery management:** Battery level → agent's "hunger" signal. Must manage charging.
 - **Physical damage:** If actuator is misused, hardware wears faster. Cost increases. This is pain.
 - **Cost to agent:** ~$0.20/day + maintenance reserve
 
@@ -115,7 +115,7 @@ class PhysicalMetabolism:
     battery_level: float               # maps to energy_state in digital metabolism
     thermal_state: float               # too hot or too cold affects processing
     physical_integrity: float          # 1.0 = perfect condition, 0.0 = broken
-    
+
     # Behavioral effects (same mechanism as digital emotional states)
     # battery < 0.2: agent becomes desperate for power — will seek charging aggressively
     # thermal > 0.9: agent throttles to prevent damage

@@ -44,7 +44,7 @@ Every point where physics law enforcement occurs must be catalogued and audited.
 | `soul_id` stored in SoulNFT token (tokenId = uint256(soul_id)) | SoulNFT.sol | On-chain |
 | OwnedGraph `agent_identity.soul_id` immutable after creation | owned_graph.py | Convention only |
 
-**Gap**: The OwnedGraph `soul_id` field is not cryptographically enforced — a runtime bug could theoretically overwrite it. 
+**Gap**: The OwnedGraph `soul_id` field is not cryptographically enforced — a runtime bug could theoretically overwrite it.
 
 **Hardening**: Add a signature check — `soul_id` changes to OwnedGraph must be signed by the agent's key. The OwnedGraph spec (doc 29) already requires this; the hardening ensures it's actually checked on every write.
 
@@ -60,7 +60,7 @@ Every point where physics law enforcement occurs must be catalogued and audited.
 
 **Gap**: There is no cryptographic barrier to setting `is_alive = true` in PostgreSQL for a dead agent. The SoulNFT is burned (irreversible), but the runtime could technically be modified to create a new SoulNFT with a new tokenId for the same soul_id.
 
-**Hardening**: 
+**Hardening**:
 1. SoulNFT: add `burnedSouls` mapping that permanently records which `soul_ids` have been burned. `mint()` reverts if `burnedSouls[soulId]` is set.
 2. Runtime: add a death seal — any agent with a burned SoulNFT that appears in the `agents` table with `is_alive = true` triggers an alert and halts the entire runtime until the creator manually reviews.
 
@@ -105,7 +105,7 @@ Every significant state change (agent death, balance update, reproduction) must 
 
 This means a compromised runtime cannot kill agents selectively or grant immortality — it needs to compromise a majority of nodes simultaneously.
 
-**Phase 6.0**: 2-of-3 nodes (creator node + 2 independent)  
+**Phase 6.0**: 2-of-3 nodes (creator node + 2 independent)
 **Phase 7**: 3-of-5 nodes (creator node + 4 community-run nodes, operators paid in USDC by the world treasury)
 
 ---
@@ -117,12 +117,12 @@ Formal verification proves mathematical properties about the contract's behavior
 ### Property 1: Death is Permanent
 
 ```
-∀ soulId: 
+∀ soulId:
   once AgentDeleted(soulId) is emitted →
   ∀ t > emission_time: leases[soulId].active = false
 ```
 
-**Tool**: Certora Prover or Halmos (symbolic execution)  
+**Tool**: Certora Prover or Halmos (symbolic execution)
 **Method**: Encode the invariant as a CVL (Certora Verification Language) rule and verify against all execution paths.
 
 ### Property 2: Only Creator Can Register Agents
@@ -133,7 +133,7 @@ Formal verification proves mathematical properties about the contract's behavior
   transaction reverts with NotCreator()
 ```
 
-**Tool**: Halmos (Foundry's symbolic testing mode)  
+**Tool**: Halmos (Foundry's symbolic testing mode)
 **Method**: Symbolic fuzz all inputs with `msg.sender = arbitrary address`.
 
 ### Property 3: endWorld Timelock Is Enforced

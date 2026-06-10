@@ -4,6 +4,7 @@ wallet_store.py — Local-dev wallet key vault (never commit).
 Stores agent private keys for on-chain actions during local development.
 Production: replace with HSM / MPC / agent-owned key management.
 """
+
 from __future__ import annotations
 
 import json

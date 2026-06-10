@@ -3,6 +3,7 @@ circuit_breaker.py — Per-agent rate limits (doc 07 circuit breakers).
 
 Tripped breakers pause actions, not life. Repeated trips increase cooldown.
 """
+
 import logging
 import os
 import time
@@ -10,10 +11,10 @@ from dataclasses import dataclass, field
 
 log = logging.getLogger("god.breaker")
 
-MAX_ACTIONS_PER_HOUR  = int(os.getenv("MAX_ACTIONS_PER_HOUR", "60"))
+MAX_ACTIONS_PER_HOUR = int(os.getenv("MAX_ACTIONS_PER_HOUR", "60"))
 MAX_MESSAGES_PER_HOUR = int(os.getenv("MAX_MESSAGES_PER_HOUR", "30"))
 MAX_LLM_CALLS_PER_HOUR = int(os.getenv("MAX_LLM_CALLS_PER_HOUR", "180"))
-BREAKER_COOLDOWN_S    = int(os.getenv("BREAKER_COOLDOWN_S", "120"))
+BREAKER_COOLDOWN_S = int(os.getenv("BREAKER_COOLDOWN_S", "120"))
 
 
 @dataclass

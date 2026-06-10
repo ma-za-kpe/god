@@ -4,6 +4,7 @@ physics_gate.py — Law 0 pre-cycle enforcement.
 Rent must gate cognition before agent code runs. Missed payments throttle
 compute (50% → 10%) per Physics Laws v2 / doc 14.
 """
+
 import logging
 import os
 from dataclasses import dataclass
@@ -16,8 +17,8 @@ MAX_MISSES = int(os.getenv("MAX_MISSED_PAYMENTS", "3"))
 @dataclass(frozen=True)
 class PhysicsGateResult:
     allow_cognition: bool
-    compute_capacity: float   # 1.0 | 0.5 | 0.1 | 0.0
-    throttle_level: str       # "none" | "throttled" | "severe" | "blocked"
+    compute_capacity: float  # 1.0 | 0.5 | 0.1 | 0.0
+    throttle_level: str  # "none" | "throttled" | "severe" | "blocked"
     reason: str
 
 

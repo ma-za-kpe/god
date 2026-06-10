@@ -4,6 +4,7 @@ narrator.py — Template-based drama narrativizer for public observer feed.
 Transforms raw events into human-readable stories without sanitizing content.
 LLM narrativization can be layered on later; templates work offline.
 """
+
 import logging
 import os
 from typing import Any, Optional
@@ -11,7 +12,7 @@ from typing import Any, Optional
 log = logging.getLogger("god.narrator")
 
 NARRATOR_ENABLED = os.getenv("NARRATOR_ENABLED", "true").lower() in ("1", "true", "yes")
-DEFAULT_STYLE    = os.getenv("NARRATOR_STYLE", "gossip")
+DEFAULT_STYLE = os.getenv("NARRATOR_STYLE", "gossip")
 
 # Events that always get a narrative.story companion
 _SIGNIFICANT = {
@@ -37,7 +38,9 @@ def _pick(payload: dict, *keys: str, default: str = "") -> str:
     return default
 
 
-def narrativize_event(event_type: str, payload: dict[str, Any], style: str = DEFAULT_STYLE) -> Optional[str]:
+def narrativize_event(
+    event_type: str, payload: dict[str, Any], style: str = DEFAULT_STYLE
+) -> Optional[str]:
     """
     Return enhanced narrative prose for an event, or None if not narratable.
     Does not remove or soften hostile content — styles it for observers.
@@ -45,13 +48,13 @@ def narrativize_event(event_type: str, payload: dict[str, Any], style: str = DEF
     if not NARRATOR_ENABLED:
         return None
 
-    name      = _pick(payload, "name", "agent_name", default="An agent")
+    name = _pick(payload, "name", "agent_name", default="An agent")
     archetype = _pick(payload, "archetype", default="unknown")
-    thought   = _pick(payload, "thought", default="")
-    content   = _pick(payload, "content", default="")
-    amount    = payload.get("amount_usdc") or payload.get("amount") or payload.get("escrow")
+    thought = _pick(payload, "thought", default="")
+    content = _pick(payload, "content", default="")
+    amount = payload.get("amount_usdc") or payload.get("amount") or payload.get("escrow")
     recipient = _pick(payload, "recipient_name", default="")
-    mt        = _pick(payload, "message_type", default="")
+    mt = _pick(payload, "message_type", default="")
 
     # Already has a good narrative from emitter — enhance only if thin
     existing = _pick(payload, "narrative", default="")
@@ -89,7 +92,7 @@ def narrativize_event(event_type: str, payload: dict[str, Any], style: str = DEF
 
     if event_type == "economy.agent.transfer":
         amt = float(amount or 0)
-        to  = recipient or _pick(payload, "recipient_id", default="another")[:8]
+        to = recipient or _pick(payload, "recipient_id", default="another")[:8]
         return f"💱 {name} sends ${amt:.4f} USDC to {to}. Trust or trap — the ecology decides."
 
     if event_type == "economy.token.deployed":
@@ -99,15 +102,15 @@ def narrativize_event(event_type: str, payload: dict[str, Any], style: str = DEF
     if event_type == "social.agent.message_sent":
         if mt in ("threat", "manifesto", "propaganda", "contract"):
             body = content[:100] if content else existing[:100]
-            return f"⚡ PUBLIC {mt.upper()} from {name}: \"{body}\""
+            return f'⚡ PUBLIC {mt.upper()} from {name}: "{body}"'
         if content:
             to = recipient or _pick(payload, "recipient_id", default="someone")[:8]
-            return f"✉ {name} → {to}: \"{content[:90]}\""
+            return f'✉ {name} → {to}: "{content[:90]}"'
 
     if event_type == "social.agent.broadcast":
         body = content[:120] if content else existing[:120]
         label = mt.upper() if mt else "BROADCAST"
-        return f"📢 {label} — {name} calls to all: \"{body}\""
+        return f'📢 {label} — {name} calls to all: "{body}"'
 
     if event_type == "social.coalition.formed":
         cname = _pick(payload, "coalition_name", default="unnamed pact")
@@ -121,12 +124,16 @@ def narrativize_event(event_type: str, payload: dict[str, Any], style: str = DEF
         if not thought or len(thought) < 12:
             return None
         if style == "gossip" and archetype == "parasite":
-            return f"👁 {name} ({archetype}) plots: \"{thought[:100]}\""
+            return f'👁 {name} ({archetype}) plots: "{thought[:100]}"'
         if style == "chronicle":
             return f"{name} ({archetype}) records: {thought[:110]}"
         # Sample cognitive events — not every thought (noise control)
-        if payload.get("throttled") or payload.get("action_type") in ("economic", "social", "reproductive"):
-            return f"{name}: \"{thought[:100]}\""
+        if payload.get("throttled") or payload.get("action_type") in (
+            "economic",
+            "social",
+            "reproductive",
+        ):
+            return f'{name}: "{thought[:100]}"'
         return None
 
     if event_type in _SIGNIFICANT and existing:

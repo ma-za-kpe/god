@@ -8,6 +8,7 @@ Each agent gets a private workspace the runtime refreshes every cycle:
 
 Evidence lives here; authority still flows only through structured actions.
 """
+
 from __future__ import annotations
 
 import json
@@ -174,7 +175,9 @@ def write_scratch(soul_id: str, key: str, content: str) -> bool:
         return False
 
 
-def log_action(soul_id: str, action_type: str, payload: dict, result: dict, success: bool = True) -> None:
+def log_action(
+    soul_id: str, action_type: str, payload: dict, result: dict, success: bool = True
+) -> None:
     now = int(time.time())
     try:
         conn = psycopg2.connect(DATABASE_URL)
@@ -240,7 +243,9 @@ def format_env_for_perception(soul_id: str) -> str:
             data = json.loads(snap.read_text(encoding="utf-8"))
             lines.append(f"Living agents: {data.get('living_agents', '?')}")
             for m in data.get("recent_inbox", []):
-                lines.append(f"  inbox: {m.get('from')} [{m.get('type')}]: {m.get('preview', '')[:80]}")
+                lines.append(
+                    f"  inbox: {m.get('from')} [{m.get('type')}]: {m.get('preview', '')[:80]}"
+                )
         except Exception:
             pass
     scratch = read_scratch(soul_id)

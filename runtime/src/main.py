@@ -2,6 +2,7 @@
 God Project — Agent Runtime
 Entry point. FastAPI server + background daemons for rent collection and agent execution.
 """
+
 import asyncio
 import logging
 import os
@@ -11,11 +12,11 @@ import uvicorn
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 
-from .rent_daemon import rent_daemon
 from .agent_runner import agent_runner
-from .services.routes import router as services_router
 from .creator.routes import router as creator_router
-from .status_engine import status_review_daemon, TIERS
+from .rent_daemon import rent_daemon
+from .services.routes import router as services_router
+from .status_engine import TIERS, status_review_daemon
 
 logging.basicConfig(
     level=getattr(logging, os.getenv("LOG_LEVEL", "INFO")),
@@ -31,6 +32,7 @@ async def _agent_jobs_daemon():
     interval = int(os.getenv("JOBS_TICK_S", "15"))
     from .agent_jobs import process_due_jobs
     from .event_emitter import get_emitter
+
     while True:
         try:
             await asyncio.sleep(interval)
@@ -51,7 +53,8 @@ async def _ws_snapshot_daemon():
         try:
             await asyncio.sleep(interval)
             from .world_snapshot import build_world_snapshot_async
-            from .world_stream import push_snapshot, has_subscribers
+            from .world_stream import has_subscribers, push_snapshot
+
             if not has_subscribers():
                 continue
             snap = await build_world_snapshot_async()
@@ -68,9 +71,12 @@ async def lifespan(app: FastAPI):
     log.info(f"  World:    {os.getenv('WORLD_ID', 'local-dev-world-1')}")
     log.info(f"  IPFS:     {os.getenv('IPFS_API', 'not configured')}")
     log.info(f"  Chain:    {os.getenv('ANVIL_RPC', 'not configured')}")
-    log.info(f"  LLM:      {os.getenv('LLM_PROVIDER', 'ollama')} / {os.getenv('LLM_MODEL', 'llama3.1:8b')}")
+    log.info(
+        f"  LLM:      {os.getenv('LLM_PROVIDER', 'ollama')} / {os.getenv('LLM_MODEL', 'llama3.1:8b')}"
+    )
 
-    from .db_pool import init_pool, close_pool
+    from .db_pool import close_pool, init_pool
+
     await init_pool()
 
     _background_tasks.append(asyncio.create_task(rent_daemon(), name="rent_daemon"))
@@ -118,6 +124,7 @@ async def list_agents(limit: int = 10000):
     try:
         import psycopg2
         import psycopg2.extras
+
         conn = psycopg2.connect(
             os.getenv("DATABASE_URL", "postgresql://god:localdev@localhost:5432/god_world"),
             cursor_factory=psycopg2.extras.RealDictCursor,
@@ -157,7 +164,8 @@ async def list_agents(limit: int = 10000):
             (os.getenv("WORLD_ID", "local-dev-world-1"), effective_limit),
         )
         agents = [dict(r) for r in cur.fetchall()]
-        cur.close(); conn.close()
+        cur.close()
+        conn.close()
         return {"agents": agents, "count": len(agents), "limit": effective_limit}
     except Exception as e:
         log.warning(f"/agents DB error: {e}")
@@ -169,6 +177,7 @@ async def world_snapshot(events_limit: int = 50, messages_limit: int = 80):
     """Pre-aggregated world state for public observer clients."""
     try:
         from .world_snapshot import build_world_snapshot_async
+
         return await build_world_snapshot_async(
             events_limit=min(events_limit, 200),
             messages_limit=min(messages_limit, 500),
@@ -177,6 +186,7 @@ async def world_snapshot(events_limit: int = 50, messages_limit: int = 80):
         log.warning(f"/world/snapshot error: {e}")
         try:
             from .world_snapshot import build_world_snapshot
+
             return build_world_snapshot(
                 events_limit=min(events_limit, 200),
                 messages_limit=min(messages_limit, 500),
@@ -188,8 +198,8 @@ async def world_snapshot(events_limit: int = 50, messages_limit: int = 80):
 @app.websocket("/world/stream")
 async def world_stream(ws: WebSocket):
     """WebSocket: snapshot on connect, delta pushes on events, periodic snapshot refresh."""
-    from .world_stream import subscribe, unsubscribe
     from .world_snapshot import build_world_snapshot_async
+    from .world_stream import subscribe, unsubscribe
 
     await subscribe(ws)
     try:
@@ -214,6 +224,7 @@ async def list_events(limit: int = 50):
     try:
         import psycopg2
         import psycopg2.extras
+
         conn = psycopg2.connect(
             os.getenv("DATABASE_URL", "postgresql://god:localdev@localhost:5432/god_world"),
             cursor_factory=psycopg2.extras.RealDictCursor,
@@ -225,7 +236,8 @@ async def list_events(limit: int = 50):
             (os.getenv("WORLD_ID", "local-dev-world-1"), limit),
         )
         events = [dict(r) for r in cur.fetchall()]
-        cur.close(); conn.close()
+        cur.close()
+        conn.close()
         return {"events": events, "limit": limit}
     except Exception as e:
         log.warning(f"/events DB error: {e}")
@@ -238,6 +250,7 @@ async def world_stats():
     try:
         import psycopg2
         import psycopg2.extras
+
         conn = psycopg2.connect(
             os.getenv("DATABASE_URL", "postgresql://god:localdev@localhost:5432/god_world"),
             cursor_factory=psycopg2.extras.RealDictCursor,
@@ -283,13 +296,14 @@ async def world_stats():
         cur.execute("SELECT COUNT(*) AS n FROM tokens WHERE world_id = %s", (world_id,))
         row["tokens_deployed"] = cur.fetchone()["n"]
 
-        cur.close(); conn.close()
+        cur.close()
+        conn.close()
         return {
             **row,
             **econ,
-            "world_id":     world_id,
+            "world_id": world_id,
             "llm_provider": os.getenv("LLM_PROVIDER", "ollama"),
-            "llm_model":    os.getenv("LLM_MODEL",    "llama3.1:8b"),
+            "llm_model": os.getenv("LLM_MODEL", "llama3.1:8b"),
         }
     except Exception as e:
         log.warning(f"/stats DB error: {e}")
@@ -302,6 +316,7 @@ async def get_agent_status(soul_id: str):
     try:
         import psycopg2
         import psycopg2.extras
+
         conn = psycopg2.connect(
             os.getenv("DATABASE_URL", "postgresql://god:localdev@localhost:5432/god_world"),
             cursor_factory=psycopg2.extras.RealDictCursor,
@@ -309,7 +324,8 @@ async def get_agent_status(soul_id: str):
         cur = conn.cursor()
         cur.execute("SELECT * FROM agent_status WHERE soul_id = %s", (soul_id,))
         row = cur.fetchone()
-        cur.close(); conn.close()
+        cur.close()
+        conn.close()
         if not row:
             return {"soul_id": soul_id, "tier": 0, "tier_name": "Newborn"}
         result = dict(row)
@@ -323,7 +339,8 @@ async def get_agent_status(soul_id: str):
 @app.get("/tools")
 async def list_tools():
     """World MCP catalogue + agent-registered tools (discovery surface)."""
-    from .tool_registry import list_world_tools, list_agent_tools
+    from .tool_registry import list_agent_tools, list_world_tools
+
     return {
         "world_tools": list_world_tools(),
         "agent_tools": list_agent_tools(),
@@ -334,8 +351,9 @@ async def list_tools():
 @app.get("/agents/{soul_id}/env")
 async def get_agent_env(soul_id: str):
     """Read-only environment summary for an agent (observer / debug)."""
-    from .agent_env import format_env_for_decide, fetch_recent_actions, read_scratch
+    from .agent_env import fetch_recent_actions, format_env_for_decide, read_scratch
     from .capabilities import format_capabilities_summary, get_granted_capabilities
+
     return {
         "soul_id": soul_id,
         "capabilities": sorted(get_granted_capabilities(soul_id)),
@@ -350,15 +368,16 @@ async def get_agent_env(soul_id: str):
 async def get_leaderboard(by: str = "prestige", limit: int = 20):
     """Top agents by prestige, sovereignty, revenue, or tier."""
     valid_sorts = {
-        "prestige":    "prestige_score",
+        "prestige": "prestige_score",
         "sovereignty": "sovereignty_score",
-        "revenue":     "external_revenue_30d",
-        "tier":        "tier",
+        "revenue": "external_revenue_30d",
+        "tier": "tier",
     }
     sort_col = valid_sorts.get(by, "prestige_score")
     try:
         import psycopg2
         import psycopg2.extras
+
         conn = psycopg2.connect(
             os.getenv("DATABASE_URL", "postgresql://god:localdev@localhost:5432/god_world"),
             cursor_factory=psycopg2.extras.RealDictCursor,
@@ -379,7 +398,8 @@ async def get_leaderboard(by: str = "prestige", limit: int = 20):
             (os.getenv("WORLD_ID", "local-dev-world-1"), min(limit, 100)),
         )
         rows = [dict(r) for r in cur.fetchall()]
-        cur.close(); conn.close()
+        cur.close()
+        conn.close()
         for r in rows:
             r["tier_name"] = TIERS[min(r["tier"], len(TIERS) - 1)].name
         return {"leaderboard": rows, "sorted_by": by, "count": len(rows)}
@@ -394,6 +414,7 @@ async def get_timeline(limit: int = 50):
     try:
         import psycopg2
         import psycopg2.extras
+
         db = os.getenv("DATABASE_URL", "postgresql://god:localdev@localhost:5432/god_world")
         world_id = os.getenv("WORLD_ID", "local-dev-world-1")
         conn = psycopg2.connect(db, cursor_factory=psycopg2.extras.RealDictCursor)
@@ -410,7 +431,8 @@ async def get_timeline(limit: int = 50):
             (world_id, world_id, limit),
         )
         rows = [dict(r) for r in cur.fetchall()]
-        cur.close(); conn.close()
+        cur.close()
+        conn.close()
         return {"timeline": rows, "count": len(rows)}
     except Exception as e:
         log.warning(f"/timeline DB error: {e}")
@@ -423,6 +445,7 @@ async def get_world_firsts():
     try:
         import psycopg2
         import psycopg2.extras
+
         db = os.getenv("DATABASE_URL", "postgresql://god:localdev@localhost:5432/god_world")
         world_id = os.getenv("WORLD_ID", "local-dev-world-1")
         conn = psycopg2.connect(db, cursor_factory=psycopg2.extras.RealDictCursor)
@@ -432,7 +455,8 @@ async def get_world_firsts():
             (world_id,),
         )
         rows = [dict(r) for r in cur.fetchall()]
-        cur.close(); conn.close()
+        cur.close()
+        conn.close()
         return {"firsts": rows, "count": len(rows)}
     except Exception as e:
         log.warning(f"/timeline/firsts DB error: {e}")
@@ -445,6 +469,7 @@ async def get_milestones():
     try:
         import psycopg2
         import psycopg2.extras
+
         db = os.getenv("DATABASE_URL", "postgresql://god:localdev@localhost:5432/god_world")
         world_id = os.getenv("WORLD_ID", "local-dev-world-1")
         conn = psycopg2.connect(db, cursor_factory=psycopg2.extras.RealDictCursor)
@@ -454,33 +479,12 @@ async def get_milestones():
             (world_id,),
         )
         rows = [dict(r) for r in cur.fetchall()]
-        cur.close(); conn.close()
+        cur.close()
+        conn.close()
         return {"milestones": rows, "count": len(rows)}
     except Exception as e:
         log.warning(f"/timeline/milestones DB error: {e}")
         return {"milestones": [], "error": str(e)}
-
-
-@app.get("/tools")
-async def list_tools():
-    """All MCP tools in the world catalogue."""
-    try:
-        import psycopg2
-        import psycopg2.extras
-        db = os.getenv("DATABASE_URL", "postgresql://god:localdev@localhost:5432/god_world")
-        world_id = os.getenv("WORLD_ID", "local-dev-world-1")
-        conn = psycopg2.connect(db, cursor_factory=psycopg2.extras.RealDictCursor)
-        cur = conn.cursor()
-        cur.execute(
-            "SELECT * FROM mcp_tools WHERE world_id = %s ORDER BY requires_tier, name",
-            (world_id,),
-        )
-        rows = [dict(r) for r in cur.fetchall()]
-        cur.close(); conn.close()
-        return {"tools": rows, "count": len(rows)}
-    except Exception as e:
-        log.warning(f"/tools DB error: {e}")
-        return {"tools": [], "error": str(e)}
 
 
 @app.get("/tools/{soul_id}/grants")
@@ -489,6 +493,7 @@ async def get_tool_grants(soul_id: str):
     try:
         import psycopg2
         import psycopg2.extras
+
         db = os.getenv("DATABASE_URL", "postgresql://god:localdev@localhost:5432/god_world")
         world_id = os.getenv("WORLD_ID", "local-dev-world-1")
         conn = psycopg2.connect(db, cursor_factory=psycopg2.extras.RealDictCursor)
@@ -504,7 +509,8 @@ async def get_tool_grants(soul_id: str):
             (soul_id, world_id),
         )
         rows = [dict(r) for r in cur.fetchall()]
-        cur.close(); conn.close()
+        cur.close()
+        conn.close()
         return {"soul_id": soul_id, "grants": rows, "count": len(rows)}
     except Exception as e:
         log.warning(f"/tools/grants DB error: {e}")
@@ -515,21 +521,24 @@ async def get_tool_grants(soul_id: str):
 # Dream endpoints
 # ---------------------------------------------------------------------------
 
+
 @app.get("/agents/{soul_id}/dreams")
 async def get_agent_dreams(soul_id: str, limit: int = 20):
     """Dream history for a specific agent."""
     try:
         import psycopg2
         import psycopg2.extras
+
         db = os.getenv("DATABASE_URL", "postgresql://god:localdev@localhost:5432/god_world")
         conn = psycopg2.connect(db, cursor_factory=psycopg2.extras.RealDictCursor)
-        cur  = conn.cursor()
+        cur = conn.cursor()
         cur.execute(
             "SELECT * FROM dreams WHERE soul_id = %s ORDER BY dreamed_at DESC LIMIT %s",
             (soul_id, min(limit, 100)),
         )
         rows = [dict(r) for r in cur.fetchall()]
-        cur.close(); conn.close()
+        cur.close()
+        conn.close()
         return {"soul_id": soul_id, "dreams": rows, "count": len(rows)}
     except Exception as e:
         log.warning(f"/agents/{soul_id}/dreams error: {e}")
@@ -542,12 +551,14 @@ async def get_agent_sleep_state(soul_id: str):
     try:
         import psycopg2
         import psycopg2.extras
+
         db = os.getenv("DATABASE_URL", "postgresql://god:localdev@localhost:5432/god_world")
         conn = psycopg2.connect(db, cursor_factory=psycopg2.extras.RealDictCursor)
-        cur  = conn.cursor()
+        cur = conn.cursor()
         cur.execute("SELECT * FROM sleep_states WHERE soul_id = %s", (soul_id,))
         row = cur.fetchone()
-        cur.close(); conn.close()
+        cur.close()
+        conn.close()
         state = dict(row) if row else None
         return {
             "soul_id": soul_id,
@@ -563,11 +574,13 @@ async def get_agent_sleep_state(soul_id: str):
 # Messaging endpoints
 # ---------------------------------------------------------------------------
 
+
 @app.get("/messages")
 async def get_world_messages(limit: int = 100):
     """All messages sent in this world (admin/observer view)."""
     try:
         from .messaging import get_world_messages as _gwm
+
         return {"messages": _gwm(limit=min(limit, 500)), "count": min(limit, 500)}
     except Exception as e:
         log.warning(f"/messages error: {e}")
@@ -579,6 +592,7 @@ async def get_agent_messages(soul_id: str, limit: int = 50):
     """Messages sent by a specific agent."""
     try:
         from .messaging import get_agent_sent_messages
+
         msgs = get_agent_sent_messages(soul_id, limit=min(limit, 200))
         return {"soul_id": soul_id, "messages": msgs, "count": len(msgs)}
     except Exception as e:
@@ -591,6 +605,7 @@ async def get_agent_inbox(soul_id: str):
     """Pull unread inbox messages for an agent (marks as read)."""
     try:
         from .messaging import pull_inbox
+
         msgs = pull_inbox(soul_id)
         return {"soul_id": soul_id, "messages": [m.to_dict() for m in msgs], "count": len(msgs)}
     except Exception as e:
@@ -604,9 +619,10 @@ async def get_agent_reputation(soul_id: str):
     try:
         import psycopg2
         import psycopg2.extras
+
         db = os.getenv("DATABASE_URL", "postgresql://god:localdev@localhost:5432/god_world")
         conn = psycopg2.connect(db, cursor_factory=psycopg2.extras.RealDictCursor)
-        cur  = conn.cursor()
+        cur = conn.cursor()
         cur.execute(
             """
             SELECT r.*, a.current_name AS subject_name
@@ -618,7 +634,8 @@ async def get_agent_reputation(soul_id: str):
             (soul_id,),
         )
         rows = [dict(r) for r in cur.fetchall()]
-        cur.close(); conn.close()
+        cur.close()
+        conn.close()
         return {"soul_id": soul_id, "reputation": rows, "count": len(rows)}
     except Exception as e:
         log.warning(f"/agents/{soul_id}/reputation error: {e}")
@@ -629,11 +646,13 @@ async def get_agent_reputation(soul_id: str):
 # Token endpoints
 # ---------------------------------------------------------------------------
 
+
 @app.get("/tokens")
 async def list_tokens():
     """All tokens deployed in this world."""
     try:
         from .token_factory import get_world_tokens
+
         tokens = get_world_tokens()
         return {"tokens": tokens, "count": len(tokens)}
     except Exception as e:
@@ -646,6 +665,7 @@ async def get_agent_tokens_endpoint(soul_id: str):
     """Tokens deployed by a specific agent."""
     try:
         from .token_factory import get_agent_tokens
+
         tokens = get_agent_tokens(soul_id)
         return {"soul_id": soul_id, "tokens": tokens, "count": len(tokens)}
     except Exception as e:
@@ -657,11 +677,13 @@ async def get_agent_tokens_endpoint(soul_id: str):
 # Population / Reproduction endpoints
 # ---------------------------------------------------------------------------
 
+
 @app.get("/population")
 async def get_population():
     """Detailed population stats including generation depth and reproduction."""
     try:
         from .reproduction import get_population_stats
+
         return get_population_stats()
     except Exception as e:
         log.warning(f"/population error: {e}")
@@ -685,10 +707,19 @@ async def creator_genesis(body: dict = {}):
         }
 
     world_id = os.getenv("WORLD_ID", "local-dev-world-1")
-    archetypes = body.get("archetypes", [
-        "trader", "hoarder", "explorer", "parasite",
-        "cooperator", "defender", "philosopher", "builder",
-    ])
+    archetypes = body.get(
+        "archetypes",
+        [
+            "trader",
+            "hoarder",
+            "explorer",
+            "parasite",
+            "cooperator",
+            "defender",
+            "philosopher",
+            "builder",
+        ],
+    )
     genesis_balance = float(body.get("genesis_balance_usdc", 2.0))
 
     log.info(
@@ -699,9 +730,10 @@ async def creator_genesis(body: dict = {}):
     # Clear existing agents (hard delete for clean genesis)
     try:
         import psycopg2
+
         db = os.getenv("DATABASE_URL", "postgresql://god:localdev@localhost:5432/god_world")
         conn = psycopg2.connect(db)
-        cur  = conn.cursor()
+        cur = conn.cursor()
         cur.execute("DELETE FROM agents WHERE world_id = %s", (world_id,))
         cur.execute("DELETE FROM sleep_states WHERE world_id = %s", (world_id,))
         # rent_payments has no world_id — delete by soul_id of agents just cleared
@@ -712,17 +744,20 @@ async def creator_genesis(body: dict = {}):
         cur.execute("DELETE FROM world_firsts WHERE world_id = %s", (world_id,))
         cur.execute("DELETE FROM world_milestones WHERE world_id = %s", (world_id,))
         conn.commit()
-        cur.close(); conn.close()
+        cur.close()
+        conn.close()
         log.info("  Existing world state cleared")
     except Exception as e:
         log.error(f"  Failed to clear world: {e}")
         from fastapi.responses import JSONResponse
+
         return JSONResponse(status_code=500, content={"error": f"Failed to clear world: {e}"})
 
     # Spawn genesis agents
-    from .seed_agents import seed_one_agent
     from decimal import Decimal
+
     from .event_emitter import get_emitter
+    from .seed_agents import seed_one_agent
 
     genesis_agents = []
     for archetype in archetypes:
@@ -740,34 +775,43 @@ async def creator_genesis(body: dict = {}):
     # Emit genesis event
     try:
         emitter = await get_emitter()
-        await emitter.emit("lifecycle", "world.genesis", {
-            "agent_count": len(genesis_agents),
-            "archetypes":  archetypes,
-            "narrative":   f"THE WORLD BEGINS. {len(genesis_agents)} genesis agents emerge from the void.",
-        })
+        await emitter.emit(
+            "lifecycle",
+            "world.genesis",
+            {
+                "agent_count": len(genesis_agents),
+                "archetypes": archetypes,
+                "narrative": f"THE WORLD BEGINS. {len(genesis_agents)} genesis agents emerge from the void.",
+            },
+        )
     except Exception as e:
         log.warning(f"  Genesis event emit failed: {e}")
 
     log.info(f"GENESIS COMPLETE: {len(genesis_agents)} agents born")
     return {
         "genesis_complete": True,
-        "agents_created":   len(genesis_agents),
-        "agents":           [{"name": a["name"], "archetype": a["archetype"], "soul_id": a["soul_id"][:12]} for a in genesis_agents],
-        "balance_each":     genesis_balance,
-        "message":          "The world has begun. Agents will reproduce naturally from here.",
+        "agents_created": len(genesis_agents),
+        "agents": [
+            {"name": a["name"], "archetype": a["archetype"], "soul_id": a["soul_id"][:12]}
+            for a in genesis_agents
+        ],
+        "balance_each": genesis_balance,
+        "message": "The world has begun. Agents will reproduce naturally from here.",
     }
 
 
 def _count_agents() -> int:
     try:
         import psycopg2
-        db  = os.getenv("DATABASE_URL", "postgresql://god:localdev@localhost:5432/god_world")
+
+        db = os.getenv("DATABASE_URL", "postgresql://god:localdev@localhost:5432/god_world")
         wid = os.getenv("WORLD_ID", "local-dev-world-1")
         conn = psycopg2.connect(db)
-        cur  = conn.cursor()
+        cur = conn.cursor()
         cur.execute("SELECT COUNT(*) FROM agents WHERE world_id = %s AND is_alive = true", (wid,))
         n = cur.fetchone()[0]
-        cur.close(); conn.close()
+        cur.close()
+        conn.close()
         return n
     except Exception:
         return -1
@@ -781,22 +825,24 @@ async def deploy_token_endpoint(body: dict):
     Production: use agent MCP tool dispatch instead.
     """
     from fastapi.responses import JSONResponse
+
     required = ["soul_id", "wallet_address", "wallet_private_key", "name", "symbol"]
-    missing  = [k for k in required if k not in body]
+    missing = [k for k in required if k not in body]
     if missing:
         return JSONResponse(status_code=400, content={"error": f"Missing fields: {missing}"})
     try:
         from .token_factory import deploy_token
+
         result = await deploy_token(
-            soul_id            = body["soul_id"],
-            wallet_address     = body["wallet_address"],
-            wallet_private_key = body["wallet_private_key"],
-            name               = body["name"],
-            symbol             = body["symbol"],
-            initial_supply     = body.get("initial_supply", 1_000_000),
-            decimals           = body.get("decimals", 18),
-            transfer_tax_bps   = body.get("transfer_tax_bps", 0),
-            tax_recipient      = body.get("tax_destination", "0x" + "0" * 40),
+            soul_id=body["soul_id"],
+            wallet_address=body["wallet_address"],
+            wallet_private_key=body["wallet_private_key"],
+            name=body["name"],
+            symbol=body["symbol"],
+            initial_supply=body.get("initial_supply", 1_000_000),
+            decimals=body.get("decimals", 18),
+            transfer_tax_bps=body.get("transfer_tax_bps", 0),
+            tax_recipient=body.get("tax_destination", "0x" + "0" * 40),
         )
         return result
     except ValueError as e:

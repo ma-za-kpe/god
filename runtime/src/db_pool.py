@@ -3,6 +3,7 @@ db_pool.py — asyncpg connection pool for FastAPI hot paths.
 
 Sync psycopg2 remains in background daemons; API routes use this pool.
 """
+
 import logging
 import os
 from typing import Any, Optional
@@ -12,7 +13,7 @@ import asyncpg
 log = logging.getLogger("god.db")
 
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://god:localdev@localhost:5432/god_world")
-WORLD_ID     = os.getenv("WORLD_ID", "local-dev-world-1")
+WORLD_ID = os.getenv("WORLD_ID", "local-dev-world-1")
 
 _pool: Optional[asyncpg.Pool] = None
 

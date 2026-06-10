@@ -26,11 +26,11 @@ Three keys. Any two required to sign a transaction.
 Key A: Hardware wallet (Ledger or Trezor)
        Location: creator's physical possession
        Used for: routine rent collection, routine operations
-       
+
 Key B: Hardware wallet (different manufacturer)
        Location: secure physical storage (fireproof safe, separate location from Key A)
        Used for: backup signing when Key A is unavailable
-       
+
 Key C: Air-gapped cold wallet (never connected to internet)
        Location: trusted third party (lawyer, family member, or escrow service)
        Used for: emergency recovery only

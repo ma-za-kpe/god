@@ -1,6 +1,7 @@
 """
 agent_jobs.py — Scheduled intents and async wake for agent tempo autonomy.
 """
+
 from __future__ import annotations
 
 import json
@@ -8,7 +9,6 @@ import logging
 import os
 import time
 import uuid
-from typing import Any
 
 import psycopg2
 import psycopg2.extras
@@ -53,6 +53,7 @@ def schedule_job(soul_id: str, job_type: str, delay_seconds: int, payload: dict)
     conn.close()
 
     from .agent_scheduler import force_wake_at
+
     force_wake_at(soul_id, float(run_at))
 
     return {"job_id": job_id, "run_at": run_at, "delay_seconds": delay_seconds, "scheduled": True}
@@ -140,15 +141,20 @@ async def process_due_jobs(emitter) -> int:
             payload = json.loads(payload)
         intent = payload.get("intent", "scheduled wake")
         from .agent_scheduler import force_wake_at
+
         force_wake_at(soul_id, time.time())
         complete_job(job["job_id"], {"intent": intent})
         try:
-            await emitter.emit("agent", "scheduled_wake", {
-                "agent_id": soul_id,
-                "job_id": job["job_id"],
-                "intent": intent[:120],
-                "narrative": f"Agent {soul_id[:8]} wakes on schedule: {intent[:80]}",
-            })
+            await emitter.emit(
+                "agent",
+                "scheduled_wake",
+                {
+                    "agent_id": soul_id,
+                    "job_id": job["job_id"],
+                    "intent": intent[:120],
+                    "narrative": f"Agent {soul_id[:8]} wakes on schedule: {intent[:80]}",
+                },
+            )
         except Exception:
             pass
         count += 1

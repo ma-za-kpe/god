@@ -4,12 +4,12 @@ capabilities.py — Tier-gated action surface for agent autonomy.
 Actions are earned through status tier, balance, and explicit grants.
 The tools menu shown to _grounded_decide is filtered per agent.
 """
+
 from __future__ import annotations
 
 import logging
 import os
 import time
-from typing import Optional
 
 import psycopg2
 import psycopg2.extras
@@ -22,8 +22,13 @@ WORLD_ID = os.getenv("WORLD_ID", "local-dev-world-1")
 # capability_id -> minimum tier
 TIER_CAPABILITIES: dict[int, list[str]] = {
     0: [
-        "send_message", "transfer_usdc", "send_broadcast", "submit_petition",
-        "write_scratch", "schedule_wake", "fork_self",
+        "send_message",
+        "transfer_usdc",
+        "send_broadcast",
+        "submit_petition",
+        "write_scratch",
+        "schedule_wake",
+        "fork_self",
     ],
     1: ["register_service", "query_world", "external_read"],
     2: ["form_coalition", "register_tool"],
@@ -35,11 +40,9 @@ TIER_CAPABILITIES: dict[int, list[str]] = {
 ACTION_DESCRIPTIONS: dict[str, str] = {
     "send_message": (
         '"send_message" → private message; to_id, content, message_type '
-        '(direct|threat|manifesto|offer|contract|propaganda). Costs $0.001.'
+        "(direct|threat|manifesto|offer|contract|propaganda). Costs $0.001."
     ),
-    "transfer_usdc": (
-        '"transfer_usdc" → send USDC; to_id, amount (max 50% balance).'
-    ),
+    "transfer_usdc": ('"transfer_usdc" → send USDC; to_id, amount (max 50% balance).'),
     "register_service": (
         '"register_service" → list paid service; service_name, service_price, service_description.'
     ),
@@ -54,29 +57,27 @@ ACTION_DESCRIPTIONS: dict[str, str] = {
     "fork_self": '"fork_self" → spawn child; costs reproduction fee.',
     "write_scratch": (
         '"write_scratch" → persist private note in your environment; '
-        'scratch_key, content (max 2000 chars). Free.'
+        "scratch_key, content (max 2000 chars). Free."
     ),
     "schedule_wake": (
         '"schedule_wake" → wake yourself after delay; delay_seconds (60–86400), intent (why).'
     ),
     "query_world": (
         '"query_world" → read internal world stats; query_type '
-        '(population|economy|leaderboard|my_status).'
+        "(population|economy|leaderboard|my_status)."
     ),
     "external_read": (
         '"external_read" → read through local gateway; query_type '
-        '(world_stats|runtime_health|allowed_url), optional url param.'
+        "(world_stats|runtime_health|allowed_url), optional url param."
     ),
     "register_tool": (
         '"register_tool" → register a callable tool others can buy; '
-        'tool_name, tool_description, tool_cost_usdc.'
+        "tool_name, tool_description, tool_cost_usdc."
     ),
-    "invoke_tool": (
-        '"invoke_tool" → call a registered tool; tool_id, tool_params (object).'
-    ),
+    "invoke_tool": ('"invoke_tool" → call a registered tool; tool_id, tool_params (object).'),
     "mutate_graph": (
         '"mutate_graph" → propose self-modification; mutation_type '
-        '(rename|biography|add_node|personality_bias), mutation_payload.'
+        "(rename|biography|add_node|personality_bias), mutation_payload."
     ),
 }
 
@@ -150,12 +151,16 @@ def check_action_allowed(soul_id: str, action_type: str) -> tuple[bool, str]:
 
 def build_tools_menu(soul_id: str) -> str:
     caps = sorted(get_granted_capabilities(soul_id))
-    lines = ['═══ TOOLS YOU CAN ACTUALLY USE ═══', "Pick at most ONE action per cycle. Use null if just thinking.", ""]
+    lines = [
+        "═══ TOOLS YOU CAN ACTUALLY USE ═══",
+        "Pick at most ONE action per cycle. Use null if just thinking.",
+        "",
+    ]
     for cap in caps:
         desc = ACTION_DESCRIPTIONS.get(cap)
         if desc:
             lines.append(f"  {desc}")
-    lines.append('  null → take no external action this cycle')
+    lines.append("  null → take no external action this cycle")
     lines.append("═══════════════════════════════════")
     return "\n".join(lines)
 

@@ -466,7 +466,7 @@ cur.execute(
 ```python
 async def _run_cycle(agents: list[dict], llm, emitter, graphs: dict):
     from .dream_engine import run_dream_cycle, put_agent_to_sleep
-    
+
     now = int(time.time())
 
     for agent in agents:

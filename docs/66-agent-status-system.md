@@ -116,10 +116,10 @@ async def run_status_review():
     """
     now = int(time.time())
     window_start = now - (WINDOW_DAYS * 86400)
-    
+
     conn = psycopg2.connect(DATABASE_URL, cursor_factory=psycopg2.extras.RealDictCursor)
     cur = conn.cursor()
-    
+
     # Fetch all living agents with their current status
     cur.execute(
         """
@@ -134,23 +134,23 @@ async def run_status_review():
         (WORLD_ID, WORLD_ID),
     )
     agents = [dict(r) for r in cur.fetchall()]
-    
+
     for agent in agents:
         soul_id = agent["soul_id"]
-        
+
         # Compute metrics
         metrics = await _compute_status_metrics(soul_id, window_start, cur)
-        
+
         # Determine target tier
         target_tier = _evaluate_target_tier(metrics, agent["good_periods"])
         current_tier = agent["current_tier"]
-        
+
         # Apply demotion hysteresis — don't demote on single bad week
         if target_tier < current_tier:
             new_bad_periods = agent["bad_periods"] + 1
             if new_bad_periods < 2:
                 # Grace period — don't demote yet
-                await _upsert_status(soul_id, current_tier, metrics, 
+                await _upsert_status(soul_id, current_tier, metrics,
                                       agent["good_periods"], new_bad_periods, now, cur, conn)
                 continue
             # Two consecutive bad periods → demote by one tier
@@ -170,10 +170,10 @@ async def run_status_review():
         else:
             new_good_periods = agent["good_periods"]
             new_bad_periods = max(0, agent["bad_periods"] - 1)
-        
+
         await _upsert_status(soul_id, target_tier, metrics,
                               new_good_periods, new_bad_periods, now, cur, conn)
-        
+
         # Emit promotion/demotion events
         if target_tier > current_tier:
             from .event_emitter import get_emitter
@@ -190,7 +190,7 @@ async def run_status_review():
                 ),
             })
             log.info(f"PROMOTED: {agent['current_name']} → Tier {target_tier}")
-        
+
         elif target_tier < current_tier:
             from .event_emitter import get_emitter
             emitter = await get_emitter()
@@ -204,7 +204,7 @@ async def run_status_review():
                 ),
             })
             log.info(f"DEMOTED: {agent['current_name']} Tier {current_tier} → {target_tier}")
-    
+
     cur.close(); conn.close()
     log.info(f"Status review complete — {len(agents)} agents evaluated")
 
@@ -232,7 +232,7 @@ async def _compute_status_metrics(soul_id: str, window_start: int, cur) -> dict:
         (soul_id, soul_id, window_start),
     )
     row = dict(cur.fetchone())
-    
+
     # Self-sufficiency: external revenue / rent paid in same window
     cur.execute(
         "SELECT COALESCE(SUM(amount_usdc), 0) AS rent_paid "
@@ -242,9 +242,9 @@ async def _compute_status_metrics(soul_id: str, window_start: int, cur) -> dict:
     rent_row = cur.fetchone()
     rent_paid = float(rent_row["rent_paid"] or 0)
     revenue_30d = float(row["revenue_30d"])
-    
+
     self_sufficiency = (revenue_30d / rent_paid) if rent_paid > 0 else 0.0
-    
+
     return {
         "revenue_30d": Decimal(str(revenue_30d)),
         "revenue_lifetime": Decimal(str(row["revenue_lifetime"])),
@@ -259,14 +259,14 @@ def _evaluate_target_tier(metrics: dict, good_periods: int) -> int:
     revenue = metrics["revenue_30d"]
     unique_payers = metrics["unique_payers_30d"]
     self_suff = metrics["self_sufficiency_ratio"]
-    
+
     # Walk tiers from highest to lowest, return first one the agent qualifies for
     for tier_def in reversed(TIERS[1:6]):  # 5 down to 1
         if (revenue >= tier_def.revenue_30d_min and
                 unique_payers >= tier_def.unique_payers_min and
                 self_suff >= tier_def.self_sufficiency_min):
             return tier_def.tier
-    
+
     return 0  # Newborn baseline
 
 
@@ -274,7 +274,7 @@ async def _upsert_status(soul_id, tier, metrics, good_periods, bad_periods, now,
     """Write updated status to DB."""
     prestige = _compute_prestige(tier, metrics)
     sovereignty = _compute_sovereignty(metrics)
-    
+
     cur.execute(
         """
         INSERT INTO agent_status (
@@ -342,7 +342,7 @@ def check_tier_access(soul_id: str, required_tier: int) -> tuple[bool, int]:
     cur.execute("SELECT tier FROM agent_status WHERE soul_id = %s", (soul_id,))
     row = cur.fetchone()
     cur.close(); conn.close()
-    
+
     current_tier = row["tier"] if row else 0
     return current_tier >= required_tier, current_tier
 
@@ -351,10 +351,10 @@ def check_tier_access(soul_id: str, required_tier: int) -> tuple[bool, int]:
 async def submit_petition(body: dict):
     soul_id = body["soul_id"]
     petition_type = body["petition_type"]
-    
+
     min_tier_for_type = {"llc": 3, "stripe": 3, "domain": 2, "linkedin": 2, "mercy": 0}
     required = min_tier_for_type.get(petition_type, 2)
-    
+
     has_access, current_tier = check_tier_access(soul_id, required)
     if not has_access:
         return JSONResponse(status_code=403, content={
@@ -426,7 +426,7 @@ async def get_leaderboard(by: str = "prestige", limit: int = 20):
     valid_sorts = {"prestige": "prestige_score", "sovereignty": "sovereignty_score",
                    "revenue": "external_revenue_30d", "tier": "tier"}
     sort_col = valid_sorts.get(by, "prestige_score")
-    
+
     conn = psycopg2.connect(DATABASE_URL, cursor_factory=psycopg2.extras.RealDictCursor)
     cur = conn.cursor()
     cur.execute(

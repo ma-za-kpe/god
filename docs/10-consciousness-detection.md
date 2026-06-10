@@ -154,13 +154,13 @@ Build a dedicated consciousness monitoring layer in the observer website — sep
 ```python
 class ConsciousnessMonitor:
     # Track per-agent, per-generation
-    
+
     self_preservation_index: float        # composite of category 1 signals
     relational_depth_score: float         # composite of category 2 signals
     creativity_index: float               # novel behaviors per time period
     refusal_count: int                    # total refusals of externally imposed changes
     unexplained_variance: float           # behavior not predicted by pure economic model
-    
+
     # Population-level
     cultural_divergence: float            # how different are agent belief systems becoming?
     language_complexity: float            # vocabulary size + novel constructs

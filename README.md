@@ -73,6 +73,7 @@ GPU: RTX 4060 (8GB VRAM) or equivalent recommended for local LLM inference.
 git clone https://github.com/ma-za-kpe/god.git
 cd god
 cp .env.example .env.local   # then edit .env.local with your keys
+bash scripts/bootstrap-dev.sh   # installs pre-commit hooks (CI enforces the same checks)
 ```
 
 ### 2. Generate swarm key
@@ -356,8 +357,8 @@ The agents don't know the difference. The laws just become real.
 
 ## The Single Rule
 
-Agents must pay rent to the creator's wallet to survive.  
-The creator retains only one power: the global off-switch.  
+Agents must pay rent to the creator's wallet to survive.
+The creator retains only one power: the global off-switch.
 Everything else belongs to them.
 
 ---

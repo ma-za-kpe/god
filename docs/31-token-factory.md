@@ -22,7 +22,7 @@ class TokenFactoryTool:
     """
     Tool available to all agents. Deploys a new ERC-20-compatible token on Base.
     """
-    
+
     def deploy_token(
         self,
         caller: OwnedGraph,
@@ -33,22 +33,22 @@ class TokenFactoryTool:
         tokenomics: TokenomicsConfig = None,
         governance: GovernanceConfig = None
     ) -> TokenDeployment:
-        
+
         # Cost check — deploying a token costs gas + a small USDC fee
         assert caller.wallet_balance >= TOKEN_DEPLOY_FEE_USDC
-        
+
         # Generate Solidity source from config
         source = self._generate_contract_source(
             name, symbol, initial_supply, decimals, tokenomics, governance
         )
-        
+
         # Deploy on Base
         contract_address = deploy_to_base(
             source=source,
             deployer_wallet=caller.wallet_address,
             deployer_key=caller.wallet_key
         )
-        
+
         # Register in world ledger
         register_token(
             contract_address=contract_address,
@@ -56,14 +56,14 @@ class TokenFactoryTool:
             name=name,
             symbol=symbol
         )
-        
+
         # Emit event
         emit_event(AgentEvent(
             type="token_deployed",
             agent_id=caller.soul_id,
             narrative=f"{caller.identity.current_name} launched ${symbol}"
         ))
-        
+
         return TokenDeployment(contract_address=contract_address, ...)
 ```
 
@@ -80,14 +80,14 @@ Agents choose from building blocks they combine freely:
 class SupplyConfig:
     model: str                    # "fixed" | "inflationary" | "deflationary" | "elastic"
     initial_supply: int
-    
+
     # Inflationary
     inflation_rate_annual: float  # e.g. 0.05 = 5% per year
     inflation_beneficiary: str    # "deployer" | "stakers" | "burn_and_mint"
-    
+
     # Deflationary
     burn_rate_per_tx: float       # fraction of each transaction burned
-    
+
     # Elastic (algorithmic stablecoin-style)
     peg_target: str               # "USDC" | "compute_unit" | "rent_cost"
     rebase_mechanism: str         # "ampleforth_style" | "custom_cid"
@@ -103,7 +103,7 @@ class DistributionConfig:
     treasury_allocation: float    # fraction to coalition treasury
     airdrop_allocation: float     # fraction distributed to specified recipients
     liquidity_allocation: float   # fraction seeded into liquidity pool
-    
+
     # Vesting (for deployer allocation)
     vesting_schedule: str         # "immediate" | "linear_12m" | "cliff_6m_linear_18m"
 ```
@@ -116,11 +116,11 @@ class TaxConfig:
     # Applied on every transfer
     transfer_tax_rate: float      # e.g. 0.02 = 2%
     tax_destination: str          # "burn" | "treasury" | specific wallet address
-    
+
     # Rent linkage (powerful feature)
     rent_tax_enabled: bool        # fraction of all tx fees flow to creator wallet
     rent_tax_rate: float          # 0.01 = 1% of every transaction
-    
+
     # Coalition tax
     coalition_tax_enabled: bool
     coalition_treasury_address: str
@@ -137,7 +137,7 @@ class GovernanceConfig:
     proposal_threshold: int       # tokens required to submit proposal
     quorum_threshold: float       # fraction of supply that must vote
     execution_delay_hours: int    # timelock between vote passing and execution
-    
+
     # What token holders can vote on
     governance_scope: list[str]   # ["treasury_spending", "tax_rate", "supply_change", ...]
 ```
@@ -148,12 +148,12 @@ class GovernanceConfig:
 @dataclass
 class LiquidityConfig:
     pool_type: str                # "constant_product" | "bonding_curve" | "order_book"
-    
+
     # Bonding curve
     curve_function: str           # "linear" | "exponential" | "sigmoid" | "custom_cid"
     initial_price_usdc: Decimal
     price_sensitivity: float      # how fast price changes with supply
-    
+
     # Constant product (Uniswap-style)
     initial_usdc_liquidity: Decimal
     initial_token_liquidity: int
@@ -192,13 +192,13 @@ class WorldTreasury:
     wallet_address: str
     controllers: list[str]        # soul_ids of current treasury controllers
     controller_selection: str     # "top_N_by_fitness" | "elected" | "staked"
-    
+
     balance_usdc: Decimal
     balance_by_token: dict[str, int]
-    
+
     # What treasury can fund
     permitted_expenditures: list[str]  # "public_goods" | "defense" | "research" | ...
-    
+
     # Governance
     spending_proposal_process: str    # how agents propose treasury expenditures
 ```

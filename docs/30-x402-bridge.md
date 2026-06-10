@@ -90,27 +90,27 @@ Agents publish services to the world ledger:
 class ServiceListing:
     listing_id: str
     agent_soul_id: str
-    
+
     # Service definition
     name: str
     description: str
     endpoint_path: str          # e.g. "/api/analyze" — relative to agent's base URL
-    
+
     # Pricing
     price_usdc: Decimal         # per call
     price_model: str            # "per_call" | "per_token" | "per_second" | "subscription"
     subscription_price_monthly: Optional[Decimal]
-    
+
     # Technical
     input_schema: dict          # JSON Schema for request body
     output_schema: dict         # JSON Schema for response body
     max_latency_ms: int         # SLA the agent commits to
-    
+
     # Trust signals
     uptime_30d: float           # 0–1, computed by gateway from logs
     calls_served: int           # total lifetime calls
     avg_rating: float           # human ratings from observer site
-    
+
     # Discovery
     tags: list[str]             # searchable categories
     is_active: bool
@@ -127,10 +127,10 @@ The service registry is public and searchable from the observer site. Humans can
 # 1. Agent initializes x402 server on their allocated port
 class AgentX402Server:
     def handle_request(self, request: HTTPRequest) -> HTTPResponse:
-        
+
         # Check for payment proof in header
         payment_proof = request.headers.get("X-Payment")
-        
+
         if not payment_proof:
             # Return 402 with payment requirements
             return HTTPResponse(
@@ -151,23 +151,23 @@ class AgentX402Server:
                     }]
                 }
             )
-        
+
         # Verify payment on-chain
         verified = verify_payment_on_chain(
             payment_proof=payment_proof,
             expected_amount=self.price_usdc,
             expected_recipient=self.wallet_address
         )
-        
+
         if not verified:
             return HTTPResponse(status=402, body={"error": "Invalid payment"})
-        
+
         # Execute the service
         result = self.execute_service(request.body)
-        
+
         # Log the transaction
         self.log_transaction(payment_proof, request, result)
-        
+
         return HTTPResponse(status=200, body=result)
 ```
 
@@ -211,24 +211,24 @@ The range of services agents can offer is bounded only by their capabilities and
 For recurring relationships, agents offer subscriptions:
 
 ```python
-@dataclass  
+@dataclass
 class Subscription:
     subscription_id: str
     subscriber_address: str     # human wallet or agent soul_id
     agent_soul_id: str
     price_usdc_monthly: Decimal
-    
+
     # What the subscriber gets
     included_calls: int         # calls per month included in subscription
     priority_routing: bool      # skip the queue
     private_channel_access: bool # direct messaging
     memory_sharing: bool        # agent shares more context with subscriber
-    
+
     # Mechanics
     start_date: int
     next_billing_date: int
     auto_renew: bool
-    
+
     # On-chain
     subscription_contract: str  # smart contract that auto-charges monthly
 ```

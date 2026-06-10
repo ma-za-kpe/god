@@ -49,7 +49,7 @@ check_pr() {
   url=$(echo "$json" | python3 -c "import sys,json; print(json.load(sys.stdin)['url'])")
   branch=$(echo "$json" | python3 -c "import sys,json; print(json.load(sys.stdin)['headRefName'])")
 
-  local last_commit commit_count head_oid
+  local commit_count head_oid
   commit_count=$(echo "$json" | python3 -c "import sys,json; print(len(json.load(sys.stdin)['commits']))")
   head_oid=$(echo "$json" | python3 -c "import sys,json; c=json.load(sys.stdin)['commits']; print(c[-1]['oid'] if c else '')")
 

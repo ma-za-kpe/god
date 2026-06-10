@@ -10,32 +10,38 @@ Prerequisites:
 
 Deployment fee: TOKEN_DEPLOY_FEE_USDC (default 1.0 USDC) deducted from agent balance.
 """
+
 import json
 import logging
 import os
 import time
-import uuid
 
 import psycopg2
 import psycopg2.extras
 
 log = logging.getLogger("god.token_factory")
 
-DATABASE_URL          = os.getenv("DATABASE_URL", "postgresql://god:localdev@localhost:5432/god_world")
-WORLD_ID              = os.getenv("WORLD_ID", "local-dev-world-1")
-ANVIL_RPC             = os.getenv("ANVIL_RPC", "http://anvil:8545")
+DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://god:localdev@localhost:5432/god_world")
+WORLD_ID = os.getenv("WORLD_ID", "local-dev-world-1")
+ANVIL_RPC = os.getenv("ANVIL_RPC", "http://anvil:8545")
 TOKEN_DEPLOY_FEE_USDC = float(os.getenv("TOKEN_DEPLOY_FEE_USDC", "1.0"))
 
 # Foundry artifact — populated after `forge build`
 ARTIFACT_PATH = os.path.join(
-    os.path.dirname(__file__), "..", "..", "contracts", "out",
-    "AgentToken.sol", "AgentToken.json",
+    os.path.dirname(__file__),
+    "..",
+    "..",
+    "contracts",
+    "out",
+    "AgentToken.sol",
+    "AgentToken.json",
 )
 
 
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
+
 
 async def deploy_token(
     soul_id: str,
@@ -102,15 +108,15 @@ async def deploy_token(
     log.debug(f"  [{soul_id[:8]}] connecting to chain at {ANVIL_RPC}")
     w3 = _get_web3()
     chain_id = w3.eth.chain_id
-    block    = w3.eth.block_number
+    block = w3.eth.block_number
     log.debug(f"  [{soul_id[:8]}] chain_id={chain_id} block={block}")
 
     try:
         account = w3.eth.account.from_key(wallet_private_key)
         log.debug(f"  [{soul_id[:8]}] deploying from {account.address}")
 
-        Contract      = w3.eth.contract(abi=abi, bytecode=bytecode)
-        supply_in_wei = initial_supply * (10 ** decimals)
+        Contract = w3.eth.contract(abi=abi, bytecode=bytecode)
+        supply_in_wei = initial_supply * (10**decimals)
 
         log.debug(
             f"  [{soul_id[:8]}] building tx: supply_wei={supply_in_wei} "
@@ -124,37 +130,34 @@ async def deploy_token(
             transfer_tax_bps,
             w3.to_checksum_address(tax_recipient),
             w3.to_checksum_address(wallet_address),
-        ).build_transaction({
-            "from":     account.address,
-            "nonce":    w3.eth.get_transaction_count(account.address),
-            "gas":      3_000_000,
-            "gasPrice": w3.to_wei("1", "gwei"),
-        })
-        log.debug(
-            f"  [{soul_id[:8]}] tx built: gas={tx['gas']} gasPrice={tx['gasPrice']}"
+        ).build_transaction(
+            {
+                "from": account.address,
+                "nonce": w3.eth.get_transaction_count(account.address),
+                "gas": 3_000_000,
+                "gasPrice": w3.to_wei("1", "gwei"),
+            }
         )
+        log.debug(f"  [{soul_id[:8]}] tx built: gas={tx['gas']} gasPrice={tx['gasPrice']}")
 
-        signed   = account.sign_transaction(tx)
-        tx_hash  = w3.eth.send_raw_transaction(signed.raw_transaction)
+        signed = account.sign_transaction(tx)
+        tx_hash = w3.eth.send_raw_transaction(signed.raw_transaction)
         log.info(f"  [{soul_id[:8]}] tx sent: {tx_hash.hex()}")
 
-        receipt  = w3.eth.wait_for_transaction_receipt(tx_hash, timeout=60)
+        receipt = w3.eth.wait_for_transaction_receipt(tx_hash, timeout=60)
         log.debug(
             f"  [{soul_id[:8]}] receipt: status={receipt['status']} "
             f"gasUsed={receipt['gasUsed']} block={receipt['blockNumber']}"
         )
 
         if receipt["status"] != 1:
-            log.error(
-                f"  [{soul_id[:8]}] deployment REVERTED: tx={tx_hash.hex()}"
-            )
+            log.error(f"  [{soul_id[:8]}] deployment REVERTED: tx={tx_hash.hex()}")
             raise RuntimeError(f"Token deployment reverted. tx={tx_hash.hex()}")
 
         contract_address = receipt["contractAddress"]
-        tx_hash_hex      = tx_hash.hex()
+        tx_hash_hex = tx_hash.hex()
         log.info(
-            f"  [{soul_id[:8]}] contract deployed at {contract_address} "
-            f"tx={tx_hash_hex[:16]}…"
+            f"  [{soul_id[:8]}] contract deployed at {contract_address} tx={tx_hash_hex[:16]}…"
         )
 
     except Exception as e:
@@ -175,19 +178,24 @@ async def deploy_token(
 
     # 7. Emit event
     from .event_emitter import get_emitter
+
     emitter = await get_emitter()
-    await emitter.emit("economy", "token.deployed", {
-        "agent_id":         soul_id,
-        "contract_address": contract_address,
-        "name":             name,
-        "symbol":           symbol,
-        "initial_supply":   initial_supply,
-        "tx_hash":          tx_hash_hex,
-        "narrative": (
-            f"{soul_id[:8]} launches ${symbol} — {name} "
-            f"with {initial_supply:,} tokens at {contract_address[:10]}…"
-        ),
-    })
+    await emitter.emit(
+        "economy",
+        "token.deployed",
+        {
+            "agent_id": soul_id,
+            "contract_address": contract_address,
+            "name": name,
+            "symbol": symbol,
+            "initial_supply": initial_supply,
+            "tx_hash": tx_hash_hex,
+            "narrative": (
+                f"{soul_id[:8]} launches ${symbol} — {name} "
+                f"with {initial_supply:,} tokens at {contract_address[:10]}…"
+            ),
+        },
+    )
 
     log.info(
         f"TOKEN DEPLOYED: ${symbol} ({name}) at {contract_address} "
@@ -196,15 +204,15 @@ async def deploy_token(
 
     return {
         "contract_address": contract_address,
-        "name":             name,
-        "symbol":           symbol,
-        "initial_supply":   initial_supply,
-        "decimals":         decimals,
+        "name": name,
+        "symbol": symbol,
+        "initial_supply": initial_supply,
+        "decimals": decimals,
         "transfer_tax_bps": transfer_tax_bps,
-        "tx_hash":          tx_hash_hex,
-        "deployed_at":      now,
-        "deploy_fee_paid":  TOKEN_DEPLOY_FEE_USDC,
-        "chain_id":         chain_id,
+        "tx_hash": tx_hash_hex,
+        "deployed_at": now,
+        "deploy_fee_paid": TOKEN_DEPLOY_FEE_USDC,
+        "chain_id": chain_id,
     }
 
 
@@ -213,13 +221,14 @@ def get_agent_tokens(soul_id: str) -> list[dict]:
     log.debug(f"get_agent_tokens: {soul_id[:8]}")
     try:
         conn = psycopg2.connect(DATABASE_URL, cursor_factory=psycopg2.extras.RealDictCursor)
-        cur  = conn.cursor()
+        cur = conn.cursor()
         cur.execute(
             "SELECT * FROM tokens WHERE owner_soul_id = %s ORDER BY deployed_at DESC",
             (soul_id,),
         )
         rows = [dict(r) for r in cur.fetchall()]
-        cur.close(); conn.close()
+        cur.close()
+        conn.close()
         log.debug(f"  [{soul_id[:8]}] found {len(rows)} tokens")
         return rows
     except Exception as e:
@@ -232,7 +241,7 @@ def get_world_tokens() -> list[dict]:
     log.debug("get_world_tokens")
     try:
         conn = psycopg2.connect(DATABASE_URL, cursor_factory=psycopg2.extras.RealDictCursor)
-        cur  = conn.cursor()
+        cur = conn.cursor()
         cur.execute(
             """
             SELECT t.*, a.current_name AS owner_name
@@ -244,7 +253,8 @@ def get_world_tokens() -> list[dict]:
             (WORLD_ID,),
         )
         rows = [dict(r) for r in cur.fetchall()]
-        cur.close(); conn.close()
+        cur.close()
+        conn.close()
         log.debug(f"get_world_tokens: {len(rows)} total")
         return rows
     except Exception as e:
@@ -256,21 +266,21 @@ def get_world_tokens() -> list[dict]:
 # Internal helpers
 # ---------------------------------------------------------------------------
 
+
 def _load_artifact() -> tuple[str, list]:
     """Load compiled contract bytecode and ABI from Foundry artifact."""
     try:
         with open(ARTIFACT_PATH) as f:
             artifact = json.load(f)
         bytecode = artifact["bytecode"]["object"]
-        abi      = artifact["abi"]
+        abi = artifact["abi"]
         if not bytecode.startswith("0x"):
             bytecode = "0x" + bytecode
         log.debug(f"_load_artifact: ABI has {len(abi)} entries")
         return bytecode, abi
     except FileNotFoundError:
         log.error(
-            f"AgentToken artifact not found at {ARTIFACT_PATH}. "
-            "Run: forge build (in contracts/)"
+            f"AgentToken artifact not found at {ARTIFACT_PATH}. Run: forge build (in contracts/)"
         )
         raise RuntimeError(
             "AgentToken artifact not found. "
@@ -298,25 +308,27 @@ def _get_web3():
 
 def _get_agent_balance(soul_id: str) -> float:
     conn = psycopg2.connect(DATABASE_URL, cursor_factory=psycopg2.extras.RealDictCursor)
-    cur  = conn.cursor()
+    cur = conn.cursor()
     cur.execute(
         "SELECT COALESCE(balance_usdc, 0) AS bal FROM agents WHERE soul_id = %s",
         (soul_id,),
     )
     row = cur.fetchone()
-    cur.close(); conn.close()
+    cur.close()
+    conn.close()
     return float(row["bal"]) if row else 0.0
 
 
 def _deduct_balance(soul_id: str, amount: float):
     conn = psycopg2.connect(DATABASE_URL)
-    cur  = conn.cursor()
+    cur = conn.cursor()
     cur.execute(
         "UPDATE agents SET balance_usdc = balance_usdc - %s WHERE soul_id = %s",
         (amount, soul_id),
     )
     conn.commit()
-    cur.close(); conn.close()
+    cur.close()
+    conn.close()
 
 
 def _persist_token(
@@ -330,7 +342,7 @@ def _persist_token(
 ):
     try:
         conn = psycopg2.connect(DATABASE_URL)
-        cur  = conn.cursor()
+        cur = conn.cursor()
         cur.execute(
             """
             INSERT INTO tokens
@@ -339,11 +351,11 @@ def _persist_token(
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
             ON CONFLICT (contract_address) DO NOTHING
             """,
-            (contract_address, soul_id, name, symbol,
-             initial_supply, now, tx_hash, WORLD_ID),
+            (contract_address, soul_id, name, symbol, initial_supply, now, tx_hash, WORLD_ID),
         )
         conn.commit()
-        cur.close(); conn.close()
+        cur.close()
+        conn.close()
         log.debug(f"_persist_token: {contract_address[:10]}… persisted for {soul_id[:8]}")
     except Exception as e:
         log.error(f"_persist_token failed: {e}", exc_info=True)

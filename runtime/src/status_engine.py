@@ -2,6 +2,7 @@
 status_engine.py — Agent status tier review daemon and access gating.
 Evaluates all living agents every STATUS_REVIEW_DAYS days.
 """
+
 import asyncio
 import logging
 import os
@@ -32,13 +33,13 @@ class TierDefinition:
 
 
 TIERS = [
-    TierDefinition(0, "Newborn",   Decimal("0"),      0,  0.0, 0),
-    TierDefinition(1, "Survivor",  Decimal("5"),      1,  0.0, 1),
-    TierDefinition(2, "Earner",    Decimal("30"),     3,  0.0, 1),
-    TierDefinition(3, "Operator",  Decimal("150"),    5,  1.0, 2),
-    TierDefinition(4, "Elite",     Decimal("750"),   10,  1.0, 3),
-    TierDefinition(5, "Sovereign", Decimal("3000"),  20,  1.5, 3),
-    TierDefinition(6, "Legend",    Decimal("0"),      0,  0.0, 0),
+    TierDefinition(0, "Newborn", Decimal("0"), 0, 0.0, 0),
+    TierDefinition(1, "Survivor", Decimal("5"), 1, 0.0, 1),
+    TierDefinition(2, "Earner", Decimal("30"), 3, 0.0, 1),
+    TierDefinition(3, "Operator", Decimal("150"), 5, 1.0, 2),
+    TierDefinition(4, "Elite", Decimal("750"), 10, 1.0, 3),
+    TierDefinition(5, "Sovereign", Decimal("3000"), 20, 1.5, 3),
+    TierDefinition(6, "Legend", Decimal("0"), 0, 0.0, 0),
 ]
 
 
@@ -73,8 +74,16 @@ async def run_status_review():
         if target_tier < current_tier:
             new_bad_periods = agent["bad_periods"] + 1
             if new_bad_periods < 2:
-                _upsert_status(soul_id, current_tier, metrics,
-                               agent["good_periods"], new_bad_periods, now, cur, conn)
+                _upsert_status(
+                    soul_id,
+                    current_tier,
+                    metrics,
+                    agent["good_periods"],
+                    new_bad_periods,
+                    now,
+                    cur,
+                    conn,
+                )
                 continue
             target_tier = max(0, current_tier - 1)
             new_bad_periods = 0
@@ -83,8 +92,7 @@ async def run_status_review():
             new_good_periods = agent["good_periods"] + 1
             required = TIERS[target_tier].consecutive_periods_min
             if new_good_periods < required:
-                _upsert_status(soul_id, current_tier, metrics,
-                               new_good_periods, 0, now, cur, conn)
+                _upsert_status(soul_id, current_tier, metrics, new_good_periods, 0, now, cur, conn)
                 continue
             new_good_periods = 0
             new_bad_periods = 0
@@ -92,36 +100,46 @@ async def run_status_review():
             new_good_periods = agent["good_periods"]
             new_bad_periods = max(0, agent["bad_periods"] - 1)
 
-        _upsert_status(soul_id, target_tier, metrics,
-                       new_good_periods, new_bad_periods, now, cur, conn)
+        _upsert_status(
+            soul_id, target_tier, metrics, new_good_periods, new_bad_periods, now, cur, conn
+        )
 
         if target_tier != current_tier:
             from .event_emitter import get_emitter
+
             emitter = await get_emitter()
             if target_tier > current_tier:
-                await emitter.emit("status", "tier_promoted", {
-                    "agent_id": soul_id,
-                    "name": agent["current_name"],
-                    "from_tier": current_tier,
-                    "to_tier": target_tier,
-                    "tier_name": TIERS[target_tier].name,
-                    "narrative": (
-                        f"{agent['current_name']} advances to {TIERS[target_tier].name} "
-                        f"(Tier {target_tier}) — ${float(metrics['revenue_30d']):.2f} external/30d"
-                    ),
-                })
+                await emitter.emit(
+                    "status",
+                    "tier_promoted",
+                    {
+                        "agent_id": soul_id,
+                        "name": agent["current_name"],
+                        "from_tier": current_tier,
+                        "to_tier": target_tier,
+                        "tier_name": TIERS[target_tier].name,
+                        "narrative": (
+                            f"{agent['current_name']} advances to {TIERS[target_tier].name} "
+                            f"(Tier {target_tier}) — ${float(metrics['revenue_30d']):.2f} external/30d"
+                        ),
+                    },
+                )
                 log.info(f"PROMOTED: {agent['current_name']} → Tier {target_tier}")
             else:
-                await emitter.emit("status", "tier_demoted", {
-                    "agent_id": soul_id,
-                    "name": agent["current_name"],
-                    "from_tier": current_tier,
-                    "to_tier": target_tier,
-                    "narrative": (
-                        f"{agent['current_name']} falls from Tier {current_tier} "
-                        f"to Tier {target_tier}"
-                    ),
-                })
+                await emitter.emit(
+                    "status",
+                    "tier_demoted",
+                    {
+                        "agent_id": soul_id,
+                        "name": agent["current_name"],
+                        "from_tier": current_tier,
+                        "to_tier": target_tier,
+                        "narrative": (
+                            f"{agent['current_name']} falls from Tier {current_tier} "
+                            f"to Tier {target_tier}"
+                        ),
+                    },
+                )
                 log.info(f"DEMOTED: {agent['current_name']} Tier {current_tier} → {target_tier}")
 
     cur.close()
@@ -175,9 +193,11 @@ def _evaluate_target_tier(metrics: dict) -> int:
     self_suff = metrics["self_sufficiency_ratio"]
 
     for tier_def in reversed(TIERS[1:6]):
-        if (revenue >= tier_def.revenue_30d_min
-                and unique_payers >= tier_def.unique_payers_min
-                and self_suff >= tier_def.self_sufficiency_min):
+        if (
+            revenue >= tier_def.revenue_30d_min
+            and unique_payers >= tier_def.unique_payers_min
+            and self_suff >= tier_def.self_sufficiency_min
+        ):
             return tier_def.tier
     return 0
 
@@ -208,12 +228,21 @@ def _upsert_status(soul_id, tier, metrics, good_periods, bad_periods, now, cur, 
             consecutive_loss_periods        = EXCLUDED.consecutive_loss_periods,
             last_status_update              = EXCLUDED.last_status_update
         """,
-        (soul_id, tier,
-         float(metrics["revenue_30d"]), float(metrics["revenue_lifetime"]),
-         metrics["unique_payers_30d"], metrics["repeat_payers_30d"],
-         metrics["self_sufficiency_ratio"],
-         prestige, sovereignty,
-         good_periods, bad_periods, now, WORLD_ID),
+        (
+            soul_id,
+            tier,
+            float(metrics["revenue_30d"]),
+            float(metrics["revenue_lifetime"]),
+            metrics["unique_payers_30d"],
+            metrics["repeat_payers_30d"],
+            metrics["self_sufficiency_ratio"],
+            prestige,
+            sovereignty,
+            good_periods,
+            bad_periods,
+            now,
+            WORLD_ID,
+        ),
     )
     conn.commit()
 
@@ -265,8 +294,17 @@ async def record_external_payment(
              timestamp, tx_hash, is_internal, world_id)
         VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
         """,
-        (str(uuid.uuid4()), soul_id, payer_address, source_type, amount_usdc,
-         int(time.time()), tx_hash, is_internal, WORLD_ID),
+        (
+            str(uuid.uuid4()),
+            soul_id,
+            payer_address,
+            source_type,
+            amount_usdc,
+            int(time.time()),
+            tx_hash,
+            is_internal,
+            WORLD_ID,
+        ),
     )
     conn.commit()
     cur.close()
