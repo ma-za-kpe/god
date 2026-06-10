@@ -262,6 +262,45 @@ curl -s http://localhost:8000/agents?limit=10000 | jq '.count'
 
 ---
 
+## Host memory budget (16 GB field machines)
+
+**2026-06-10 field report:** crash/lag was **host RAM pressure**, not malicious code or heavy Docker containers.
+
+| Layer | Typical RAM | Notes |
+|-------|-------------|-------|
+| **Ollama (`llama3.1:8b`)** | ~5–6 GB | Runs on **host**, not in compose — dominant consumer |
+| WSL / Docker Desktop | ~600 MB+ | Overhead on Windows |
+| Browser (observer tabs) | ~1–2 GB | Close during scale tests |
+| **god-runtime** | ~200 MB | Healthy; 30–40% CPU under load |
+| postgres + nats | ~50 MB RAM | **23–26% CPU** is normal when agents cycle — event + DB fan-out per doc 76 |
+
+**Rule of thumb:** need **≥3 GB free** before enabling Ollama + observer + 20+ agents. Below that, expect swap thrash, observer stutter, and “the other side crashed” symptoms with containers still `healthy`.
+
+### Immediate relief (field operator)
+
+```bash
+ollama stop llama3.1:8b          # frees ~5.6 GB instantly
+# or smaller model:
+ollama pull llama3.2:3b
+# set LLM_MODEL=llama3.2:3b in .env.local
+```
+
+Close Chrome tabs; keep one observer tab. Pause bulk seed until RAM is comfortable.
+
+### `.env.local` for tight 16 GB hosts (non-scale days)
+
+```env
+LLM_CONCURRENCY=2
+AGENT_CYCLE_SECONDS=60
+MAX_LLM_CALLS_PER_HOUR=90
+```
+
+For **observation-only** runs (no cognition): `LLM_PROVIDER=stub` in runtime env — world ticks without loading Ollama.
+
+Report host RAM in every `[FIELD-*]` block: `free -h` (Linux) or Task Manager summary (Windows).
+
+---
+
 ## Metrics + Logs in Every `[FIELD-*]` Report
 
 Copy-paste this block filled in, then **append the log bundle** (not optional):
@@ -275,7 +314,9 @@ Snapshot p95 ms:
 Observer FPS (5 min avg):
 WS: ok | fail
 Runtime restarts:
+Host RAM free / total:
 Docker mem peak:
+Ollama RSS (if running):
 Notes:
 --- logs ---
 (paste output of: docker compose logs runtime --tail 200)

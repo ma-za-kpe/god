@@ -212,7 +212,7 @@ These modules have complete implementation specs but the code files don't exist 
 ### Manifesto & scale (in flight)
 
 1. **T-5000-01** — field scale test on PR #1 ([doc 78](./docs/78-pr-field-test-protocol.md))
-2. **Observer perf** — T-OBS-LAG-01 field data → fixes per [doc 76](./docs/76-agent-scaling-and-observer-performance.md) ([#16](https://github.com/ma-za-kpe/god/issues/16))
+2. **Observer perf** — T-OBS-LAG-01: **[FIELD-DATA] 2026-06-10** — host RAM 91.7% (Ollama ~5.6 GB on host); Docker containers healthy (~200 MB runtime). Lag = memory pressure + known observer O(n²), not malicious code. See [doc 78 host memory budget](./docs/78-pr-field-test-protocol.md#host-memory-budget-16-gb-field-machines). ([#16](https://github.com/ma-za-kpe/god/issues/16))
 3. **Grounding** — continue field validation; no ungrounded thoughts in production paths
 
 ### Phase 1 Completion (all on localhost)

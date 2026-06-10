@@ -39,7 +39,7 @@
 | R16 | **Tie AI-driven economy + governance; refresh memory from docs** | ✅ | doc 85 system map |
 | R17 | **Agentic economic activity — transact, negotiate, settle deals** | ✅ | economic_activity.py, buy_service, offer/acceptance |
 | R18 | **Watch PR/comments, continue work, monitor CI** | 🔄 | no extra sync ritual — PR #1 + CI watch |
-| R19 | **Observer UI lagging — field operator logs + track** | ⏳ | T-OBS-LAG-01 on PR #1, GH #16 |
+| R19 | **Observer UI lagging — field operator logs + track** | ⏳ | T-OBS-LAG-01 · **[FIELD-DATA]** 2026-06-10: host RAM 91.7% (Ollama 5.6 GB), containers healthy — not malice |
 | R20 | **Never forget creator requests — track here or open GH issue** | ✅ | R14 + this backlog |
 | R21 | **Always update progress docs when shipping work** | ✅ | PROGRESS.md, changelog, this backlog |
 
