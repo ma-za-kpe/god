@@ -128,6 +128,7 @@
     .c-social    { color: #dd77ff; }
     .c-threat    { color: #ff4466; }
     .c-manifesto { color: #ffaa33; }
+    .c-narrative { color: #aaddff; font-style: italic; }
     .c-other     { color: #778899; }
   </style>
 </head>
@@ -278,7 +279,7 @@ function soulPhase(id)      { return (hi(id+'p')%1000)/1000*Math.PI*2; }
 const ICONS = { trader:'⬟', hoarder:'◈', explorer:'◎', parasite:'◉', cooperator:'⬡', defender:'◆', philosopher:'◇', builder:'⬢' };
 const ARCH_COL = { trader:'#ffcc44', hoarder:'#ff8844', explorer:'#44ffcc', parasite:'#ff4488', cooperator:'#44ff88', defender:'#4488ff', philosopher:'#aa77ff', builder:'#ff9900' };
 
-function evCat(t){ return t.startsWith('lifecycle')?'lifecycle':t.startsWith('economy')?'economy':t.startsWith('cognitive')?'cognitive':t.startsWith('social')?'social':'other'; }
+function evCat(t){ if(t.startsWith('narrative'))return'narrative'; return t.startsWith('lifecycle')?'lifecycle':t.startsWith('economy')?'economy':t.startsWith('cognitive')?'cognitive':t.startsWith('social')?'social':'other'; }
 function evCol(t){ if(t.includes('died'))return'#ff3333';if(t.includes('born')||t.includes('reproduced'))return'#44ff88';if(t.startsWith('economy'))return'#ffcc33';if(t.startsWith('cognitive'))return'#44aaff';if(t.startsWith('social'))return'#dd77ff';return'#888'; }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -1008,32 +1009,72 @@ async function fetchSnapshot() {
   try {
     const snap = await (await fetch(`${RUNTIME}/world/snapshot`)).json();
     if (snap.error) return;
-    applyAgents(snap.agents);
-    applyMessages(snap.messages);
-    const d = snap.stats || {};
-    if (d.world_start_ts && (!S.worldStart || d.world_start_ts < S.worldStart)) S.worldStart = d.world_start_ts;
-    document.getElementById('s-born').textContent   = d.total_born || '0';
-    document.getElementById('s-died').textContent   = d.total_died || '0';
-    document.getElementById('s-gen').textContent    = d.max_generation || '1';
-    document.getElementById('s-usdc').textContent   = d.total_usdc_in_world ? parseFloat(d.total_usdc_in_world).toFixed(2) : '—';
-    document.getElementById('s-msgs').textContent   = d.messages_total || '0';
-    document.getElementById('s-tokens').textContent = d.tokens_deployed || '0';
-    document.getElementById('s-dreams').textContent = d.dreams_total || '0';
-    document.getElementById('s-llm').textContent    = d.llm_model || '—';
-    document.getElementById('world-id-pill').textContent = (snap.world_id || d.world_id || '—') + (useClusterLayout() ? ' · CLUSTER' : '');
-    updateEcon(d);
-    if (snap.events) {
-      [...snap.events].reverse().forEach(feedItem);
-      S.actTick++;
-    }
+    applySnapshotMsg(snap);
   } catch {}
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// WebSocket stream (primary) + HTTP snapshot fallback
+// ═══════════════════════════════════════════════════════════════════════════
+let ws = null, wsConnected = false;
+
+function wsUrl() {
+  return RUNTIME.replace(/^http/, 'ws') + '/world/stream';
+}
+
+function connectStream() {
+  try {
+    ws = new WebSocket(wsUrl());
+    ws.onopen = () => { wsConnected = true; document.getElementById('world-id-pill').title = 'live stream'; };
+    ws.onmessage = (e) => {
+      try {
+        const msg = JSON.parse(e.data);
+        if (msg.type === 'snapshot') applySnapshotMsg(msg);
+        else if (msg.type === 'delta') {
+          if (msg.events) [...msg.events].reverse().forEach(feedItem);
+          if (msg.messages) applyMessages(msg.messages);
+        }
+      } catch {}
+    };
+    ws.onclose = () => {
+      wsConnected = false;
+      setTimeout(connectStream, 4000);
+    };
+    ws.onerror = () => { wsConnected = false; };
+  } catch {
+    setTimeout(connectStream, 4000);
+  }
+}
+
+function applySnapshotMsg(snap) {
+  applyAgents(snap.agents);
+  applyMessages(snap.messages);
+  const d = snap.stats || {};
+  if (d.world_start_ts && (!S.worldStart || d.world_start_ts < S.worldStart)) S.worldStart = d.world_start_ts;
+  document.getElementById('s-born').textContent   = d.total_born || '0';
+  document.getElementById('s-died').textContent   = d.total_died || '0';
+  document.getElementById('s-gen').textContent    = d.max_generation || '1';
+  document.getElementById('s-usdc').textContent   = d.total_usdc_in_world ? parseFloat(d.total_usdc_in_world).toFixed(2) : '—';
+  document.getElementById('s-msgs').textContent   = d.messages_total || '0';
+  document.getElementById('s-tokens').textContent = d.tokens_deployed || '0';
+  document.getElementById('s-dreams').textContent = d.dreams_total || '0';
+  document.getElementById('s-llm').textContent    = d.llm_model || '—';
+  const mode = useClusterLayout() ? ' · CLUSTER' : '';
+  const live = wsConnected ? ' · LIVE' : '';
+  document.getElementById('world-id-pill').textContent = (snap.world_id || d.world_id || '—') + mode + live;
+  updateEcon(d);
+  if (snap.events) {
+    [...snap.events].reverse().forEach(feedItem);
+    S.actTick++;
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Boot
 // ═══════════════════════════════════════════════════════════════════════════
+connectStream();
 fetchSnapshot();
-setInterval(fetchSnapshot, POLL_SNAP);
+setInterval(() => { if (!wsConnected) fetchSnapshot(); }, POLL_SNAP * 3);
 </script>
 </body>
 </html>

@@ -286,6 +286,18 @@ async def _execute_action(agent: dict, action: dict, emitter) -> None:
     name     = agent.get("current_name") or soul_id[:8]
     act_type = action.get("type")
 
+    from .circuit_breaker import check_agent, record_action, record_message
+    if not check_agent(soul_id).allowed:
+        log.debug(f"  {name} action blocked: circuit breaker cooldown")
+        return
+    if act_type in ("send_message", "send_broadcast"):
+        if not record_message(soul_id).allowed:
+            log.debug(f"  {name} message blocked: rate limit")
+            return
+    elif not record_action(soul_id).allowed:
+        log.debug(f"  {name} action blocked: rate limit")
+        return
+
     try:
         # ── send_message ────────────────────────────────────────────────────
         if act_type == "send_message":
@@ -611,7 +623,14 @@ async def _maybe_reproduce(agent: dict, emitter) -> None:
         log.warning(f"  {name} fork_self failed: {e}")
 
 
-async def _run_cycle(agents: list[dict], llm, emitter, graphs: dict, cycle_tick: int = 0):
+async def _run_cycle(
+    agents: list[dict],
+    llm,
+    emitter,
+    graphs: dict,
+    cycle_tick: int = 0,
+    all_agents: list[dict] | None = None,
+):
     from .archetype_graphs import run_agent_graph
     from .dream_engine import (
         run_dream_cycle,
@@ -672,7 +691,9 @@ async def _run_cycle(agents: list[dict], llm, emitter, graphs: dict, cycle_tick:
                 )
             except Exception as e:
                 log.warning(f"  {name} dream cycle error: {e}", exc_info=True)
-            await asyncio.sleep(0.05)
+            from .agent_scheduler import mark_scheduled
+            mark_scheduled(soul_id)
+            await asyncio.sleep(0.02)
             continue
 
         # ----------------------------------------------------------------
@@ -694,6 +715,8 @@ async def _run_cycle(agents: list[dict], llm, emitter, graphs: dict, cycle_tick:
         gate = evaluate_physics_gate(agent)
         if not gate.allow_cognition:
             log.info(f"  {name} [{archetype}] BLOCKED by physics gate: {gate.reason}")
+            from .agent_scheduler import mark_scheduled
+            mark_scheduled(soul_id)
             continue
 
         if gate.throttle_level != "none":
@@ -716,7 +739,8 @@ async def _run_cycle(agents: list[dict], llm, emitter, graphs: dict, cycle_tick:
         # Inject full world context: peers, inbox, services, coalitions
         # ----------------------------------------------------------------
         agent = dict(agent)
-        agent["_peers"]  = _salience_peers(agent, agents)
+        peer_pool = all_agents if all_agents is not None else agents
+        agent["_peers"]  = _salience_peers(agent, peer_pool)
         agent["_inbox"]  = batch_inboxes.get(soul_id) or []
         my_svcs, market  = await _fetch_services_context(soul_id)
         agent["_my_services"]      = my_svcs
@@ -740,7 +764,16 @@ async def _run_cycle(agents: list[dict], llm, emitter, graphs: dict, cycle_tick:
                 "throttled": True,
                 "narrative": f"{name} (throttled): \"{thought}\"",
             })
+            from .agent_scheduler import mark_scheduled
+            mark_scheduled(soul_id)
             await asyncio.sleep(0.02)
+            continue
+
+        from .circuit_breaker import check_agent
+        if not check_agent(soul_id).allowed:
+            log.debug(f"  {name} cognition skipped: circuit breaker")
+            from .agent_scheduler import mark_scheduled
+            mark_scheduled(soul_id)
             continue
 
         result      = await run_agent_graph(graphs, agent, cycle_llm)
@@ -796,7 +829,9 @@ async def _run_cycle(agents: list[dict], llm, emitter, graphs: dict, cycle_tick:
             except Exception as e:
                 log.warning(f"  {name} sleep transition error: {e}")
 
-        await asyncio.sleep(0.05)  # stagger to avoid NATS burst
+        from .agent_scheduler import mark_scheduled
+        mark_scheduled(soul_id)
+        await asyncio.sleep(0.02)  # stagger to avoid NATS burst
 
 
 async def agent_runner():
@@ -820,10 +855,15 @@ async def agent_runner():
     graphs = build_all_graphs(llm)
     log.info(f"  Compiled {len(graphs)} archetype graphs: {list(graphs.keys())}")
 
+    from .agent_scheduler import bootstrap_agent, is_due, mark_scheduled, prune_dead
+
     cycle_tick = 0
+    SCHEDULER_TICK_S = float(os.getenv("SCHEDULER_TICK_S", "1.0"))
+
     while True:
         try:
             cycle_tick += 1
+            now = time.time()
             conn = _db()
             cur = conn.cursor()
             cur.execute(
@@ -856,13 +896,22 @@ async def agent_runner():
             conn.close()
 
             if agents:
-                emitter = await get_emitter()
-                log.info(f"Agent cycle: {len(agents)} agents")
-                await _run_cycle(agents, llm, emitter, graphs, cycle_tick)
+                alive_ids = {a["soul_id"] for a in agents}
+                prune_dead(alive_ids)
+                for a in agents:
+                    bootstrap_agent(a["soul_id"], now)
+
+                due = [a for a in agents if is_due(a["soul_id"], now)]
+                if due:
+                    emitter = await get_emitter()
+                    log.info(f"Agent cycle: {len(due)}/{len(agents)} due")
+                    await _run_cycle(
+                        due, llm, emitter, graphs, cycle_tick, all_agents=agents
+                    )
             else:
                 log.info("No living agents — waiting for genesis...")
 
         except Exception as e:
             log.error(f"Agent runner error: {e}", exc_info=True)
 
-        await asyncio.sleep(CYCLE_S)
+        await asyncio.sleep(SCHEDULER_TICK_S)

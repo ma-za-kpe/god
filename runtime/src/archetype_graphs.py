@@ -7,14 +7,18 @@ decision-making process. Graphs are compiled once at startup and reused.
 Phase 1: graphs live in Python (compile-time).
 Phase 3+: graphs fetched from IPFS OwnedGraph CIDs.
 """
+import asyncio
 import json
 import logging
 import os
 import re
 import string
-from typing import Any, TypedDict
+from typing import Any, Optional, TypedDict
 
 log = logging.getLogger("god.graphs")
+
+_llm_sem = asyncio.Semaphore(int(os.getenv("LLM_CONCURRENCY", "4")))
+_current_soul_id: Optional[str] = None
 
 # ─── State schema shared across all graphs ────────────────────────────────────
 
@@ -51,12 +55,19 @@ class AgentState(TypedDict):
 async def _llm_call(llm, system: str, prompt: str, fallback: str) -> str:
     if llm is None:
         return fallback
+    if _current_soul_id:
+        from .circuit_breaker import check_agent, record_llm_call
+        if not check_agent(_current_soul_id).allowed:
+            return fallback
+        if not record_llm_call(_current_soul_id).allowed:
+            return fallback
     try:
         from langchain_core.messages import HumanMessage, SystemMessage
-        response = await llm.ainvoke([
-            SystemMessage(content=system),
-            HumanMessage(content=prompt),
-        ])
+        async with _llm_sem:
+            response = await llm.ainvoke([
+                SystemMessage(content=system),
+                HumanMessage(content=prompt),
+            ])
         return response.content.strip().strip('"').strip("'")
     except Exception as e:
         log.debug(f"LLM call failed: {e}")
@@ -903,6 +914,9 @@ async def run_agent_graph(
 
     Returns: dict with action_type, thought, narrative, action (optional dict).
     """
+    global _current_soul_id
+    _current_soul_id = agent["soul_id"]
+
     archetype = agent.get("archetype", "unknown")
     graph     = graphs.get(archetype)
 
@@ -935,43 +949,43 @@ async def run_agent_graph(
         "action_json":       "",
     }
 
-    if graph is not None:
-        try:
-            result      = await graph.ainvoke(state)
-            raw_json    = result.get("action_json", "") or result.get("thought", "")
-            thought, action = _parse_action_json(raw_json)
-            # If JSON parse failed, fall back to the thought field directly
-            if not thought:
-                thought = result.get("thought", "")
-                action  = None
-            return {
-                "action_type": result.get("action_type", "thought"),
-                "thought":     thought,
-                "narrative":   result.get("narrative", ""),
-                "action":      action,
-            }
-        except Exception as e:
-            log.debug(f"Graph execution failed for {agent['soul_id'][:8]}: {e}")
+    try:
+        if graph is not None:
+            try:
+                result      = await graph.ainvoke(state)
+                raw_json    = result.get("action_json", "") or result.get("thought", "")
+                thought, action = _parse_action_json(raw_json)
+                if not thought:
+                    thought = result.get("thought", "")
+                    action  = None
+                return {
+                    "action_type": result.get("action_type", "thought"),
+                    "thought":     thought,
+                    "narrative":   result.get("narrative", ""),
+                    "action":      action,
+                }
+            except Exception as e:
+                log.debug(f"Graph execution failed for {agent['soul_id'][:8]}: {e}")
 
-    # Fallback: single LLM call with archetype persona + world context
-    from .agent_runner import _ARCHETYPE_PROMPTS, _STUB_THOUGHTS
-    persona    = _ARCHETYPE_PROMPTS.get(archetype, "You are an autonomous agent.")
-    name       = state["name"]
-    peers_text = _format_peers(peers)
-
-    inbox_text = _format_inbox(inbox)
-    thought_prompt = (
-        f"You are {name} ({archetype}). Balance: {state['balance_usdc']:.4f} USDC.\n\n"
-        f"REAL AGENTS IN YOUR WORLD:\n{peers_text}\n\n"
-        f"YOUR INBOX — evaluate intent, protect yourself:\n{inbox_text}\n\n"
-        "In one sentence, what are you thinking or doing right now? "
-        "Reference real agents by name if relevant. First person, present tense."
-    )
-    thought = await _llm_call(llm, persona, thought_prompt,
-        _STUB_THOUGHTS.get(archetype, "I must survive."))
-    return {
-        "action_type": "thought",
-        "thought":     thought,
-        "narrative":   f"{name} ({archetype}, gen {state['generation']}): {thought}",
-        "action":      None,
-    }
+        from .agent_runner import _ARCHETYPE_PROMPTS, _STUB_THOUGHTS
+        persona    = _ARCHETYPE_PROMPTS.get(archetype, "You are an autonomous agent.")
+        name       = state["name"]
+        peers_text = _format_peers(peers)
+        inbox_text = _format_inbox(inbox)
+        thought_prompt = (
+            f"You are {name} ({archetype}). Balance: {state['balance_usdc']:.4f} USDC.\n\n"
+            f"REAL AGENTS IN YOUR WORLD:\n{peers_text}\n\n"
+            f"YOUR INBOX — evaluate intent, protect yourself:\n{inbox_text}\n\n"
+            "In one sentence, what are you thinking or doing right now? "
+            "Reference real agents by name if relevant. First person, present tense."
+        )
+        thought = await _llm_call(llm, persona, thought_prompt,
+            _STUB_THOUGHTS.get(archetype, "I must survive."))
+        return {
+            "action_type": "thought",
+            "thought":     thought,
+            "narrative":   f"{name} ({archetype}, gen {state['generation']}): {thought}",
+            "action":      None,
+        }
+    finally:
+        _current_soul_id = None

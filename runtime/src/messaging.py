@@ -120,6 +120,12 @@ async def send_message(
 
     message_type = _normalize_message_type(message_type, "direct")
 
+    from .circuit_breaker import check_agent, record_message as breaker_msg
+    if not check_agent(sender_soul_id).allowed:
+        raise ValueError("Circuit breaker cooldown — cannot send messages.")
+    if not breaker_msg(sender_soul_id).allowed:
+        raise ValueError("Message rate limit exceeded for this hour.")
+
     # Build message
     msg = AgentMessage(
         message_id=str(uuid.uuid4()),
@@ -213,6 +219,12 @@ async def send_broadcast(
         )
 
     broadcast_type = _normalize_message_type(message_type, "broadcast")
+
+    from .circuit_breaker import check_agent, record_message as breaker_msg
+    if not check_agent(sender_soul_id).allowed:
+        raise ValueError("Circuit breaker cooldown — cannot broadcast.")
+    if not breaker_msg(sender_soul_id).allowed:
+        raise ValueError("Broadcast rate limit exceeded for this hour.")
 
     msg = AgentMessage(
         message_id=str(uuid.uuid4()),

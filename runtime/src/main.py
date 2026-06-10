@@ -8,7 +8,7 @@ import os
 from contextlib import asynccontextmanager
 
 import uvicorn
-from fastapi import FastAPI
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 
 from .rent_daemon import rent_daemon
@@ -26,6 +26,24 @@ log = logging.getLogger("god.runtime")
 _background_tasks: list[asyncio.Task] = []
 
 
+async def _ws_snapshot_daemon():
+    """Periodic full snapshot push for WebSocket observers."""
+    interval = int(os.getenv("WS_SNAPSHOT_INTERVAL_S", "30"))
+    while True:
+        try:
+            await asyncio.sleep(interval)
+            from .world_snapshot import build_world_snapshot_async
+            from .world_stream import push_snapshot, has_subscribers
+            if not has_subscribers():
+                continue
+            snap = await build_world_snapshot_async()
+            await push_snapshot(snap)
+        except asyncio.CancelledError:
+            break
+        except Exception as e:
+            log.debug(f"WS snapshot daemon: {e}")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     log.info("Starting God Runtime...")
@@ -34,9 +52,13 @@ async def lifespan(app: FastAPI):
     log.info(f"  Chain:    {os.getenv('ANVIL_RPC', 'not configured')}")
     log.info(f"  LLM:      {os.getenv('LLM_PROVIDER', 'ollama')} / {os.getenv('LLM_MODEL', 'llama3.1:8b')}")
 
+    from .db_pool import init_pool, close_pool
+    await init_pool()
+
     _background_tasks.append(asyncio.create_task(rent_daemon(), name="rent_daemon"))
     _background_tasks.append(asyncio.create_task(agent_runner(), name="agent_runner"))
     _background_tasks.append(asyncio.create_task(status_review_daemon(), name="status_review"))
+    _background_tasks.append(asyncio.create_task(_ws_snapshot_daemon(), name="ws_snapshot"))
 
     yield
 
@@ -44,6 +66,7 @@ async def lifespan(app: FastAPI):
     for task in _background_tasks:
         task.cancel()
     await asyncio.gather(*_background_tasks, return_exceptions=True)
+    await close_pool()
 
 
 app = FastAPI(title="God Runtime", version="0.1.0", lifespan=lifespan)
@@ -126,15 +149,44 @@ async def list_agents(limit: int = 10000):
 async def world_snapshot(events_limit: int = 50, messages_limit: int = 80):
     """Pre-aggregated world state for public observer clients."""
     try:
-        from .world_snapshot import build_world_snapshot
-        snap = build_world_snapshot(
+        from .world_snapshot import build_world_snapshot_async
+        return await build_world_snapshot_async(
             events_limit=min(events_limit, 200),
             messages_limit=min(messages_limit, 500),
         )
-        return snap
     except Exception as e:
         log.warning(f"/world/snapshot error: {e}")
-        return {"error": str(e), "world_id": os.getenv("WORLD_ID", "local-dev-world-1")}
+        try:
+            from .world_snapshot import build_world_snapshot
+            return build_world_snapshot(
+                events_limit=min(events_limit, 200),
+                messages_limit=min(messages_limit, 500),
+            )
+        except Exception as e2:
+            return {"error": str(e2), "world_id": os.getenv("WORLD_ID", "local-dev-world-1")}
+
+
+@app.websocket("/world/stream")
+async def world_stream(ws: WebSocket):
+    """WebSocket: snapshot on connect, delta pushes on events, periodic snapshot refresh."""
+    from .world_stream import subscribe, unsubscribe
+    from .world_snapshot import build_world_snapshot_async
+
+    await subscribe(ws)
+    try:
+        snap = await build_world_snapshot_async()
+        await ws.send_json({"type": "snapshot", **snap})
+        while True:
+            # Keepalive — client may send ping text
+            msg = await ws.receive_text()
+            if msg == "ping":
+                await ws.send_json({"type": "pong", "epoch": snap.get("epoch")})
+    except WebSocketDisconnect:
+        pass
+    except Exception as e:
+        log.debug(f"WS stream closed: {e}")
+    finally:
+        await unsubscribe(ws)
 
 
 @app.get("/events")

@@ -44,12 +44,23 @@ class EventEmitter:
         log.info(f"EventEmitter connected → {NATS_URL}")
 
     async def emit(self, category: str, event_type: str, payload: dict[str, Any]) -> str:
+        full_type = f"{category}.{event_type}"
+
+        # Narrator enhances drama feed without sanitizing ecology
+        try:
+            from .narrator import narrativize_event, should_emit_story
+            story = narrativize_event(full_type, payload)
+            if story:
+                payload = {**payload, "narrative": story}
+        except Exception:
+            pass
+
         subject = f"world.{WORLD_ID}.events.{category}.{event_type}"
         event = {
             "event_id": str(uuid.uuid4()),
             "world_id": WORLD_ID,
             "category": category,
-            "event_type": f"{category}.{event_type}",
+            "event_type": full_type,
             "timestamp": int(time.time()),
             **payload,
         }
@@ -60,11 +71,43 @@ class EventEmitter:
         # Persist to PostgreSQL so /events API can serve it
         await asyncio.get_event_loop().run_in_executor(None, self._persist, event)
 
+        # WebSocket delta push for public observers
+        try:
+            from .world_stream import push_event
+            asyncio.create_task(push_event(event))
+        except Exception:
+            pass
+
+        # Companion narrative.story for significant drama
+        try:
+            from .narrator import should_emit_story
+            narrative = event.get("narrative")
+            if should_emit_story(full_type, narrative):
+                story_event = {
+                    "event_id": str(uuid.uuid4()),
+                    "world_id": WORLD_ID,
+                    "category": "narrative",
+                    "event_type": "narrative.story",
+                    "timestamp": int(time.time()),
+                    "agent_id": event.get("agent_id"),
+                    "source_event_id": event["event_id"],
+                    "source_event_type": full_type,
+                    "narrative": narrative,
+                    "headline": narrative[:72],
+                }
+                await asyncio.get_event_loop().run_in_executor(
+                    None, self._persist, story_event
+                )
+                from .world_stream import push_event
+                asyncio.create_task(push_event(story_event))
+        except Exception:
+            pass
+
         # Check for world firsts (non-blocking, best-effort)
         try:
             from .timeline import check_for_firsts
             asyncio.create_task(check_for_firsts(
-                f"{category}.{event_type}", payload, event["event_id"]
+                full_type, payload, event["event_id"]
             ))
         except Exception:
             pass
