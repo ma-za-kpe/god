@@ -2,7 +2,7 @@
 
 > **Canonical list of creator/operator requests** — the coding agent updates this so nothing is forgotten. GitHub issues track execution; this doc tracks intent.
 
-**Last updated:** 2026-06-10
+**Last updated:** 2026-06-10 (Phase 1 local stability pass)
 
 ---
 
@@ -43,6 +43,7 @@
 | R20 | **Never forget creator requests — track here or open GH issue** | ✅ | this backlog |
 | R21 | **Always update progress docs when shipping work** | ✅ | PROGRESS.md, changelog |
 | R22 | **Onboard new field operator — handoff PR + status report** | ✅ | doc 86, PR #17 investigation closed; future work via PR comments |
+| R23 | **Stable locally before deploy — Phase 1 issues, circulation, top earners** | 🔄 | feat/phase1-local-stability; defer deploy/E2B to [doc 87](./87-phase2-brainstorm.md) |
 
 ---
 
@@ -62,20 +63,25 @@
 | P2 | Template narrator | #6 ✅ |
 | P3 | Autonomy 100% audit | #10 ✅ |
 
-### Open — field / near-term
+### Open — Phase 1 local (ship before any deploy)
 
 | P | Task | Issue |
 |---|------|-------|
-| P0 | T-5000-01 Phase A scale test (field) | #4 — reopen when field ready |
-| P1 | Observer perf / lag at scale | #16 |
-| P1 | Hallucination post-fix field soak | R5 — `spot-check-grounding.py` |
-| P1 | New field operator handoff | PR #17, R22 |
+| P0 | T-5000-01 Phase A scale test (field) | #4 — after local stable |
+| P1 | Observer perf / lag at scale | #16 — LITE mode default, cluster layout, deferred hydrate |
+| P1 | Episodic memory commit pipeline | #25 — `episodic_memory.py` |
+| P1 | Money in circulation + top-earner monitor | R23 — x402 credit, genesis services, observer panel |
+| P1 | Hallucination post-fix field soak | R5 — merge PR #26, field grep |
+| P1 | Recipient grounding fix | PR #26 — ⏳ merge |
 
-### Open — not built yet (2026-06-10)
+### Deferred — Phase 2+ (brainstorm only)
+
+See [doc 87 — Phase 2 brainstorm](./87-phase2-brainstorm.md): E2B Startups, top-earner reproduction gate, Akash, public host.
+
+### Open — not built yet (post–Phase 1 gate)
 
 | P | Task | Issue |
 |---|------|-------|
-| P1 | Episodic memory commit pipeline | #25 |
 | P1 | Public observer host | #21 |
 | P2 | E2B agent sandboxes | #19 |
 | P2 | Base mainnet deploy | #20 |

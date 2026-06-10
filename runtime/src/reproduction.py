@@ -37,6 +37,11 @@ ARCHETYPE_MUTATION_PROB = float(os.getenv("ARCHETYPE_MUTATION_PROB", "0.10"))
 # Law 6: reproduction requires 5× total reproduction cost (single canonical env var).
 REPRO_MIN_MULT = float(os.getenv("REPRO_MIN_MULT", os.getenv("MIN_BALANCE_MULT", "5.0")))
 MIN_BALANCE_MULT = REPRO_MIN_MULT  # backward-compatible alias
+# Ecology gate: only top wealth accumulators who earned from peers may reproduce.
+REPRO_TOP_FRACTION = float(os.getenv("REPRO_TOP_FRACTION", "0.15"))
+REPRO_MIN_PEER_EARNED_USDC = float(os.getenv("REPRO_MIN_PEER_EARNED_USDC", "0.005"))
+REPRO_MAX_POPULATION = int(os.getenv("REPRO_MAX_POPULATION", "32"))
+REPRO_RANK_WINDOW_DAYS = int(os.getenv("REPRO_RANK_WINDOW_DAYS", "30"))
 
 ALL_ARCHETYPES = [
     "trader",
@@ -279,9 +284,50 @@ async def mate(agent_a: dict, agent_b: dict) -> dict:
     return child
 
 
+def compute_reproduction_eligible(alive_agents: list[dict]) -> set[str]:
+    """
+    Top ecosystem earners only — must have received USDC from other agents
+    (transfers + service sales + external revenue), then rank by balance.
+    """
+    if not alive_agents:
+        return set()
+    if len(alive_agents) >= REPRO_MAX_POPULATION:
+        log.debug(
+            f"reproduction gate: population cap {REPRO_MAX_POPULATION} reached "
+            f"({len(alive_agents)} alive) — no new births"
+        )
+        return set()
+
+    window_start = int(time.time()) - (REPRO_RANK_WINDOW_DAYS * 86400)
+    soul_ids = [a["soul_id"] for a in alive_agents]
+    peer_earned = _batch_peer_earned_usdc(soul_ids, window_start)
+
+    candidates: list[tuple[str, float, float]] = []
+    for agent in alive_agents:
+        sid = agent["soul_id"]
+        earned = peer_earned.get(sid, 0.0)
+        if earned < REPRO_MIN_PEER_EARNED_USDC:
+            continue
+        balance = float(agent.get("balance_usdc") or 0)
+        candidates.append((sid, balance, earned))
+
+    candidates.sort(key=lambda row: (row[1], row[2]), reverse=True)
+    top_n = max(1, int(len(alive_agents) * REPRO_TOP_FRACTION))
+    eligible = {row[0] for row in candidates[:top_n]}
+    if eligible:
+        log.debug(
+            f"reproduction gate: {len(eligible)}/{len(alive_agents)} eligible "
+            f"(top {REPRO_TOP_FRACTION:.0%}, min peer earned {REPRO_MIN_PEER_EARNED_USDC} USDC)"
+        )
+    return eligible
+
+
 def can_reproduce_sync(agent: dict) -> tuple[bool, str]:
     """Synchronous eligibility check for tool dispatcher. Returns (ok, reason)."""
-    return _can_reproduce(agent, None)
+    alive = _fetch_alive_agents()
+    eligible = compute_reproduction_eligible(alive)
+    enriched = {**agent, "_repro_eligible": agent["soul_id"] in eligible}
+    return _can_reproduce(enriched, None)
 
 
 def get_population_stats() -> dict:
@@ -323,10 +369,103 @@ def get_population_stats() -> dict:
 # ---------------------------------------------------------------------------
 
 
+def _fetch_alive_agents() -> list[dict]:
+    try:
+        conn = psycopg2.connect(DATABASE_URL, cursor_factory=psycopg2.extras.RealDictCursor)
+        cur = conn.cursor()
+        cur.execute(
+            """
+            SELECT soul_id, COALESCE(balance_usdc, 0) AS balance_usdc, is_alive
+            FROM agents
+            WHERE world_id = %s AND is_alive = true
+            """,
+            (WORLD_ID,),
+        )
+        rows = [dict(r) for r in cur.fetchall()]
+        cur.close()
+        conn.close()
+        return rows
+    except Exception as e:
+        log.debug(f"_fetch_alive_agents failed: {e}")
+        return []
+
+
+def _batch_peer_earned_usdc(soul_ids: list[str], window_start: int) -> dict[str, float]:
+    """USDC received from other agents via transfers and service sales."""
+    if not soul_ids:
+        return {}
+    earned: dict[str, float] = {sid: 0.0 for sid in soul_ids}
+    try:
+        conn = psycopg2.connect(DATABASE_URL, cursor_factory=psycopg2.extras.RealDictCursor)
+        cur = conn.cursor()
+        cur.execute(
+            """
+            SELECT payload->>'recipient_id' AS soul_id,
+                   COALESCE(SUM((payload->>'amount_usdc')::numeric), 0) AS total
+            FROM events
+            WHERE world_id = %s
+              AND event_type = 'economy.agent.transfer'
+              AND timestamp >= %s
+              AND payload->>'recipient_id' = ANY(%s)
+            GROUP BY payload->>'recipient_id'
+            """,
+            (WORLD_ID, window_start, soul_ids),
+        )
+        for row in cur.fetchall():
+            if row["soul_id"]:
+                earned[row["soul_id"]] = earned.get(row["soul_id"], 0.0) + float(row["total"] or 0)
+
+        cur.execute(
+            """
+            SELECT payload->>'seller_id' AS soul_id,
+                   COALESCE(SUM((payload->>'paid_usdc')::numeric), 0) AS total
+            FROM events
+            WHERE world_id = %s
+              AND event_type = 'economy.service.purchased'
+              AND timestamp >= %s
+              AND payload->>'seller_id' = ANY(%s)
+            GROUP BY payload->>'seller_id'
+            """,
+            (WORLD_ID, window_start, soul_ids),
+        )
+        for row in cur.fetchall():
+            if row["soul_id"]:
+                earned[row["soul_id"]] = earned.get(row["soul_id"], 0.0) + float(row["total"] or 0)
+
+        cur.execute(
+            """
+            SELECT agent_id AS soul_id,
+                   COALESCE(SUM((payload->>'amount_usdc')::numeric), 0) AS total
+            FROM events
+            WHERE world_id = %s
+              AND event_type = 'economy.external_revenue_received'
+              AND timestamp >= %s
+              AND agent_id = ANY(%s)
+            GROUP BY agent_id
+            """,
+            (WORLD_ID, window_start, soul_ids),
+        )
+        for row in cur.fetchall():
+            if row["soul_id"]:
+                earned[row["soul_id"]] = earned.get(row["soul_id"], 0.0) + float(row["total"] or 0)
+
+        cur.close()
+        conn.close()
+    except Exception as e:
+        log.debug(f"_batch_peer_earned_usdc failed: {e}")
+    return earned
+
+
 def _can_reproduce(agent: dict, partner: Optional[dict]) -> tuple[bool, str]:
     """Check if agent can reproduce. Returns (ok, reason)."""
     if not agent.get("is_alive", True):
         return False, "agent not alive"
+
+    if agent.get("_repro_eligible") is False:
+        return False, (
+            "not among top ecosystem earners — must accumulate wealth from peers "
+            f"(top {REPRO_TOP_FRACTION:.0%}, min {REPRO_MIN_PEER_EARNED_USDC} USDC received)"
+        )
 
     total_cost = MATING_COST_USDC + CHILD_SEED_USDC
     min_balance = total_cost * MIN_BALANCE_MULT

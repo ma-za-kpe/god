@@ -276,6 +276,44 @@ def check_tier_access(soul_id: str, required_tier: int) -> tuple[bool, int]:
         return False, 0
 
 
+async def refresh_agent_status(soul_id: str) -> None:
+    """Recompute status metrics for one agent (leaderboard / top-earner monitoring)."""
+    now = int(time.time())
+    window_start = now - (WINDOW_DAYS * 86400)
+    conn = psycopg2.connect(DATABASE_URL, cursor_factory=psycopg2.extras.RealDictCursor)
+    cur = conn.cursor()
+    try:
+        cur.execute(
+            """
+            SELECT COALESCE(s.tier, 0) AS current_tier,
+                   COALESCE(s.consecutive_profitable_periods, 0) AS good_periods,
+                   COALESCE(s.consecutive_loss_periods, 0) AS bad_periods
+            FROM agents a
+            LEFT JOIN agent_status s ON s.soul_id = a.soul_id AND s.world_id = %s
+            WHERE a.soul_id = %s AND a.is_alive = true AND a.world_id = %s
+            """,
+            (WORLD_ID, soul_id, WORLD_ID),
+        )
+        row = cur.fetchone()
+        if not row:
+            return
+        metrics = _compute_status_metrics(soul_id, window_start, cur)
+        _upsert_status(
+            soul_id,
+            row["current_tier"],
+            metrics,
+            row["good_periods"],
+            row["bad_periods"],
+            now,
+            cur,
+            conn,
+        )
+        conn.commit()
+    finally:
+        cur.close()
+        conn.close()
+
+
 async def record_external_payment(
     soul_id: str,
     payer_address: str,
