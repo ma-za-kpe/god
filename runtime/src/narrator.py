@@ -23,6 +23,9 @@ _SIGNIFICANT = {
     "economy.rent.missed",
     "economy.rent.paid",
     "economy.agent.transfer",
+    "economy.deal.settled",
+    "economy.deal.failed",
+    "economy.service.purchased",
     "economy.token.deployed",
     "social.agent.broadcast",
     "social.coalition.formed",
@@ -94,6 +97,20 @@ def narrativize_event(
         amt = float(amount or 0)
         to = recipient or _pick(payload, "recipient_id", default="another")[:8]
         return f"💱 {name} sends ${amt:.4f} USDC to {to}. Trust or trap — the ecology decides."
+
+    if event_type == "economy.deal.settled":
+        amt = float(amount or 0)
+        return f"🤝 DEAL CLOSED: ${amt:.4f} USDC changes hands. Negotiation became transaction."
+
+    if event_type == "economy.deal.failed":
+        err = _pick(payload, "error", default="failed")
+        return f"⚠ DEAL COLLAPSED: {name}'s acceptance could not settle ({err})."
+
+    if event_type == "economy.service.purchased":
+        svc = _pick(payload, "service_name", default="service")
+        paid = float(payload.get("paid_usdc") or amount or 0)
+        seller = _pick(payload, "seller_id", default="seller")[:8]
+        return f"🛒 {name} buys '{svc}' from {seller} for ${paid:.4f} USDC."
 
     if event_type == "economy.token.deployed":
         sym = _pick(payload, "symbol", default="???")

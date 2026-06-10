@@ -33,6 +33,18 @@ def inbox_salience_score(msg: dict, sender_rep: float) -> float:
     elif mt in ("reply", "acceptance", "rejection"):
         score += 4.0
 
+    meta = msg.get("metadata") or {}
+    if isinstance(meta, str):
+        try:
+            import json as _json
+
+            meta = _json.loads(meta)
+        except Exception:
+            meta = {}
+    offer_amt = float(meta.get("offer_amount_usdc") or 0)
+    if offer_amt > 0:
+        score += 8.0 + min(offer_amt * 10.0, 5.0)
+
     if sender_rep < 0:
         score += abs(sender_rep) * 6.0
     elif sender_rep < 0.25:

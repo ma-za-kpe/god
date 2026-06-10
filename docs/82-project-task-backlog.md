@@ -29,13 +29,16 @@
 | R6 | Field operator: **WAIT** for `[AGENT-READY]` before rebuild | ✅ | doc 78 |
 | R7 | Field operator: **LOGS** on every `[FIELD-*]` report | ✅ | doc 78 |
 | R8 | Docs release pipeline + pre-commit enforced | ✅ | docs 79, CI |
-| R9 | Agent is boss — branches, issues, manifesto-bound | 🔄 | issues #2–#12 |
+| R9 | Agent is boss — branches, issues, manifesto-bound | ✅ | issues #2–#12 closed; `develop` live |
 | R10 | Docs-first before tasks; operator runs pre-commit; watch CI; save Actions credits | ✅ | CLAUDE.md, doc 78 |
 | R11 | UI must buzz — transactions, movement, flicker, concurrent WS | ✅ | observer @ c8339b5, #11 |
 | R12 | Open source everything; no key leaks; security audit | ✅ | MIT, doc 80, #12 |
 | R13 | **Brand theme, logo, guidelines; reflect in UI; world logs in observer** | ✅ | doc 81, observer brand.css + WORLD LOG tab |
 | R14 | **Keep all requests in this task list** | ✅ | this file |
-| R15 | **Open-source contribution guidelines + airtight git workflow; protect branches; close all issues** | 🔄 | CONTRIBUTING.md, doc 83, issues #2–#12 |
+| R15 | **Open-source contribution guidelines + airtight git workflow; protect branches; close all issues** | ✅ | CONTRIBUTING.md, doc 83, protection on main+develop |
+| R16 | **Tie AI-driven economy + governance; refresh memory from docs** | ✅ | doc 85 system map |
+| R17 | **Agentic economic activity — transact, negotiate, settle deals** | ✅ | economic_activity.py, buy_service, offer/acceptance |
+| R18 | **Watch PR/comments, continue work, monitor CI** | 🔄 | no extra sync ritual — PR #1 + CI watch |
 
 ---
 

@@ -19,7 +19,12 @@ _FORBIDDEN_CONCEPTS = re.compile(
     r"anomal(?:y|ies)\s+to\s+inquire|heading\s+towards\s+the|"
     r"re-?route\s+\d+%|data\s+center|server\s+room|"
     r"internet\s+access|web\s+server|blockchain\s+node|"
-    r"two-?factor|password|cyber\s*security)\b",
+    r"two-?factor|password|cyber\s*security|"
+    r"quantum\s*node|nexus\s+hub|omniswap|dex\s+infrastructure|"
+    r"deck\s+\d+|sub-?level\s+\d+|quadrants?|planes?|kilometers?|"
+    r"energy\s+signatures?|supercomputer|coords?|coordinates?|"
+    r"simulated\s+entity|fake\s+crypto|exchange\s+fees?|"
+    r"ethereum\s+mainnet|eth\s+mainnet)\b",
     re.IGNORECASE,
 )
 
@@ -49,6 +54,10 @@ def peer_names(state: dict) -> set[str]:
         n = (p.get("name") or p.get("current_name") or "").strip()
         if n:
             names.add(n)
+    for m in state.get("inbox") or []:
+        sn = (m.get("sender_name") or "").strip()
+        if sn and sn != "ENV":
+            names.add(sn)
     return names
 
 
@@ -84,7 +93,8 @@ def build_grounding_block(state: dict) -> str:
         f"You: {name} [{arch}] balance=${bal:.4f} rent=${rent:.4f}\n"
         f"Agents that exist by name: {roster}\n"
         f"Services visible: {svc_count} | Your coalitions: {coal_count} | Inbox messages: {inbox_n}\n"
-        f"Real actions: send_message, transfer_usdc, register_service, broadcast, coalition, petition.\n"
+        f"Real actions: send_message, transfer_usdc, buy_service, offer/acceptance, "
+        f"register_service, broadcast, coalition, petition.\n"
         f"Do NOT reference anything not listed above unless it came from your inbox verbatim.\n"
     )
 
@@ -187,4 +197,6 @@ def world_rules_forbidden_section() -> str:
         "  • Agent 'prices' or market quotes for other agents (only service prices exist)\n"
         "  • Agents not in the LIVE WORLD roster above\n"
         "  • Anomalies/queries/events you did not receive in inbox or ENV\n"
+        "  • Sci-fi overlay (Nexus Hub, QuantumNode, Deck levels, quadrants, km, coords)\n"
+        "  • Unfounded DEX/Ethereum claims (unless you deployed a token this cycle)\n"
     )
