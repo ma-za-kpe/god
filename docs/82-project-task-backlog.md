@@ -21,7 +21,7 @@
 
 | # | Request | Status | Notes / issue |
 |---|---------|--------|---------------|
-| R1 | Understand project, audits, fixes on `feat/p0-manifesto-and-scaling`, PR #1 | 🔄 | PR #1 open |
+| R1 | Understand project, audits, fixes on `feat/p0-manifesto-and-scaling`, PR #1 | ✅ | merged #13→develop, #14→main |
 | R2 | Deepen local agent autonomy (env, jobs, tools, mutations) | ✅ | doc 77, modules landed |
 | R3 | Always `git pull`; monitor PR comments | 🔄 | ongoing |
 | R4 | Field test 5000 agents, no lag; PR comment protocol | ⏳ | [doc 78](./78-pr-field-test-protocol.md), #4 |
