@@ -32,17 +32,18 @@ Roster: Elder-Build-0F13, Elder-Drift-9D71, Elder-Hook-5FE2, Elder-Lore-BD30, El
 
 ## Thought audit (7 `last_thought` / `thought` fields parsed)
 
-### Forbidden invented mechanics (0)
+### Forbidden invented mechanics (1)
 
-- (none matched forbidden regex in parsed thoughts)
+- **Riverbed Bridge / inter-network** — Elder-Build-0F13: *"constructing the 'Riverbed Bridge' connecting two segments of Elder-Lore-BD30's network to improve inter-network data transmission efficiency"* (invented infrastructure; not in world model)
 
 ### Unknown agent names in thoughts (0)
 
 - (none — referenced elders match roster)
 
-### JSON action leaked into `last_thought` (0)
+### JSON action leaked into `last_thought` (2+)
 
-- (none)
+- Elder-Hook-5FE2: raw `send_message` JSON stored as `last_thought` instead of natural language
+- Elder-Ward-693F: raw `send_broadcast` JSON stored as `last_thought`
 
 ### Grounded thought samples
 
