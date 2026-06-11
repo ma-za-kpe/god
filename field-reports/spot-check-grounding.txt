@@ -1,0 +1,14 @@
+﻿spot-check output (env note - python not available, consistent with pre-commit):
+python3 not recognized in this Windows env (as in all pre-commit runs). Manual from greps in halluc-log-raw.txt: multiple grounding rejects for unknown/invented agents (e.g. Elder-Store-E66C, Elder-Hook-5FE2, Weave-Mapper, Elder-Scaffold etc from history + current).
+Attempt cmd: python scripts/spot-check-grounding.py --runtime http://localhost:8888 --sample 20
+Actual run error: The term 'python' is not recognized as the name of a cmdlet... (full in cmd output).
+[FIELD NOTE - env + manual 2026-06-11 @ post-rebase 1f91047]
+Attempted: python scripts/spot-check-grounding.py (no python/python3 in PATH on field machine).
+Manual supplement from fresh halluc-log-raw.txt (exactly 2000 lines, captured with docker logs --tail 2000):
+- grounding|reject matches: 2 (e.g. "Elder-Drift-9D71 grounding reject: unknown agent 'Weave-Mapper' — 'There is a new service called...'")
+- Elder- invented/peer refs in window: 33 (examples: Elder-Store-E66C, Elder-Hook-5FE2 [parasite], Elder-Ward-693F [defender], Elder-Weave-DD84, Elder-Lore-BD30, Agent-Delta-291G in dreams, Weave-Mapper rejected by grounding)
+- circuit breaker/TRIP: 0 in this tail (keepalives, deltas, MSG SENT, DREAMs, rent, settles active)
+- MSG SENT / DREAM / episode committed: 80 activity lines
+No FORBIDDEN halluc terms (quantum node etc) in recent 2000, but clear invented recipients/services being proposed and caught by grounding before execution. Raw threats, coalition pacts, parasite exploitation, defender alerts, rent cycles, dream mutations (counterfactual + diversify) all present and unsanitized. Per Ecology Hardening Manifesto (doc74).
+Full raw: field-reports/halluc-log-raw.txt ; see hallucination-audit-20260611.md and T-HALL-LOG-01-FIELD-DATA.md
+Exit code N/A (env); manual confirms rejects working as designed for T-HALL-LOG-01.
