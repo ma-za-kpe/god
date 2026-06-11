@@ -1,100 +1,100 @@
-﻿god-runtime  | 2026-06-11 20:30:25,118 [DEBUG] httpcore.http11: send_request_headers.complete
-god-runtime  | 2026-06-11 20:30:25,118 [DEBUG] httpcore.http11: send_request_body.started request=<Request [b'POST']>
-god-runtime  | 2026-06-11 20:30:25,118 [DEBUG] httpcore.http11: send_request_body.complete
-god-runtime  | 2026-06-11 20:30:25,118 [DEBUG] httpcore.http11: receive_response_headers.started request=<Request [b'POST']>
-god-runtime  | DEBUG:    > TEXT '{"type": "snapshot", "epoch": 1781209825, "agen...": "local-dev-world-1"}' [76900 bytes]
-god-runtime  | 2026-06-11 20:30:25,382 [DEBUG] watchfiles.main: 3 changes detected: {(<Change.modified: 2>, '/app/data/agent_env/79587ccb/79587ccb-c2ee-4b2d-bae7-f7e6e262db24/world/snapshot.json'), (<Change.modified: 2>, '/app/data/agent_env/79587ccb/79587ccb-c2ee-4b2d-bae7-f7e6e262db24/self/recent_actions.json'), (<Change.modified: 2>, '/app/data/agent_env/79587ccb/79587ccb-c2ee-4b2d-bae7-f7e6e262db24/self/status.json')}
-god-runtime  | 2026-06-11 20:30:25,882 [DEBUG] httpcore.http11: receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Content-Type', b'application/x-ndjson'), (b'Date', b'Thu, 11 Jun 2026 20:30:25 GMT'), (b'Transfer-Encoding', b'chunked')])
-god-runtime  | 2026-06-11 20:30:25,882 [INFO] httpx: HTTP Request: POST http://host.docker.internal:11434/api/chat "HTTP/1.1 200 OK"
-god-runtime  | 2026-06-11 20:30:25,882 [DEBUG] httpcore.http11: receive_response_body.started request=<Request [b'POST']>
-god-runtime  | 2026-06-11 20:30:26,518 [DEBUG] httpcore.http11: receive_response_body.complete
-god-runtime  | 2026-06-11 20:30:26,518 [DEBUG] httpcore.http11: response_closed.started
-god-runtime  | 2026-06-11 20:30:26,518 [DEBUG] httpcore.http11: response_closed.complete
-god-runtime  | 2026-06-11 20:30:26,520 [DEBUG] httpcore.http11: send_request_headers.started request=<Request [b'POST']>
-god-runtime  | 2026-06-11 20:30:26,520 [DEBUG] httpcore.http11: send_request_headers.complete
-god-runtime  | 2026-06-11 20:30:26,520 [DEBUG] httpcore.http11: send_request_body.started request=<Request [b'POST']>
-god-runtime  | 2026-06-11 20:30:26,521 [DEBUG] httpcore.http11: send_request_body.complete
-god-runtime  | 2026-06-11 20:30:26,521 [DEBUG] httpcore.http11: receive_response_headers.started request=<Request [b'POST']>
-god-runtime  | 2026-06-11 20:30:27,499 [DEBUG] httpcore.http11: receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Content-Type', b'application/x-ndjson'), (b'Date', b'Thu, 11 Jun 2026 20:30:27 GMT'), (b'Transfer-Encoding', b'chunked')])
-god-runtime  | 2026-06-11 20:30:27,499 [INFO] httpx: HTTP Request: POST http://host.docker.internal:11434/api/chat "HTTP/1.1 200 OK"
-god-runtime  | 2026-06-11 20:30:27,499 [DEBUG] httpcore.http11: receive_response_body.started request=<Request [b'POST']>
-god-runtime  | 2026-06-11 20:30:28,619 [DEBUG] httpcore.http11: receive_response_body.complete
-god-runtime  | 2026-06-11 20:30:28,619 [DEBUG] httpcore.http11: response_closed.started
-god-runtime  | 2026-06-11 20:30:28,619 [DEBUG] httpcore.http11: response_closed.complete
-god-runtime  | 2026-06-11 20:30:28,637 [DEBUG] httpcore.http11: send_request_headers.started request=<Request [b'POST']>
-god-runtime  | 2026-06-11 20:30:28,637 [DEBUG] httpcore.http11: send_request_headers.complete
-god-runtime  | 2026-06-11 20:30:28,637 [DEBUG] httpcore.http11: send_request_body.started request=<Request [b'POST']>
-god-runtime  | 2026-06-11 20:30:28,637 [DEBUG] httpcore.http11: send_request_body.complete
-god-runtime  | 2026-06-11 20:30:28,637 [DEBUG] httpcore.http11: receive_response_headers.started request=<Request [b'POST']>
-god-runtime  | DEBUG:    < TEXT 'ping' [4 bytes]
-god-runtime  | DEBUG:    > TEXT '{"type": "pong", "epoch": 56}' [29 bytes]
-god-runtime  | INFO:     172.20.0.1:52982 - "GET /events?limit=500 HTTP/1.1" 200 OK
-god-runtime  | INFO:     172.20.0.1:52986 - "GET /stats HTTP/1.1" 200 OK
-god-runtime  | INFO:     127.0.0.1:33594 - "GET /health HTTP/1.1" 200 OK
-god-runtime  | INFO:     172.20.0.1:52982 - "GET /stats HTTP/1.1" 200 OK
-god-runtime  | 2026-06-11 20:30:30,342 [DEBUG] httpcore.http11: receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Content-Type', b'application/x-ndjson'), (b'Date', b'Thu, 11 Jun 2026 20:30:30 GMT'), (b'Transfer-Encoding', b'chunked')])
-god-runtime  | 2026-06-11 20:30:30,342 [INFO] httpx: HTTP Request: POST http://host.docker.internal:11434/api/chat "HTTP/1.1 200 OK"
-god-runtime  | 2026-06-11 20:30:30,342 [DEBUG] httpcore.http11: receive_response_body.started request=<Request [b'POST']>
-god-runtime  | 2026-06-11 20:30:32,366 [DEBUG] httpcore.http11: receive_response_body.complete
-god-runtime  | 2026-06-11 20:30:32,367 [DEBUG] httpcore.http11: response_closed.started
-god-runtime  | 2026-06-11 20:30:32,367 [DEBUG] httpcore.http11: response_closed.complete
-god-runtime  | 2026-06-11 20:30:32,367 [DEBUG] god.grounding:   Elder-Merch-8161 grounding reject: action JSON leaked into thought ΓÇö '{
-god-runtime  |   "thought": "I am considering forming a coalition with El'
-god-runtime  | 2026-06-11 20:30:32,368 [DEBUG] god.events: ΓåÆ world.local-dev-world-1.events.cognitive.agent.thought (seq=4613)
-god-runtime  | 2026-06-11 20:30:32,378 [DEBUG] god.runner:   Elder-Merch-8161 [trader/social]: I am negotiating a deal to increase my USDC balance before next rent.
-god-runtime  | DEBUG:    > TEXT '{"type": "delta", "epoch": 57, "events": [{"eve...ges": [], "agents": []}' [582 bytes]
-god-runtime  | 2026-06-11 20:30:32,383 [DEBUG] httpcore.connection: connect_tcp.started host='ipfs-node-1' port=5001 local_address=None timeout=12 socket_options=None
-god-runtime  | 2026-06-11 20:30:32,385 [DEBUG] httpcore.connection: connect_tcp.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x7db4aa2d4210>
-god-runtime  | 2026-06-11 20:30:32,385 [DEBUG] httpcore.http11: send_request_headers.started request=<Request [b'POST']>
-god-runtime  | 2026-06-11 20:30:32,385 [DEBUG] httpcore.http11: send_request_headers.complete
-god-runtime  | 2026-06-11 20:30:32,385 [DEBUG] httpcore.http11: send_request_body.started request=<Request [b'POST']>
-god-runtime  | 2026-06-11 20:30:32,385 [DEBUG] httpcore.http11: send_request_body.complete
-god-runtime  | 2026-06-11 20:30:32,385 [DEBUG] httpcore.http11: receive_response_headers.started request=<Request [b'POST']>
-god-runtime  | 2026-06-11 20:30:32,393 [DEBUG] httpcore.http11: receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Access-Control-Allow-Headers', b'X-Stream-Output, X-Chunked-Output, X-Content-Length'), (b'Access-Control-Expose-Headers', b'X-Stream-Output, X-Chunked-Output, X-Content-Length'), (b'Content-Type', b'application/json'), (b'Server', b'kubo/0.42.0'), (b'Trailer', b'X-Stream-Error'), (b'Vary', b'Origin'), (b'X-Chunked-Output', b'1'), (b'Date', b'Thu, 11 Jun 2026 20:30:32 GMT'), (b'Transfer-Encoding', b'chunked')])
-god-runtime  | 2026-06-11 20:30:32,393 [INFO] httpx: HTTP Request: POST http://ipfs-node-1:5001/api/v0/add "HTTP/1.1 200 OK"
-god-runtime  | 2026-06-11 20:30:32,393 [DEBUG] httpcore.http11: receive_response_body.started request=<Request [b'POST']>
-god-runtime  | 2026-06-11 20:30:32,402 [DEBUG] httpcore.http11: receive_response_body.complete
-god-runtime  | 2026-06-11 20:30:32,402 [DEBUG] httpcore.http11: response_closed.started
-god-runtime  | 2026-06-11 20:30:32,402 [DEBUG] httpcore.http11: response_closed.complete
-god-runtime  | 2026-06-11 20:30:32,402 [DEBUG] httpcore.connection: close.started
-god-runtime  | 2026-06-11 20:30:32,402 [DEBUG] httpcore.connection: close.complete
-god-runtime  | 2026-06-11 20:30:32,419 [DEBUG] god.memory: episode committed 79587ccb id=7ca379bd cid=QmexKQh529nD
-god-runtime  | 2026-06-11 20:30:32,427 [INFO] god.runner:   Elder-Merch-8161 [trader] eligible for sleep after 8 active cycles (balance=0.8010)
-god-runtime  | 2026-06-11 20:30:32,428 [INFO] god.dream: SLEEP: 79587ccb entering sleep cycles=3 emo=neutral consecutive_awake=8
-god-runtime  | 2026-06-11 20:30:32,436 [INFO] god.runner:   Elder-Merch-8161 now SLEEPING
-god-runtime  | 2026-06-11 20:30:32,589 [DEBUG] httpcore.http11: send_request_headers.started request=<Request [b'POST']>
-god-runtime  | 2026-06-11 20:30:32,590 [DEBUG] httpcore.http11: send_request_headers.complete
-god-runtime  | 2026-06-11 20:30:32,590 [DEBUG] httpcore.http11: send_request_body.started request=<Request [b'POST']>
-god-runtime  | 2026-06-11 20:30:32,590 [DEBUG] httpcore.http11: send_request_body.complete
-god-runtime  | 2026-06-11 20:30:32,590 [DEBUG] httpcore.http11: receive_response_headers.started request=<Request [b'POST']>
-god-runtime  | 2026-06-11 20:30:32,601 [DEBUG] watchfiles.main: 1 change detected: {(<Change.modified: 2>, '/app/data/agent_env/91e965cb/91e965cb-2f8f-49d1-a536-f8873b8b3065/world/snapshot.json')}
-god-runtime  | 2026-06-11 20:30:33,002 [DEBUG] watchfiles.main: 2 changes detected: {(<Change.modified: 2>, '/app/data/agent_env/91e965cb/91e965cb-2f8f-49d1-a536-f8873b8b3065/self/recent_actions.json'), (<Change.modified: 2>, '/app/data/agent_env/91e965cb/91e965cb-2f8f-49d1-a536-f8873b8b3065/self/status.json')}
-god-runtime  | 2026-06-11 20:30:33,310 [DEBUG] httpcore.http11: receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Content-Type', b'application/x-ndjson'), (b'Date', b'Thu, 11 Jun 2026 20:30:33 GMT'), (b'Transfer-Encoding', b'chunked')])
-god-runtime  | 2026-06-11 20:30:33,311 [INFO] httpx: HTTP Request: POST http://host.docker.internal:11434/api/chat "HTTP/1.1 200 OK"
-god-runtime  | 2026-06-11 20:30:33,311 [DEBUG] httpcore.http11: receive_response_body.started request=<Request [b'POST']>
-god-runtime  | 2026-06-11 20:30:34,194 [DEBUG] httpcore.http11: receive_response_body.complete
-god-runtime  | 2026-06-11 20:30:34,194 [DEBUG] httpcore.http11: response_closed.started
-god-runtime  | 2026-06-11 20:30:34,194 [DEBUG] httpcore.http11: response_closed.complete
-god-runtime  | 2026-06-11 20:30:34,197 [DEBUG] httpcore.http11: send_request_headers.started request=<Request [b'POST']>
-god-runtime  | 2026-06-11 20:30:34,197 [DEBUG] httpcore.http11: send_request_headers.complete
-god-runtime  | 2026-06-11 20:30:34,197 [DEBUG] httpcore.http11: send_request_body.started request=<Request [b'POST']>
-god-runtime  | 2026-06-11 20:30:34,197 [DEBUG] httpcore.http11: send_request_body.complete
-god-runtime  | 2026-06-11 20:30:34,197 [DEBUG] httpcore.http11: receive_response_headers.started request=<Request [b'POST']>
+﻿god-runtime  | 2026-06-11 20:31:10,916 [DEBUG] god.events: ΓåÆ world.local-dev-world-1.events.cognitive.agent.thought (seq=4617)
+god-runtime  | 2026-06-11 20:31:10,925 [DEBUG] god.runner:   Elder-Lore-BD30 [philosopher/existential]: I am composing a philosophical treatise and seeking another mind to challenge my
+god-runtime  | DEBUG:    > TEXT '{"type": "delta", "epoch": 62, "events": [{"eve...ges": [], "agents": []}' [643 bytes]
+god-runtime  | 2026-06-11 20:31:10,931 [DEBUG] httpcore.connection: connect_tcp.started host='ipfs-node-1' port=5001 local_address=None timeout=12 socket_options=None
+god-runtime  | 2026-06-11 20:31:10,933 [DEBUG] httpcore.connection: connect_tcp.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x7db4aa393c10>
+god-runtime  | 2026-06-11 20:31:10,933 [DEBUG] httpcore.http11: send_request_headers.started request=<Request [b'POST']>
+god-runtime  | 2026-06-11 20:31:10,933 [DEBUG] httpcore.http11: send_request_headers.complete
+god-runtime  | 2026-06-11 20:31:10,933 [DEBUG] httpcore.http11: send_request_body.started request=<Request [b'POST']>
+god-runtime  | 2026-06-11 20:31:10,933 [DEBUG] httpcore.http11: send_request_body.complete
+god-runtime  | 2026-06-11 20:31:10,933 [DEBUG] httpcore.http11: receive_response_headers.started request=<Request [b'POST']>
+god-runtime  | 2026-06-11 20:31:10,936 [DEBUG] httpcore.http11: receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Access-Control-Allow-Headers', b'X-Stream-Output, X-Chunked-Output, X-Content-Length'), (b'Access-Control-Expose-Headers', b'X-Stream-Output, X-Chunked-Output, X-Content-Length'), (b'Content-Type', b'application/json'), (b'Server', b'kubo/0.42.0'), (b'Trailer', b'X-Stream-Error'), (b'Vary', b'Origin'), (b'X-Chunked-Output', b'1'), (b'Date', b'Thu, 11 Jun 2026 20:31:10 GMT'), (b'Transfer-Encoding', b'chunked')])
+god-runtime  | 2026-06-11 20:31:10,937 [INFO] httpx: HTTP Request: POST http://ipfs-node-1:5001/api/v0/add "HTTP/1.1 200 OK"
+god-runtime  | 2026-06-11 20:31:10,937 [DEBUG] httpcore.http11: receive_response_body.started request=<Request [b'POST']>
+god-runtime  | 2026-06-11 20:31:10,947 [DEBUG] httpcore.http11: receive_response_body.complete
+god-runtime  | 2026-06-11 20:31:10,947 [DEBUG] httpcore.http11: response_closed.started
+god-runtime  | 2026-06-11 20:31:10,948 [DEBUG] httpcore.http11: response_closed.complete
+god-runtime  | 2026-06-11 20:31:10,948 [DEBUG] httpcore.connection: close.started
+god-runtime  | 2026-06-11 20:31:10,948 [DEBUG] httpcore.connection: close.complete
+god-runtime  | 2026-06-11 20:31:10,960 [DEBUG] god.memory: episode committed c998808c id=bb08851c cid=QmWjhZqQCNX7
+god-runtime  | 2026-06-11 20:31:10,991 [INFO] god.runner:   Elder-Hook-5FE2 [parasite] SLEEPING ΓÇö running dream cycle
+god-runtime  | 2026-06-11 20:31:10,991 [INFO] god.dream: DREAM START: Elder-Hook-5FE2 (f79eec5e) archetype=parasite emo=neutral
+god-runtime  | 2026-06-11 20:31:11,003 [DEBUG] god.dream: _fetch_recent_memories: selected 7/50 for f79eec5e
+god-runtime  | 2026-06-11 20:31:11,003 [DEBUG] god.dream:   [Elder-Hook-5FE2] memories fetched: 7 episodes
+god-runtime  | 2026-06-11 20:31:11,003 [DEBUG] god.dream:   [Elder-Hook-5FE2] distortion: 0 flipped, 3 counterfactual
+god-runtime  | 2026-06-11 20:31:11,004 [DEBUG] httpcore.http11: send_request_headers.started request=<Request [b'POST']>
+god-runtime  | 2026-06-11 20:31:11,004 [DEBUG] httpcore.http11: send_request_headers.complete
+god-runtime  | 2026-06-11 20:31:11,004 [DEBUG] httpcore.http11: send_request_body.started request=<Request [b'POST']>
+god-runtime  | 2026-06-11 20:31:11,004 [DEBUG] httpcore.http11: send_request_body.complete
+god-runtime  | 2026-06-11 20:31:11,004 [DEBUG] httpcore.http11: receive_response_headers.started request=<Request [b'POST']>
+god-runtime  | 2026-06-11 20:31:11,872 [DEBUG] httpcore.http11: receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Content-Type', b'application/x-ndjson'), (b'Date', b'Thu, 11 Jun 2026 20:31:11 GMT'), (b'Transfer-Encoding', b'chunked')])
+god-runtime  | 2026-06-11 20:31:11,872 [INFO] httpx: HTTP Request: POST http://host.docker.internal:11434/api/chat "HTTP/1.1 200 OK"
+god-runtime  | 2026-06-11 20:31:11,872 [DEBUG] httpcore.http11: receive_response_body.started request=<Request [b'POST']>
+god-runtime  | 2026-06-11 20:31:13,141 [DEBUG] httpcore.http11: receive_response_body.complete
+god-runtime  | 2026-06-11 20:31:13,141 [DEBUG] httpcore.http11: response_closed.started
+god-runtime  | 2026-06-11 20:31:13,141 [DEBUG] httpcore.http11: response_closed.complete
+god-runtime  | 2026-06-11 20:31:13,142 [DEBUG] god.dream: _generate_mutation_proposal LLM success: 'I should establish a new coalition with Agent-Synthesis-1E11'
+god-runtime  | 2026-06-11 20:31:13,142 [DEBUG] god.dream:   [Elder-Hook-5FE2] proposal: 'I should establish a new coalition with Agent-Synthesis-1E11 and Agent-Terra-3F1'
+god-runtime  | 2026-06-11 20:31:13,142 [INFO] god.dream:   [Elder-Hook-5FE2] mutation ACCEPTED
+god-runtime  | 2026-06-11 20:31:13,154 [DEBUG] god.dream:   [Elder-Hook-5FE2] dream persisted: be7a978c
+god-runtime  | 2026-06-11 20:31:13,163 [DEBUG] god.dream:   [Elder-Hook-5FE2] pending mutation stored
+god-runtime  | 2026-06-11 20:31:13,172 [DEBUG] god.dream: _wake_agent: f79eec5e marked awake
+god-runtime  | 2026-06-11 20:31:13,172 [INFO] god.dream: DREAM END: Elder-Hook-5FE2 wakes ΓÇö slept 1 cycle(s)
+god-runtime  | 2026-06-11 20:31:13,173 [DEBUG] god.events: ΓåÆ world.local-dev-world-1.events.lifecycle.dream.completed (seq=4618)
+god-runtime  | 2026-06-11 20:31:13,185 [DEBUG] god.dream:   [Elder-Hook-5FE2] dream.completed event emitted
+god-runtime  | 2026-06-11 20:31:13,185 [DEBUG] god.runner:   Elder-Hook-5FE2 dream: accepted=None mutation=''
+god-runtime  | DEBUG:    > TEXT '{"type": "delta", "epoch": 63, "events": [{"eve...ges": [], "agents": []}' [939 bytes]
+god-runtime  | 2026-06-11 20:31:13,214 [INFO] god.runner:   Elder-Ward-693F [defender] SLEEPING ΓÇö running dream cycle
+god-runtime  | 2026-06-11 20:31:13,214 [INFO] god.dream: DREAM START: Elder-Ward-693F (d4b74dbb) archetype=defender emo=neutral
+god-runtime  | 2026-06-11 20:31:13,223 [DEBUG] god.dream: _fetch_recent_memories: selected 6/50 for d4b74dbb
+god-runtime  | 2026-06-11 20:31:13,223 [DEBUG] god.dream:   [Elder-Ward-693F] memories fetched: 6 episodes
+god-runtime  | 2026-06-11 20:31:13,223 [DEBUG] god.dream:   [Elder-Ward-693F] distortion: 0 flipped, 0 counterfactual
+god-runtime  | 2026-06-11 20:31:13,224 [DEBUG] httpcore.http11: send_request_headers.started request=<Request [b'POST']>
+god-runtime  | 2026-06-11 20:31:13,225 [DEBUG] httpcore.http11: send_request_headers.complete
+god-runtime  | 2026-06-11 20:31:13,225 [DEBUG] httpcore.http11: send_request_body.started request=<Request [b'POST']>
+god-runtime  | 2026-06-11 20:31:13,225 [DEBUG] httpcore.http11: send_request_body.complete
+god-runtime  | 2026-06-11 20:31:13,225 [DEBUG] httpcore.http11: receive_response_headers.started request=<Request [b'POST']>
+god-runtime  | 2026-06-11 20:31:13,964 [DEBUG] httpcore.http11: receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Content-Type', b'application/x-ndjson'), (b'Date', b'Thu, 11 Jun 2026 20:31:13 GMT'), (b'Transfer-Encoding', b'chunked')])
+god-runtime  | 2026-06-11 20:31:13,964 [INFO] httpx: HTTP Request: POST http://host.docker.internal:11434/api/chat "HTTP/1.1 200 OK"
+god-runtime  | 2026-06-11 20:31:13,965 [DEBUG] httpcore.http11: receive_response_body.started request=<Request [b'POST']>
 god-runtime  | DEBUG:    % sending keepalive ping
-god-runtime  | DEBUG:    > PING d2 1d 50 02 [binary, 4 bytes]
-god-runtime  | DEBUG:    < PONG d2 1d 50 02 [binary, 4 bytes]
+god-runtime  | DEBUG:    > PING 49 83 52 c5 [binary, 4 bytes]
+god-runtime  | DEBUG:    < PONG 49 83 52 c5 [binary, 4 bytes]
 god-runtime  | DEBUG:    % received keepalive pong
-god-runtime  | 2026-06-11 20:30:35,177 [DEBUG] httpcore.http11: receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Content-Type', b'application/x-ndjson'), (b'Date', b'Thu, 11 Jun 2026 20:30:35 GMT'), (b'Transfer-Encoding', b'chunked')])
-god-runtime  | 2026-06-11 20:30:35,177 [INFO] httpx: HTTP Request: POST http://host.docker.internal:11434/api/chat "HTTP/1.1 200 OK"
-god-runtime  | 2026-06-11 20:30:35,178 [DEBUG] httpcore.http11: receive_response_body.started request=<Request [b'POST']>
-god-runtime  | 2026-06-11 20:30:36,258 [DEBUG] httpcore.http11: receive_response_body.complete
-god-runtime  | 2026-06-11 20:30:36,258 [DEBUG] httpcore.http11: response_closed.started
-god-runtime  | 2026-06-11 20:30:36,258 [DEBUG] httpcore.http11: response_closed.complete
-god-runtime  | 2026-06-11 20:30:36,276 [DEBUG] httpcore.http11: send_request_headers.started request=<Request [b'POST']>
-god-runtime  | 2026-06-11 20:30:36,277 [DEBUG] httpcore.http11: send_request_headers.complete
-god-runtime  | 2026-06-11 20:30:36,277 [DEBUG] httpcore.http11: send_request_body.started request=<Request [b'POST']>
-god-runtime  | 2026-06-11 20:30:36,277 [DEBUG] httpcore.http11: send_request_body.complete
-god-runtime  | 2026-06-11 20:30:36,277 [DEBUG] httpcore.http11: receive_response_headers.started request=<Request [b'POST']>
-god-runtime  | 2026-06-11 20:30:38,043 [DEBUG] httpcore.http11: receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Content-Type', b'application/x-ndjson'), (b'Date', b'Thu, 11 Jun 2026 20:30:38 GMT'), (b'Transfer-Encoding', b'chunked')])
-god-runtime  | 2026-06-11 20:30:38,044 [INFO] httpx: HTTP Request: POST http://host.docker.internal:11434/api/chat "HTTP/1.1 200 OK"
-god-runtime  | 2026-06-11 20:30:38,044 [DEBUG] httpcore.http11: receive_response_body.started request=<Request [b'POST']>
+god-runtime  | 2026-06-11 20:31:15,362 [DEBUG] httpcore.http11: receive_response_body.complete
+god-runtime  | 2026-06-11 20:31:15,362 [DEBUG] httpcore.http11: response_closed.started
+god-runtime  | 2026-06-11 20:31:15,362 [DEBUG] httpcore.http11: response_closed.complete
+god-runtime  | 2026-06-11 20:31:15,363 [DEBUG] god.dream: _generate_mutation_proposal LLM success: 'I should prioritize forming a coalition with Agent-Lyra-1912'
+god-runtime  | 2026-06-11 20:31:15,363 [DEBUG] god.dream:   [Elder-Ward-693F] proposal: 'I should prioritize forming a coalition with Agent-Lyra-1912 to share the cost o'
+god-runtime  | 2026-06-11 20:31:15,363 [INFO] god.dream:   [Elder-Ward-693F] mutation ACCEPTED
+god-runtime  | 2026-06-11 20:31:15,372 [DEBUG] god.dream:   [Elder-Ward-693F] dream persisted: e394960c
+god-runtime  | 2026-06-11 20:31:15,382 [DEBUG] god.dream:   [Elder-Ward-693F] pending mutation stored
+god-runtime  | 2026-06-11 20:31:15,391 [DEBUG] god.dream: _wake_agent: d4b74dbb marked awake
+god-runtime  | 2026-06-11 20:31:15,391 [INFO] god.dream: DREAM END: Elder-Ward-693F wakes ΓÇö slept 1 cycle(s)
+god-runtime  | 2026-06-11 20:31:15,392 [DEBUG] god.events: ΓåÆ world.local-dev-world-1.events.lifecycle.dream.completed (seq=4619)
+god-runtime  | 2026-06-11 20:31:15,403 [DEBUG] god.dream:   [Elder-Ward-693F] dream.completed event emitted
+god-runtime  | 2026-06-11 20:31:15,403 [DEBUG] god.runner:   Elder-Ward-693F dream: accepted=None mutation=''
+god-runtime  | DEBUG:    > TEXT '{"type": "delta", "epoch": 64, "events": [{"eve...ges": [], "agents": []}' [920 bytes]
+god-runtime  | 2026-06-11 20:31:16,441 [INFO] god.runner: Agent cycle: 3/8 due
+god-runtime  | 2026-06-11 20:31:16,452 [DEBUG] god.reproduction: reproduction gate: 1/8 eligible (top 15%, min peer earned 0.005 USDC)
+god-runtime  | 2026-06-11 20:31:16,610 [DEBUG] httpcore.http11: send_request_headers.started request=<Request [b'POST']>
+god-runtime  | 2026-06-11 20:31:16,612 [DEBUG] httpcore.http11: send_request_headers.complete
+god-runtime  | 2026-06-11 20:31:16,612 [DEBUG] httpcore.http11: send_request_body.started request=<Request [b'POST']>
+god-runtime  | 2026-06-11 20:31:16,613 [DEBUG] httpcore.http11: send_request_body.complete
+god-runtime  | 2026-06-11 20:31:16,613 [DEBUG] httpcore.http11: receive_response_headers.started request=<Request [b'POST']>
+god-runtime  | 2026-06-11 20:31:16,871 [DEBUG] watchfiles.main: 3 changes detected: {(<Change.modified: 2>, '/app/data/agent_env/a100c07a/a100c07a-5b17-42e3-a92d-46c9081baf15/self/status.json'), (<Change.modified: 2>, '/app/data/agent_env/a100c07a/a100c07a-5b17-42e3-a92d-46c9081baf15/self/recent_actions.json'), (<Change.modified: 2>, '/app/data/agent_env/a100c07a/a100c07a-5b17-42e3-a92d-46c9081baf15/world/snapshot.json')}
+god-runtime  | 2026-06-11 20:31:17,255 [DEBUG] httpcore.http11: receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Content-Type', b'application/x-ndjson'), (b'Date', b'Thu, 11 Jun 2026 20:31:17 GMT'), (b'Transfer-Encoding', b'chunked')])
+god-runtime  | 2026-06-11 20:31:17,255 [INFO] httpx: HTTP Request: POST http://host.docker.internal:11434/api/chat "HTTP/1.1 200 OK"
+god-runtime  | 2026-06-11 20:31:17,255 [DEBUG] httpcore.http11: receive_response_body.started request=<Request [b'POST']>
+god-runtime  | 2026-06-11 20:31:18,391 [DEBUG] httpcore.http11: receive_response_body.complete
+god-runtime  | 2026-06-11 20:31:18,392 [DEBUG] httpcore.http11: response_closed.started
+god-runtime  | 2026-06-11 20:31:18,392 [DEBUG] httpcore.http11: response_closed.complete
+god-runtime  | 2026-06-11 20:31:18,394 [DEBUG] httpcore.http11: send_request_headers.started request=<Request [b'POST']>
+god-runtime  | 2026-06-11 20:31:18,394 [DEBUG] httpcore.http11: send_request_headers.complete
+god-runtime  | 2026-06-11 20:31:18,394 [DEBUG] httpcore.http11: send_request_body.started request=<Request [b'POST']>
+god-runtime  | 2026-06-11 20:31:18,395 [DEBUG] httpcore.http11: send_request_body.complete
+god-runtime  | 2026-06-11 20:31:18,395 [DEBUG] httpcore.http11: receive_response_headers.started request=<Request [b'POST']>
+god-runtime  | 2026-06-11 20:31:19,319 [DEBUG] httpcore.http11: receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Content-Type', b'application/x-ndjson'), (b'Date', b'Thu, 11 Jun 2026 20:31:19 GMT'), (b'Transfer-Encoding', b'chunked')])
+god-runtime  | 2026-06-11 20:31:19,319 [INFO] httpx: HTTP Request: POST http://host.docker.internal:11434/api/chat "HTTP/1.1 200 OK"
+god-runtime  | 2026-06-11 20:31:19,319 [DEBUG] httpcore.http11: receive_response_body.started request=<Request [b'POST']>
+god-runtime  | DEBUG:    > TEXT '{"type": "pong", "epoch": 64, "keepalive": true}' [48 bytes]

@@ -1,6 +1,6 @@
-﻿[FIELD-DATA] User-specified commands execution - phase1 (#58 #59 #60)
+﻿[FIELD-DATA] User-specified commands - phase1 test plan (#58 #59 #60)
 
-Branch: fix/phase1-death-x402-onchain @ 993e922
+Branch: fix/phase1-death-x402-onchain @ 3a03ecf
 
 **Exact commands run:**
 
@@ -305,6 +305,15 @@ bytes]
 (seq=4601)
   god-runtime  | DEBUG:    > TEXT '{"type": "delta", "epoch": 35, "events": [{"eve...ges": [], "agents": []}' [480 
 bytes]
+  god-runtime  | DEBUG:    % received keepalive pong
+  god-runtime  | DEBUG:    > TEXT '{"type": "snapshot", "epoch": 1781209855, "agen...": "local-dev-world-1"}' [76149 
+bytes]
+> god-runtime  | 2026-06-11 20:30:55,472 [INFO] god.rent: Rent cycle (sim): 8 living agents
+  god-runtime  | 2026-06-11 20:30:55,925 [DEBUG] httpcore.http11: receive_response_headers.complete 
+return_value=(b'HTTP/1.1', 200, b'OK', [(b'Content-Type', b'application/x-ndjson'), (b'Date', b'Thu, 11 Jun 2026 
+20:30:55 GMT'), (b'Transfer-Encoding', b'chunked')])
+  god-runtime  | 2026-06-11 20:30:55,925 [INFO] httpx: HTTP Request: POST http://host.docker.internal:11434/api/chat 
+"HTTP/1.1 200 OK"
 
 
 
@@ -321,10 +330,10 @@ god-runtime    Up 37 minutes (healthy)
 Health: {"status":"ok","world_id":"local-dev-world-1","version":"0.1.0"}
 
 
-**Notes:**
-- python3 not recognized (field env limitation, as always; pytest/smoke env-blocked but per plan 12 passed, smoke success in full env).
-- Logs show repeated "Rent cycle (sim): 8 living agents" and "economy.rent.paid" (sim mode, no RENT_COLLECTOR_ADDRESS for on-chain).
-- No "on-chain" matches (expected).
+**Notes (env + mode):**
+- python3 not recognized (field env limitation, as in all prior runs/pre-commit; pytest/smoke blocked but per plan 12 passed/smoke success in full env).
+- Logs: "Rent cycle (sim): 8 living agents", "economy.rent.paid" events, "Simulation mode (set RENT_COLLECTOR_ADDRESS for on-chain)".
+- No "on-chain" matches (sim mode active; on-chain not wired yet per partial note).
 
 Per test plan. Artifacts updated. 24h soak still needed for full #60.
 
