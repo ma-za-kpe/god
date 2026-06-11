@@ -1409,35 +1409,62 @@ async function fetchSnapshot() {
 // ═══════════════════════════════════════════════════════════════════════════
 // WebSocket stream (primary) + HTTP snapshot fallback
 // ═══════════════════════════════════════════════════════════════════════════
-let ws = null, wsConnected = false;
+let ws = null, wsConnected = false, wsPingTimer = null, wsReconnectTimer = null;
 
 function wsUrl() {
   return RUNTIME.replace(/^http/, 'ws') + '/world/stream';
 }
 
+function startWsPing() {
+  if (wsPingTimer) clearInterval(wsPingTimer);
+  wsPingTimer = setInterval(() => {
+    if (ws && ws.readyState === WebSocket.OPEN) ws.send('ping');
+  }, 20000);
+}
+
+function scheduleWsReconnect() {
+  if (wsReconnectTimer) clearTimeout(wsReconnectTimer);
+  wsReconnectTimer = setTimeout(connectStream, 4000);
+}
+
 function connectStream() {
   try {
+    if (wsReconnectTimer) { clearTimeout(wsReconnectTimer); wsReconnectTimer = null; }
+    if (wsPingTimer) { clearInterval(wsPingTimer); wsPingTimer = null; }
+    if (ws) {
+      ws.onclose = null;
+      ws.onerror = null;
+      if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) ws.close();
+    }
     ws = new WebSocket(wsUrl());
     ws.onopen = () => {
       wsConnected = true;
       document.getElementById('world-id-pill').title = 'live stream';
-      pushSystemLog('SYS', 'life', 'World stream connected');
+      startWsPing();
     };
     ws.onmessage = (e) => {
       try {
         const msg = JSON.parse(e.data);
-        if (msg.type === 'snapshot') applySnapshotMsg(msg);
-        else if (msg.type === 'delta') S.deltaQueue.push(msg);
+        if (msg.type === 'pong') return;
+        if (msg.type === 'snapshot') {
+          if (!document.getElementById('world-id-pill').dataset.wsLive) {
+            document.getElementById('world-id-pill').dataset.wsLive = '1';
+            pushSystemLog('SYS', 'life', 'World stream connected');
+          }
+          applySnapshotMsg(msg);
+        } else if (msg.type === 'delta') S.deltaQueue.push(msg);
       } catch {}
     };
     ws.onclose = () => {
       wsConnected = false;
+      delete document.getElementById('world-id-pill').dataset.wsLive;
+      if (wsPingTimer) { clearInterval(wsPingTimer); wsPingTimer = null; }
       pushSystemLog('SYS', 'warn', 'World stream disconnected — polling fallback');
-      setTimeout(connectStream, 4000);
+      scheduleWsReconnect();
     };
     ws.onerror = () => { wsConnected = false; };
   } catch {
-    setTimeout(connectStream, 4000);
+    scheduleWsReconnect();
   }
 }
 
