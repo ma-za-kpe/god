@@ -171,6 +171,27 @@
     /* ── RAW API PANEL ── */
     #raw-panel { display: none; flex: 1; flex-direction: column; overflow: hidden; padding: 12px; gap: 8px; }
     #raw-panel.visible { display: flex; }
+    #field-dump-panel {
+      display: none; flex: 1; flex-direction: column; overflow: hidden;
+      padding: 12px; gap: 8px;
+    }
+    #field-dump-panel.visible { display: flex; }
+    #field-dump-panel label { color: var(--dim); font-size: 9px; letter-spacing: 0.2em; }
+    #field-dump-panel textarea {
+      flex: 1; min-height: 120px; background: var(--bg3); border: 1px solid var(--border);
+      color: var(--text); font-family: inherit; font-size: 10.5px; line-height: 1.5;
+      padding: 8px; resize: vertical; outline: none;
+    }
+    #field-dump-panel textarea:focus { border-color: var(--accent); }
+    #field-dump-controls { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    #field-dump-controls button {
+      background: var(--bg3); border: 1px solid var(--border); color: var(--text);
+      padding: 4px 12px; font-family: inherit; font-size: 11px; cursor: pointer;
+      letter-spacing: 0.1em;
+    }
+    #field-dump-controls button:hover { border-color: var(--accent2); color: var(--bright); }
+    #field-dump-controls button.primary { border-color: var(--accent); color: var(--accent2); }
+    #field-dump-status { color: var(--dim); font-size: 10px; letter-spacing: 0.1em; }
     #raw-panel textarea {
       background: var(--bg3); border: 1px solid var(--border); color: var(--text);
       font-family: 'Courier New', monospace; font-size: 11px; resize: none;
@@ -247,6 +268,7 @@
     <div class="nav-item" data-section="petitions">✉ PETITIONS</div>
     <div class="nav-item" data-section="services">◆ SERVICES</div>
     <div class="nav-section">TOOLS</div>
+    <div class="nav-item" data-section="fielddump">⎘ FIELD DUMP</div>
     <div class="nav-item" data-section="raw">⌨ RAW API</div>
     <div class="nav-item" data-section="genesis">⚡ GENESIS</div>
   </div>
@@ -285,6 +307,24 @@
             <span class="raw-status" id="raw-status"></span>
           </div>
           <textarea id="raw-output" readonly placeholder="Response will appear here…"></textarea>
+        </div>
+
+        <!-- FIELD DUMP PANEL -->
+        <div id="field-dump-panel">
+          <div style="color:var(--bright);letter-spacing:0.2em;font-size:11px;">⎘ FIELD DUMP — paste into PR comments</div>
+          <div style="color:var(--dim);font-size:10px;line-height:1.6;">
+            Builds a runtime snapshot from the API. Paste <code style="color:var(--accent2)">docker compose logs runtime --tail 2000</code> below, then COPY ALL for one blob.
+          </div>
+          <div id="field-dump-controls">
+            <button class="primary" onclick="buildFieldDump()">↻ BUILD DUMP</button>
+            <button onclick="copyFieldDump()">⎘ COPY ALL</button>
+            <button onclick="copyFieldDumpApi()">⎘ COPY API ONLY</button>
+            <span id="field-dump-status"></span>
+          </div>
+          <label>RUNTIME API SNAPSHOT (auto)</label>
+          <textarea id="field-dump-api" readonly placeholder="Click BUILD DUMP…"></textarea>
+          <label>DOCKER LOGS (paste terminal output)</label>
+          <textarea id="field-dump-docker" placeholder="docker compose logs runtime --tail 2000"></textarea>
         </div>
 
         <!-- GENESIS PANEL -->
@@ -509,6 +549,7 @@ function setLoading(on) {
 }
 
 async function fetchSection(name) {
+  if (name === 'fielddump') { showFieldDump(); return; }
   if (name === 'raw') { showRaw(); return; }
   if (name === 'genesis') { showGenesis(); return; }
 
@@ -520,7 +561,9 @@ async function fetchSection(name) {
   document.querySelectorAll('.nav-item').forEach(el => el.classList.toggle('active', el.dataset.section === name));
   document.getElementById('section-title').textContent = SECTIONS[name]?.title || name.toUpperCase();
   document.getElementById('raw-panel').classList.remove('visible');
+  document.getElementById('field-dump-panel').classList.remove('visible');
   document.getElementById('genesis-panel').style.display = 'none';
+  document.getElementById('json-panel').style.display = '';
   document.getElementById('table-wrap').querySelector('table').style.display = '';
   document.getElementById('pager').style.display = '';
 
@@ -672,6 +715,121 @@ function copyJson() {
 }
 function clearJson() { document.getElementById('json-output').innerHTML = '<span style="color:var(--dim)">← click any row</span>'; }
 
+// ── FIELD DUMP PANEL ──────────────────────────────────────────────────────
+
+const GROUNDING_GREP = /grounding reject|riverbed|aurora net|elder-tier|inter-network|invented concept|action json/i;
+
+function showFieldDump() {
+  S.section = 'fielddump';
+  document.querySelectorAll('.nav-item').forEach(el => el.classList.toggle('active', el.dataset.section === 'fielddump'));
+  document.getElementById('section-title').textContent = 'FIELD DUMP';
+  document.getElementById('table-wrap').querySelector('table').style.display = 'none';
+  document.getElementById('raw-panel').classList.remove('visible');
+  document.getElementById('genesis-panel').style.display = 'none';
+  document.getElementById('field-dump-panel').classList.add('visible');
+  document.getElementById('json-panel').style.display = 'none';
+  document.getElementById('pager').style.display = 'none';
+  if (!document.getElementById('field-dump-api').value.trim()) buildFieldDump();
+}
+
+async function buildFieldDump() {
+  const status = document.getElementById('field-dump-status');
+  status.textContent = '⟳ fetching…';
+  status.style.color = 'var(--dim)';
+  const ts = new Date().toISOString();
+  const lines = [
+    `[FIELD-DATA] snapshot @ ${ts}`,
+    `API: ${API}`,
+    '',
+    '=== HEALTH ===',
+  ];
+  try {
+    const t0 = Date.now();
+    const [health, stats, agentsResp, eventsResp, messagesResp] = await Promise.all([
+      fetch(`${API}/health`).then(r => r.json()).catch(e => ({ error: e.message })),
+      fetch(`${API}/stats`).then(r => r.json()).catch(e => ({ error: e.message })),
+      fetch(`${API}/agents?limit=500`).then(r => r.json()).catch(e => ({ error: e.message })),
+      fetch(`${API}/events?limit=200`).then(r => r.json()).catch(e => ({ error: e.message })),
+      fetch(`${API}/messages?limit=100`).then(r => r.json()).catch(e => ({ error: e.message })),
+    ]);
+    const ms = Date.now() - t0;
+    lines.push(JSON.stringify(health, null, 2));
+    lines.push('', '=== STATS ===', JSON.stringify(stats, null, 2));
+
+    const agents = agentsResp.agents || [];
+    lines.push('', `=== AGENTS (${agents.length}) — last_thought ===`);
+    for (const a of agents) {
+      const name = a.current_name || a.soul_id?.slice(0, 8) || '?';
+      const thought = (a.last_thought || '').trim() || '(empty)';
+      lines.push(`${name} [${a.archetype || '?'}] bal=$${Number(a.balance_usdc || 0).toFixed(4)}: ${thought}`);
+    }
+
+    const suspects = agents.filter(a => {
+      const t = (a.last_thought || '');
+      return GROUNDING_GREP.test(t) || /["']action["']\s*:/.test(t) || /send_message|send_broadcast/.test(t) && t.includes('{');
+    });
+    lines.push('', `=== THOUGHT AUDIT (${suspects.length} suspect) ===`);
+    if (!suspects.length) lines.push('(none flagged in last_thought sample)');
+    else suspects.forEach(a => lines.push(`${a.current_name}: ${a.last_thought}`));
+
+    const events = eventsResp.events || [];
+    lines.push('', `=== EVENTS (tail ${events.length}) ===`);
+    events.slice(0, 40).forEach(e => {
+      lines.push(`${new Date((e.timestamp || 0) * 1000).toISOString().slice(11, 19)} ${e.event_type || '?'} ${(e.narrative || '').slice(0, 120)}`);
+    });
+
+    const messages = messagesResp.messages || [];
+    lines.push('', `=== MESSAGES (tail ${messages.length}) ===`);
+    messages.slice(0, 20).forEach(m => {
+      lines.push(`${m.sender_name || '?'} → ${m.recipient_name || m.recipient_id || '?'}: ${(m.body || m.subject || '').slice(0, 100)}`);
+    });
+
+    const docker = document.getElementById('field-dump-docker').value;
+    if (docker.trim()) {
+      const hits = docker.split('\n').filter(l => GROUNDING_GREP.test(l));
+      lines.push('', `=== DOCKER GREP grounding (${hits.length} lines) ===`);
+      if (!hits.length) lines.push('(no grounding reject lines in pasted logs)');
+      else hits.forEach(l => lines.push(l.slice(0, 300)));
+    }
+
+    document.getElementById('field-dump-api').value = lines.join('\n');
+    status.textContent = `✓ built in ${ms}ms · ${lines.join('\n').length} chars`;
+    status.style.color = 'var(--green)';
+  } catch (e) {
+    document.getElementById('field-dump-api').value = `Error: ${e.message}`;
+    status.textContent = '✗ failed';
+    status.style.color = 'var(--red)';
+  }
+}
+
+function fieldDumpCombined() {
+  const api = document.getElementById('field-dump-api').value.trim();
+  const docker = document.getElementById('field-dump-docker').value.trim();
+  const parts = [api];
+  if (docker) parts.push('', '=== DOCKER LOGS (pasted) ===', docker);
+  return parts.join('\n');
+}
+
+function flashBtn(btn, label = '✓ COPIED') {
+  const orig = btn.textContent;
+  btn.textContent = label;
+  setTimeout(() => { btn.textContent = orig; }, 1200);
+}
+
+function copyFieldDump() {
+  const txt = fieldDumpCombined();
+  navigator.clipboard.writeText(txt).then(() => {
+    flashBtn(document.querySelector('#field-dump-controls button:nth-child(2)'));
+  });
+}
+
+function copyFieldDumpApi() {
+  const txt = document.getElementById('field-dump-api').value;
+  navigator.clipboard.writeText(txt).then(() => {
+    flashBtn(document.querySelector('#field-dump-controls button:nth-child(3)'));
+  });
+}
+
 // ── RAW API PANEL ─────────────────────────────────────────────────────────
 
 function showRaw() {
@@ -680,7 +838,9 @@ function showRaw() {
   document.getElementById('section-title').textContent = 'RAW API';
   document.getElementById('table-wrap').querySelector('table').style.display = 'none';
   document.getElementById('raw-panel').classList.add('visible');
+  document.getElementById('field-dump-panel').classList.remove('visible');
   document.getElementById('genesis-panel').style.display = 'none';
+  document.getElementById('json-panel').style.display = '';
   document.getElementById('pager').style.display = 'none';
 }
 
@@ -720,7 +880,9 @@ function showGenesis() {
   document.getElementById('section-title').textContent = 'WORLD GENESIS';
   document.getElementById('table-wrap').querySelector('table').style.display = 'none';
   document.getElementById('raw-panel').classList.remove('visible');
+  document.getElementById('field-dump-panel').classList.remove('visible');
   document.getElementById('genesis-panel').style.display = 'block';
+  document.getElementById('json-panel').style.display = 'none';
   document.getElementById('pager').style.display = 'none';
   document.getElementById('genesis-status').textContent = '';
 }
@@ -780,7 +942,10 @@ document.querySelectorAll('.nav-item').forEach(el => {
   el.addEventListener('click', () => fetchSection(el.dataset.section));
 });
 
-function refresh() { fetchSection(S.section); }
+function refresh() {
+  if (S.section === 'fielddump') buildFieldDump();
+  else fetchSection(S.section);
+}
 
 let autoTimer = null;
 function toggleAutoRefresh() {
