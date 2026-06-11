@@ -2,7 +2,7 @@
 
 > **Canonical list of creator/operator requests** — the coding agent updates this so nothing is forgotten. GitHub issues track execution; this doc tracks intent.
 
-**Last updated:** 2026-06-11 (deploy gate: all Phase 1 issues closed)
+**Last updated:** 2026-06-11 (Phase 1 issues closed; 14-day soak gate remains)
 
 ---
 
@@ -38,12 +38,16 @@ Track: [github.com/ma-za-kpe/god/issues](https://github.com/ma-za-kpe/god/issues
 | #10 | Autonomy 100% audit | ✅ CLOSED |
 | #11 | Observer live buzz UI | ✅ CLOSED |
 | #12 | Open source + security baseline | ✅ CLOSED |
-| #16 | Observer performance / lag (T-OBS-LAG-01) | 🔄 **OPEN** — LITE shipped; browser soak + field PASS pending |
-| #25 | Episodic memory commit pipeline | 🔄 **OPEN** — code on `develop`; field soak + close pending |
+| #16 | Observer performance / lag (T-OBS-LAG-01) | ✅ CLOSED |
+| #25 | Episodic memory commit pipeline | ✅ CLOSED |
 
-### Not Phase 1 (blocked until gate above passes)
+### Deploy still blocked (creator rule)
 
-#18, #19, #20, #21, #22, #23, #24 — Phase 2+ only. Do not start until Phase 1 issue list is fully closed **and** [doc 73](./73-phase1-deployment-checklist.md) §G (14-day local stability) passes.
+Phase 1 **issues are closed**, but **no public deploy** until [doc 73](./73-phase1-deployment-checklist.md) §G (**14-day local stability soak**) passes.
+
+### Not Phase 1 (blocked until soak + gate above)
+
+#18, #19, #20, #21, #22, #23, #24 — Phase 2+ only.
 
 ---
 
@@ -51,11 +55,11 @@ Track: [github.com/ma-za-kpe/god/issues](https://github.com/ma-za-kpe/god/issues
 
 | # | Request | Status | Notes / issue |
 |---|---------|--------|---------------|
-| R1 | Understand project, audits, fixes on `feat/p0-manifesto-and-scaling`, PR #1 | 🔄 | PR #1 open |
+| R1 | Understand project, audits, fixes on `feat/p0-manifesto-and-scaling`, PR #1 | ✅ | PR #1 + #13 merged to `main` / `develop` |
 | R2 | Deepen local agent autonomy (env, jobs, tools, mutations) | ✅ | doc 77, modules landed |
 | R3 | Always `git pull`; monitor PR comments | 🔄 | ongoing |
 | R4 | Field test 5000 agents, no lag; PR comment protocol | ⏳ | [doc 78](./78-pr-field-test-protocol.md), #4 |
-| R5 | Hallucinations must not happen — live world only | 🔄 | grounding.py, #8 |
+| R5 | Hallucinations must not happen — live world only | 🔄 | grounding.py, #8, PR #26; field soak via T-HALL-LOG-01 |
 | R6 | Field operator: **WAIT** for `[AGENT-READY]` before rebuild | ✅ | doc 78 |
 | R7 | Field operator: **LOGS** on every `[FIELD-*]` report | ✅ | doc 78 |
 | R8 | Docs release pipeline + pre-commit enforced | ✅ | docs 79, CI |
@@ -68,12 +72,12 @@ Track: [github.com/ma-za-kpe/god/issues](https://github.com/ma-za-kpe/god/issues
 | R15 | **Open-source contribution guidelines + airtight git workflow; protect branches; close all issues** | ✅ | CONTRIBUTING.md, doc 83, protection on main+develop |
 | R16 | **Tie AI-driven economy + governance; refresh memory from docs** | ✅ | doc 85 system map |
 | R17 | **Agentic economic activity — transact, negotiate, settle deals** | ✅ | economic_activity.py, buy_service, offer/acceptance |
-| R18 | **Watch PR/comments, continue work, monitor CI** | 🔄 | no extra sync ritual — PR #1 + CI watch |
-| R19 | **Observer UI lagging — field operator logs + track** | ⏳ | T-OBS-LAG-01, GH #16; host RAM pressure confirmed |
+| R18 | **Watch PR/comments, continue work, monitor CI** | 🔄 | active task PRs on `develop` + CI watch |
+| R19 | **Observer UI lagging — field operator logs + track** | ✅ | #16 closed; LITE + WS keepalive (PR #27, #33) |
 | R20 | **Never forget creator requests — track here or open GH issue** | ✅ | this backlog |
 | R21 | **Always update progress docs when shipping work** | ✅ | PROGRESS.md, changelog |
 | R22 | **Onboard new field operator — handoff PR + status report** | ✅ | doc 86, PR #17 investigation closed; future work via PR comments |
-| R23 | **Stable locally before deploy — all Phase 1 GH issues closed** | 🔄 | #16 + #25 remain OPEN; #26/#27/#28 merged; defer deploy to [doc 87](./87-phase2-brainstorm.md) |
+| R23 | **Stable locally before deploy — all Phase 1 GH issues closed** | 🔄 | issues closed; **14-day soak** + hallucination field audit remain; see [doc 87](./87-phase2-brainstorm.md) |
 
 ---
 
@@ -93,15 +97,17 @@ Track: [github.com/ma-za-kpe/god/issues](https://github.com/ma-za-kpe/god/issues
 | P2 | Template narrator | #6 ✅ |
 | P3 | Autonomy 100% audit | #10 ✅ |
 
-### Open — Phase 1 local (must close before any deploy)
+### Phase 1 shipped (issues closed — soak + audit remain)
 
-| P | Task | Issue | Blocker |
-|---|------|-------|---------|
-| P1 | Observer perf / lag at scale | **#16** | Browser PASS under field RAM; LITE on `develop` |
-| P1 | Episodic memory commit pipeline | **#25** | Field shows `episode committed`; close after acceptance checklist |
-| — | Money in circulation + top-earner monitor | R23 | ✅ shipped #27 |
-| — | Hallucination / recipient grounding | R5, #8 | ✅ shipped #26, field PASS |
-| — | Schema repair | PR #28 | ✅ merged, field PASS |
+| P | Task | Issue | Notes |
+|---|------|-------|-------|
+| P1 | Observer perf / lag at scale | **#16** ✅ | LITE + WS keepalive on `develop` |
+| P1 | Episodic memory commit pipeline | **#25** ✅ | `episodic_memory.py` on `develop` |
+| — | Money in circulation + top-earner monitor | R23 | ✅ shipped PR #27 |
+| — | Hallucination / recipient grounding | R5, #8 | ✅ shipped PR #26; field log audit pending |
+| — | Schema repair | PR #28 | ✅ merged |
+| — | WS Decimal / keepalive | PR #33 | ✅ merged |
+| — | README logo + doc sync | — | PR in flight |
 
 ### Deferred — Phase 2+ (brainstorm only)
 
@@ -136,4 +142,4 @@ See [doc 87 — Phase 2 brainstorm](./87-phase2-brainstorm.md): E2B Startups, to
 1. Reread manifesto + autonomy + audit + task-specific doc before each task
 2. Pre-commit locally before every push; watch CI once
 3. Update **this file** when creator adds a new request
-4. Post `[AGENT-REQUEST]` / `[AGENT-READY]` on PR #1 for field work
+4. Post `[AGENT-REQUEST]` / `[AGENT-READY]` on the **active task PR** for field work

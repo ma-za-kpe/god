@@ -2,7 +2,7 @@
 
 > Living audit for issue #10 — [doc 77](./77-agent-autonomy-local.md) structured actuation coverage.
 
-**Last audit:** 2026-06-10 · Branch `feat/p0-manifesto-and-scaling`
+**Last audit:** 2026-06-10 · Branch `develop` (integrated via PR #13)
 
 ---
 
