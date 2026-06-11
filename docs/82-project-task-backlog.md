@@ -59,7 +59,7 @@ Phase 1 **issues are closed**, but **no public deploy** until [doc 73](./73-phas
 | R2 | Deepen local agent autonomy (env, jobs, tools, mutations) | ✅ | doc 77, modules landed |
 | R3 | Always `git pull`; monitor PR comments | 🔄 | ongoing |
 | R4 | Field test 5000 agents, no lag; PR comment protocol | ⏳ | [doc 78](./78-pr-field-test-protocol.md), #4 |
-| R5 | Hallucinations must not happen — live world only | 🔄 | grounding.py, #8, PR #26; T-HALL-LOG-01 field soak complete (PR #51); follow-up #53 (T-HALL-02 builder infra fiction) |
+| R5 | Hallucinations must not happen — live world only | 🔄 | grounding.py, #8, PR #26; T-HALL-LOG-01 (PR #51); #53 fix merged #54 — T-HALL-02 field re-soak pending |
 | R6 | Field operator: **WAIT** for `[AGENT-READY]` before rebuild | ✅ | doc 78 |
 | R7 | Field operator: **LOGS** on every `[FIELD-*]` report | ✅ | doc 78 |
 | R8 | Docs release pipeline + pre-commit enforced | ✅ | docs 79, CI |
@@ -77,7 +77,7 @@ Phase 1 **issues are closed**, but **no public deploy** until [doc 73](./73-phas
 | R20 | **Never forget creator requests — track here or open GH issue** | ✅ | this backlog |
 | R21 | **Always update progress docs when shipping work** | ✅ | PROGRESS.md, changelog |
 | R22 | **Onboard new field operator — handoff PR + status report** | ✅ | doc 86, PR #17 investigation closed; future work via PR comments |
-| R23 | **Stable locally before deploy — all Phase 1 GH issues closed** | 🔄 | issues closed; **14-day soak** + hallucination field audit (T-HALL-LOG-01 + #53 T-HALL-02) remain; see [doc 87](./87-phase2-brainstorm.md) |
+| R23 | **Stable locally before deploy — all Phase 1 GH issues closed** | 🔄 | issues closed; **14-day soak** + T-HALL-02 re-soak after #54 remain; see [doc 87](./87-phase2-brainstorm.md) |
 
 ---
 

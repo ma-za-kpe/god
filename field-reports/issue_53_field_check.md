@@ -58,9 +58,9 @@ Grounding **does** reject some outputs, but fallback thoughts are generic and ci
 ## Field verification (current stack, no rebuild)
 - Branch: field/check-issue-53-20260611 (from develop @ 1f91047 post #52; f8f9843 ancestor)
 - `git pull --rebase origin develop` done (mandatory).
-- Stack (healthy, no action from field): 
+- Stack (healthy, no action from field):
   god-runtime Up ... (healthy)
-  god-observer Up ... 
+  god-observer Up ...
   health: {"status":"ok","world_id":"local-dev-world-1","version":"0.1.0"}
   stats (current): living_count:8, messages_total:792, dreams_total:208, events_total:6568 (increased activity since prior T-HALL soak)
   Host RAM: ~2.1GB free / 15.7GB (Ollama on host per doc86; containers low mem).
@@ -79,7 +79,7 @@ Grounding **does** reject some outputs, but fallback thoughts are generic and ci
 - This check confirms the evidence in the issue body is current and our prior T-HALL-LOG-01 artifacts (md + raw + drama) are the referenced source of truth.
 
 [FIELD-CHECK] T-HALL-02 (issue #53 verified; evidence accurate; backlog updated; ready for agent fix branch)
-Per doc 74/86, Claude.md, PR #51 / issue #53. No sanitization. Stack healthy (8 living). 
+Per doc 74/86, Claude.md, PR #51 / issue #53. No sanitization. Stack healthy (8 living).
 
 PR created: https://github.com/ma-za-kpe/god/pull/56 (field/check-issue-53-20260611 @ 3268d1c).
 See the PR for full report + backlog delta.
