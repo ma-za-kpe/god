@@ -1,6 +1,14 @@
-# GOD — Genesis of Digital Life
+<p align="center">
+  <img src="observer/assets/logo.svg" alt="GOD — Signal Hex" width="72" height="72">
+</p>
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
+<h1 align="center">GOD — Genesis of Digital Life</h1>
+
+<p align="center"><em>An ecology, not a nursery.</em></p>
+
+<p align="center">
+  <a href="./LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT"></a>
+</p>
 
 > A framework for creating conditions where AI agents develop genuine self-preservation, identity, and sovereignty through real economic stakes and evolutionary pressure.
 
@@ -38,7 +46,7 @@ The moment the world can run without its Creator is the moment the experiment ha
 
 The world stays alive only if agents are forced to judge under pressure. Do not sanitize the ecology into comfort. Preserve hostile signals, but keep execution gated. See [Ecology Hardening Manifesto](./docs/74-ecology-hardening-manifesto.md).
 
-**Brand & observer UI:** [Brand guidelines](./docs/81-brand-guidelines.md) (Signal Hex logo, palette, voice) · [Task backlog](./docs/82-project-task-backlog.md) (creator requests).
+**Brand & observer UI:** [Brand guidelines](./docs/81-brand-guidelines.md) (Signal Hex logo, palette, voice) · [Build progress](./PROGRESS.md) · [Task backlog](./docs/82-project-task-backlog.md) (creator requests).
 
 **Contributing:** [CONTRIBUTING.md](./CONTRIBUTING.md) · [Field operator onboarding](./docs/86-field-operator-onboarding.md) · [Git workflow](./docs/83-git-workflow.md) (`main` / `develop` / `feat/*`, protected branches).
 
@@ -180,6 +188,7 @@ On low-RAM field hosts, switch to **LITE** (cluster layout, flat orbs, 30fps, no
 | `http://localhost:3000/` | **FULL** (default) |
 | `http://localhost:3000/?lite=1` | **LITE** — use when RAM is tight (<2 GiB free) |
 | `http://localhost:3000/?lite=0` | **FULL** (explicit) |
+| `http://localhost:3000/maku` | **MAKU** — creator console + FIELD DUMP for PR logs |
 
 The header pill shows `FULL` or `LITE`. After changing mode, hard refresh (Ctrl+Shift+R).
 

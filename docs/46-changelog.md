@@ -244,6 +244,15 @@ Each entry records:
 
 ---
 
+### README logo + doc sync to `develop` (2026-06-11)
+**Decision:** Merge Signal Hex README branding from stale `feat/p0-manifesto-and-scaling` tip into `develop`; sync operator docs to `develop` branch + port `8888`.
+
+**Rationale:** PR #1 and #13 merged the feature branch in June 2026, but six post-merge doc commits (logo README, `maku.html` brand lockup) never reached `develop`. Field protocol still referenced `feat/p0-manifesto-and-scaling` and `localhost:8000`, causing operator confusion. Canonical branch is `develop`; stale remote feature branch should not be used.
+
+**Changes:** Centered logo in README; GOD brand on `maku.html`; doc 78/82/73/87/PROGRESS aligned with closed Phase 1 issues and current stack.
+
+---
+
 ## Open Design Questions (Unresolved)
 
 - **Neuromorphic hardware integration:** How to interface with neuromorphic chips if they become accessible. No answer yet.

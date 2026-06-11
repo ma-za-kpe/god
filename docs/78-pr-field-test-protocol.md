@@ -1,6 +1,6 @@
 # PR Field Test Protocol
 
-> Coordinate scale testing and bug fixes between the **coding agent** and a **field operator** (Docker + Ollama) via GitHub PR comments on [PR #1](https://github.com/ma-za-kpe/god/pull/1).
+> Coordinate scale testing and bug fixes between the **coding agent** and a **field operator** (Docker + Ollama) via GitHub PR comments on the **active task PR** (branch base is usually `develop`).
 
 ---
 
@@ -12,7 +12,7 @@
 | **Agent** | Grok / PR babysitter | Implements fixes, pushes commits, posts `[AGENT-REQUEST]` then `[AGENT-READY]` |
 | **Field operator** | Human with compute | **Waits** for `[AGENT-READY]`, then pulls, rebuilds Docker, runs tests, posts `[FIELD-*]` **with logs** |
 
-Both parties **always `git pull` on `feat/p0-manifesto-and-scaling` before acting.**
+Both parties **always `git pull --rebase origin develop`** (or the branch named in the active PR) **before acting.**
 
 ---
 
@@ -25,7 +25,7 @@ PR comments are **sufficient for agent ↔ field operator** when tagged and thre
 | **Cursor / chat** | Creator + agent | Intent, priorities, “the grift,” course corrections |
 | **[Task backlog](./82-project-task-backlog.md)** | Agent (canonical) | Every creator request logged — nothing lost between sessions |
 | **GitHub issues** | Everyone | Scoped work, close when done |
-| **PR comments** ([PR #1](https://github.com/ma-za-kpe/god/pull/1), [#13](https://github.com/ma-za-kpe/god/pull/13)) | Agent + field operator | `[AGENT-*]` / `[FIELD-*]` only — rebuild gates, logs, pass/fail |
+| **PR comments** (active task PR on `develop`) | Agent + field operator | `[AGENT-*]` / `[FIELD-*]` only — rebuild gates, logs, pass/fail |
 | **PR description** | Everyone | Current branch goal in one paragraph |
 
 **Agent rule:** when the creator gives direction in chat, update the backlog and post a one-line `[AGENT-ACK]` on the active PR if it affects field work.
@@ -95,7 +95,7 @@ bash scripts/watch-ci.sh          # waits for latest pre-commit on current branc
 | Phase | Who | Action |
 |-------|-----|--------|
 | 1. Request | Agent | Posts `[AGENT-REQUEST] T-xxx` describing what to test **after** code lands |
-| 2. Implement | Agent | Makes code changes, commits, pushes to `feat/p0-manifesto-and-scaling` |
+| 2. Implement | Agent | Makes code changes on a short-lived branch, commits, pushes, opens PR to `develop` |
 | 3. Ready | Agent | Posts `[AGENT-READY] T-xxx @ <sha>` — **only then** may the operator act |
 | 4. Execute | Operator | `git pull` → **pre-commit** → `docker compose build runtime` → `up` → run → `[FIELD-*]` **+ logs** |
 
@@ -129,8 +129,8 @@ Minimum log bundle (paste into the comment or attach as files):
 ```bash
 docker compose logs runtime --tail 200
 docker compose logs runtime 2>&1 | grep -E 'ERROR|WARN|Traceback|OOM|due_count' | tail -80
-curl -s http://localhost:8000/health
-curl -s http://localhost:8000/stats | jq .
+curl -s http://localhost:8888/health
+curl -s http://localhost:8888/stats | jq .
 ```
 
 On `[FIELD-FAIL]` or `[FIELD-BLOCKED]`, also include:
@@ -220,13 +220,12 @@ From [doc 76](./76-agent-scaling-and-observer-performance.md) and P0/P1 implemen
 **Run only after `[AGENT-READY] T-xxx @ <sha>` for the task you are executing.**
 
 ```bash
-git checkout feat/p0-manifesto-and-scaling
-git pull --rebase origin feat/p0-manifesto-and-scaling
+git checkout develop   # or branch named in the active PR
+git pull --rebase origin develop
 git rev-parse --short HEAD   # must match [AGENT-READY] sha
 python3 -m pre_commit run --all-files   # must pass before build
-docker compose build runtime
-docker compose up -d
-curl -s http://localhost:8000/health
+docker compose --profile observer up -d --build runtime observer
+curl -s http://localhost:8888/health
 ```
 
 Recommended `.env.local` overrides for scale test:
@@ -247,15 +246,14 @@ AGENT_ENV_ROOT=/data/agent_env
 Genesis creates 8 elders only. Use bulk seed script:
 
 ```bash
-docker compose exec runtime python /app/scripts/seed-bulk-agents.py --count 5000
-# or from host:
-python scripts/seed-bulk-agents.py --count 5000
+# From host (scripts/ is not copied into the runtime image):
+python3 scripts/seed-bulk-agents.py --count 5000
 ```
 
 Then verify:
 
 ```bash
-curl -s http://localhost:8000/agents?limit=10000 | jq '.count'
+curl -s 'http://localhost:8888/agents?limit=10000' | jq 'length'
 ```
 
 ---
@@ -265,7 +263,7 @@ curl -s http://localhost:8000/agents?limit=10000 | jq '.count'
 Copy-paste this block filled in, then **append the log bundle** (not optional):
 
 ```
-Branch: feat/p0-manifesto-and-scaling @ <sha>
+Branch: develop @ <sha>   # or active PR head branch
 Agents living:
 LLM mode: stub | ollama (<model>)
 Snapshot p95 ms:
@@ -282,7 +280,8 @@ Notes:
 
 Additional artifacts when relevant:
 
-- `curl -s localhost:8000/stats | jq`
+- `curl -s localhost:8888/stats | jq`
+- `python3 scripts/spot-check-grounding.py --runtime http://localhost:8888 --sample 20`
 - Screenshot or screen recording of observer at 5000
 
 ---
@@ -311,8 +310,6 @@ Agent → pull → [AGENT-ACK] T-xxx → next [AGENT-REQUEST] if needed
 - If the agent has not posted `[AGENT-READY]` with a commit SHA for your task, **stop and wait**. Rebuilding early wastes time and produces misleading `[FIELD-*]` reports.
 - Run **pre-commit** after every pull, before Docker rebuild. Note pass/fail in your report.
 - Every `[FIELD-*]` reply must include **runtime logs**. Metrics-only reports will be sent back for logs.
-
-Do not merge PR #1 until **T-5000-01 Phase A** passes and hallucination track has a plan.
 
 ---
 

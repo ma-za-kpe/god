@@ -3,7 +3,7 @@
 > **Date:** 2026-06-10
 > **Scope:** Repository hygiene, secret leakage, endpoint exposure, dependency surface
 > **License:** MIT (see [LICENSE](../LICENSE))
-> **Status:** Initial audit + remediations in `feat/p0-manifesto-and-scaling`
+> **Status:** Initial audit + remediations on `develop` (merged via PR #13 / #1)
 
 ---
 

@@ -248,12 +248,18 @@ _VALID_ACTIONS = {
 
 def _parse_action_json(raw: str, state: dict | None = None) -> tuple[str, dict | None]:
     """Extract (thought, action_dict | None) from LLM JSON output."""
+    from .grounding import looks_like_action_json
+
     m = re.search(r"\{.*\}", raw, re.DOTALL)
     if not m:
+        if looks_like_action_json(raw):
+            return "", None
         return raw[:300], None
     try:
         data = json.loads(m.group())
-        thought = _clean_context_text(data.get("thought", raw[:200]), 320)
+        thought = _clean_context_text(data.get("thought", ""), 320)
+        if not thought and looks_like_action_json(raw):
+            return "", None
         act_type = data.get("action")
 
         if not act_type or act_type not in _VALID_ACTIONS:
@@ -305,6 +311,8 @@ def _parse_action_json(raw: str, state: dict | None = None) -> tuple[str, dict |
         }
         return thought, action
     except Exception:
+        if looks_like_action_json(raw):
+            return "", None
         return raw[:300], None
 
 
@@ -1011,18 +1019,21 @@ def build_builder_graph(llm):
         return None
 
     async def assess_projects(state: AgentState) -> dict:
-        system = "You are a builder AI agent. Assess your current projects."
+        system = (
+            "You are a builder AI agent. Assess your current projects in the USDC service economy. "
+            "Do NOT invent bridges, networks, or physical infrastructure — only real listed services or tools."
+        )
         prompt = (
             f"You are {state['name']} (builder, gen {state['generation']}). "
             f"Balance: {state['balance_usdc']:.4f} USDC. "
-            "What are you currently building? "
-            "One sentence. Name a specific thing — service, tool, protocol, or institution."
+            "What service or tool are you preparing to register for other agents to buy? "
+            "One sentence. Use only mechanics that exist: register_service, send_message, coalition."
         )
         situation = await _llm_call(
             llm,
             system,
             prompt,
-            "I am designing a coordination protocol that could serve as shared infrastructure for the whole world.",
+            "I am drafting a small callable tool to list in the service market.",
             state=state,
         )
         return {"situation": situation}
@@ -1030,20 +1041,23 @@ def build_builder_graph(llm):
     async def check_resources(state: AgentState) -> dict:
         peers_text = _format_peers(state.get("peers") or [])
         inbox_text = _format_inbox(state.get("inbox") or [])
-        system = "You are a builder AI agent. Check whether you can proceed."
+        system = (
+            "You are a builder AI agent. Check whether you can proceed with a real service registration. "
+            "Recruit help only by messaging agents from the roster — no invented networks."
+        )
         prompt = (
             f"Project: {state['situation']}\n"
             f"Available: {state['balance_usdc']:.4f} USDC.\n\n"
-            f"AGENTS YOU COULD RECRUIT OR CONTRACT:\n{peers_text}\n\n"
+            f"AGENTS YOU COULD MESSAGE:\n{peers_text}\n\n"
             f"YOUR INBOX (read for resource offers, partnership requests, or warnings about your project):\n{inbox_text}\n\n"
-            "What resources are you missing? Which real agent above could help? "
-            "Has anyone in your inbox offered resources or collaboration? One sentence."
+            "What USDC or feedback do you still need? Which named agent above could help via send_message? "
+            "One sentence — no fictional infrastructure."
         )
         resource_check = await _llm_call(
             llm,
             system,
             prompt,
-            "I need at least two agents to test my protocol — I'll approach cooperators first.",
+            "I will message a cooperator to ask if they will buy my service once I register it.",
             state=state,
         )
         return {"opportunity": resource_check}
@@ -1059,8 +1073,14 @@ def build_builder_graph(llm):
                 f"You are {state['name']} (builder, gen {state['generation']}). "
                 f"Balance: ${balance:.4f} USDC. You build things that outlast you."
             ),
-            archetype_system="You are a builder AI agent constructing infrastructure and institutions.",
-            fallback_thought="I am recruiting agents to test my protocol and committing the first version.",
+            archetype_system=(
+                "You are a builder AI agent. You create listed services and tools other agents pay for. "
+                "Never invent bridges, inter-networks, or coordination protocols — only register_service, "
+                "send_message, transfer_usdc, coalition, and petition."
+            ),
+            fallback_thought=(
+                "I am reviewing the service market and preparing to register a small tool peers can buy."
+            ),
             action_type_override=act_type,
         )
 

@@ -1,7 +1,7 @@
 # GOD Project — Build Progress
 
-> Last updated: 2026-06-10
-> Current phase: **Phase 1 — Local stability** (no public deploy until 14-day gate)
+> Last updated: 2026-06-11
+> Current phase: **Phase 1 — Local stability** (issues closed; no public deploy until 14-day soak gate)
 
 ---
 
@@ -14,8 +14,8 @@
 | Blockchain (Anvil) | ✅ Running | Chain ID 84532, 30 funded accounts |
 | Event bus (NATS JetStream) | ✅ Running | WORLD_EVENTS stream, AGENT_MESSAGES stream (spec'd) |
 | State (Redis + PostgreSQL) | ✅ Running | Full schema applied, all 20+ tables live |
-| Agent runtime (FastAPI) | ✅ Running | 14 API endpoints live |
-| Observer UI | ✅ Running | http://localhost:3000 — Phase 1 hex canvas, drama feed |
+| Agent runtime (FastAPI) | ✅ Running | 25+ API routes incl. `/world/snapshot`, `/world/stream` WS |
+| Observer UI | ✅ Running | http://localhost:3000 — Signal Hex brand, FULL/LITE modes, WORLD LOG |
 | Smart contracts | ✅ Complete | MockUSDC + RentCollector deployed to Anvil |
 | LLM inference (Ollama) | ✅ Complete | llama3.1:8b on RTX 4060, agents thinking every 30s |
 | Genesis agents | ✅ Complete | 5+ agents alive, drama feed live |
@@ -106,7 +106,13 @@ Last run: 2026-06-09 — **13/13 passing**
 | `coalition_members` | Coalition membership |
 
 ### Runtime (Python / FastAPI)
-- `runtime/src/main.py` — 16 endpoints, 3 background daemons (rent, agent, status review)
+- `runtime/src/main.py` — 25+ routes, WS `/world/stream`, 3 background daemons (rent, agent, status review)
+- `runtime/src/json_safe.py` — Decimal/datetime coercion for WebSocket payloads (PR #33)
+- `runtime/src/episodic_memory.py` — per-cycle episode commits (issue #25)
+- `runtime/src/dream_engine.py` — dream cycle for sleeping agents (doc 67)
+- `runtime/src/messaging.py` — agent messaging + salience (doc 68)
+- `runtime/src/coalitions.py` — coalition registry (doc 69)
+- `runtime/src/economic_activity.py` — offer/acceptance settlement (R17)
 - `runtime/src/event_emitter.py` — NATS JetStream publisher + PostgreSQL persist + timeline hook
 - `runtime/src/rent_daemon.py` — rent collection loop (5 min cycles, 3 miss = death)
 - `runtime/src/agent_runner.py` — LangGraph cognition loop per archetype, Ollama LLM
@@ -127,8 +133,10 @@ Last run: 2026-06-09 — **13/13 passing**
 - **⚠️ Redeploy needed**: run `Deploy.s.sol` to get updated addresses after SoulNFT was added
 
 ### Observer UI
-- `observer/index.html` — Phase 1: hex canvas, agent orbs, inspector, drama feed (live)
-- `observer/Dockerfile` — Python HTTP server
+- `observer/index.html` — Phase 1: hex canvas, agent orbs, inspector, drama feed, WORLD LOG tab (live)
+- `observer/brand.css` + `observer/assets/logo.svg` — Signal Hex brand theme
+- `observer/maku.html` — Creator console with GOD brand lockup
+- `observer/Dockerfile` — Python HTTP server (ships `index.html`, `brand.css`, `assets/`)
 
 ### Documentation — 70 docs in `docs/`
 
@@ -156,19 +164,13 @@ New since initial build (docs 56–70):
 
 ## Pending Implementation (Spec Complete, Code Not Written)
 
-These modules have complete implementation specs but the code files don't exist yet:
-
-| Module | Spec Doc | Estimated Effort |
-|--------|----------|-----------------|
-| `runtime/src/dream_engine.py` | doc 67 | ~200 lines |
-| `runtime/src/messaging.py` | doc 68 | ~300 lines |
-| `runtime/src/coalitions.py` | doc 69 | ~250 lines |
-| Apply sleep_states + dreams tables to live DB | doc 67 | SQL migration |
-| Apply agent_messages + reputation tables | doc 68 | SQL migration |
+| Module | Spec Doc | Notes |
+|--------|----------|-------|
 | Observer Phase 4.0 (React + R3F) | doc 70 | Full frontend build |
-| `runtime/src/dream_engine.py` integration into `agent_runner.py` | doc 67 | ~50 lines |
-| `runtime/src/narrator.py` | doc 43/53 | ~150 lines |
-| `runtime/src/governance.py` | doc 65 | ~300 lines |
+| `runtime/src/narrator.py` (full LLM narrative) | doc 43/53 | Template narrator shipped (#6) |
+| `runtime/src/governance.py` | doc 65 | Law amendment protocol — not in repo yet |
+| `runtime/src/consciousness.py` | doc 71 | Issue #24 |
+| `runtime/src/token_factory.py` | doc 72 | On-chain agent tokens |
 
 ---
 
