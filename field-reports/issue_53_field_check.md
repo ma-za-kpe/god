@@ -81,4 +81,6 @@ Grounding **does** reject some outputs, but fallback thoughts are generic and ci
 [FIELD-CHECK] T-HALL-02 (issue #53 verified; evidence accurate; backlog updated; ready for agent fix branch)
 Per doc 74/86, Claude.md, PR #51 / issue #53. No sanitization. Stack healthy (8 living). 
 
-See commit on field/check-issue-53-20260611 for backlog delta.
+PR created: https://github.com/ma-za-kpe/god/pull/56 (field/check-issue-53-20260611 @ 3268d1c).
+See the PR for full report + backlog delta.
+Note: Agent fix for the request landed on develop as commit 3eece47 ("fix(grounding): block builder infrastructure fiction and JSON thought leaks (#54)"). Field PR is tracking side for issue #53 / T-HALL-02.
