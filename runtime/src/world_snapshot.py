@@ -8,11 +8,12 @@ public spectators at high agent counts.
 import logging
 import os
 import time
-from decimal import Decimal
 from typing import Any
 
 import psycopg2
 import psycopg2.extras
+
+from .json_safe import json_safe
 
 log = logging.getLogger("god.snapshot")
 
@@ -149,17 +150,6 @@ def _attach_economy_stats(cur, stats: dict, world_id: str) -> None:
     stats["top_earners"] = [dict(r) for r in cur.fetchall()]
 
 
-def _json_safe(value: Any) -> Any:
-    """Coerce DB numerics for FastAPI send_json / observer WS."""
-    if isinstance(value, Decimal):
-        return float(value)
-    if isinstance(value, dict):
-        return {k: _json_safe(v) for k, v in value.items()}
-    if isinstance(value, list):
-        return [_json_safe(v) for v in value]
-    return value
-
-
 def _finalize_snapshot(
     agents: list[dict],
     stats: dict,
@@ -170,7 +160,7 @@ def _finalize_snapshot(
     stats["world_id"] = world_id
     stats["llm_provider"] = os.getenv("LLM_PROVIDER", "ollama")
     stats["llm_model"] = os.getenv("LLM_MODEL", "llama3.1:8b")
-    return _json_safe(
+    return json_safe(
         {
             "epoch": int(time.time()),
             "agents": agents,

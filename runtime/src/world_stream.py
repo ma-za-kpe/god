@@ -11,6 +11,8 @@ from typing import Any
 
 from fastapi import WebSocket
 
+from .json_safe import json_safe
+
 log = logging.getLogger("god.stream")
 
 _subscribers: set[WebSocket] = set()
@@ -44,7 +46,7 @@ async def broadcast(message: dict[str, Any]):
     """Push JSON to all connected observers. Drops dead sockets."""
     if not _subscribers:
         return
-    data = json.dumps(message, default=str)
+    data = json.dumps(json_safe(message))
     dead: list[WebSocket] = []
     async with _lock:
         clients = list(_subscribers)

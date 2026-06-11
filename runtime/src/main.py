@@ -199,23 +199,32 @@ async def world_snapshot(events_limit: int = 50, messages_limit: int = 80):
 
 @app.websocket("/world/stream")
 async def world_stream(ws: WebSocket):
-    """WebSocket: snapshot on connect, delta pushes on events, periodic snapshot refresh."""
+    """WebSocket: snapshot on connect, delta pushes on events, keepalive ping/pong."""
+    import asyncio
+    import json
+
+    from .json_safe import json_safe
     from .world_snapshot import build_world_snapshot_async
-    from .world_stream import subscribe, unsubscribe
+    from .world_stream import current_epoch, subscribe, unsubscribe
 
     await subscribe(ws)
     try:
         snap = await build_world_snapshot_async()
-        await ws.send_json({"type": "snapshot", **snap})
+        await ws.send_text(json.dumps(json_safe({"type": "snapshot", **snap})))
         while True:
-            # Keepalive — client may send ping text
-            msg = await ws.receive_text()
+            try:
+                msg = await asyncio.wait_for(ws.receive_text(), timeout=25.0)
+            except asyncio.TimeoutError:
+                await ws.send_text(
+                    json.dumps({"type": "pong", "epoch": current_epoch(), "keepalive": True})
+                )
+                continue
             if msg == "ping":
-                await ws.send_json({"type": "pong", "epoch": snap.get("epoch")})
+                await ws.send_text(json.dumps({"type": "pong", "epoch": current_epoch()}))
     except WebSocketDisconnect:
         pass
     except Exception as e:
-        log.debug(f"WS stream closed: {e}")
+        log.warning(f"WS stream closed: {e}", exc_info=True)
     finally:
         await unsubscribe(ws)
 
