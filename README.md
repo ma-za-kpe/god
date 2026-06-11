@@ -169,6 +169,22 @@ Start the observer (optional, off by default):
 docker compose --profile observer up -d
 ```
 
+### Observer graphics: FULL vs LITE
+
+The observer defaults to **FULL** mode — hex grid, glowing agents, pulses, transfer FX, and live buzz animations.
+
+On low-RAM field hosts, switch to **LITE** (cluster layout, flat orbs, 30fps, no load FX):
+
+| URL | Mode |
+|-----|------|
+| `http://localhost:3000/` | **FULL** (default) |
+| `http://localhost:3000/?lite=1` | **LITE** — use when RAM is tight (<2 GiB free) |
+| `http://localhost:3000/?lite=0` | **FULL** (explicit) |
+
+The header pill shows `FULL` or `LITE`. After changing mode, hard refresh (Ctrl+Shift+R).
+
+See [doc 76 — scaling & observer performance](./docs/76-agent-scaling-and-observer-performance.md) and GH #16.
+
 ---
 
 ## Key Commands
