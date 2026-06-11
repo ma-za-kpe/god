@@ -111,4 +111,13 @@ async def seed_one_agent(
     except Exception as e:
         log.warning(f"  DB persist failed for {soul_id[:8]}: {e}")
 
+    try:
+        from .chain_rent import fund_agent_wallet, is_configured, register_agent_on_chain
+
+        if is_configured():
+            register_agent_on_chain(soul_id, wallet_address)
+            fund_agent_wallet(wallet_address, seed_balance)
+    except Exception as e:
+        log.warning(f"  On-chain genesis register failed for {soul_id[:8]}: {e}")
+
     return result

@@ -278,14 +278,68 @@ async def try_settle_acceptance(
     return result
 
 
+async def _debit_buyer(
+    buyer_id: str,
+    amount: float,
+    reason: str,
+    emitter,
+) -> dict[str, Any]:
+    """Debit buyer only (seller credited separately, e.g. via x402 route)."""
+    amount = round(float(amount), 6)
+    if amount < 0.0001:
+        return {"ok": False, "error": "invalid_amount"}
+
+    conn = _db()
+    cur = conn.cursor()
+    try:
+        cur.execute(
+            "SELECT soul_id, current_name, balance_usdc FROM agents WHERE soul_id = %s AND is_alive = true",
+            (buyer_id,),
+        )
+        buyer = cur.fetchone()
+        if not buyer:
+            return {"ok": False, "error": "agent_not_found"}
+
+        buyer_bal = float(buyer["balance_usdc"] or 0)
+        if buyer_bal < amount:
+            return {"ok": False, "error": "insufficient_balance", "need": amount, "have": buyer_bal}
+
+        cur.execute(
+            "UPDATE agents SET balance_usdc = balance_usdc - %s WHERE soul_id = %s",
+            (amount, buyer_id),
+        )
+        cur.execute("SELECT balance_usdc FROM agents WHERE soul_id = %s", (buyer_id,))
+        buyer_after = float(cur.fetchone()["balance_usdc"] or 0)
+        conn.commit()
+    finally:
+        cur.close()
+        conn.close()
+
+    buyer_name = buyer["current_name"] or buyer_id[:8]
+    await emitter.emit(
+        "economy",
+        "service.payment",
+        {
+            "agent_id": buyer_id,
+            "name": buyer_name,
+            "amount_usdc": amount,
+            "balance_after": buyer_after,
+            "reason": reason,
+            "narrative": f"{buyer_name} paid ${amount:.4f} USDC for {reason}",
+        },
+    )
+    return {"ok": True, "buyer_balance": buyer_after, "amount_usdc": amount}
+
+
 async def buy_service(
     buyer_id: str,
     seller_id: str,
     service_name: str,
     emitter,
 ) -> dict[str, Any]:
-    """Purchase a listed service — debits buyer, credits seller."""
-    from .services.registry import get_service, increment_call_count
+    """Purchase a listed service via x402 HTTP (402 → pay → 200) when possible."""
+    from .services.client import invoke_x402_service, service_resource_url
+    from .services.registry import get_agent_wallet, get_service, increment_call_count
 
     listing = get_service(seller_id, service_name)
     if not listing:
@@ -294,6 +348,51 @@ async def buy_service(
     price = float(listing.get("price_usdc") or 0)
     if price < 0.0001:
         return {"ok": False, "error": "invalid_price"}
+
+    use_x402 = os.getenv("USE_X402_FOR_BUY_SERVICE", "true").lower() == "true"
+    if use_x402:
+        buyer_wallet = get_agent_wallet(buyer_id)
+        if not buyer_wallet:
+            return {"ok": False, "error": "buyer_wallet_not_found"}
+
+        resource_url = listing.get("resource_url") or service_resource_url(listing["endpoint_path"])
+        http_result = await invoke_x402_service(resource_url, buyer_wallet)
+        if not http_result.ok:
+            return {"ok": False, "error": http_result.error or "x402_invoke_failed"}
+
+        debit = await _debit_buyer(
+            buyer_id,
+            price,
+            reason=f"service:{service_name}",
+            emitter=emitter,
+        )
+        if not debit.get("ok"):
+            return debit
+
+        await increment_call_count(seller_id, service_name)
+        await emitter.emit(
+            "economy",
+            "service.purchased",
+            {
+                "agent_id": buyer_id,
+                "seller_id": seller_id,
+                "service_name": service_name,
+                "price_usdc": price,
+                "paid_usdc": price,
+                "resource_url": resource_url,
+                "x402": True,
+                "narrative": (
+                    f"Service purchased via x402: '{service_name}' from {seller_id[:8]} "
+                    f"for ${price:.4f} USDC"
+                ),
+            },
+        )
+        return {
+            **debit,
+            "service_name": service_name,
+            "listing_id": listing.get("listing_id"),
+            "response": http_result.body,
+        }
 
     seller_share = round(price * SELLER_SHARE, 6)
     result = await execute_transfer(

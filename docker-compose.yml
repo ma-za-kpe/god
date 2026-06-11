@@ -192,7 +192,12 @@ services:
         required: false
     environment:
       - IPFS_API=http://ipfs-node-1:5001
+      - IPFS_API_ENDPOINTS=http://ipfs-node-1:5001,http://ipfs-node-2:5001,http://ipfs-node-3:5001
+      - MIN_IPFS_PINS=3
       - IPFS_GATEWAY=http://ipfs-node-1:8080
+      - RUNTIME_BASE_URL=http://localhost:8888
+      - MOCK_X402_PAYMENTS=${MOCK_X402_PAYMENTS:-true}
+      - USE_X402_FOR_BUY_SERVICE=${USE_X402_FOR_BUY_SERVICE:-true}
       - ANVIL_RPC=http://anvil:8545
       - CHAIN_ID=84532
       - NATS_URL=nats://nats:4222
@@ -206,7 +211,9 @@ services:
       - OLLAMA_BASE_URL=http://host.docker.internal:11434
       # Set after deploying contracts: forge script contracts/script/Deploy.s.sol ...
       - RENT_COLLECTOR_ADDRESS=${RENT_COLLECTOR_ADDRESS:-}
+      - SOUL_NFT_ADDRESS=${SOUL_NFT_ADDRESS:-}
       - USDC_ADDRESS=${USDC_ADDRESS:-}
+      - CREATOR_PRIVATE_KEY=${CREATOR_PRIVATE_KEY:-}
       # Optional cloud LLM fallbacks
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
