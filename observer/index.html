@@ -181,7 +181,7 @@
     </div>
   </div>
   <span class="pill" id="world-id-pill">…</span>
-  <span class="pill" id="perf-pill" title="Observer render mode">LITE</span>
+  <span class="pill" id="perf-pill" title="Observer render mode">FULL</span>
   <div id="live-dot"></div>
   <div id="buzz-meter" title="world activity">BUZZ —</div>
   <div class="sg">
@@ -300,12 +300,12 @@ const RUNTIME    = 'http://localhost:8888';
 const POLL_SNAP  = 3000;
 const CLUSTER_MODE_THRESHOLD = 50;
 
-// Field-first performance — default LITE on low-RAM hosts. Add ?full=1 for rich FX.
+// FULL graphics by default (original animations). Opt in to LITE with ?lite=1 for low-RAM hosts.
 function detectLiteMode() {
   const q = new URLSearchParams(location.search);
+  if (q.get('lite') === '1') return true;
   if (q.get('full') === '1') return false;
-  if (q.has('lite')) return q.get('lite') !== '0';
-  return true;
+  return false;
 }
 const OBS_LITE = detectLiteMode();
 const PERF = {
