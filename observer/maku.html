@@ -3,26 +3,33 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>MAKU — Creator Console</title>
+  <title>MAKU — Creator Console · GOD</title>
+  <link rel="icon" href="assets/logo.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="brand.css">
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
   <style>
     :root {
-      --bg:      #07070f;
-      --bg2:     #0d0d1a;
-      --bg3:     #111124;
-      --border:  #1e1e3a;
-      --accent:  #4444cc;
-      --accent2: #6655ff;
-      --gold:    #bb9900;
-      --green:   #22cc77;
-      --red:     #cc3333;
-      --orange:  #cc7722;
-      --purple:  #9944cc;
-      --text:    #b0b0d0;
-      --dim:     #555577;
-      --bright:  #d0d0ff;
+      --bg:      var(--god-void);
+      --bg2:     var(--god-surface-solid);
+      --bg3:     #11142a;
+      --border:  rgba(30, 34, 64, 0.55);
+      --accent:  var(--god-cognition);
+      --accent2: var(--god-life);
+      --gold:    var(--god-economy);
+      --green:   var(--god-life);
+      --red:     var(--god-threat);
+      --orange:  var(--god-manifesto);
+      --purple:  var(--god-social);
+      --text:    var(--god-text);
+      --dim:     var(--god-muted);
+      --bright:  #e8eaff;
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { background: var(--bg); color: var(--text); font-family: 'Courier New', monospace; font-size: 12px; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+    body { background: var(--bg); color: var(--text); font-family: var(--god-font); font-size: 12px; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+    .brand-lockup { display: flex; align-items: center; gap: 8px; }
+    .brand-lockup img { width: 24px; height: 24px; filter: drop-shadow(var(--god-glow-life)); }
+    .brand-wordmark { color: var(--god-life); font-size: 0.78rem; font-weight: 600; letter-spacing: 0.3em; line-height: 1; }
+    .brand-sub { font-size: 0.48rem; letter-spacing: 0.18em; color: var(--god-muted); margin-top: 2px; }
 
     /* ── TOP BAR ── */
     #topbar {
@@ -31,8 +38,7 @@
       border-bottom: 1px solid var(--border);
       flex-shrink: 0;
     }
-    #topbar .logo { font-size: 1rem; letter-spacing: 0.3em; color: var(--accent2); font-weight: bold; }
-    #topbar .sub  { color: var(--dim); font-size: 0.7rem; letter-spacing: 0.2em; }
+
     #topbar .spacer { flex: 1; }
     #topbar .api-input {
       background: var(--bg3); border: 1px solid var(--border); color: var(--text);
@@ -205,8 +211,13 @@
 
 <!-- TOP BAR -->
 <div id="topbar">
-  <div class="logo">⬡ MAKU</div>
-  <div class="sub">CREATOR CONSOLE</div>
+  <div class="brand-lockup">
+    <img src="assets/logo.svg" alt="GOD" width="24" height="24">
+    <div>
+      <div class="brand-wordmark">MAKU</div>
+      <div class="brand-sub">CREATOR CONSOLE</div>
+    </div>
+  </div>
   <div class="spacer"></div>
   <div id="stat-pill">
     ALIVE <span id="s-alive">—</span> &nbsp;

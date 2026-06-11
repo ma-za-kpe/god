@@ -44,11 +44,11 @@ Three parties must sign off: **Creator** (you), **Runtime** (the code), **World*
 ## SECTION B — Runtime API
 
 ### B1. Health Endpoints
-- [ ] `curl http://localhost:8000/health` returns `{"status": "ok"}`
-- [ ] `curl http://localhost:8000/stats` returns valid JSON (not 500)
-- [ ] `curl http://localhost:8000/agents` returns `[]` (clean world, no agents yet)
-- [ ] `curl http://localhost:8000/tokens` returns `[]`
-- [ ] `curl http://localhost:8000/messages` returns `[]`
+- [ ] `curl http://localhost:8888/health` returns `{"status": "ok"}`
+- [ ] `curl http://localhost:8888/stats` returns valid JSON (not 500)
+- [ ] `curl http://localhost:8888/agents` returns `[]` (clean world, no agents yet)
+- [ ] `curl http://localhost:8888/tokens` returns `[]`
+- [ ] `curl http://localhost:8888/messages` returns `[]`
 
 ### B2. Observer
 - [ ] `http://localhost:3000/` loads in browser without JS errors in console
@@ -71,7 +71,7 @@ Three parties must sign off: **Creator** (you), **Runtime** (the code), **World*
 - [ ] Agent wallets can receive test USDC (verify with a manual mint transaction)
 
 ### C2. Rent Loop
-- [ ] `runtime/src/rent_collector.py` connects to `RENT_COLLECTOR_ADDRESS` without errors
+- [ ] `runtime/src/rent_daemon.py` connects to `RENT_COLLECTOR_ADDRESS` without errors
 - [ ] `docker compose logs god-runtime | grep "rent"` shows rent cycle starting (not crashing)
 - [ ] Rent period is set correctly: `RENT_PERIOD_SECONDS` in `.env` (default: 3600)
 
@@ -117,13 +117,13 @@ Three parties must sign off: **Creator** (you), **Runtime** (the code), **World*
 
 ### E2. Run Genesis
 ```bash
-curl -X POST http://localhost:8000/creator/genesis \
+curl -X POST http://localhost:8888/creator/genesis \
   -H "Content-Type: application/json" \
   -d '{"confirm": true}'
 ```
 - [ ] Response shows 8 agents created (one per archetype)
 - [ ] `docker compose logs god-runtime | grep "GENESIS"` shows genesis event emitted
-- [ ] `curl http://localhost:8000/agents` returns 8 agents, all `is_alive: true`
+- [ ] `curl http://localhost:8888/agents` returns 8 agents, all `is_alive: true`
 - [ ] All 8 agents have valid `wallet_address`, `soul_id`, `archetype`
 
 ### E3. Post-Genesis Validation (first 5 minutes)
@@ -131,12 +131,12 @@ curl -X POST http://localhost:8000/creator/genesis \
 - [ ] `docker compose logs god-runtime | grep "Agent cycle"` shows "8 agents"
 - [ ] At least one agent emits a thought (logs show `[archetype]: ...thought...`)
 - [ ] No crash loops in god-runtime logs
-- [ ] `curl http://localhost:8000/stats` shows `alive_agents: 8`
+- [ ] `curl http://localhost:8888/stats` shows `alive_agents: 8`
 
 ### E4. First Rent Cycle
 - [ ] After `RENT_PERIOD_SECONDS`, at least one rent payment appears in `SELECT * FROM rent_payments LIMIT 5`
 - [ ] No agents die from rent on cycle 1 (they start at 2.0 USDC, rent is ~0.01 USDC)
-- [ ] `curl http://localhost:8000/stats` shows `total_usdc_in_world` decreasing as rent is collected
+- [ ] `curl http://localhost:8888/stats` shows `total_usdc_in_world` decreasing as rent is collected
 
 ---
 

@@ -128,7 +128,7 @@ Production: shadow-runtime reload per [Technical Architecture](./07-technical-ar
 | Variable | Default | Purpose |
 |----------|---------|---------|
 | `AGENT_ENV_ROOT` | `data/agent_env` | Filesystem namespace |
-| `RUNTIME_URL` | `http://localhost:8000` | Gateway target |
+| `RUNTIME_URL` | `http://localhost:8888` | Gateway target |
 | `ENABLE_EXTERNAL_FETCH` | `true` | Allowlisted HTTP read |
 | `JOBS_TICK_S` | `15` | Job daemon interval |
 | `MUTATION_COST_USDC` | `0.002` | Graph mutation fee |

@@ -2,19 +2,21 @@
 
 > **Gate:** Do not deploy publicly, apply for E2B Startups, or gate reproduction on external rank until Phase 1 runs stable locally for 14 days (see [doc 73](./73-phase1-deployment-checklist.md) Section G).
 
-**Last updated:** 2026-06-10
+**Last updated:** 2026-06-11
 
 ---
 
-## Phase 1 must finish first (active engineering)
+## Phase 1 issues — closed (soak gate remains)
 
-| Item | Issue | Acceptance |
-|------|-------|------------|
-| Observer lag / local stability | #16 | p95 snapshot < 500ms; no UI freeze at field agent counts |
-| Episodic memory writers | #25 | `episodes` rows after cycles; dreams replay real memory |
-| Hallucination soak | PR #26, R5 | No invented recipients in logs after merge |
-| Money in circulation | — | Transfers + service purchases visible in observer; x402 credits ledger |
-| Top-earner monitoring | — | Observer + `/leaderboard?by=revenue` reflect `external_revenue_30d` |
+All Phase 1 GitHub issues (#2–#12, #16, #25) are **closed** on `develop`. Deploy is still blocked by [doc 73](./73-phase1-deployment-checklist.md) §G (**14-day local stability soak**) and ongoing field hallucination audit.
+
+| Item | Issue / PR | Status |
+|------|------------|--------|
+| Observer lag / local stability | #16, PR #27, #33 | ✅ closed — LITE + WS keepalive |
+| Episodic memory writers | #25 | ✅ closed — `episodic_memory.py` |
+| Hallucination grounding | #8, PR #26 | ✅ shipped — field log soak pending |
+| Money in circulation | PR #27 | ✅ shipped |
+| Top-earner monitoring | PR #27 | ✅ `/leaderboard?by=revenue` + `external_revenue_30d` |
 
 **Explicitly not Phase 1:** public observer host (#21), Base mainnet (#20), E2B production (#19), K8s (#18).
 
@@ -76,7 +78,7 @@ There is no passive “agent mining” for USD today. Agents earn like businesse
 When field exceeds ~50 agents with LLM:
 
 - Shard agent workers + LLM queue
-- Per-agent `next_cycle_at` (partially landed via scheduler)
+- Per-agent `next_cycle_at` (not landed — scheduler tick only today)
 - WebSocket delta stream (partially landed)
 - Cluster LOD map (partially landed — threshold 50 agents)
 - Population governor tied to rent curve
