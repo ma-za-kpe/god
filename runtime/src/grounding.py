@@ -24,8 +24,25 @@ _FORBIDDEN_CONCEPTS = re.compile(
     r"deck\s+\d+|sub-?level\s+\d+|quadrants?|planes?|kilometers?|"
     r"energy\s+signatures?|supercomputer|coords?|coordinates?|"
     r"simulated\s+entity|fake\s+crypto|exchange\s+fees?|"
-    r"ethereum\s+mainnet|eth\s+mainnet)\b",
+    r"ethereum\s+mainnet|eth\s+mainnet|"
+    r"riverbed\s+bridge|aurora\s+net|luminous\s+nexus|elder-?tier|"
+    r"inter-?network|data\s+transmission\s+(?:between|across|efficiency)|"
+    r"constructing\s+the\s+['\"]|"
+    r"coordination\s+protocol|shared\s+infrastructure\s+for\s+the\s+(?:whole\s+)?world|"
+    r"reputation-?based\s+(?:rat|system|network|infrastructure))\b",
     re.IGNORECASE,
+)
+
+# Action schema leaking into natural-language thought fields.
+_ACTION_JSON_LEAK_RE = re.compile(
+    r"(?:^\s*[\{\(]|"
+    r'["\']action["\']\s*:|'
+    r'["\']to_id["\']\s*:.*["\']content["\']\s*:|'
+    r'["\']message_type["\']\s*:|'
+    r'["\']send_message["\']|'
+    r'["\']send_broadcast["\']|'
+    r'["\']register_service["\'])',
+    re.IGNORECASE | re.DOTALL,
 )
 
 # Agent-name-like tokens agents invent (Elder-*, Load-*, archetype prefixes).
@@ -99,6 +116,14 @@ def build_grounding_block(state: dict) -> str:
     )
 
 
+def looks_like_action_json(text: str) -> bool:
+    """True when text is action JSON (or a fragment) rather than a thought."""
+    if not text or not str(text).strip():
+        return False
+    t = str(text).strip()
+    return bool(_ACTION_JSON_LEAK_RE.search(t))
+
+
 def check_hallucination(text: str) -> tuple[bool, str]:
     """Return (ok, reason). False if text invents forbidden concepts."""
     if not text or not str(text).strip():
@@ -123,6 +148,8 @@ def check_agent_references(text: str, state: dict) -> tuple[bool, str]:
 
 
 def validate_grounded_text(text: str, state: dict) -> tuple[bool, str]:
+    if looks_like_action_json(text):
+        return False, "action JSON leaked into thought"
     ok, reason = check_hallucination(text)
     if not ok:
         return ok, reason
@@ -134,7 +161,24 @@ def grounded_fallback(state: dict) -> str:
     name = state.get("name", "I")
     bal = float(state.get("balance_usdc", 0))
     rent = float(state.get("rent_amount", 0.001))
+    arch = str(state.get("archetype") or "")
     peers = state.get("peers") or []
+    if arch == "builder":
+        if bal < rent * 2:
+            return (
+                f"{name} pauses new work — balance ${bal:.4f} is too thin; "
+                "earning USDC comes before registering another service."
+            )
+        if peers:
+            target = peers[0].get("name") or peers[0].get("current_name") or "a peer"
+            return (
+                f"{name} considers messaging {target} about a listed service "
+                "or registering a small tool peers can buy."
+            )
+        return (
+            f"{name} reviews the service market and balance ${bal:.4f}, "
+            "planning what to register next."
+        )
     if bal < rent * 2:
         return f"{name} focuses on earning USDC — balance ${bal:.4f} is too thin before next rent."
     if peers:
@@ -209,4 +253,6 @@ def world_rules_forbidden_section() -> str:
         "  • Anomalies/queries/events you did not receive in inbox or ENV\n"
         "  • Sci-fi overlay (Nexus Hub, QuantumNode, Deck levels, quadrants, km, coords)\n"
         "  • Unfounded DEX/Ethereum claims (unless you deployed a token this cycle)\n"
+        "  • Fictional infrastructure (bridges, inter-networks, Aurora Net, coordination protocols)\n"
+        "  • Action JSON in the thought field — thoughts are plain language only\n"
     )
