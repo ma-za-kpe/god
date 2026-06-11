@@ -2,7 +2,7 @@
 
 > **Canonical list of creator/operator requests** — the coding agent updates this so nothing is forgotten. GitHub issues track execution; this doc tracks intent.
 
-**Last updated:** 2026-06-11 (Phase 1 issues closed; 14-day soak gate remains)
+**Last updated:** 2026-06-11 (Phase 1 issues closed; 14-day soak gate remains; issue #53 / T-HALL-02 tracking added)
 
 ---
 
@@ -59,7 +59,7 @@ Phase 1 **issues are closed**, but **no public deploy** until [doc 73](./73-phas
 | R2 | Deepen local agent autonomy (env, jobs, tools, mutations) | ✅ | doc 77, modules landed |
 | R3 | Always `git pull`; monitor PR comments | 🔄 | ongoing |
 | R4 | Field test 5000 agents, no lag; PR comment protocol | ⏳ | [doc 78](./78-pr-field-test-protocol.md), #4 |
-| R5 | Hallucinations must not happen — live world only | 🔄 | grounding.py, #8, PR #26; field soak via T-HALL-LOG-01 |
+| R5 | Hallucinations must not happen — live world only | 🔄 | grounding.py, #8, PR #26; T-HALL-LOG-01 field soak complete (PR #51); follow-up #53 (T-HALL-02 builder infra fiction) |
 | R6 | Field operator: **WAIT** for `[AGENT-READY]` before rebuild | ✅ | doc 78 |
 | R7 | Field operator: **LOGS** on every `[FIELD-*]` report | ✅ | doc 78 |
 | R8 | Docs release pipeline + pre-commit enforced | ✅ | docs 79, CI |
@@ -77,7 +77,7 @@ Phase 1 **issues are closed**, but **no public deploy** until [doc 73](./73-phas
 | R20 | **Never forget creator requests — track here or open GH issue** | ✅ | this backlog |
 | R21 | **Always update progress docs when shipping work** | ✅ | PROGRESS.md, changelog |
 | R22 | **Onboard new field operator — handoff PR + status report** | ✅ | doc 86, PR #17 investigation closed; future work via PR comments |
-| R23 | **Stable locally before deploy — all Phase 1 GH issues closed** | 🔄 | issues closed; **14-day soak** + hallucination field audit remain; see [doc 87](./87-phase2-brainstorm.md) |
+| R23 | **Stable locally before deploy — all Phase 1 GH issues closed** | 🔄 | issues closed; **14-day soak** + hallucination field audit (T-HALL-LOG-01 + #53 T-HALL-02) remain; see [doc 87](./87-phase2-brainstorm.md) |
 
 ---
 
@@ -90,7 +90,7 @@ Phase 1 **issues are closed**, but **no public deploy** until [doc 73](./73-phas
 | P0 | Physics gate — rent before cognition | #2 ✅ |
 | P1 | Message type taxonomy | #5 ✅ |
 | P1 | Inbox salience at scale | #3 ✅ |
-| P1 | Hallucination grounding (code) | #8 ✅ — field re-validation pending |
+| P1 | Hallucination grounding (code) | #8 ✅ — T-HALL-LOG-01 field validation delivered; #53 T-HALL-02 open (builder infra fiction) |
 | P1 | Observer live buzz UI | #11 ✅ |
 | P2 | Reproduction 5× rent (Law 6) | #7 ✅ |
 | P2 | Circuit breakers | #9 ✅ |
@@ -104,7 +104,7 @@ Phase 1 **issues are closed**, but **no public deploy** until [doc 73](./73-phas
 | P1 | Observer perf / lag at scale | **#16** ✅ | LITE + WS keepalive on `develop` |
 | P1 | Episodic memory commit pipeline | **#25** ✅ | `episodic_memory.py` on `develop` |
 | — | Money in circulation + top-earner monitor | R23 | ✅ shipped PR #27 |
-| — | Hallucination / recipient grounding | R5, #8 | ✅ shipped PR #26; field log audit pending |
+| — | Hallucination / recipient grounding | R5, #8 | ✅ shipped PR #26; T-HALL-LOG-01 logs + audit delivered (PR #51); #53 (T-HALL-02) open for builder fiction fix + field [FIELD-PASS] |
 | — | Schema repair | PR #28 | ✅ merged |
 | — | WS Decimal / keepalive | PR #33 | ✅ merged |
 | — | README logo + doc sync | — | PR in flight |
