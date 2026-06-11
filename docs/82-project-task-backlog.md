@@ -2,7 +2,7 @@
 
 > **Canonical list of creator/operator requests** — the coding agent updates this so nothing is forgotten. GitHub issues track execution; this doc tracks intent.
 
-**Last updated:** 2026-06-10
+**Last updated:** 2026-06-11 (deploy gate: all Phase 1 issues closed)
 
 ---
 
@@ -14,6 +14,36 @@
 | 🔄 | In progress |
 | ⏳ | Waiting (field operator / merge) |
 | 📋 | Planned |
+
+---
+
+## Deploy gate (creator rule — non-negotiable)
+
+**No public deploy** (Base mainnet, public observer host, E2B production, or any off-localhost stack) until **every Phase 1 GitHub issue is CLOSED**.
+
+Track: [github.com/ma-za-kpe/god/issues](https://github.com/ma-za-kpe/god/issues)
+
+### Phase 1 issues (must all be ✅ CLOSED before deploy)
+
+| Issue | Title | Status |
+|-------|-------|--------|
+| #2 | Physics gate — rent before cognition | ✅ CLOSED |
+| #3 | Inbox salience at scale | ✅ CLOSED |
+| #4 | T-5000-01 Phase A scale test | ✅ CLOSED |
+| #5 | Message type taxonomy | ✅ CLOSED |
+| #6 | Minimal narrator | ✅ CLOSED |
+| #7 | Reproduction 5× rent (Law 6) | ✅ CLOSED |
+| #8 | Hallucination grounding | ✅ CLOSED |
+| #9 | Circuit breakers | ✅ CLOSED |
+| #10 | Autonomy 100% audit | ✅ CLOSED |
+| #11 | Observer live buzz UI | ✅ CLOSED |
+| #12 | Open source + security baseline | ✅ CLOSED |
+| #16 | Observer performance / lag (T-OBS-LAG-01) | 🔄 **OPEN** — LITE shipped; browser soak + field PASS pending |
+| #25 | Episodic memory commit pipeline | 🔄 **OPEN** — code on `develop`; field soak + close pending |
+
+### Not Phase 1 (blocked until gate above passes)
+
+#18, #19, #20, #21, #22, #23, #24 — Phase 2+ only. Do not start until Phase 1 issue list is fully closed **and** [doc 73](./73-phase1-deployment-checklist.md) §G (14-day local stability) passes.
 
 ---
 
@@ -39,32 +69,65 @@
 | R16 | **Tie AI-driven economy + governance; refresh memory from docs** | ✅ | doc 85 system map |
 | R17 | **Agentic economic activity — transact, negotiate, settle deals** | ✅ | economic_activity.py, buy_service, offer/acceptance |
 | R18 | **Watch PR/comments, continue work, monitor CI** | 🔄 | no extra sync ritual — PR #1 + CI watch |
+| R19 | **Observer UI lagging — field operator logs + track** | ⏳ | T-OBS-LAG-01, GH #16; host RAM pressure confirmed |
+| R20 | **Never forget creator requests — track here or open GH issue** | ✅ | this backlog |
+| R21 | **Always update progress docs when shipping work** | ✅ | PROGRESS.md, changelog |
+| R22 | **Onboard new field operator — handoff PR + status report** | ✅ | doc 86, PR #17 investigation closed; future work via PR comments |
+| R23 | **Stable locally before deploy — all Phase 1 GH issues closed** | 🔄 | #16 + #25 remain OPEN; #26/#27/#28 merged; defer deploy to [doc 87](./87-phase2-brainstorm.md) |
 
 ---
 
 ## Engineering queue (priority)
 
+### Shipped (closed issues — code on `main`)
+
 | P | Task | Issue |
 |---|------|-------|
-| P0 | Physics gate — rent before cognition | #2 |
-| P0 | T-5000-01 Phase A scale test | #4 |
-| P1 | Message type taxonomy | #5 |
-| P1 | Inbox salience at scale | #3 |
-| P1 | Hallucination grounding hardening | #8 |
-| P1 | Observer live UI at scale verify | #11 |
-| P2 | Reproduction 5× rent (Law 6) | #7 |
-| P2 | Circuit breakers | #9 |
-| P2 | Narrator / drama feed | #6 |
-| P3 | Autonomy 100% audit | #10 |
+| P0 | Physics gate — rent before cognition | #2 ✅ |
+| P1 | Message type taxonomy | #5 ✅ |
+| P1 | Inbox salience at scale | #3 ✅ |
+| P1 | Hallucination grounding (code) | #8 ✅ — field re-validation pending |
+| P1 | Observer live buzz UI | #11 ✅ |
+| P2 | Reproduction 5× rent (Law 6) | #7 ✅ |
+| P2 | Circuit breakers | #9 ✅ |
+| P2 | Template narrator | #6 ✅ |
+| P3 | Autonomy 100% audit | #10 ✅ |
+
+### Open — Phase 1 local (must close before any deploy)
+
+| P | Task | Issue | Blocker |
+|---|------|-------|---------|
+| P1 | Observer perf / lag at scale | **#16** | Browser PASS under field RAM; LITE on `develop` |
+| P1 | Episodic memory commit pipeline | **#25** | Field shows `episode committed`; close after acceptance checklist |
+| — | Money in circulation + top-earner monitor | R23 | ✅ shipped #27 |
+| — | Hallucination / recipient grounding | R5, #8 | ✅ shipped #26, field PASS |
+| — | Schema repair | PR #28 | ✅ merged, field PASS |
+
+### Deferred — Phase 2+ (brainstorm only)
+
+See [doc 87 — Phase 2 brainstorm](./87-phase2-brainstorm.md): E2B Startups, top-earner reproduction gate, Akash, public host.
+
+### Open — not built yet (post–Phase 1 gate)
+
+| P | Task | Issue |
+|---|------|-------|
+| P1 | Public observer host | #21 |
+| P2 | E2B agent sandboxes | #19 |
+| P2 | Base mainnet deploy | #20 |
+| P2 | Governance module (`governance.py`) | #22 |
+| P2 | LLM narrative engine (full) | #23 |
+| P3 | K8s distributed mesh | #18 |
+| P3 | Consciousness detection | #24 |
 
 ---
 
 ## Field operator (standing orders)
 
 1. **WAIT** for `[AGENT-READY] T-xxx @ <sha>` before rebuild
-2. Run `python3 -m pre_commit run --all-files` after every pull
-3. Include **runtime logs** in every `[FIELD-*]` report
-4. Never commit field JSON/log dumps
+2. **`git pull --rebase` before every push**
+3. Run `python3 -m pre_commit run --all-files` after every pull
+4. Include **runtime logs** in every `[FIELD-*]` report
+5. Never commit field JSON/log dumps — use [status report template](./templates/FIELD_STATUS_REPORT.md)
 
 ---
 

@@ -309,20 +309,41 @@ async def _fetch_reputation_avg(soul_id: str) -> float:
 
 
 def _resolve_target(cur, to_id: str):
-    """Resolve a full UUID or 8-char prefix to a live agent row. Returns row or None."""
-    if not to_id:
+    """Resolve display name, full UUID, or unique hex prefix to a live agent row."""
+    import re
+
+    if not to_id or not str(to_id).strip():
         return None
-    if len(to_id) < 36:
-        cur.execute(
-            "SELECT soul_id, current_name FROM agents WHERE soul_id LIKE %s AND is_alive = true LIMIT 1",
-            (to_id + "%",),
-        )
-    else:
+    tid = str(to_id).strip()
+    if len(tid) >= 36:
         cur.execute(
             "SELECT soul_id, current_name FROM agents WHERE soul_id = %s AND is_alive = true",
-            (to_id,),
+            (tid,),
         )
-    return cur.fetchone()
+        return cur.fetchone()
+    cur.execute(
+        """
+        SELECT soul_id, current_name FROM agents
+        WHERE is_alive = true AND LOWER(current_name) = LOWER(%s)
+        LIMIT 2
+        """,
+        (tid,),
+    )
+    rows = cur.fetchall()
+    if len(rows) == 1:
+        return rows[0]
+    if re.match(r"^[0-9a-fA-F-]{8,35}$", tid):
+        cur.execute(
+            """
+            SELECT soul_id, current_name FROM agents
+            WHERE is_alive = true AND soul_id LIKE %s
+            """,
+            (tid + "%",),
+        )
+        rows = cur.fetchall()
+        if len(rows) == 1:
+            return rows[0]
+    return None
 
 
 async def _execute_action(agent: dict, action: dict, emitter) -> None:
@@ -372,10 +393,23 @@ async def _execute_action(agent: dict, action: dict, emitter) -> None:
                     str(action.get("payer_on_accept") or "recipient"),
                     content,
                 )
+            from .grounding import resolve_target_peer
+            from .messaging import resolve_recipient_soul_id
             from .messaging import send_message as do_send
 
+            peer_state = {
+                "soul_id": soul_id,
+                "name": name,
+                "peers": agent.get("_peers") or agent.get("peers") or [],
+                "inbox": agent.get("_inbox") or agent.get("inbox") or [],
+            }
+            peer = resolve_target_peer(to_id, peer_state)
+            recipient = (peer or {}).get("soul_id") or resolve_recipient_soul_id(to_id)
+            if not recipient:
+                log.debug(f"  {name} send_message dropped: unknown recipient '{to_id}'")
+                return
+
             try:
-                recipient = to_id if len(to_id) >= 36 else _resolve_full_id(to_id)
                 msg = await do_send(
                     sender_soul_id=soul_id,
                     recipient_soul_id=recipient,
@@ -834,21 +868,11 @@ async def _execute_action(agent: dict, action: dict, emitter) -> None:
         log_action(soul_id, act_type, action, {"error": str(e)}, success=False)
 
 
-def _resolve_full_id(prefix: str) -> str:
-    """Resolve an 8-char soul_id prefix to the full UUID. Returns prefix on failure."""
-    try:
-        conn = _db()
-        cur = conn.cursor()
-        cur.execute(
-            "SELECT soul_id FROM agents WHERE soul_id LIKE %s AND is_alive = true LIMIT 1",
-            (prefix + "%",),
-        )
-        row = cur.fetchone()
-        cur.close()
-        conn.close()
-        return (row or {}).get("soul_id") or prefix
-    except Exception:
-        return prefix
+def _resolve_full_id(prefix: str) -> str | None:
+    """Resolve display name or hex soul_id prefix to full UUID. None if not exactly one match."""
+    from .messaging import resolve_recipient_soul_id
+
+    return resolve_recipient_soul_id(prefix)
 
 
 def _build_llm():
@@ -1036,6 +1060,11 @@ async def _run_cycle(
     # Empirically tuned: agents with ≥8 consecutive active cycles may dream
     REST_THRESHOLD = int(os.getenv("DREAM_REST_THRESHOLD", "8"))
 
+    from .reproduction import compute_reproduction_eligible
+
+    peer_pool = all_agents if all_agents is not None else agents
+    eligible_repro = compute_reproduction_eligible(peer_pool)
+
     batch = _batch_preload_context(agents)
     batch_inboxes = batch["inboxes"]
     batch_reputation = batch["reputation"]
@@ -1137,6 +1166,7 @@ async def _run_cycle(
         # Inject full world context: peers, inbox, services, coalitions
         # ----------------------------------------------------------------
         agent = dict(agent)
+        agent["_repro_eligible"] = soul_id in eligible_repro
         peer_pool = all_agents if all_agents is not None else agents
         agent["_peers"] = _salience_peers(agent, peer_pool)
         agent["_inbox"] = batch_inboxes.get(soul_id) or []
@@ -1238,6 +1268,19 @@ async def _run_cycle(
         structured_action = result.get("action")
         if structured_action:
             await _execute_action(agent, structured_action, emitter)
+
+        try:
+            from .episodic_memory import commit_cycle_episode
+
+            await commit_cycle_episode(
+                agent,
+                thought=thought,
+                action_type=action_type,
+                structured_action=structured_action,
+                cycle_number=cycle_tick,
+            )
+        except Exception as e:
+            log.debug(f"  {name} episode commit skipped: {e}")
 
         # Legacy free-text tool dispatcher removed — all actions go through structured JSON.
         # See _execute_action() and _grounded_decide() in archetype_graphs.py.

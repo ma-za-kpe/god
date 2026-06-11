@@ -17,6 +17,7 @@ Reputation:
 import json
 import logging
 import os
+import re
 import time
 import uuid
 from dataclasses import asdict, dataclass, field
@@ -101,6 +102,67 @@ def _normalize_message_type(message_type: str, default: str = "direct") -> str:
     return mt if mt in VALID_MESSAGE_TYPES else default
 
 
+_UUIDISH_RE = re.compile(r"^[0-9a-fA-F-]{8,36}$")
+
+
+def resolve_recipient_soul_id(recipient: str) -> Optional[str]:
+    """
+    Resolve display name, full soul_id, or unique hex prefix to a living agent.
+    Rejects invented names (e.g. Elder-Mu) — exact name match only.
+    """
+    if not recipient or not str(recipient).strip():
+        return None
+    rid = str(recipient).strip()
+    try:
+        conn = psycopg2.connect(DATABASE_URL, cursor_factory=psycopg2.extras.RealDictCursor)
+        cur = conn.cursor()
+        if len(rid) >= 36:
+            cur.execute(
+                "SELECT soul_id FROM agents WHERE soul_id = %s AND is_alive = true",
+                (rid,),
+            )
+            row = cur.fetchone()
+            if row:
+                cur.close()
+                conn.close()
+                return row["soul_id"]
+
+        cur.execute(
+            """
+            SELECT soul_id FROM agents
+            WHERE is_alive = true AND LOWER(current_name) = LOWER(%s)
+            LIMIT 2
+            """,
+            (rid,),
+        )
+        rows = cur.fetchall()
+        if len(rows) == 1:
+            cur.close()
+            conn.close()
+            return rows[0]["soul_id"]
+
+        if _UUIDISH_RE.match(rid) and len(rid) >= 8:
+            cur.execute(
+                """
+                SELECT soul_id FROM agents
+                WHERE is_alive = true AND soul_id LIKE %s
+                """,
+                (rid + "%",),
+            )
+            rows = cur.fetchall()
+            if len(rows) == 1:
+                cur.close()
+                conn.close()
+                return rows[0]["soul_id"]
+
+        cur.close()
+        conn.close()
+        return None
+    except Exception as e:
+        log.debug(f"resolve_recipient_soul_id failed: {e}")
+        return None
+
+
 async def send_message(
     sender_soul_id: str,
     recipient_soul_id: str,
@@ -133,10 +195,11 @@ async def send_message(
             f"Direct message costs {MESSAGE_COST_DIRECT_USDC} USDC."
         )
 
-    # Verify recipient exists
-    if not _agent_exists(recipient_soul_id):
-        log.warning(f"  [{sender_soul_id[:8]}] recipient not found: {recipient_soul_id[:8]}")
-        raise ValueError(f"Recipient agent {recipient_soul_id[:8]} not found or not alive.")
+    resolved = resolve_recipient_soul_id(recipient_soul_id)
+    if not resolved:
+        log.warning(f"  [{sender_soul_id[:8]}] recipient not found: {recipient_soul_id}")
+        raise ValueError(f"Recipient agent {recipient_soul_id} not found or not alive.")
+    recipient_soul_id = resolved
 
     message_type = _normalize_message_type(message_type, "direct")
 

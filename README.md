@@ -40,7 +40,7 @@ The world stays alive only if agents are forced to judge under pressure. Do not 
 
 **Brand & observer UI:** [Brand guidelines](./docs/81-brand-guidelines.md) (Signal Hex logo, palette, voice) · [Task backlog](./docs/82-project-task-backlog.md) (creator requests).
 
-**Contributing:** [CONTRIBUTING.md](./CONTRIBUTING.md) · [Git workflow](./docs/83-git-workflow.md) (`main` / `develop` / `feat/*`, protected branches).
+**Contributing:** [CONTRIBUTING.md](./CONTRIBUTING.md) · [Field operator onboarding](./docs/86-field-operator-onboarding.md) · [Git workflow](./docs/83-git-workflow.md) (`main` / `develop` / `feat/*`, protected branches).
 
 **System map:** [AI-driven economy & governance](./docs/85-economy-governance-system.md) — how rent, tiers, DAOs, petitions, and the observer tie together.
 
@@ -168,6 +168,22 @@ Start the observer (optional, off by default):
 ```bash
 docker compose --profile observer up -d
 ```
+
+### Observer graphics: FULL vs LITE
+
+The observer defaults to **FULL** mode — hex grid, glowing agents, pulses, transfer FX, and live buzz animations.
+
+On low-RAM field hosts, switch to **LITE** (cluster layout, flat orbs, 30fps, no load FX):
+
+| URL | Mode |
+|-----|------|
+| `http://localhost:3000/` | **FULL** (default) |
+| `http://localhost:3000/?lite=1` | **LITE** — use when RAM is tight (<2 GiB free) |
+| `http://localhost:3000/?lite=0` | **FULL** (explicit) |
+
+The header pill shows `FULL` or `LITE`. After changing mode, hard refresh (Ctrl+Shift+R).
+
+See [doc 76 — scaling & observer performance](./docs/76-agent-scaling-and-observer-performance.md) and GH #16.
 
 ---
 

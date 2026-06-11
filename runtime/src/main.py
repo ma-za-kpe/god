@@ -76,7 +76,9 @@ async def lifespan(app: FastAPI):
     )
 
     from .db_pool import close_pool, init_pool
+    from .db_schema import ensure_schema
 
+    ensure_schema()
     await init_pool()
 
     _background_tasks.append(asyncio.create_task(rent_daemon(), name="rent_daemon"))
@@ -197,23 +199,32 @@ async def world_snapshot(events_limit: int = 50, messages_limit: int = 80):
 
 @app.websocket("/world/stream")
 async def world_stream(ws: WebSocket):
-    """WebSocket: snapshot on connect, delta pushes on events, periodic snapshot refresh."""
+    """WebSocket: snapshot on connect, delta pushes on events, keepalive ping/pong."""
+    import asyncio
+    import json
+
+    from .json_safe import json_safe
     from .world_snapshot import build_world_snapshot_async
-    from .world_stream import subscribe, unsubscribe
+    from .world_stream import current_epoch, subscribe, unsubscribe
 
     await subscribe(ws)
     try:
         snap = await build_world_snapshot_async()
-        await ws.send_json({"type": "snapshot", **snap})
+        await ws.send_text(json.dumps(json_safe({"type": "snapshot", **snap})))
         while True:
-            # Keepalive — client may send ping text
-            msg = await ws.receive_text()
+            try:
+                msg = await asyncio.wait_for(ws.receive_text(), timeout=25.0)
+            except asyncio.TimeoutError:
+                await ws.send_text(
+                    json.dumps({"type": "pong", "epoch": current_epoch(), "keepalive": True})
+                )
+                continue
             if msg == "ping":
-                await ws.send_json({"type": "pong", "epoch": snap.get("epoch")})
+                await ws.send_text(json.dumps({"type": "pong", "epoch": current_epoch()}))
     except WebSocketDisconnect:
         pass
     except Exception as e:
-        log.debug(f"WS stream closed: {e}")
+        log.warning(f"WS stream closed: {e}", exc_info=True)
     finally:
         await unsubscribe(ws)
 
@@ -554,6 +565,15 @@ async def get_tool_grants(soul_id: str):
 # ---------------------------------------------------------------------------
 
 
+@app.get("/agents/{soul_id}/episodes")
+async def get_agent_episodes(soul_id: str, limit: int = 20):
+    """Recent episodic memory index rows for an agent (GH #25 debug surface)."""
+    from .episodic_memory import list_episodes
+
+    rows = list_episodes(soul_id, limit=limit)
+    return {"soul_id": soul_id, "episodes": rows, "count": len(rows)}
+
+
 @app.get("/agents/{soul_id}/dreams")
 async def get_agent_dreams(soul_id: str, limit: int = 20):
     """Dream history for a specific agent."""
@@ -775,6 +795,11 @@ async def creator_genesis(
         db = os.getenv("DATABASE_URL", "postgresql://god:localdev@localhost:5432/god_world")
         conn = psycopg2.connect(db)
         cur = conn.cursor()
+        cur.execute(
+            "DELETE FROM service_listings WHERE agent_soul_id IN "
+            "(SELECT soul_id FROM agents WHERE world_id = %s)",
+            (world_id,),
+        )
         cur.execute("DELETE FROM agents WHERE world_id = %s", (world_id,))
         cur.execute("DELETE FROM sleep_states WHERE world_id = %s", (world_id,))
         # rent_payments has no world_id — delete by soul_id of agents just cleared
@@ -782,6 +807,9 @@ async def creator_genesis(
         cur.execute("DELETE FROM events WHERE world_id = %s", (world_id,))
         cur.execute("DELETE FROM agent_messages WHERE world_id = %s", (world_id,))
         cur.execute("DELETE FROM dreams WHERE world_id = %s", (world_id,))
+        cur.execute("DELETE FROM episodes WHERE world_id = %s", (world_id,))
+        cur.execute("DELETE FROM external_payments WHERE world_id = %s", (world_id,))
+        cur.execute("DELETE FROM agent_status WHERE world_id = %s", (world_id,))
         cur.execute("DELETE FROM world_firsts WHERE world_id = %s", (world_id,))
         cur.execute("DELETE FROM world_milestones WHERE world_id = %s", (world_id,))
         conn.commit()
@@ -812,6 +840,24 @@ async def creator_genesis(
             log.info(f"  GENESIS: {agent['name']} ({archetype}) soul={agent['soul_id'][:8]}")
         except Exception as e:
             log.error(f"  Failed to create genesis {archetype}: {e}")
+
+    # Seed starter marketplace so USDC circulates via buy_service / x402 locally
+    try:
+        from .services.registry import register_service
+
+        starter_services = (
+            ("world_stats", "Living agent count and USDC totals", 0.01),
+            ("generate_thought", "One archetype-styled thought from this agent", 0.02),
+        )
+        for agent in genesis_agents:
+            sid = agent["soul_id"]
+            for svc_name, svc_desc, svc_price in starter_services:
+                await register_service(sid, svc_name, svc_desc, svc_price)
+        log.info(
+            f"  Genesis marketplace: {len(starter_services)} services × {len(genesis_agents)} agents"
+        )
+    except Exception as e:
+        log.warning(f"  Genesis service seeding failed: {e}")
 
     # Emit genesis event
     try:

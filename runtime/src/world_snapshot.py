@@ -13,6 +13,8 @@ from typing import Any
 import psycopg2
 import psycopg2.extras
 
+from .json_safe import json_safe
+
 log = logging.getLogger("god.snapshot")
 
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://god:localdev@localhost:5432/god_world")
@@ -87,6 +89,67 @@ def _build_clusters(agents: list[dict]) -> list[dict]:
     return list(clusters.values())
 
 
+def _attach_economy_stats(cur, stats: dict, world_id: str) -> None:
+    """Circulation + top-earner metrics for Phase 1 local monitoring."""
+    now = int(time.time())
+    day_ago = now - 86400
+
+    cur.execute(
+        "SELECT COUNT(*) AS n FROM episodes WHERE world_id = %s",
+        (world_id,),
+    )
+    stats["episodes_total"] = cur.fetchone()["n"]
+
+    cur.execute(
+        """
+        SELECT COUNT(*) AS n
+        FROM events
+        WHERE world_id = %s AND timestamp >= %s
+          AND event_type = 'economy.agent.transfer'
+        """,
+        (world_id, day_ago),
+    )
+    stats["transfers_24h"] = cur.fetchone()["n"]
+
+    cur.execute(
+        """
+        SELECT COUNT(*) AS n
+        FROM events
+        WHERE world_id = %s AND timestamp >= %s
+          AND event_type = 'economy.service.purchased'
+        """,
+        (world_id, day_ago),
+    )
+    stats["service_purchases_24h"] = cur.fetchone()["n"]
+
+    cur.execute(
+        """
+        SELECT COALESCE(SUM(amount_usdc), 0) AS total
+        FROM external_payments
+        WHERE world_id = %s AND NOT is_internal AND timestamp >= %s
+        """,
+        (world_id, now - 30 * 86400),
+    )
+    stats["external_revenue_30d"] = float(cur.fetchone()["total"] or 0)
+
+    cur.execute(
+        """
+        SELECT a.soul_id, a.current_name, a.archetype,
+               COALESCE(a.balance_usdc, 0) AS balance_usdc,
+               COALESCE(s.external_revenue_30d, 0) AS external_revenue_30d,
+               COALESCE(s.tier, 0) AS tier,
+               COALESCE(s.prestige_score, 0) AS prestige_score
+        FROM agents a
+        LEFT JOIN agent_status s ON s.soul_id = a.soul_id AND s.world_id = %s
+        WHERE a.world_id = %s AND a.is_alive = true
+        ORDER BY COALESCE(s.external_revenue_30d, 0) DESC, a.balance_usdc DESC
+        LIMIT 8
+        """,
+        (world_id, world_id),
+    )
+    stats["top_earners"] = [dict(r) for r in cur.fetchall()]
+
+
 def _finalize_snapshot(
     agents: list[dict],
     stats: dict,
@@ -97,16 +160,19 @@ def _finalize_snapshot(
     stats["world_id"] = world_id
     stats["llm_provider"] = os.getenv("LLM_PROVIDER", "ollama")
     stats["llm_model"] = os.getenv("LLM_MODEL", "llama3.1:8b")
-    return {
-        "epoch": int(time.time()),
-        "agents": agents,
-        "agent_count": len(agents),
-        "stats": stats,
-        "events": events,
-        "messages": messages,
-        "clusters": _build_clusters(agents),
-        "world_id": world_id,
-    }
+    return json_safe(
+        {
+            "epoch": int(time.time()),
+            "agents": agents,
+            "agent_count": len(agents),
+            "stats": stats,
+            "events": events,
+            "messages": messages,
+            "clusters": _build_clusters(agents),
+            "leaderboard": stats.get("top_earners", []),
+            "world_id": world_id,
+        }
+    )
 
 
 def build_world_snapshot(
@@ -133,6 +199,8 @@ def build_world_snapshot(
     for key, sql in _count_sql.items():
         cur.execute(sql, (world_id,))
         stats[key] = cur.fetchone()["n"]
+
+    _attach_economy_stats(cur, stats, world_id)
 
     cur.execute(
         "SELECT event_id, agent_id, event_type, timestamp, narrative, payload "
@@ -183,6 +251,13 @@ async def build_world_snapshot_async(
     for key, sql in _count_sql_async.items():
         row = await fetch_one(sql, world_id)
         stats[key] = row["n"] if row else 0
+
+    # Economy stats (sync helper — small queries)
+    conn = _db()
+    cur = conn.cursor()
+    _attach_economy_stats(cur, stats, world_id)
+    cur.close()
+    conn.close()
 
     events = await fetch_all(
         "SELECT event_id, agent_id, event_type, timestamp, narrative, payload "

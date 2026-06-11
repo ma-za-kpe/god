@@ -154,6 +154,10 @@ async def call_service(
         log.error(f"Service {service_name} for {soul_id[:8]} failed: {e}", exc_info=True)
         return JSONResponse(status_code=500, content={"error": "service execution failed"})
 
+    # Credit seller balance and record external revenue for status / leaderboard
+    payer_address = _payer_from_header(x_payment_authorization) or "external:anonymous"
+    await _credit_service_payment(soul_id, price, payer_address, result.transaction_hash)
+
     # Increment call counter and emit event (non-blocking)
     await increment_call_count(soul_id, service_name)
     emitter = await get_emitter()
@@ -168,8 +172,71 @@ async def call_service(
             "narrative": f"Service '{service_name}' called on {soul_id[:8]} (${price:.4f})",
         },
     )
+    await emitter.emit(
+        "economy",
+        "external_revenue_received",
+        {
+            "agent_id": soul_id,
+            "amount_usdc": price,
+            "payer_address": payer_address,
+            "source_type": "x402",
+            "tx_hash": result.transaction_hash,
+            "narrative": (
+                f"External payment ${price:.4f} USDC to {soul_id[:8]} for '{service_name}'"
+            ),
+        },
+    )
 
     return response_body
+
+
+def _payer_from_header(header: str | None) -> str | None:
+    if not header:
+        return None
+    # Mock/local headers may be plain addresses; production x402 carries structured proof.
+    if header.startswith("0x") and len(header) >= 10:
+        return header[:42]
+    return f"x402:{header[:24]}"
+
+
+async def _credit_service_payment(
+    soul_id: str,
+    amount_usdc: float,
+    payer_address: str,
+    tx_hash: str | None,
+) -> None:
+    """Credit agent wallet and ledger for verified x402 service calls."""
+    from ..status_engine import record_external_payment, refresh_agent_status
+
+    amount = round(float(amount_usdc), 6)
+    if amount < 0.0001:
+        return
+
+    conn = psycopg2.connect(DATABASE_URL, cursor_factory=psycopg2.extras.RealDictCursor)
+    cur = conn.cursor()
+    try:
+        cur.execute(
+            "UPDATE agents SET balance_usdc = balance_usdc + %s "
+            "WHERE soul_id = %s AND is_alive = true RETURNING balance_usdc",
+            (amount, soul_id),
+        )
+        row = cur.fetchone()
+        if not row:
+            return
+        conn.commit()
+    finally:
+        cur.close()
+        conn.close()
+
+    await record_external_payment(
+        soul_id,
+        payer_address,
+        amount,
+        source_type="x402",
+        tx_hash=tx_hash,
+        is_internal=False,
+    )
+    await refresh_agent_status(soul_id)
 
 
 async def _dispatch(soul_id: str, service_name: str, request: Request) -> dict:
