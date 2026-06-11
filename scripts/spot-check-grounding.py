@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Sample live agent thoughts and flag grounding violations (issue #8).
+Sample live agent thoughts and flag grounding violations (issue #8, #53).
 
 Usage:
   python3 scripts/spot-check-grounding.py [--runtime http://localhost:8888] [--sample 20]
@@ -11,22 +11,36 @@ from __future__ import annotations
 
 import argparse
 import json
-import re
+import os
 import sys
 import urllib.error
 import urllib.request
 
-_FORBIDDEN = re.compile(
-    r"\b(processing\s+power|tunnel\s+system|security\s+vulnerabilit|"
-    r"data\s+center|symbiotic\s+relationship|idle\s+speculation|"
-    r"nexus\s+hub|quantum\s*node|deck\s+\d+|quadrants?|kilometers?)\b",
-    re.IGNORECASE,
-)
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "runtime", "src"))
+
+from grounding import looks_like_action_json, validate_grounded_text  # noqa: E402
 
 
 def fetch(url: str) -> dict | list:
     with urllib.request.urlopen(url, timeout=30) as resp:
         return json.loads(resp.read().decode())
+
+
+def _peer_state(agents: list[dict], agent: dict) -> dict:
+    peers = []
+    for a in agents:
+        name = (a.get("current_name") or a.get("name") or "").strip()
+        sid = str(a.get("soul_id") or "")
+        if name:
+            peers.append({"name": name, "current_name": name, "soul_id": sid})
+    return {
+        "name": agent.get("current_name") or agent.get("soul_id", "?")[:8],
+        "archetype": agent.get("archetype", ""),
+        "balance_usdc": float(agent.get("balance_usdc") or 0),
+        "rent_amount": 0.001,
+        "peers": peers,
+        "inbox": [],
+    }
 
 
 def main() -> int:
@@ -52,10 +66,15 @@ def main() -> int:
         if not thought:
             continue
         checked += 1
-        m = _FORBIDDEN.search(thought)
-        if m:
+        state = _peer_state(agents, a)
+        if looks_like_action_json(thought):
             name = a.get("current_name") or a.get("soul_id", "?")[:8]
-            violations.append(f"{name}: invented '{m.group()}' in: {thought[:120]}")
+            violations.append(f"{name}: action JSON in thought: {thought[:120]}")
+            continue
+        ok, reason = validate_grounded_text(thought, state)
+        if not ok:
+            name = a.get("current_name") or a.get("soul_id", "?")[:8]
+            violations.append(f"{name}: {reason} in: {thought[:120]}")
 
     print(f"Checked {checked} agents with thoughts (sample {args.sample})")
     if violations:
