@@ -42,7 +42,7 @@ TIER_CAPABILITIES: dict[int, list[str]] = {
     # For real Cardano later: same schemas, womb calls cardano_market real impl.
     1: ["cardano_monitor_market"],  # cheap queries
     2: ["cardano_mock_swap", "cardano_provide_liquidity", "cardano_harvest_yield"],
-    3: ["cardano_governance_vote", "cardano_rebalance"],
+    3: ["cardano_governance_vote", "cardano_rebalance", "register_cardano_service"],
 }
 
 ACTION_DESCRIPTIONS: dict[str, str] = {
