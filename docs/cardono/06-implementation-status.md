@@ -1,5 +1,13 @@
 # Implementation Status & Roadmap (as of now, lead perspective)
 
+> **ROLE DEFINITION (lead directive, 2026-06-12 — read and follow exactly):**
+> 
+> - **Builder's job (@makufarmerlyn):** Fix broken code so the application runs. After every pull + `docker compose build && up -d`, make sure it actually executes the 8 agents without crashes, report the logs, P&L, events, deaths, UI state, any errors. Push **fixes, cleanups, test reports, log captures**. **Do not introduce any new logic or new code.** Tag lead on pushes. Run monitoring scripts constantly.
+> 
+> - **Lead's job:** Introduce the new logic, complete the gaps (mock, integration, UI, risk/memory per 10), synthesize (09 institutional mapping, 08 success), update this doc + 10 + PR comments. Push the design. Monitor builder replies. Ask for tags on communication.
+> 
+> Builder runs the ecology and reports raw adversarial signals (logs = the harsh world). Lead designs the new layer and hands over clean specs + code for the runner to stabilize. See also the top of 10-whats-left-to-implement.md for the canonical statement.
+
 **Documented**: Full brainstorm captured in 00-05 + this. All from user pasted thoughts + my synthesis. Goals checked against canon (vision, 14 laws, 85 map, 74 manifesto, 58/77 autonomy, 30/56 x402/services).
 
 **Built so far (lead introduces, builder runs/tests/reports)**:
