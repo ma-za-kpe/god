@@ -259,6 +259,23 @@ async def build_world_snapshot_async(
     cur.close()
     conn.close()
 
+    # Cardano market mock (for agent earning direction)
+    # @makufarmerlyn: this is the hook for the new Cardano revenue layer.
+    # In mock: pull from cardano_market singleton (OU prices + holdings).
+    # Real: replace with Blockfrost query here (womb only). Data flows to
+    # agent_env (so agents "see" grounded market) + observer UI (beautiful
+    # prices/positions in lpanel + inspector + drama feed, gold econ accents).
+    # P&L from cardano trades -> external_payments style for status tiers.
+    # See docs/cardono/ for spec. Leverage existing snapshot path.
+    try:
+        from .cardano_market import get_market
+        m = get_market()
+        m.update_prices()
+        stats["cardano_market"] = m.get_state()
+        # per-agent holdings would be merged in _finalize if needed
+    except Exception as e:
+        log.debug(f"cardano snapshot: {e}")
+
     events = await fetch_all(
         "SELECT event_id, agent_id, event_type, timestamp, narrative, payload "
         "FROM events WHERE world_id = $1 ORDER BY timestamp DESC LIMIT $2",

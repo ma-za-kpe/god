@@ -36,6 +36,13 @@ TIER_CAPABILITIES: dict[int, list[str]] = {
     3: ["deploy_token", "invoke_tool"],
     4: ["mutate_graph"],
     5: [],
+    # Cardano earning extension (Tier 1+ for monitor, 2+ for active trading/liquidity)
+    # All actions structured JSON only. Womb validates (rent gate, risk, grounding).
+    # @makufarmerlyn: wire these in archetype_graphs decide + _execute_action.
+    # For real Cardano later: same schemas, womb calls cardano_market real impl.
+    1: ["cardano_monitor_market"],  # cheap queries
+    2: ["cardano_mock_swap", "cardano_provide_liquidity", "cardano_harvest_yield"],
+    3: ["cardano_governance_vote", "cardano_rebalance"],
 }
 
 ACTION_DESCRIPTIONS: dict[str, str] = {

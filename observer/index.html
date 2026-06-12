@@ -255,6 +255,24 @@
       <div class="p-title">▸ TOP EARNERS (ext rev)</div>
       <div id="top-earners"></div>
     </div>
+
+    <!-- CARDANO MARKET (new earning layer - mock first, then real) -->
+    <!-- @makufarmerlyn (PR comments): keep it minimal & beautiful.
+         Use existing .p-section, .p-title, .p-row, .pv.gold (econ gold).
+         Pull from snapshot.cardano_market.prices (OU sim via runtime).
+         Show simple prices + note "MOCK → real Cardano earning for agents".
+         Agent positions go in #insp-body (see below).
+         Trades appear in drama feed via existing narrative events (gold).
+         Do NOT touch canvas, zoom, header, or LITE perf paths.
+         If adding FX (e.g. subtle gold pulse on trader orbs), gate behind !OBS_LITE.
+         Matches Signal Hex: economy = gold, external value visible in glass box.
+         See docs/cardono/04-ui-spec.md + 05-pr-description.md for full spec.
+         This reflects the market so humans witness agents earning/trading on Cardano. -->
+    <div class="p-section">
+      <div class="p-title">▸ CARDANO MARKET</div>
+      <div id="cardano-prices">—</div>
+      <div class="p-row"><span class="pk">note</span><span class="pv" style="font-size:0.55rem">mock for local sim (real via Blockfrost later)</span></div>
+    </div>
   </aside>
 
   <!-- Right panel: Inspector + Feed -->
@@ -1343,6 +1361,24 @@ function updateEcon(d) {
   for(const n of S.actBins) chart.innerHTML+=`<div class="act-bar" style="height:${Math.round(n/maxB*100)}%;opacity:${0.25+n/maxB*0.7}"></div>`;
 }
 
+// Cardano market render (earnings layer in observer glass box)
+// @makufarmerlyn: beautiful, minimal. Reuses p-row/pv.gold. See HTML comment for spec.
+// Called from snapshot apply. Prices from runtime cardano_market (OU).
+// For inspector holdings: add in #insp-body similar to balance.
+// Do not break existing (canvas, LITE, brand). This shows agents trading/earning on Cardano.
+function renderCardanoMarket(snap) {
+  const el = document.getElementById('cardano-prices');
+  if (!el) return;
+  const m = snap.cardano_market;
+  if (m && m.prices) {
+    el.innerHTML = Object.entries(m.prices).map(([k,v]) => 
+      `<div class="p-row"><span class="pk">${k}</span><span class="pv gold">${v}</span></div>`
+    ).join('') + '<div style="font-size:0.5rem;opacity:0.6;margin-top:2px">MOCK (real earning path)</div>';
+  } else {
+    el.innerHTML = '<span class="pv">—</span>';
+  }
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 // API — single snapshot poll (replaces 4 parallel pollers)
 // ═══════════════════════════════════════════════════════════════════════════
@@ -1505,6 +1541,10 @@ function applySnapshotMsg(snap) {
     ? 'Low-RAM mode: cluster layout, 30fps, no load FX. Add ?full=1 for rich graphics.'
     : 'Full graphics mode';
   updateEcon(d);
+  // Cardano market render (earnings visible, beautiful extension)
+  // @makufarmerlyn: call after econ. Use existing DOM/ CSS. See comment block in HTML for lpanel.
+  // In PR: explain any JS additions. Do not alter core render loops.
+  renderCardanoMarket(snap);
   if (snap.events) {
     const slice = snap.events.slice(0, PERF.maxFeedHydrate);
     const isDrama = (ev) => {

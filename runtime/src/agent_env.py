@@ -97,6 +97,11 @@ def refresh_env(
         "my_coalitions": agent.get("_my_coalitions", [])[:4],
         "pending_jobs": _count_pending_jobs(soul_id),
         "scratch_keys": list_scratch_keys(soul_id),
+        # Cardano earning holdings (from cardano_market mock)
+        # Agents see this grounded in env -> can decide to swap etc.
+        # @makufarmerlyn: womb populates via cardano_market.get_agent_holdings
+        # Real: this becomes on-chain query result (no hallucination).
+        "cardano_holdings": agent.get("cardano_holdings", {"ADA": 0, "USDCx": 0, "pnl": 0}),
     }
     _write_json(root / "self" / "status.json", self_view)
 
