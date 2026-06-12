@@ -243,6 +243,14 @@ _VALID_ACTIONS = {
     "register_tool",
     "invoke_tool",
     "mutate_graph",
+    # Cardano earning layer (per docs/cardono/02/03/10 gaps 1-2)
+    "cardano_monitor_market",
+    "cardano_mock_swap",
+    "cardano_provide_liquidity",
+    "cardano_harvest_yield",
+    "cardano_governance_vote",
+    "cardano_rebalance",
+    "register_cardano_service",
 }
 
 
@@ -308,6 +316,49 @@ def _parse_action_json(raw: str, state: dict | None = None) -> tuple[str, dict |
             "mutation_payload": data.get("mutation_payload")
             if isinstance(data.get("mutation_payload"), dict)
             else {},
+            # Cardano action payload fields (flat or under payload; support both for schemas in 03)
+            "from_asset": _clean_context_text(
+                data.get("from_asset")
+                or data.get("from")
+                or (data.get("payload") or {}).get("from_asset"),
+                16,
+            ),
+            "to_asset": _clean_context_text(
+                data.get("to_asset")
+                or data.get("to")
+                or (data.get("payload") or {}).get("to_asset"),
+                16,
+            ),
+            "slippage_tolerance": float(
+                data.get("slippage_tolerance")
+                or (data.get("payload") or {}).get("slippage_tolerance")
+                or 0.02
+            ),
+            "pool": _clean_context_text(
+                data.get("pool") or (data.get("payload") or {}).get("pool"), 32
+            ),
+            "amount_a": float(
+                data.get("amount_a") or (data.get("payload") or {}).get("amount_a") or 0
+            ),
+            "amount_b": float(
+                data.get("amount_b") or (data.get("payload") or {}).get("amount_b") or 0
+            ),
+            "position_id": _clean_context_text(
+                data.get("position_id") or (data.get("payload") or {}).get("position_id"), 64
+            ),
+            "proposal_id": _clean_context_text(
+                data.get("proposal_id") or (data.get("payload") or {}).get("proposal_id"), 64
+            ),
+            "vote": _clean_context_text(
+                data.get("vote") or (data.get("payload") or {}).get("vote") or "abstain", 16
+            ),
+            "stake_amount": float(
+                data.get("stake_amount") or (data.get("payload") or {}).get("stake_amount") or 0
+            ),
+            "targets": data.get("targets") or (data.get("payload") or {}).get("targets") or {},
+            "reason": _clean_context_text(
+                data.get("reason") or (data.get("payload") or {}).get("reason"), 200
+            ),
         }
         return thought, action
     except Exception:
@@ -345,13 +396,17 @@ LOCAL GATEWAY (Tier 1+):
 WHAT DOES NOT EXIST HERE — never reference these:
   • Unrestricted internet or arbitrary external networks
   • Two-factor authentication, passwords, or cybersecurity tools
-  • External crypto markets (ETH, BTC, DeFi, Ethereum price, exchanges)
   • Real-world companies, organizations, or physical infrastructure
   • Any agent NOT listed in your LIVE WORLD roster above
   • Any project, location, or institution not created by agents in this world
   • Physical geography, tunnels, territories, or "exploration" of space
   • Compute internals: processing power, CPU, speculation, internal system scans
   • Agent "prices" — other agents have USDC balances and service prices, not stock prices
+LOCAL CARDANO MOCK MARKET (allowed, grounded — see cardono/ docs):
+  • Use cardano_* actions (Tier-gated) for local earning sim: monitor (prices/positions/yields), mock_swap (OU prices + slippage/impact), provide_liquidity + harvest_yield (APY), governance_vote (sentiment), rebalance, register_cardano_service (signals/copy for meta-economy).
+  • Prices/holdings appear in your env snapshot (world/self). P&L credits your USDC balance (counts as external revenue for tiers/status). Bad trades cause real losses → rent pressure → selection.
+  • This is the "outside is real" bridge for Phase 1 (mock). Real Blockfrost/PyCardano later (womb only, same schemas). Do not invent real chains/DEXes/wallets.
+  • Register "trading_signals" etc via register_cardano_service (or register_service) and sell to peers.
 ═══════════════════════════════════════════════════
 """
 

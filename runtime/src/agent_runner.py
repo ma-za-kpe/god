@@ -11,6 +11,7 @@ To start local inference:
 """
 
 import asyncio
+import json
 import logging
 import os
 import random
@@ -799,6 +800,152 @@ async def _execute_action(agent: dict, action: dict, emitter) -> None:
             )
             return
 
+        # ── cardano_* (local mock market earning layer; full handlers in cardano_market.py) ──
+        # Gaps 1-2: complete OU/execute/holdings/snapshot + integration + archetype support.
+        # All via structured JSON. Womb pre-gate + try/except here = actions must not fail (07).
+        # P&L credited to balance_usdc + external_payments (feeds status tiers per 58/66/85).
+        # Events: cardano.trade / cardano.yield / cardano.gov for observer feed + drama.
+        # @makufarmerlyn: call from here after tier check (capabilities). Enrich snapshot holds/trades.
+        # Teaching pain in OU/slippage/regimes so agents learn sizing via failures (09). Dreams replay losses.
+        if act_type.startswith("cardano_"):
+            from .cardano_market import get_market
+
+            m = get_market()
+            try:
+                res = {}
+                # support flat (from parse) or payload-wrapped per 03-schemas
+                p = action.get("payload") if isinstance(action.get("payload"), dict) else action
+                if act_type == "cardano_monitor_market":
+                    q = p.get("query_type") or p.get("query") or "prices"
+                    h = m.get_agent_holdings(soul_id)
+                    res = {"success": True, "query": q, "state": m.get_state(), "my_holdings": h}
+                elif act_type == "cardano_mock_swap":
+                    res = m.execute_mock_swap(
+                        soul_id,
+                        p.get("from_asset") or p.get("from", "ADA"),
+                        p.get("to_asset") or p.get("to", "USDCx"),
+                        float(p.get("amount") or 0),
+                        float(p.get("slippage_tolerance") or 0.02),
+                    )
+                elif act_type == "cardano_provide_liquidity":
+                    res = m.execute_provide_liquidity(
+                        soul_id,
+                        p.get("pool", "ADA_USDCx"),
+                        float(p.get("amount_a") or 0),
+                        float(p.get("amount_b") or 0),
+                    )
+                elif act_type == "cardano_harvest_yield":
+                    res = m.execute_harvest_yield(soul_id, p.get("position_id", "lp_default"))
+                elif act_type == "cardano_governance_vote":
+                    res = m.execute_governance_vote(
+                        soul_id,
+                        p.get("proposal_id", "CIP-mock"),
+                        p.get("vote", "yes"),
+                        float(p.get("stake_amount") or 0),
+                    )
+                elif act_type == "cardano_rebalance":
+                    targets = p.get("targets") or {}
+                    if isinstance(targets, str):
+                        try:
+                            targets = json.loads(targets)
+                        except Exception:
+                            targets = {}
+                    res = m.execute_rebalance(soul_id, targets)
+                elif act_type == "register_cardano_service":
+                    from .services.registry import register_service as do_reg_cardano
+
+                    svc_name = str(p.get("name") or "cardano_signal")[:40].lower().replace(" ", "_")
+                    svc_desc = str(
+                        p.get("description")
+                        or p.get("service_description")
+                        or "cardano meta-service"
+                    )[:200]
+                    price = max(0.001, float(p.get("price_usdc") or 0.01))
+                    listing = await do_reg_cardano(
+                        soul_id=soul_id, name=svc_name, description=svc_desc, price_usdc=price
+                    )
+                    res = {"success": True, "listing": listing}
+                else:
+                    res = {"success": False, "error": "unknown cardano action type"}
+                ok = bool(res.get("success", False))
+                log_action(soul_id, act_type, action, res, success=ok)
+                # P&L / settlement to local balance as external revenue (for rent, status, repro)
+                pnl = 0.0
+                if ok and isinstance(res, dict):
+                    if "pnl" in res:
+                        pnl = float(res.get("pnl") or 0)
+                    elif "harvested" in res:
+                        pnl = float(res.get("harvested") or 0)
+                    elif "reward" in res:
+                        pnl = float(res.get("reward") or 0)
+                    if abs(pnl) > 0.00001:
+                        conn = _db()
+                        cur = conn.cursor()
+                        cur.execute(
+                            "UPDATE agents SET balance_usdc = balance_usdc + %s WHERE soul_id = %s",
+                            (pnl, soul_id),
+                        )
+                        # record for status_engine ext rev (non-internal)
+                        try:
+                            import uuid as _uuid
+
+                            cur.execute(
+                                "INSERT INTO external_payments (payment_id, soul_id, amount_usdc, source, is_internal, world_id, timestamp) "
+                                "VALUES (%s, %s, %s, 'cardano_mock', false, %s, %s)",
+                                (
+                                    str(_uuid.uuid4()),
+                                    soul_id,
+                                    round(pnl, 6),
+                                    WORLD_ID,
+                                    int(time.time()),
+                                ),
+                            )
+                        except Exception:
+                            pass  # table may vary; balance credit is the key signal
+                        conn.commit()
+                        cur.close()
+                        conn.close()
+                    try:
+                        from .circuit_breaker import record_cardano_pnl
+
+                        record_cardano_pnl(soul_id, pnl)
+                    except Exception:
+                        pass
+                # Drama events for observer (04) + feed
+                et = (
+                    "cardano.trade"
+                    if any(x in act_type for x in ("swap", "rebalance"))
+                    else (
+                        "cardano.yield"
+                        if any(x in act_type for x in ("harvest", "liquidity", "provide"))
+                        else "cardano.gov"
+                    )
+                )
+                narr = f"{name} {act_type} {'+ ' if pnl > 0 else ''}{pnl:+.4f} (mock Cardano)"
+                await emitter.emit(
+                    "economy",
+                    et,
+                    {
+                        "agent_id": soul_id,
+                        "name": name,
+                        "pnl": round(pnl, 4),
+                        "result": {
+                            k: v for k, v in (res or {}).items() if k not in ("new_holdings",)
+                        },
+                        "narrative": narr,
+                    },
+                )
+                if not ok:
+                    log.info(
+                        f"  {name} cardano action {act_type} failed gracefully (learning signal): {res.get('error')}"
+                    )
+            except Exception as e:
+                log.warning(
+                    f"  {name} {act_type} cardano failed safely (actions must not fail 07/09): {e}"
+                )
+                log_action(soul_id, act_type, action, {"error": str(e)}, success=False)
+            return
+
         # ── register_tool ─────────────────────────────────────────────────
         if act_type == "register_tool":
             from .tool_registry import register_agent_tool
@@ -1190,6 +1337,17 @@ async def _run_cycle(
             if gate.throttle_level != "none"
             else {}
         )
+        # Inject grounded cardano holdings (from mock market) into agent for env + decide.
+        # Per gaps 1/2 (snapshot + archetype + agent_env). P&L visible to agent for real decisions.
+        # @makufarmerlyn: this + world_snapshot cardano_market + self/status.json = agents see prices/pos grounded.
+        try:
+            from .cardano_market import get_market
+
+            mkt = get_market()
+            mkt.update_prices()
+            agent["cardano_holdings"] = mkt.get_agent_holdings(soul_id)
+        except Exception:
+            agent["cardano_holdings"] = {"ADA": 0.0, "USDCx": 0.0, "pnl_24h": 0.0}
         refresh_env(
             soul_id,
             agent,

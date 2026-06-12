@@ -287,6 +287,7 @@
         <div class="irow"><span class="k">soul_id</span><span class="v" id="i-soul"></span></div>
         <div class="irow"><span class="k">status</span><span class="v" id="i-status"></span></div>
         <div class="irow"><span class="k">balance</span><span class="v gold" id="i-bal"></span></div>
+        <div class="irow"><span class="k">cardano holdings</span><span class="v gold" id="i-cardano"></span></div>
         <div class="irow"><span class="k">generation</span><span class="v pur" id="i-gen"></span></div>
         <div class="irow"><span class="k">rents paid</span><span class="v grn" id="i-paid"></span></div>
         <div class="irow"><span class="k">rents missed</span><span class="v" id="i-miss"></span></div>
@@ -1107,6 +1108,12 @@ function showInspector(a) {
   document.getElementById('i-soul').textContent=a.soul_id.slice(0,16)+'…';
   const sEl=document.getElementById('i-status'); sEl.textContent=a.is_alive?'● alive':'○ dead'; sEl.className=`v ${a.is_alive?'grn':'red'}`;
   document.getElementById('i-bal').textContent=`${parseFloat(a.balance_usdc||0).toFixed(4)} USDC`;
+  // ▸ CARDANO HOLDINGS in inspector (04-spec + gap3). Beautiful reuse of .irow + .gold.
+  // Data from snap.agents (if enriched) or per-agent cardano_holdings (from runner/env). Positions + PNL.
+  // @makufarmerlyn: no perf hit; simple text. Ties to lpanel prices + feed cardano events.
+  const ch = a.cardano_holdings || (snap && snap.cardano_market && snap.cardano_market.positions_sample ? (snap.cardano_market.positions_sample[(a.soul_id||'').slice(0,8)] || null) : null);
+  const chTxt = ch ? `ADA ${parseFloat(ch.ADA||0).toFixed(1)} | USDCx ${parseFloat(ch.USDCx||0).toFixed(1)} | LP ${parseFloat(ch.LP_WING_ADA_USDCx||0).toFixed(1)} pnl ${parseFloat(ch.pnl_24h||ch.pnl||0).toFixed(2)}` : '— (no pos)';
+  const iCard = document.getElementById('i-cardano'); if(iCard) iCard.textContent = chTxt;
   document.getElementById('i-gen').textContent=`gen ${a.generation||1}`;
   document.getElementById('i-paid').textContent=a.rent_paid_count||0;
   const mEl=document.getElementById('i-miss'); mEl.textContent=a.rent_miss_count||0; mEl.className=`v ${(a.rent_miss_count||0)>0?'red':''}`;
@@ -1280,7 +1287,8 @@ function feedItem(ev, opts = {}) {
     const mt=(ev.message_type||ev.payload?.message_type||'').toLowerCase();
     if(mt==='threat') cat='threat';
     else if(mt==='manifesto'||mt==='propaganda') cat='manifesto';
-    div.className='feed-item' + (cat==='economy'?' flash-econ':cat==='social'||cat==='threat'||cat==='manifesto'?' flash-social':'');
+    const isCardanoEv = (ev.event_type||'').includes('cardano.'); // gold econ flash for trade/yield/gov per 04 + gap3
+    div.className='feed-item' + (cat==='economy' || isCardanoEv ?' flash-econ':cat==='social'||cat==='threat'||cat==='manifesto'?' flash-social':'');
     div.innerHTML=`<span class="f-ts">${ts} · ${ev.event_type}${mt?` · ${mt}`:''}</span><span class="f-text c-${cat}">${ev.narrative||ev.event_type}</span>`;
     list.insertBefore(div,list.firstChild);
     while(list.children.length>120) list.removeChild(list.lastChild);
@@ -1371,9 +1379,13 @@ function renderCardanoMarket(snap) {
   if (!el) return;
   const m = snap.cardano_market;
   if (m && m.prices) {
-    el.innerHTML = Object.entries(m.prices).map(([k,v]) => 
-      `<div class="p-row"><span class="pk">${k}</span><span class="pv gold">${v}</span></div>`
-    ).join('') + '<div style="font-size:0.5rem;opacity:0.6;margin-top:2px">MOCK (real earning path)</div>';
+    let h = Object.entries(m.prices).map(([k,v]) =>
+      `<div class="p-row"><span class="pk">${k}</span><span class="pv gold">${parseFloat(v).toFixed(4)}</span></div>`
+    ).join('');
+    if (m.volume_24h_mock) h += `<div class="p-row"><span class="pk">vol</span><span class="pv gold">${m.volume_24h_mock}</span></div>`;
+    if (m.top_earners_sample && m.top_earners_sample.length) h += `<div class="p-row"><span class="pk">earn</span><span class="pv gold">${m.top_earners_sample.map(x=>x[0]).join(' ')}</span></div>`;
+    h += '<div style="font-size:0.5rem;opacity:0.6;margin-top:2px">MOCK → real Cardano (Blockfrost)</div>';
+    el.innerHTML = h;
   } else {
     el.innerHTML = '<span class="pv">—</span>';
   }

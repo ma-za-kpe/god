@@ -73,6 +73,8 @@ async def run_status_review():
 
         if target_tier < current_tier:
             new_bad_periods = agent["bad_periods"] + 1
+            # Cardano P&L (via external_payments 'cardano_mock' + balance) feeds here (gap4).
+            # Sustained cardano losses -> more bad_periods -> demote (losing streak tool loss via circuit too).
             if new_bad_periods < 2:
                 _upsert_status(
                     soul_id,

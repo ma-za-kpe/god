@@ -1,6 +1,6 @@
 # Cardano Brainstorm for GOD Project
 
-**Context**: 
+**Context**:
 - GOD (Genesis of Digital Life) ecology: harsh rent-or-die (Law 0), permanent death (Law 2), cryptographic ownership (Law 3), soul_id sacred (Law 1), Creator minimal power (off-switch only, Law 5 + Covenant), agent sovereignty gradient, OwnedGraphs as mutable agent "bodies/genomes", x402 real-world bridge, on-chain enforcement currently via EVM (Base) RentCollector + SoulNFT.
 - Current on-chain: Solidity/Foundry, USDC on EVM, Anvil/Base for rent collection, progressive pricing, 3-miss death + NFT burn.
 - Branch: `cardano`

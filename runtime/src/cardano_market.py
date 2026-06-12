@@ -37,7 +37,6 @@ grounded). Sandbox only thinks/proposes (via dreams, mutations, decide).
 """
 
 import logging
-import os
 import random
 import time
 from dataclasses import dataclass, field
@@ -64,13 +63,15 @@ INITIAL_PRICES = {
 _agent_holdings: Dict[str, Dict[str, float]] = {}
 
 
-def _ornstein_uhlenbeck(current: float, mu: float, theta: float, sigma: float, dt: float = 1.0) -> float:
+def _ornstein_uhlenbeck(
+    current: float, mu: float, theta: float, sigma: float, dt: float = 1.0
+) -> float:
     """Ornstein-Uhlenbeck process for mean-reverting price.
     dX = theta*(mu - X)*dt + sigma*dW
     """
     drift = theta * (mu - current) * dt
     # approx brownian with random.gauss (std ~ sigma * sqrt(dt))
-    shock = random.gauss(0, sigma * (dt ** 0.5))
+    shock = random.gauss(0, sigma * (dt**0.5))
     new_price = current + drift + shock
     # clamp to avoid negative / crazy values (realistic guard)
     return max(0.01, round(new_price, 4))
@@ -81,11 +82,13 @@ class MockMarket:
     prices: Dict[str, float] = field(default_factory=lambda: INITIAL_PRICES.copy())
     last_update: float = field(default_factory=time.time)
     _rng_seed: Optional[int] = None  # for reproducibility in tests if wanted
+    recent_trades: list = field(default_factory=list)  # for snapshot/feed (gap1)
 
     def update_prices(self) -> None:
         """Advance all prices with OU. Call periodically from womb (e.g. every N cycles).
         @makufarmerlyn: Must never raise. Wrapped for 'actions must not fail' rule.
         See docs/cardono/07-actions-must-not-fail.md. On any math/OU edge, log and keep last prices.
+        Regime-ish via sigma + mean shifts in OU params (prevent pure overfit).
         """
         try:
             now = time.time()
@@ -102,11 +105,24 @@ class MockMarket:
             # Keep previous prices - action "did not fail" the system.
 
     def get_state(self) -> dict:
-        """For world snapshot / agent env (grounded data only)."""
+        """For world snapshot / agent env (grounded data only). Extended for gaps 1/3 (positions, recent_trades)."""
+        # Sample positions (top few by total value rough) + recent for UI/feed
+        pos_sample = {}
+        try:
+            for sid, h in list(_agent_holdings.items())[:6]:
+                pos_sample[sid[:8]] = {
+                    k: round(v, 4)
+                    for k, v in h.items()
+                    if k in ("ADA", "USDCx", "LP_WING_ADA_USDCx", "pnl_24h")
+                }
+        except Exception:
+            pass
         return {
             "prices": dict(self.prices),
             "last_update": self.last_update,
-            "note": "MOCK for local earning sim. Real data via Blockfrost later.",
+            "recent_trades": list(self.recent_trades[-10:]),
+            "positions_sample": pos_sample,
+            "note": "MOCK for local earning sim (OU + slippage + yield + gov sentiment). Real via Blockfrost/PyCardano in womb only later. See cardono/02.",
         }
 
     def get_agent_holdings(self, soul_id: str) -> dict:
@@ -130,19 +146,35 @@ class MockMarket:
         """
         try:
             if from_asset not in self.prices or to_asset not in self.prices:
-                return {"success": False, "error": "unknown asset", "details": f"from={from_asset}, to={to_asset}"}
+                return {
+                    "success": False,
+                    "error": "unknown asset",
+                    "details": f"from={from_asset}, to={to_asset}",
+                }
 
             current_price = self.prices[from_asset]
             # simple impact + slippage (realistic for small local sim)
-            effective_price = current_price * (1 + random.uniform(-slippage_tolerance, slippage_tolerance))
+            effective_price = current_price * (
+                1 + random.uniform(-slippage_tolerance, slippage_tolerance)
+            )
             if effective_price <= 0:
-                return {"success": False, "error": "invalid effective price", "details": str(effective_price)}
+                return {
+                    "success": False,
+                    "error": "invalid effective price",
+                    "details": str(effective_price),
+                }
 
             received = amount / effective_price
 
-            holdings = _agent_holdings.setdefault(soul_id, {"ADA": 0.0, "USDCx": 0.0, "pnl_24h": 0.0})
+            holdings = _agent_holdings.setdefault(
+                soul_id, {"ADA": 0.0, "USDCx": 0.0, "pnl_24h": 0.0}
+            )
             if holdings.get(from_asset, 0) < amount:
-                return {"success": False, "error": "insufficient mock balance", "details": f"has={holdings.get(from_asset, 0)}, need={amount}"}
+                return {
+                    "success": False,
+                    "error": "insufficient mock balance",
+                    "details": f"has={holdings.get(from_asset, 0)}, need={amount}",
+                }
 
             holdings[from_asset] -= amount
             holdings[to_asset] = holdings.get(to_asset, 0) + received
@@ -161,18 +193,39 @@ class MockMarket:
                 "pnl": round(pnl, 4),
                 "new_holdings": dict(holdings),
             }
+            self.recent_trades.append(
+                {
+                    "t": int(time.time()),
+                    "soul": soul_id[:8],
+                    "type": "swap",
+                    "pnl": round(pnl, 4),
+                    "pair": f"{from_asset}->{to_asset}",
+                }
+            )
+            if len(self.recent_trades) > 50:
+                self.recent_trades = self.recent_trades[-50:]
             log.info(f"Cardano mock swap for {soul_id[:8]}: {result}")
             return result
         except Exception as e:
-            log.warning(f"Cardano mock swap failed safely for {soul_id[:8]} (no crash, action did not fail system): {e}")
-            return {"success": False, "error": "internal mock error", "details": "contact womb - failure handled gracefully"}
+            log.warning(
+                f"Cardano mock swap failed safely for {soul_id[:8]} (no crash, action did not fail system): {e}"
+            )
+            return {
+                "success": False,
+                "error": "internal mock error",
+                "details": "contact womb - failure handled gracefully",
+            }
 
     # TODO @makufarmerlyn (builder): Review the full OU + handlers. Pull, rebuild docker, test mock trades/yields/gov in local 8-agent setup, report logs. Extend for real later. See docs/cardono/10 and 09. Always push updates and tag @ma-za-kpe.
 
-    def execute_provide_liquidity(self, soul_id: str, pool: str, amount_a: float, amount_b: float) -> dict:
+    def execute_provide_liquidity(
+        self, soul_id: str, pool: str, amount_a: float, amount_b: float
+    ) -> dict:
         """Mock provide liquidity to a pool. Updates holdings, accrues simulated yield."""
         try:
-            holdings = _agent_holdings.setdefault(soul_id, {"ADA": 0.0, "USDCx": 0.0, "pnl_24h": 0.0, "LP_WING_ADA_USDCx": 0.0})
+            holdings = _agent_holdings.setdefault(
+                soul_id, {"ADA": 0.0, "USDCx": 0.0, "pnl_24h": 0.0, "LP_WING_ADA_USDCx": 0.0}
+            )
             if holdings.get("ADA", 0) < amount_a or holdings.get("USDCx", 0) < amount_b:
                 return {"success": False, "error": "insufficient mock balance for LP"}
             holdings["ADA"] -= amount_a
@@ -192,16 +245,33 @@ class MockMarket:
                 "simulated_yield": round(yield_amount, 4),
                 "new_holdings": dict(holdings),
             }
+            self.recent_trades.append(
+                {
+                    "t": int(time.time()),
+                    "soul": soul_id[:8],
+                    "type": "provide_liquidity",
+                    "pnl": round(yield_amount, 4),
+                    "pool": pool,
+                }
+            )
+            if len(self.recent_trades) > 50:
+                self.recent_trades = self.recent_trades[-50:]
             log.info(f"Cardano mock LP for {soul_id[:8]}: {result}")
             return result
         except Exception as e:
             log.warning(f"Cardano mock LP failed safely for {soul_id[:8]}: {e}")
-            return {"success": False, "error": "internal mock LP error", "details": "handled gracefully per 07"}
+            return {
+                "success": False,
+                "error": "internal mock LP error",
+                "details": "handled gracefully per 07",
+            }
 
     def execute_harvest_yield(self, soul_id: str, position_id: str) -> dict:
         """Mock harvest yield from LP position."""
         try:
-            holdings = _agent_holdings.setdefault(soul_id, {"ADA": 0.0, "USDCx": 0.0, "pnl_24h": 0.0, "LP_WING_ADA_USDCx": 0.0})
+            holdings = _agent_holdings.setdefault(
+                soul_id, {"ADA": 0.0, "USDCx": 0.0, "pnl_24h": 0.0, "LP_WING_ADA_USDCx": 0.0}
+            )
             lp = holdings.get("LP_WING_ADA_USDCx", 0)
             if lp <= 0:
                 return {"success": False, "error": "no LP position"}
@@ -214,23 +284,42 @@ class MockMarket:
                 "harvested": round(harvest, 4),
                 "new_holdings": dict(holdings),
             }
+            self.recent_trades.append(
+                {
+                    "t": int(time.time()),
+                    "soul": soul_id[:8],
+                    "type": "harvest_yield",
+                    "pnl": round(harvest, 4),
+                    "pos": position_id,
+                }
+            )
+            if len(self.recent_trades) > 50:
+                self.recent_trades = self.recent_trades[-50:]
             log.info(f"Cardano mock harvest for {soul_id[:8]}: {result}")
             return result
         except Exception as e:
             log.warning(f"Cardano mock harvest failed safely for {soul_id[:8]}: {e}")
-            return {"success": False, "error": "internal mock harvest error", "details": "handled gracefully per 07"}
+            return {
+                "success": False,
+                "error": "internal mock harvest error",
+                "details": "handled gracefully per 07",
+            }
 
-    def execute_governance_vote(self, soul_id: str, proposal_id: str, vote: str, stake_amount: float) -> dict:
+    def execute_governance_vote(
+        self, soul_id: str, proposal_id: str, vote: str, stake_amount: float
+    ) -> dict:
         """Mock governance vote. Affects sentiment (small price bias) + possible reward."""
         try:
-            holdings = _agent_holdings.setdefault(soul_id, {"ADA": 0.0, "USDCx": 0.0, "pnl_24h": 0.0})
+            holdings = _agent_holdings.setdefault(
+                soul_id, {"ADA": 0.0, "USDCx": 0.0, "pnl_24h": 0.0}
+            )
             if holdings.get("ADA", 0) < stake_amount:
                 return {"success": False, "error": "insufficient stake"}
             holdings["ADA"] -= stake_amount  # stake locked mock
             # Mock sentiment impact on prices
             bias = 0.005 if vote.lower() == "yes" else -0.003
             for asset in self.prices:
-                self.prices[asset] *= (1 + bias)
+                self.prices[asset] *= 1 + bias
             reward = stake_amount * 0.02 if vote.lower() == "yes" else 0  # mock reward
             holdings["USDCx"] += reward
             holdings["pnl_24h"] = holdings.get("pnl_24h", 0) + reward
@@ -243,16 +332,34 @@ class MockMarket:
                 "reward": round(reward, 4),
                 "new_holdings": dict(holdings),
             }
+            self.recent_trades.append(
+                {
+                    "t": int(time.time()),
+                    "soul": soul_id[:8],
+                    "type": "governance_vote",
+                    "pnl": round(reward, 4),
+                    "proposal": proposal_id,
+                    "vote": vote,
+                }
+            )
+            if len(self.recent_trades) > 50:
+                self.recent_trades = self.recent_trades[-50:]
             log.info(f"Cardano mock gov vote for {soul_id[:8]}: {result}")
             return result
         except Exception as e:
             log.warning(f"Cardano mock gov vote failed safely for {soul_id[:8]}: {e}")
-            return {"success": False, "error": "internal mock gov error", "details": "handled gracefully per 07"}
+            return {
+                "success": False,
+                "error": "internal mock gov error",
+                "details": "handled gracefully per 07",
+            }
 
     def execute_rebalance(self, soul_id: str, targets: dict) -> dict:
         """Mock rebalance to target allocations."""
         try:
-            holdings = _agent_holdings.setdefault(soul_id, {"ADA": 0.0, "USDCx": 0.0, "pnl_24h": 0.0})
+            holdings = _agent_holdings.setdefault(
+                soul_id, {"ADA": 0.0, "USDCx": 0.0, "pnl_24h": 0.0}
+            )
             total = sum(holdings.get(k, 0) for k in ["ADA", "USDCx"])
             if total <= 0:
                 return {"success": False, "error": "no balance to rebalance"}
@@ -269,11 +376,26 @@ class MockMarket:
                 "changes": changes,
                 "new_holdings": dict(holdings),
             }
+            self.recent_trades.append(
+                {
+                    "t": int(time.time()),
+                    "soul": soul_id[:8],
+                    "type": "rebalance",
+                    "pnl": 0.0,
+                    "targets": targets,
+                }
+            )
+            if len(self.recent_trades) > 50:
+                self.recent_trades = self.recent_trades[-50:]
             log.info(f"Cardano mock rebalance for {soul_id[:8]}: {result}")
             return result
         except Exception as e:
             log.warning(f"Cardano mock rebalance failed safely for {soul_id[:8]}: {e}")
-            return {"success": False, "error": "internal mock rebalance error", "details": "handled gracefully per 07"}
+            return {
+                "success": False,
+                "error": "internal mock rebalance error",
+                "details": "handled gracefully per 07",
+            }
 
 
 _market = MockMarket()
@@ -287,3 +409,10 @@ def get_market() -> MockMarket:
 # Example: how womb would call (do not call from sandbox)
 # holdings = market.execute_mock_swap(soul, "ADA", "USDCx", 100)
 # then credit holdings["pnl"] via external_payments or direct balance for status
+
+# Portfolio Guardian (gap4 / 09-risk): agents mutate_graph to add "portfolio_guardian" node.
+# It runs in perception/_grounded_decide (or pre-execute) checking total exposure / drawdown vs cardano_holdings + balance.
+# Womb (here + runner cardano block + circuit) enforces hard limits. "Teaching pain" in OU makes it learnable.
+# Concrete: if sum(exposure) > 0.25 * (balance + holdings total) or recent drawdown > 0.3 -> reject or reduce size.
+# Ties to episodic_memory (high valence on losses) + dream_engine (replay -> mutate "add guardian") + status demote.
+# No hardcode perfection — emerges via selection + memory per 74/08/09.

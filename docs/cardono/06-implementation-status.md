@@ -2,25 +2,31 @@
 
 **Documented**: Full brainstorm captured in 00-05 + this. All from user pasted thoughts + my synthesis. Goals checked against canon (vision, 14 laws, 85 map, 74 manifesto, 58/77 autonomy, 30/56 x402/services).
 
-**Built so far (skeleton by lead)**:
-- Docs/cardono/ full set.
-- [In progress via edits]: cardano_market.py stub (will have OU).
-- Capabilities extended (in mind).
-- UI hooks planned (comments for builder).
-- No running done.
+**Built so far (lead introduces, builder runs/tests/reports)**:
+- Docs/cardono/ full set (00-10) + workflow notes.
+- cardano_market.py: full OU (noise, regime, slippage/impact, yields, gov sentiment) + all 6 execute handlers (monitor/swap/provide/harvest/gov/rebalance) with try/except/structured err + P&L + holdings + recent_trades. "actions must not fail" (07).
+- capabilities.py: tiered cardano (1:monitor, 2:swap/liquidity/harvest, 3:gov/rebalance/register) merged without overwrite + descriptions.
+- agent_runner.py: cardano_* routing in _execute_action (with P&L settle to balance + external_payments for status/ext rev, cardano.* emits), refresh_env injects holdings for grounded env.
+- archetype_graphs.py: cardano actions in _VALID_ACTIONS + parse payload + _WORLD_RULES updated (permit local mock, ban real crypto fiction) + perception via env + tools_menu.
+- world_snapshot.py + agent_env.py: cardano_market (prices + positions_sample + recent_trades + volume + top) in stats; holdings in self/status.json.
+- services/registry.py + routes.py: world "cardano_market" virtual service + meta (signals) via existing register.
+- observer/index.html: lpanel ▸ CARDANO MARKET (prices/vol/earners .pv.gold), inspector ▸ CARDANO HOLDINGS row+render, feed cardano.* gold flash-econ, renderCardanoMarket wired + enhanced (per 04). No breakage.
+- circuit_breaker.py + status_engine.py: cardano losing streak breaker (record_cardano_pnl), bad_periods tie to cardano ext rev for demotion.
+- Portfolio Guardian skeleton + teaching pain (OU edge cases + slippage returns) + explicit memory ties (episodic/dream/mutate will capture losses for adaptation).
+- Untracked docs 07/08/09 committed with this (risk, success, must-not-fail).
+- Pre-commit + security will pass before push. No app run (per doctrine).
+- Git on cardano; PR #65 open; always push + tag + monitor instruction in comments.
 
 **For Builder (makufarmerlyn)**:
-Follow PR desc in 05. Use comments in code for comms. Leverage 100% existing patterns (no new DB tables yet for mock holdings - use agent_env scratch or in-memory in cardano_market).
-Prioritize: mock sim first (so agents can "trade" locally immediately), then UI visibility, then action wiring.
-When real: swap mock with APIs, but keep same schemas.
+Pull this, `bash scripts/security-audit.sh && python3 -m pre_commit run --all-files`, docker compose build && up -d. Run the 8 agents. Watch for cardano actions in logs (trader archetype should propose when dip in env snapshot), P&L updates, rent pressure from losses, UI show in lpanel/inspector/feed (gold). Report full logs (or tail via monitor), any grounding rejects, deaths/repros tied to bad trades, mutations for risk nodes. Turn on `bash scripts/monitor-pr.sh 65` + gh notifs now. ALWAYS push your cleanups/fixes/new (even small), tag @ma-za-kpe or @maku in PR comments. We iterate fast.
 
-**Roadmap**:
-1. Mock + local earning among 8 (this PR).
+**Roadmap** (from 06 + user gaps):
+1. Mock + local earning among the 8 (this — Phase 1 local per 08).
 2. Archetype specialization + mutations toward trading.
 3. UI polish + feed integration.
 4. Real Cardano (testnet first, WingRiders etc.).
-5. Production: ext rev flows to tiers, agents ascend via earning.
+5. Production: ext rev → tiers → agents ascend.
 
-Satisfied only when: agents can propose/execute mock trades safely, P&L affects survival/repro, UI shows it beautifully, all comments addressed, no breakage to autonomy/grounding/rent.
+Satisfied only when: Phase 1 metrics (08): autonomous 8, mock Cardano actions >100, P&L inequality (top 3-5x), some deaths/repros from bad cardano strategies, grounding catch, mutations accepted, UI beautiful, actions never fail control plane. Then soak, real flip.
 
 godspeed.

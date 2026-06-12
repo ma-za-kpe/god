@@ -259,20 +259,39 @@ async def build_world_snapshot_async(
     cur.close()
     conn.close()
 
-    # Cardano market mock (for agent earning direction)
-    # @makufarmerlyn: this is the hook for the new Cardano revenue layer.
-    # In mock: pull from cardano_market singleton (OU prices + holdings).
-    # Real: replace with Blockfrost query here (womb only). Data flows to
-    # agent_env (so agents "see" grounded market) + observer UI (beautiful
-    # prices/positions in lpanel + inspector + drama feed, gold econ accents).
-    # P&L from cardano trades -> external_payments style for status tiers.
-    # See docs/cardono/ for spec. Leverage existing snapshot path.
+    # Cardano market mock (for agent earning direction) — extended per gaps 1/3 (02-spec, 04-ui, 10).
+    # @makufarmerlyn: prices + positions_sample + recent_trades + mock volume now in snap.
+    # Wire to lpanel CARDANO MARKET, inspector CARDANO HOLDINGS, feed cardano.* events (gold).
+    # Agent env sees via injected holdings + world snapshot. P&L -> ext rev for tiers.
+    # Real flip: Blockfrost here (womb only). Same shape.
     try:
         from .cardano_market import get_market
+
         m = get_market()
         m.update_prices()
-        stats["cardano_market"] = m.get_state()
-        # per-agent holdings would be merged in _finalize if needed
+        cm = m.get_state()
+        # enrich for UI + snapshot spec (positions, trades, volume for top earners / 24h in lpanel)
+        try:
+            trades = cm.get("recent_trades", [])
+            vol = sum(abs(float(t.get("pnl", 0))) for t in trades)
+            cm["volume_24h_mock"] = round(vol, 4)
+            cm["top_earners_sample"] = sorted(
+                [
+                    (
+                        k,
+                        sum(
+                            v.get("pnl_24h", 0)
+                            for v in (pos_sample or {}).values()
+                            if isinstance(v, dict)
+                        ),
+                    )
+                    for k, pos_sample in list((cm.get("positions_sample") or {}).items())
+                ],
+                key=lambda x: -x[1],
+            )[:3]
+        except Exception:
+            cm["volume_24h_mock"] = 0.0
+        stats["cardano_market"] = cm
     except Exception as e:
         log.debug(f"cardano snapshot: {e}")
 

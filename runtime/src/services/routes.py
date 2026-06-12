@@ -44,9 +44,19 @@ BASE_URL = os.getenv("RUNTIME_BASE_URL", "http://localhost:8888")
 
 @router.get("")
 async def list_all_services(soul_id: str | None = None):
-    """List all active service listings, optionally filtered by agent."""
+    """List all active service listings, optionally filtered by agent.
+    Includes virtual world cardano_market service (gap2) for prices/monitor + meta signals market.
+    """
     try:
         services = list_services(soul_id=soul_id, active_only=True)
+        # Merge virtual cardano world service (from registry const) so agents can "see" it for earning layer
+        try:
+            from .registry import CARDANO_WORLD_SERVICE
+
+            if not any(s.get("name") == "cardano_market" for s in services):
+                services = [CARDANO_WORLD_SERVICE] + services
+        except Exception:
+            pass
         return {"services": services, "count": len(services)}
     except Exception as e:
         log.warning(f"list_services error: {e}")

@@ -32,7 +32,7 @@ Womb: returns snapshot slice. Cheap, no cost.
   }
 }
 
-Womb: 
+Womb:
 - Check balance (mock holdings or USDC proxy).
 - Apply OU current price + slippage + impact.
 - Update agent cardano_positions.

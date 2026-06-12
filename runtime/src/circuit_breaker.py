@@ -93,3 +93,26 @@ def record_llm_call(soul_id: str) -> BreakerVerdict:
         log.warning(f"Breaker TRIP {soul_id[:8]}: llm_calls/hour exceeded")
         return BreakerVerdict(False, "max_llm_calls_per_hour")
     return BreakerVerdict(True)
+
+
+# Cardano risk extension (gap4 / 09): losing streaks from mock (or real) P&L demote/pause cardano tools.
+# "Teaching pain" (extreme slippage/regime in OU) + this = agents learn sizing/buffers via failures (not crashes).
+# Call from agent_runner after cardano_* if pnl < 0.
+CARDANO_LOSS_STREAK_TRIP = 3
+
+
+def record_cardano_pnl(soul_id: str, pnl: float) -> BreakerVerdict:
+    """Track cardano-specific loss streaks. Negative pnl increments; positive resets. Trips on streak -> pause trading actions."""
+    c = _get(soul_id)
+    # reuse trips for streak (or could add c.cardano_streak)
+    if pnl < -0.0001:
+        c.trips += 1
+        if c.trips >= CARDANO_LOSS_STREAK_TRIP:
+            c.paused_until = time.time() + (
+                BREAKER_COOLDOWN_S * 3
+            )  # harsher for repeated cardano losses
+            log.warning(f"Breaker CARDANO LOSS STREAK TRIP {soul_id[:8]} (streak~{c.trips})")
+            return BreakerVerdict(False, "cardano_losing_streak")
+    else:
+        c.trips = max(0, c.trips - 1)
+    return BreakerVerdict(True)

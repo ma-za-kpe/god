@@ -166,3 +166,20 @@ def list_services(soul_id: str | None = None, active_only: bool = True) -> list[
         cur.close()
         conn.close()
     return rows
+
+
+# World "cardano_market" service (gap 2 / 02-spec + 10): cheap grounded monitor for prices/positions.
+# Agents discover via existing service market or query; register meta-services (signals, copy-trades)
+# via register_cardano_service (uses this registry) for P&L meta-economy + ext rev to tiers.
+CARDANO_WORLD_SERVICE = {
+    "listing_id": "cardano_market_world",
+    "agent_soul_id": None,
+    "name": "cardano_market",
+    "description": "Mock Cardano market (OU prices, yields, positions). Use cardano_monitor_market action or buy peer signals/copy-trades. P&L feeds rent/status.",
+    "price_usdc": 0.0005,
+    "is_active": True,
+    "resource_url": "/world/snapshot (cardano_market key)",
+}
+
+# Note: virtual CARDANO_WORLD_SERVICE is merged in routes.list_all_services and snapshot for visibility.
+# No dupe func. Existing list_services works; callers (runner fetch, UI) see cardano via explicit or routes wrapper.

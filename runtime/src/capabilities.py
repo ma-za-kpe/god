@@ -31,19 +31,29 @@ TIER_CAPABILITIES: dict[int, list[str]] = {
         "schedule_wake",
         "fork_self",
     ],
-    1: ["register_service", "query_world", "external_read"],
-    2: ["form_coalition", "register_tool"],
-    3: ["deploy_token", "invoke_tool"],
+    1: ["register_service", "query_world", "external_read", "cardano_monitor_market"],
+    2: [
+        "form_coalition",
+        "register_tool",
+        "cardano_mock_swap",
+        "cardano_provide_liquidity",
+        "cardano_harvest_yield",
+    ],
+    3: [
+        "deploy_token",
+        "invoke_tool",
+        "cardano_governance_vote",
+        "cardano_rebalance",
+        "register_cardano_service",
+    ],
     4: ["mutate_graph"],
     5: [],
-    # Cardano earning extension (Tier 1+ for monitor, 2+ for active trading/liquidity)
-    # All actions structured JSON only. Womb validates (rent gate, risk, grounding).
-    # @makufarmerlyn: wire these in archetype_graphs decide + _execute_action.
-    # For real Cardano later: same schemas, womb calls cardano_market real impl.
-    1: ["cardano_monitor_market"],  # cheap queries
-    2: ["cardano_mock_swap", "cardano_provide_liquidity", "cardano_harvest_yield"],
-    3: ["cardano_governance_vote", "cardano_rebalance", "register_cardano_service"],
 }
+# Cardano earning extension (Tier 1+ for monitor, 2+ for active trading/liquidity/yield/gov).
+# All actions structured JSON only. Womb validates (rent gate, risk, grounding).
+# @makufarmerlyn: wire these in archetype_graphs decide + _execute_action.
+# For real Cardano later: same schemas, womb calls cardano_market real impl.
+# Merged lists (no overwrite) to preserve base tiers + cardano per gap 2 in 10.
 
 ACTION_DESCRIPTIONS: dict[str, str] = {
     "send_message": (
@@ -94,6 +104,13 @@ ACTION_DESCRIPTIONS: dict[str, str] = {
         '"mutate_graph" → propose self-modification; mutation_type '
         "(rename|biography|add_node|personality_bias), mutation_payload."
     ),
+    "cardano_monitor_market": '"cardano_monitor_market" → query live mock Cardano prices/positions/yields (Tier 1+). Grounded from snapshot. No cost.',
+    "cardano_mock_swap": '"cardano_mock_swap" → swap via local OU sim (from_asset, to_asset, amount, slippage_tolerance, reason). P&L settles to balance + ext rev for status. Tier 2+.',
+    "cardano_provide_liquidity": '"cardano_provide_liquidity" → add to pool (pool, amount_a, amount_b). Sim yield accrues. Tier 2+.',
+    "cardano_harvest_yield": '"cardano_harvest_yield" → harvest LP yield (position_id). Credits USDCx proxy. Tier 2+.',
+    "cardano_governance_vote": '"cardano_governance_vote" → mock CIP vote (proposal_id, vote, stake_amount). Affects sentiment + small reward. Tier 3+.',
+    "cardano_rebalance": '"cardano_rebalance" → set target % allocations (targets dict). Costs implicit in mock. Tier 3+.',
+    "register_cardano_service": '"register_cardano_service" → list paid meta-service (signals, copy-trades) on Cardano layer (name, description, price_usdc). Others buy via buy_service. Tier 3+.',
 }
 
 
