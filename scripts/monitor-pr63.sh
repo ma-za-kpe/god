@@ -77,9 +77,11 @@ while true; do
   last_sha="${sha:-$last_sha}"
 
   save_state
-  echo "last_comment_id=${last_comment_id}" >>"$STATE"
-  echo "last_sha=${last_sha}" >>"$STATE"
-  echo "last_evid=${last_evid:-0}" >>"$STATE"
+  {
+    echo "last_comment_id=${last_comment_id}"
+    echo "last_sha=${last_sha}"
+    echo "last_evid=${last_evid:-0}"
+  } >>"$STATE"
 
   sleep "$INTERVAL"
 done

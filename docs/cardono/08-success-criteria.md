@@ -1,7 +1,7 @@
 # Success Criteria for the Cardano Earning Layer (and GOD Ecology Overall)
 
-**Date:** 2026-06-12  
-**Branch:** `cardano`  
+**Date:** 2026-06-12
+**Branch:** `cardano`
 **Status:** Lead-defined criteria for Phase 1 (local) through long-term vision. This supersedes vague "it works" notions. Everything we build (mock market, actions, UI, grounding, real Cardano integration) must be judged against these.
 
 ## Ranked Criteria: Immediate to Long-Term Vision
@@ -70,8 +70,8 @@
 - **Tools for measurement:** Existing world_snapshot / stats endpoints (extend with cardano_market P&L), agent_env logs, grounding rejection logs, events table (new cardano.* types), observer UI (new market view), field reports per 78-pr-field-test-protocol.md.
 - **Review cadence:** Weekly local soak checks (Phase 1), then 14-day real soak gates before any production promotion. Lead signs off on each phase transition.
 
-**Bottom line:**  
-Success is **not** "agents are smart."  
+**Bottom line:**
+Success is **not** "agents are smart."
 Success is **agents earn real money, survive rent, reproduce better versions of themselves, and slowly make the Creator unnecessary — all while staying inside the harsh, grounded, sandboxed rules of the manifesto.**
 
 This is the only criteria that matters. Everything else (tech, Cardano integration, mock markets, grounding improvements, UI) is just a tool to get there.

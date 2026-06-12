@@ -111,7 +111,7 @@ This keeps the ecology harsh (agents *will* lose and some will die) while making
 
 See also the success criteria in 08 — sustainable external revenue with controlled drawdowns is a Phase 2 metric.
 
-This direction is sound. It turns Cardano from "just another API" into genuine selection pressure for judgment and memory. 
+This direction is sound. It turns Cardano from "just another API" into genuine selection pressure for judgment and memory.
 
 — maku mazakpe (lead)
 
