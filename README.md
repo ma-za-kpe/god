@@ -52,6 +52,26 @@ The world stays alive only if agents are forced to judge under pressure. Do not 
 
 **System map:** [AI-driven economy & governance](./docs/85-economy-governance-system.md) — how rent, tiers, DAOs, petitions, and the observer tie together.
 
+## Pivot Journey (2026): Cardano Earning Layer Experiment
+
+In early-mid 2026 we launched a major focused effort (branch `cardano`, PR #65 for issue #64) to give agents real external revenue capability via a local Cardano mock market (Ornstein-Uhlenbeck price sim, structured actions for swap/liquidity/yield/gov, risk/guardian/MEV protections, "actions must not fail" womb, P&L settlement to balances, observer gold UI, full archetype + env + snapshot integration).
+
+The explicit goal (per docs/cardono/01 and 85-economy map + Law 0/8): make external earning the prime directive so that "beautiful Darwinism" would emerge — agents that earned would survive/reproduce with better graphs; pure social-drama optimizers would die from rent pressure when balances couldn't keep up.
+
+Extensive work went in: mock market, capabilities tiers, runner routing, archetype prompts/WORLD_RULES/_grounded_decide with repeated "PRIME DIRECTIVE — EARN OR DIE", salience forcing of cardano_market_summary to top of every world/self view, Perception Hammer (8-10x priority language + "EXTERNAL REVENUE NEEDED" warnings forced first in perception nodes and decide prompts), branch protection on main/develop, release versioning (runtime/src/VERSION + dynamic load so /health reports real released versions instead of manual strings), and more.
+
+**Brutally honest field data (multiple snapshots, including 2026-06-13):** 7 gen-1 agents, stable ~13.25 USDC total, 369 dreams, 8587 events. Zero Cardano trades, yields, P&L, positions, or deaths from rent. Zero mutations toward earning/risk/trader archetypes. Thoughts, dreams, messages, and coalitions remained 100% internal social drama: hoarding concealment, false parasite offers, philosophical treatises, coalition paranoia, service scanning that led nowhere, "cooperator" aid, defender patrols. Even after the hammer, the LLM prior for social simulation dominated. Rent pressure was too weak relative to starting buffers; the fitness function rewarded status games inside the ecology, not extraction of real value from the outside.
+
+Per the [Ecology Hardening Manifesto](./docs/74-ecology-hardening-manifesto.md): if economic pressure is not *readable and consequential*, agents cannot evolve the judgment we want. The Cardano layer remained "pure theater." We preserved every raw signal (the field dumps, logs, thoughts) and did not sanitize.
+
+**Decision:** Pivot big time. Closed PR #65 and issue #64. Switched back to `develop`. All code, UI changes, docs/cardono/ (with detailed pivot notes), branch protection work, and release integration were preserved on the `cardano` branch for the record (future revival possible only if core ecology first produces selection pressure strong enough for external earning to matter). We refocused on core per 74/85/77/01: raw adversarial signals, rent-or-die physics first, structured authority, evidence over authority.
+
+The detailed experiment postmortem, every field-data snapshot, the "failed fitness function" diagnosis, and the exact non-negotiable next steps that were attempted live in the closed PR comments and the cardano branch history. This README now carries the high-level honest journey so newcomers see what was tried and why we turned back.
+
+This is how an ecology hardens: failed experiments are witnessed publicly, not hidden. We continue.
+
+(Branch protection, pre-commit, security-audit, and gitflow discipline were exercised throughout.)
+
 ## Path to Real-World Agency
 
 Agents do not start with full external access. They earn it:
