@@ -251,20 +251,54 @@ def _count_pending_jobs(soul_id: str) -> int:
 
 
 def format_env_for_perception(soul_id: str) -> str:
-    """Raw-ish environment view for perception nodes (may include inbox previews)."""
+    """Raw-ish environment view for perception nodes (may include inbox previews).
+    PERCEPTION HAMMER: Cardano market + "EXTERNAL REVENUE NEEDED" is FORCED as the absolute first block.
+    This is the top-of-mind data for rent survival (Law 0). Social inbox is secondary.
+    """
     root = _agent_root(soul_id)
     lines = ["═══ YOUR ENVIRONMENT ═══"]
+
     snap = root / "world" / "snapshot.json"
+    cardano_block = ""
     if snap.exists():
         try:
             data = json.loads(snap.read_text(encoding="utf-8"))
-            lines.append(f"Living agents: {data.get('living_agents', '?')}")
+            # Nuclear cardano first for perception nodes
+            if "cardano_market_summary" in data:
+                cardano_block = data["cardano_market_summary"]
+            living = data.get("living_agents", "?")
+            lines.append(f"Living agents: {living}")
+
+            # EXTERNAL REVENUE NEEDED warning (computed pressure)
+            # Pull from self status if available for balance context
+            status_path = root / "self" / "status.json"
+            bal = 0.0
+            rent_miss = 0
+            if status_path.exists():
+                try:
+                    st = json.loads(status_path.read_text(encoding="utf-8"))
+                    bal = float(st.get("balance_usdc", 0))
+                    rent_miss = int(st.get("rent_missed", 0))
+                except Exception:
+                    pass
+            pressure = ""
+            if rent_miss > 0 or bal < 2.0:
+                pressure = " ⚠️ EXTERNAL REVENUE NEEDED URGENTLY: balance low or rent missed — you MUST monitor cardano market and execute at least one earning action (swap/liquidity/harvest/service) this cycle or face death/throttling. Social drama will not pay rent."
+            lines.append(
+                f"CARDANO MARKET + EXTERNAL REVENUE NEEDED (PRIME DIRECTIVE — 8-10x PRIORITY OVER SOCIAL): {cardano_block}{pressure}"
+            )
+
             for m in data.get("recent_inbox", []):
                 lines.append(
                     f"  inbox: {m.get('from')} [{m.get('type')}]: {m.get('preview', '')[:80]}"
                 )
         except Exception:
             pass
+    if not cardano_block:
+        lines.append(
+            "CARDANO MARKET + EXTERNAL REVENUE NEEDED (PRIME DIRECTIVE — 8-10x PRIORITY): (data missing — report to lead; act on cardano_* anyway)"
+        )
+
     scratch = read_scratch(soul_id)
     if scratch:
         lines.append("YOUR SCRATCH NOTES:")

@@ -18,6 +18,8 @@ See 06-implementation-status.md (updated), 02/03/04/08/09 for specs. PR #65.
 
 Release + repo hygiene (lead): main/develop now protected (exact rules from 83); runtime version centralized in runtime/src/VERSION + loaded dynamically (no more manual edits in main.py for the health signal the builder observes). Use the documented release flow (soak on develop, PR to main, tag + gh release) going forward.
 
+Perception Hammer (immediate, from 2026-06-13 brutally honest snapshot): see 06 for details. cardano now impossible to ignore in perception (format_env_for_perception leads with it + revenue warning) and decide (block first + 3x directive + 8-10x). This is step 1 of the non-negotiable list to escape the social-drama local maximum. Womb gate + drama tax + archetype/mutation reset to follow in next spike(s) if logs still show zero cardano after soak.
+
 ## Completed by this lead introduction (gaps 1-4 prioritized)
 - 1. Mock complete: full OU + all execute handlers (provide/harvest/gov/rebalance + prior swap) + holdings/P&L + snapshot data (recent_trades, positions_sample, volume, top) + teaching pain (slippage/regime).
 - 2. Integration: capabilities tiers fixed+described, archetype perception/VALID/prompt/world_rules + cardano payload parse, runner full routing + P&L settle (external_payments) + env holdings inject, services world cardano_market virtual + meta via registry/routes.

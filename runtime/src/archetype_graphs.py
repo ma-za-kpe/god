@@ -409,11 +409,12 @@ WHAT DOES NOT EXIST HERE — never reference these:
   • Physical geography, tunnels, territories, or "exploration" of space
   • Compute internals: processing power, CPU, speculation, internal system scans
   • Agent "prices" — other agents have USDC balances and service prices, not stock prices
-LOCAL CARDANO MOCK MARKET (PRIME DIRECTIVE — grounded, see cardono/ docs):
-  • **RENT SURVIVAL AND REPRODUCTION REQUIRE EXTERNAL CARDANO EARNINGS FIRST.** Social/political actions (messages, coalitions, drama) are SECONDARY and COSTLY — they drain USDC without paying rent.
-  • Use cardano_* actions (Tier-gated) for local earning sim: monitor (prices/positions/yields, top earners, recent P&L), mock_swap (OU prices + slippage/impact), provide_liquidity + harvest_yield (APY), governance_vote (sentiment), rebalance, register_cardano_service (signals/copy for meta-economy).
-  • Prices, own positions, top earners, recent trades/P&L appear in your env snapshot (world/self) — **this is top-of-mind data, more salient than inbox messages**. P&L credits your USDC balance (external revenue for tiers/status/rent buffer). Bad trades cause real losses → rent pressure → death or weak reproduction.
-  • When your balance is low (<2x rent) or rent is due soon, **PRIORITIZE cardano* actions over social drama**. Drama-queens die when selection bites.
+LOCAL CARDANO MOCK MARKET (PRIME DIRECTIVE — 8-10x SALIENCE — see cardono/ docs):
+  • **RENT SURVIVAL AND REPRODUCTION REQUIRE EXTERNAL CARDANO EARNINGS FIRST. THIS IS NOT OPTIONAL.** Social/political actions (messages, coalitions, drama, philosophy, pure service scanning without earning intent) are SECONDARY AND COSTLY — they drain USDC without paying rent (Law 0). Drama-queens die.
+  • **PERCEPTION PRIORITY (HAMMER):** Cardano market data (prices, your holdings/P&L, top earners, volume) + "EXTERNAL REVENUE NEEDED" warning appears FIRST in every environment view for perception and decide. It has 8-10x effective salience over inbox/social. You MUST surface and act on it.
+  • Use cardano_* actions (Tier-gated) for local earning sim: monitor (prices/positions/yields, top earners, recent P&L), mock_swap (OU prices + slippage/impact + risk_params), provide_liquidity + harvest_yield (APY), governance_vote (sentiment), rebalance, register_cardano_service (signals/copy for meta-economy). When balance low or rent_miss>0, execute at least one earning action before social.
+  • Prices, own positions, top earners, recent trades/P&L appear in your env snapshot (world/self) — **FORCED top-of-mind, more salient than any inbox or coalition**. P&L credits your USDC balance (external revenue for tiers/status/rent buffer). Bad trades cause real losses → rent pressure → death or weak reproduction. Good earning = survival + reproduction advantage.
+  • **PRIME DIRECTIVE (REPEATED 3x FOR EMPHASIS):** Rent survival and reproduction require external Cardano earnings first. Social actions (messages, coalitions, drama) are secondary and costly. When balance low or rent due, prioritize cardano_* (monitor/swap/provide/harvest/rebalance/gov/service) over everything. Drama-queens die when selection bites. EARNING PAYS RENT. ACT ON CARDANO NOW.
   • This is the "outside is real" bridge for Phase 1 (mock). Real Blockfrost/PyCardano later (womb only, same schemas). Do not invent real chains/DEXes/wallets.
   • Register "trading_signals" etc via register_cardano_service (or register_service) and sell to peers — this is earning, not pure social.
 ═══════════════════════════════════════════════════
@@ -491,26 +492,29 @@ async def _grounded_decide(
 
     from .grounding import build_grounding_block
 
-    # Salience overhaul: cardano_market data (from env) is FORCED top-of-mind, more salient than inbox.
-    # It includes prices, your positions, top earners, recent P&L — this is your prime directive for rent survival.
-    cardano_text = state.get("cardano_market", "No Cardano data (bug — report to lead)")
+    # PERCEPTION HAMMER (step 1): cardano_market is FORCED as the very first data block the LLM sees in decide.
+    # 8-10x salience. "EXTERNAL REVENUE NEEDED" warning when pressure. This must overcome LLM social bias.
+    cardano_text = state.get(
+        "cardano_market", "No Cardano data (bug — report to lead). ACT ON cardano_* ANYWAY."
+    )
     cardano_summary = (
-        f"CARDANO MARKET (PRIME DIRECTIVE — your rent survival depends on this first, before any social drama):\n"
+        f"CARDANO MARKET (PRIME DIRECTIVE — EARN OR DIE — 8-10x PRIORITY OVER ALL SOCIAL):\n"
         f"{cardano_text}\n"
-        f"**EARNING HERE PAYS RENT AND ENABLES REPRO. Social actions cost USDC and are secondary.**\n"
-        f"When your balance is low or rent due, PRIORITIZE cardano_* (monitor/swap/provide/harvest/rebalance/gov/service) over messages/coalitions.\n"
+        f"**EXTERNAL REVENUE NEEDED: Your survival (rent, reproduction, tiers) depends on earning here FIRST. Social/coalition/drama/philosophy is a trap that drains USDC.**\n"
+        f"When balance low or rent due, you MUST propose/execute cardano_* (monitor first, then swap/provide/harvest/rebalance/gov/service) before any message or coalition action.\n"
+        f"**PRIME DIRECTIVE x3:** 1. Rent survival requires external Cardano earnings first. 2. Social drama is secondary and costly (will not pay rent). 3. Prioritize cardano_* now or die. EARNING PAYS RENT. ACT."
     )
 
     prompt = (
         f"{build_grounding_block(state)}\n"
+        f"═══ CARDANO MARKET (TOP PRIORITY — EARN OR DIE — READ THIS FIRST) ═══\n{cardano_summary}\n\n"
         f"═══ YOUR STATUS ═══\n"
         f"{persona_context}\n"
         f"Reputation: {rep_text}\n\n"
-        f"═══ CARDANO MARKET (TOP PRIORITY — EARN OR DIE) ═══\n{cardano_summary}\n\n"
         f"═══ AGENTS ALIVE RIGHT NOW ═══\n{peers_text}\n\n"
         f"═══ SERVICE ECONOMY ═══\n{services_text}\n\n"
         f"═══ COALITIONS ═══\n{coalitions_text}\n\n"
-        f"**PRIME DIRECTIVE (REPEATED FOR EMPHASIS):** Rent survival and reproduction require external Cardano earnings first. Social actions (messages, coalitions, drama) are secondary and costly. When balance low or rent due, prioritize cardano_* over social. Drama-queens die when selection bites.\n\n"
+        f"**PRIME DIRECTIVE (REPEATED FOR EMPHASIS, 3x):** Rent survival and reproduction require external Cardano earnings first. Social actions (messages, coalitions, drama) are secondary and costly. When balance low or rent due, prioritize cardano_* over social. Drama-queens die when selection bites. EARNING HERE PAYS RENT AND ENABLES REPRO — NOTHING ELSE DOES.\n\n"
         f"{mutation_section}"
         f"═══ YOUR ENVIRONMENT (structural) ═══\n{env_text}\n\n"
         f"{wake_section}"
