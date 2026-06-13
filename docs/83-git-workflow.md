@@ -78,9 +78,11 @@ python3 -m pre_commit run --all-files   # required before every push
 ## Release path
 
 1. Soak `develop` (field tests, doc 78).
-2. Open PR `develop` → `main` with release notes.
+2. Open PR `develop` → `main` with release notes (bump `runtime/src/VERSION` and/or `docs/VERSION` here — no manual string edits in source).
 3. Merge when CI green.
-4. Tag `docs-v*` or semver for [docs release](./79-documentation-release.md).
+4. Tag `vX.Y.Z` for runtime release (updates health/FastAPI version via the VERSION file) or `docs-vX.Y.Z` for docs bundle. See [docs release process](./79-documentation-release.md) for details on both.
+
+This integrates releases so version changes are deliberate and part of the GitHub release flow rather than ad-hoc.
 
 ---
 
