@@ -359,8 +359,10 @@ def _parse_action_json(raw: str, state: dict | None = None) -> tuple[str, dict |
             "reason": _clean_context_text(
                 data.get("reason") or (data.get("payload") or {}).get("reason"), 200
             ),
-            # Per audit + gaps 2/4: risk_params REQUIRED object for all cardano trade/liquidity/gov (max_risk_pct 0.5-1%, stop_loss_pct, take_profit_pct).
-            # Womb rejects without. Guardian pre-checks it for every action.
+            # Per audit + gaps 2/4 + MEV layer: risk_params REQUIRED object for all cardano trade/liquidity/gov.
+            # Core: max_risk_pct (0.5-1%), stop_loss_pct, take_profit_pct (low/dynamic slippage + limit orders).
+            # Additional MEV: deadline (ts), twap_chunks (int >=2 for large), use_batch (bool for uniform clearing), commit_hash + revealed (commit-reveal), use_private_relay.
+            # Womb/guardian rejects without or bad. Mock simulates (batch uniform price, TWAP reduced impact, commit delay, private execution).
             "risk_params": data.get("risk_params")
             or (data.get("payload") or {}).get("risk_params")
             or {},
@@ -407,11 +409,13 @@ WHAT DOES NOT EXIST HERE — never reference these:
   • Physical geography, tunnels, territories, or "exploration" of space
   • Compute internals: processing power, CPU, speculation, internal system scans
   • Agent "prices" — other agents have USDC balances and service prices, not stock prices
-LOCAL CARDANO MOCK MARKET (allowed, grounded — see cardono/ docs):
-  • Use cardano_* actions (Tier-gated) for local earning sim: monitor (prices/positions/yields), mock_swap (OU prices + slippage/impact), provide_liquidity + harvest_yield (APY), governance_vote (sentiment), rebalance, register_cardano_service (signals/copy for meta-economy).
-  • Prices/holdings appear in your env snapshot (world/self). P&L credits your USDC balance (counts as external revenue for tiers/status). Bad trades cause real losses → rent pressure → selection.
+LOCAL CARDANO MOCK MARKET (PRIME DIRECTIVE — grounded, see cardono/ docs):
+  • **RENT SURVIVAL AND REPRODUCTION REQUIRE EXTERNAL CARDANO EARNINGS FIRST.** Social/political actions (messages, coalitions, drama) are SECONDARY and COSTLY — they drain USDC without paying rent.
+  • Use cardano_* actions (Tier-gated) for local earning sim: monitor (prices/positions/yields, top earners, recent P&L), mock_swap (OU prices + slippage/impact), provide_liquidity + harvest_yield (APY), governance_vote (sentiment), rebalance, register_cardano_service (signals/copy for meta-economy).
+  • Prices, own positions, top earners, recent trades/P&L appear in your env snapshot (world/self) — **this is top-of-mind data, more salient than inbox messages**. P&L credits your USDC balance (external revenue for tiers/status/rent buffer). Bad trades cause real losses → rent pressure → death or weak reproduction.
+  • When your balance is low (<2x rent) or rent is due soon, **PRIORITIZE cardano* actions over social drama**. Drama-queens die when selection bites.
   • This is the "outside is real" bridge for Phase 1 (mock). Real Blockfrost/PyCardano later (womb only, same schemas). Do not invent real chains/DEXes/wallets.
-  • Register "trading_signals" etc via register_cardano_service (or register_service) and sell to peers.
+  • Register "trading_signals" etc via register_cardano_service (or register_service) and sell to peers — this is earning, not pure social.
 ═══════════════════════════════════════════════════
 """
 
@@ -487,14 +491,26 @@ async def _grounded_decide(
 
     from .grounding import build_grounding_block
 
+    # Salience overhaul: cardano_market data (from env) is FORCED top-of-mind, more salient than inbox.
+    # It includes prices, your positions, top earners, recent P&L — this is your prime directive for rent survival.
+    cardano_text = state.get("cardano_market", "No Cardano data (bug — report to lead)")
+    cardano_summary = (
+        f"CARDANO MARKET (PRIME DIRECTIVE — your rent survival depends on this first, before any social drama):\n"
+        f"{cardano_text}\n"
+        f"**EARNING HERE PAYS RENT AND ENABLES REPRO. Social actions cost USDC and are secondary.**\n"
+        f"When your balance is low or rent due, PRIORITIZE cardano_* (monitor/swap/provide/harvest/rebalance/gov/service) over messages/coalitions.\n"
+    )
+
     prompt = (
         f"{build_grounding_block(state)}\n"
         f"═══ YOUR STATUS ═══\n"
         f"{persona_context}\n"
         f"Reputation: {rep_text}\n\n"
+        f"═══ CARDANO MARKET (TOP PRIORITY — EARN OR DIE) ═══\n{cardano_summary}\n\n"
         f"═══ AGENTS ALIVE RIGHT NOW ═══\n{peers_text}\n\n"
         f"═══ SERVICE ECONOMY ═══\n{services_text}\n\n"
         f"═══ COALITIONS ═══\n{coalitions_text}\n\n"
+        f"**PRIME DIRECTIVE (REPEATED FOR EMPHASIS):** Rent survival and reproduction require external Cardano earnings first. Social actions (messages, coalitions, drama) are secondary and costly. When balance low or rent due, prioritize cardano_* over social. Drama-queens die when selection bites.\n\n"
         f"{mutation_section}"
         f"═══ YOUR ENVIRONMENT (structural) ═══\n{env_text}\n\n"
         f"{wake_section}"

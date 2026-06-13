@@ -311,20 +311,26 @@
 
         <!-- FIELD DUMP PANEL -->
         <div id="field-dump-panel">
-          <div style="color:var(--bright);letter-spacing:0.2em;font-size:11px;">⎘ FIELD DUMP — paste into PR comments</div>
+          <div style="color:var(--bright);letter-spacing:0.2em;font-size:11px;">⎘ FIELD DUMP — NEW LOGS FOR PR #65 (Cardano / MEV / guardian / risk_params soak)</div>
           <div style="color:var(--dim);font-size:10px;line-height:1.6;">
-            Builds a runtime snapshot from the API. Paste <code style="color:var(--accent2)">docker compose logs runtime --tail 2000</code> below, then COPY ALL for one blob.
+            For the other person after docker rebuild + new soak with MEV fields (commit_hash, twap_chunks, use_batch, deadline etc.):<br>
+            1. Run in terminal: <code style="color:var(--accent2)">docker compose logs runtime --tail 5000 | cat</code> (or <code> | grep -E 'cardano|guardian|risk_params|MEV|commit|batch|twap|replay|analytics'</code> for focused new logs).<br>
+            2. Paste the fresh output in DOCKER LOGS below.<br>
+            3. Click BUILD DUMP (gets current API state + Cardano snapshot).<br>
+            4. CLICK "⎘ COPY ALL" — this gives one clean blob to paste in PR comment (tagged to lead).<br>
+            Easy select/copy for new logs after every change.
           </div>
           <div id="field-dump-controls">
             <button class="primary" onclick="buildFieldDump()">↻ BUILD DUMP</button>
-            <button onclick="copyFieldDump()">⎘ COPY ALL</button>
+            <button onclick="copyFieldDump()">⎘ COPY ALL (new logs + API)</button>
             <button onclick="copyFieldDumpApi()">⎘ COPY API ONLY</button>
+            <button onclick="selectDockerLogs()">SELECT DOCKER LOGS</button>
             <span id="field-dump-status"></span>
           </div>
-          <label>RUNTIME API SNAPSHOT (auto)</label>
+          <label>RUNTIME API SNAPSHOT (auto — includes Cardano holdings/analytics)</label>
           <textarea id="field-dump-api" readonly placeholder="Click BUILD DUMP…"></textarea>
-          <label>DOCKER LOGS (paste terminal output)</label>
-          <textarea id="field-dump-docker" placeholder="docker compose logs runtime --tail 2000"></textarea>
+          <label>NEW DOCKER LOGS (paste fresh terminal output here after rebuild/soak)</label>
+          <textarea id="field-dump-docker" placeholder="docker compose logs runtime --tail 5000 | cat&#10;(or grep for cardano|guardian|risk_params|MEV|commit|batch|twap|replay after new changes)&#10;Paste the output from your latest run, then COPY ALL above." style="min-height: 220px;"></textarea>
         </div>
 
         <!-- GENESIS PANEL -->
@@ -830,6 +836,29 @@ function copyFieldDumpApi() {
   });
 }
 
+function selectDockerLogs() {
+  const ta = document.getElementById('field-dump-docker');
+  ta.focus();
+  ta.select();
+  // flash a hint on the copy button
+  const copyBtn = document.querySelector('#field-dump-controls button:nth-child(2)');
+  if (copyBtn) {
+    const orig = copyBtn.textContent;
+    copyBtn.textContent = '⎘ NOW COPY ALL';
+    setTimeout(() => { copyBtn.textContent = orig; }, 1800);
+  }
+}
+
+function fieldDumpCombined() {
+  const api = document.getElementById('field-dump-api').value.trim();
+  const docker = document.getElementById('field-dump-docker').value.trim();
+  const ts = new Date().toISOString().replace('T', ' ').slice(0,19);
+  const parts = [`=== NEW LOGS / SOAK REPORT FOR PR #65 (Cardano MEV/guardian/risk) @ ${ts} ===`];
+  if (api) parts.push('', '=== RUNTIME API SNAPSHOT ===', api);
+  if (docker) parts.push('', '=== DOCKER LOGS (pasted fresh after rebuild/soak) ===', docker);
+  return parts.join('\n');
+}
+
 // ── RAW API PANEL ─────────────────────────────────────────────────────────
 
 function showRaw() {
@@ -871,6 +900,16 @@ function copyRaw() {
 }
 
 document.getElementById('raw-endpoint').addEventListener('keydown', e => { if (e.key === 'Enter') runRaw(); });
+
+// Make "new logs" docker textarea easy to copy: auto-select on focus + bigger feel
+const dockerTa = document.getElementById('field-dump-docker');
+if (dockerTa) {
+  dockerTa.addEventListener('focus', () => {
+    setTimeout(() => { dockerTa.select(); }, 50);
+  });
+  // hint on double-click too
+  dockerTa.addEventListener('dblclick', () => { dockerTa.select(); });
+}
 
 // ── GENESIS PANEL ─────────────────────────────────────────────────────────
 

@@ -1,11 +1,11 @@
 # What's Left to Implement – Cardano Earning Layer (Post-Builder Updates)
 
 > **ROLE DEFINITION (lead directive, 2026-06-12 — emphasize this every cycle):**
-> 
+>
 > - **Builder's job (@makufarmerlyn / the other person who is actually running the code):** Fix broken code. Make sure the application runs well after pull + docker rebuild. Test, capture logs, clean up, report back (survival, P&L, events, errors, UI behavior, any grounding/circuit issues). Push your fixes, cleanups, test results, rebases, and log artifacts frequently. **Do NOT introduce any new logic, new features, new architecture, or new code paths.** Tag the lead on every push/comment. Keep monitoring on (monitor-pr.sh + GitHub notifs).
-> 
+>
 > - **Lead's job (ma-za-kpe / this agent):** Introduce new code, new logic, synthesis, research tie-ins (institutional risk, Cardano primitives, memory/learning), fresh perspective. Update the canonical docs/cardono/ specs. Push the new logic. Leave detailed comments on #65 for the builder. Monitor replies. Ask them to tag if they need to communicate. Document the "what's left" and workflow here.
-> 
+>
 > This division keeps the ecology clean: the person running the actual system focuses on making physics work and reporting raw signals (logs, deaths, P&L, drama). The lead brings the new design/logic after seeing the live results. One canonical place for roles (link here from PR comments). Do not blur it.
 
 **Date:** 2026-06-12 (lead review after @makufarmerlyn's enforcement work)

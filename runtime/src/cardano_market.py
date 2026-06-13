@@ -65,6 +65,10 @@ class MockMarket:
     # Priority: historical first for real patterns. Contention on executes.
     historical_prices: Dict[str, list] = field(default_factory=dict)  # asset -> [price_series]
     current_hist_idx: Dict[str, int] = field(default_factory=dict)
+    # MEV protection simulation state (for additional layers)
+    pending_commits: dict = field(
+        default_factory=dict
+    )  # commit_hash -> {"soul": , "action": , "ts": }
 
     def _maybe_init_historical(self):
         if not self.historical_prices:
@@ -126,8 +130,9 @@ class MockMarket:
             log.warning(f"Cardano mock price update failed safely: {e}")
 
     def _guardian_check(self, soul_id: str, risk_params: dict, trade_value: float) -> dict:
-        """Mandatory Portfolio Guardian pre-check (per audit + plan).
+        """Mandatory Portfolio Guardian pre-check (per audit + plan + new MEV layer).
         Enforced in womb before any cardano trade/liquidity.
+        Supports additional protections: deadline, twap_chunks, use_batch, commit_reveal.
         Returns {"ok": bool, "reason": str}.
         Builder: do not relax this. Report any guardian blocks in logs.
         """
@@ -157,6 +162,29 @@ class MockMarket:
                 crash_impact = -0.5 * trade_value
                 if recent_pnl + crash_impact < -0.1:
                     return {"ok": False, "reason": "stress test: -50% crash would breach DD limits"}
+
+            # New MEV: deadline / expiry
+            if "deadline" in risk_params:
+                if time.time() > float(risk_params["deadline"]):
+                    return {"ok": False, "reason": "deadline expired - tx too old for MEV window"}
+
+            # New MEV: TWAP chunking required for large trades
+            twap = int(risk_params.get("twap_chunks", 1))
+            if trade_value > 0.05 * (total_exposure + holdings.get("USDCx", 0) + 1) and twap < 2:
+                return {
+                    "ok": False,
+                    "reason": "large trade requires twap_chunks >=2 for impact reduction",
+                }
+
+            # New MEV: commit-reveal required for high value
+            if trade_value > 0.1 and not risk_params.get("commit_hash"):
+                return {
+                    "ok": False,
+                    "reason": "high value requires commit_hash for commit-reveal protection",
+                }
+
+            # New MEV: batch mode encouraged for multiple
+            # (no hard reject, but note in result for sim)
 
             return {"ok": True, "reason": "guardian ok"}
         except Exception as e:
@@ -229,17 +257,53 @@ class MockMarket:
 
             current_price = self.prices[from_asset]
 
-            # Sharpened slippage + contention (multi-agent eUTxO-like batch impact)
-            base_impact = random.uniform(-slippage_tolerance, slippage_tolerance)
-            recent_activity = len(
-                [
-                    t
-                    for t in self.recent_trades[-5:]
-                    if t.get("type") in ("swap", "provide_liquidity")
-                ]
-            )
-            contention_mult = 1 + (recent_activity * 0.15)
-            effective_price = current_price * (1 + base_impact * contention_mult)
+            # MEV protections simulation (on top of core risk/slippage)
+            # 1. Commit-reveal: if commit_hash without reveal, record pending, delay full exec
+            commit_hash = risk_params.get("commit_hash")
+            if commit_hash and not risk_params.get("revealed", False):
+                self.pending_commits[commit_hash] = {
+                    "soul": soul_id,
+                    "action": "swap",
+                    "from_asset": from_asset,
+                    "to_asset": to_asset,
+                    "amount": amount,
+                    "ts": time.time(),
+                }
+                return {
+                    "success": False,
+                    "error": "commit_phase",
+                    "details": "waiting for reveal; commit recorded for MEV protection",
+                    "commit_hash": commit_hash,
+                }
+
+            # 2. Batch auctions / uniform clearing: if use_batch, use averaged "batch price"
+            if risk_params.get("use_batch") or risk_params.get("batch_mode"):
+                # Simulate uniform clearing price (average of current + recent impact or fixed)
+                batch_price = current_price
+                if self.recent_trades:
+                    recent_prices = [
+                        self.prices.get(t.get("pair", "").split("->")[0], current_price)
+                        for t in self.recent_trades[-3:]
+                        if "->" in t.get("pair", "")
+                    ]
+                    if recent_prices:
+                        batch_price = sum(recent_prices) / len(recent_prices)
+                effective_price = batch_price  # uniform for batch
+            else:
+                # 3. Low/dynamic slippage + TWAP chunking
+                twap_chunks = int(risk_params.get("twap_chunks", 1))
+                base_impact = random.uniform(-slippage_tolerance, slippage_tolerance) / max(
+                    1, twap_chunks
+                )
+                recent_activity = len(
+                    [
+                        t
+                        for t in self.recent_trades[-5:]
+                        if t.get("type") in ("swap", "provide_liquidity")
+                    ]
+                )
+                contention_mult = 1 + (recent_activity * 0.15)
+                effective_price = current_price * (1 + base_impact * contention_mult)
 
             # Fee realism
             fee = 0.003
@@ -285,6 +349,11 @@ class MockMarket:
                 "contention_mult": round(contention_mult, 2),
                 "guardian": guardian,
                 "new_holdings": dict(holdings),
+                "mev_protection": {
+                    "commit_reveal": bool(commit_hash),
+                    "batch": bool(risk_params.get("use_batch") or risk_params.get("batch_mode")),
+                    "twap_chunks": twap_chunks,
+                },
             }
             self.recent_trades.append(
                 {

@@ -57,10 +57,22 @@ def refresh_env(
     root = ensure_agent_env(soul_id)
     now = int(time.time())
 
+    # Salience overhaul: Cardano market data FORCED top-of-mind, more salient than inbox.
+    # Summary: prices, your positions, top earners, recent P&L — prime directive for rent survival.
+    cardano_market = agent.get("cardano_market", {}) or {}
+    cardano_summary = (
+        "CARDANO MARKET (PRIME DIRECTIVE — EARN OR DIE: this is top-of-mind data for rent survival. "
+        f"Prices: {cardano_market.get('prices', {})} | Your holdings: {agent.get('cardano_holdings', {})} | "
+        f"Top earners: {cardano_market.get('top_earners_sample', [])} | Recent P&L/volume: {cardano_market.get('volume_24h_mock', 0)} | "
+        "When balance low or rent due, PRIORITIZE cardano_* actions (monitor/swap/provide/harvest/rebalance/gov/service) over social drama. "
+        "Social actions cost USDC and are secondary. Bad trades = losses → rent pressure → death. Good earning = buffers + reproduction."
+    )
+
     world_view = {
         "epoch": now,
         "world_id": WORLD_ID,
         "living_agents": len(peers) + 1,
+        "cardano_market_summary": cardano_summary,  # FORCED top-of-mind
         "peers": [
             {
                 "soul_id": p.get("soul_id", "")[:8],
