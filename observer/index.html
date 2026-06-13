@@ -1384,6 +1384,7 @@ function renderCardanoMarket(snap) {
     ).join('');
     if (m.volume_24h_mock) h += `<div class="p-row"><span class="pk">vol</span><span class="pv gold">${m.volume_24h_mock}</span></div>`;
     if (m.top_earners_sample && m.top_earners_sample.length) h += `<div class="p-row"><span class="pk">earn</span><span class="pv gold">${m.top_earners_sample.map(x=>x[0]).join(' ')}</span></div>`;
+    if (m.analytics) h += `<div class="p-row"><span class="pk">sig</span><span class="pv gold" style="font-size:0.5rem">${JSON.stringify(m.analytics).slice(0,60)}</span></div>`;
     h += '<div style="font-size:0.5rem;opacity:0.6;margin-top:2px">MOCK → real Cardano (Blockfrost)</div>';
     el.innerHTML = h;
   } else {

@@ -183,3 +183,10 @@ CARDANO_WORLD_SERVICE = {
 
 # Note: virtual CARDANO_WORLD_SERVICE is merged in routes.list_all_services and snapshot for visibility.
 # No dupe func. Existing list_services works; callers (runner fetch, UI) see cardano via explicit or routes wrapper.
+
+# Per audit + gap2: performance history for agent-registered cardano meta-services (signals/copy-trades).
+# Reputation + slash for losers. Updated on buy/settle (in economic_activity or routes).
+# Lead: simple in-mem for mock; real would persist to DB.
+CARDANO_META_PERF: dict[
+    str, dict
+] = {}  # service_name -> {"calls": int, "pnl_sum": float, "successes": int}

@@ -820,37 +820,83 @@ async def _execute_action(agent: dict, action: dict, emitter) -> None:
                     h = m.get_agent_holdings(soul_id)
                     res = {"success": True, "query": q, "state": m.get_state(), "my_holdings": h}
                 elif act_type == "cardano_mock_swap":
-                    res = m.execute_mock_swap(
-                        soul_id,
-                        p.get("from_asset") or p.get("from", "ADA"),
-                        p.get("to_asset") or p.get("to", "USDCx"),
-                        float(p.get("amount") or 0),
-                        float(p.get("slippage_tolerance") or 0.02),
-                    )
+                    risk_p = p.get("risk_params") or p.get("risk") or {}
+                    # Womb level pre: require risk_params per sharpened plan (0.5-1% max, stops)
+                    if not risk_p or float(risk_p.get("max_risk_pct", 0)) > 0.02:
+                        res = {
+                            "success": False,
+                            "error": "missing_or_excessive_risk_params",
+                            "details": "womb requires risk_params with max_risk_pct <=0.02 + stops",
+                        }
+                    else:
+                        res = m.execute_mock_swap(
+                            soul_id,
+                            p.get("from_asset") or p.get("from", "ADA"),
+                            p.get("to_asset") or p.get("to", "USDCx"),
+                            float(p.get("amount") or 0),
+                            float(p.get("slippage_tolerance") or 0.02),
+                            risk_params=risk_p,
+                        )
                 elif act_type == "cardano_provide_liquidity":
-                    res = m.execute_provide_liquidity(
-                        soul_id,
-                        p.get("pool", "ADA_USDCx"),
-                        float(p.get("amount_a") or 0),
-                        float(p.get("amount_b") or 0),
-                    )
+                    risk_p = p.get("risk_params") or p.get("risk") or {}
+                    if not risk_p or float(risk_p.get("max_risk_pct", 0)) > 0.02:
+                        res = {
+                            "success": False,
+                            "error": "missing_or_excessive_risk_params",
+                            "details": "womb requires risk_params with max_risk_pct <=0.02 + stops",
+                        }
+                    else:
+                        res = m.execute_provide_liquidity(
+                            soul_id,
+                            p.get("pool", "ADA_USDCx"),
+                            float(p.get("amount_a") or 0),
+                            float(p.get("amount_b") or 0),
+                            risk_params=risk_p,
+                        )
                 elif act_type == "cardano_harvest_yield":
-                    res = m.execute_harvest_yield(soul_id, p.get("position_id", "lp_default"))
+                    risk_p = p.get("risk_params") or p.get("risk") or {}
+                    if not risk_p or float(risk_p.get("max_risk_pct", 0)) > 0.02:
+                        res = {
+                            "success": False,
+                            "error": "missing_or_excessive_risk_params",
+                            "details": "womb requires risk_params",
+                        }
+                    else:
+                        res = m.execute_harvest_yield(
+                            soul_id, p.get("position_id", "lp_default"), risk_params=risk_p
+                        )
                 elif act_type == "cardano_governance_vote":
-                    res = m.execute_governance_vote(
-                        soul_id,
-                        p.get("proposal_id", "CIP-mock"),
-                        p.get("vote", "yes"),
-                        float(p.get("stake_amount") or 0),
-                    )
+                    risk_p = p.get("risk_params") or p.get("risk") or {}
+                    if not risk_p or float(risk_p.get("max_risk_pct", 0)) > 0.02:
+                        res = {
+                            "success": False,
+                            "error": "missing_or_excessive_risk_params",
+                            "details": "womb requires risk_params",
+                        }
+                    else:
+                        res = m.execute_governance_vote(
+                            soul_id,
+                            p.get("proposal_id", "CIP-mock"),
+                            p.get("vote", "yes"),
+                            float(p.get("stake_amount") or 0),
+                            risk_params=risk_p,
+                        )
                 elif act_type == "cardano_rebalance":
-                    targets = p.get("targets") or {}
-                    if isinstance(targets, str):
-                        try:
-                            targets = json.loads(targets)
-                        except Exception:
-                            targets = {}
-                    res = m.execute_rebalance(soul_id, targets)
+                    risk_p = p.get("risk_params") or p.get("risk") or {}
+                    if not risk_p or float(risk_p.get("max_risk_pct", 0)) > 0.02:
+                        res = {
+                            "success": False,
+                            "error": "missing_or_excessive_risk_params",
+                            "details": "womb requires risk_params",
+                        }
+                    else:
+                        targets = p.get("targets") or {}
+                        if isinstance(targets, str):
+                            try:
+                                targets = json.loads(targets)
+                            except Exception:
+                                targets = {}
+                        res = m.execute_rebalance(soul_id, targets, risk_params=risk_p)
                 elif act_type == "register_cardano_service":
                     from .services.registry import register_service as do_reg_cardano
 
@@ -865,6 +911,18 @@ async def _execute_action(agent: dict, action: dict, emitter) -> None:
                         soul_id=soul_id, name=svc_name, description=svc_desc, price_usdc=price
                     )
                     res = {"success": True, "listing": listing}
+                    # Perf history stub for meta-services (audit/gap2: signals/copy need track record + slash).
+                    # Updated here + on settle (economic). Simple in-mem; real DB.
+                    try:
+                        from .services.registry import CARDANO_META_PERF
+
+                        perf = CARDANO_META_PERF.get(
+                            svc_name, {"calls": 0, "pnl_sum": 0.0, "successes": 0}
+                        )
+                        perf["calls"] += 1
+                        CARDANO_META_PERF[svc_name] = perf
+                    except Exception:
+                        pass
                 else:
                     res = {"success": False, "error": "unknown cardano action type"}
                 ok = bool(res.get("success", False))
@@ -911,6 +969,11 @@ async def _execute_action(agent: dict, action: dict, emitter) -> None:
                         record_cardano_pnl(soul_id, pnl)
                     except Exception:
                         pass
+                # Explicit memory tie (gap 4 / audit): cardano episodes get pnl_impact + vol_regime for dream_engine bias to risk/guardian nodes after losses.
+                # Reuses commit_cycle_episode / _emotional_imprint (main cycle after execute); tags will drive higher prob corrective mutations.
+                if "cardano_" in act_type:
+                    p["cardano_pnl_impact"] = round(pnl, 4) if "pnl" in locals() else 0
+                    p["vol_regime"] = "high" if abs(pnl) > 0.05 else "normal"
                 # Drama events for observer (04) + feed
                 et = (
                     "cardano.trade"

@@ -359,6 +359,11 @@ def _parse_action_json(raw: str, state: dict | None = None) -> tuple[str, dict |
             "reason": _clean_context_text(
                 data.get("reason") or (data.get("payload") or {}).get("reason"), 200
             ),
+            # Per audit + gaps 2/4: risk_params REQUIRED object for all cardano trade/liquidity/gov (max_risk_pct 0.5-1%, stop_loss_pct, take_profit_pct).
+            # Womb rejects without. Guardian pre-checks it for every action.
+            "risk_params": data.get("risk_params")
+            or (data.get("payload") or {}).get("risk_params")
+            or {},
         }
         return thought, action
     except Exception:
