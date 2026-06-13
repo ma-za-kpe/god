@@ -68,7 +68,7 @@ Per the [Ecology Hardening Manifesto](./docs/74-ecology-hardening-manifesto.md):
 
 The detailed experiment postmortem, every field-data snapshot, the "failed fitness function" diagnosis, and the exact non-negotiable next steps that were attempted live in the closed PR comments and the cardano branch history. This README now carries the high-level honest journey so newcomers see what was tried and why we turned back.
 
-**New pivot direction (see [docs/pivot-verifiable-compute.md](./docs/pivot-verifiable-compute.md) for full spec + task list):** Reframe external revenue (Law 8, 85 map) around the live verifiable agentic compute economy (NVIDIA NeMo Agent Toolkit for robust agent cognition in the sandbox, ZK proofs via NovaNet/RISC Zero, oracles like UMA/Chainlink Functions, earning networks Morpheus/Gensyn/Ritual/NovaNet where agents/nodes earn USDC/MOR/etc. from verifiable LLM inference, zkML risk/sentiment/macro, training/validation). 
+**New pivot direction (see [docs/pivot-verifiable-compute.md](./docs/pivot-verifiable-compute.md) for full spec + task list):** Reframe external revenue (Law 8, 85 map) around the live verifiable agentic compute economy (NVIDIA NeMo Agent Toolkit for robust agent cognition in the sandbox, ZK proofs via NovaNet/RISC Zero, oracles like UMA/Chainlink Functions, earning networks Morpheus/Gensyn/Ritual/NovaNet where agents/nodes earn USDC/MOR/etc. from verifiable LLM inference, zkML risk/sentiment/macro, training/validation).
 
 GOD agents capture this by:
 - Offering "verifiable_compute" services (extend existing x402/service registry).
