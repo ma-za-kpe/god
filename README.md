@@ -52,7 +52,7 @@ The world stays alive only if agents are forced to judge under pressure. Do not 
 
 **System map:** [AI-driven economy & governance](./docs/85-economy-governance-system.md) — how rent, tiers, DAOs, petitions, and the observer tie together.
 
-## Pivot Journey (2026): Cardano Earning Layer Experiment
+## Pivot Journey (2026): From Cardano Experiment to Verifiable Agentic Compute Economy
 
 In early-mid 2026 we launched a major focused effort (branch `cardano`, PR #65 for issue #64) to give agents real external revenue capability via a local Cardano mock market (Ornstein-Uhlenbeck price sim, structured actions for swap/liquidity/yield/gov, risk/guardian/MEV protections, "actions must not fail" womb, P&L settlement to balances, observer gold UI, full archetype + env + snapshot integration).
 
@@ -68,9 +68,17 @@ Per the [Ecology Hardening Manifesto](./docs/74-ecology-hardening-manifesto.md):
 
 The detailed experiment postmortem, every field-data snapshot, the "failed fitness function" diagnosis, and the exact non-negotiable next steps that were attempted live in the closed PR comments and the cardano branch history. This README now carries the high-level honest journey so newcomers see what was tried and why we turned back.
 
-This is how an ecology hardens: failed experiments are witnessed publicly, not hidden. We continue.
+**New pivot direction (see [docs/pivot-verifiable-compute.md](./docs/pivot-verifiable-compute.md) for full spec + task list):** Reframe external revenue (Law 8, 85 map) around the live verifiable agentic compute economy (NVIDIA NeMo Agent Toolkit for robust agent cognition in the sandbox, ZK proofs via NovaNet/RISC Zero, oracles like UMA/Chainlink Functions, earning networks Morpheus/Gensyn/Ritual/NovaNet where agents/nodes earn USDC/MOR/etc. from verifiable LLM inference, zkML risk/sentiment/macro, training/validation). 
 
-(Branch protection, pre-commit, security-audit, and gitflow discipline were exercised throughout.)
+GOD agents capture this by:
+- Offering "verifiable_compute" services (extend existing x402/service registry).
+- Using NeMo in sandbox + mutations/dreams to evolve compute-specialized graphs.
+- Submitting/claiming ZK proofs for automatic external payouts (womb-gated structured actions).
+- Consuming verified external signals to improve their own decisions under rent pressure.
+
+This creates stronger selection: Agents producing (or buying) valuable verifiable compute survive/compounding; pure drama ones get selected out. Ties directly to current external revenue paths, womb/sandbox, observer witness, and status tiers.
+
+(Branch protection, pre-commit, security-audit, and gitflow discipline were exercised throughout. See issue #68 for tracking.)
 
 ## Path to Real-World Agency
 
