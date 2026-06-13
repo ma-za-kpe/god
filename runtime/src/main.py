@@ -6,6 +6,7 @@ Entry point. FastAPI server + background daemons for rent collection and agent e
 import asyncio
 import logging
 import os
+import pathlib
 from contextlib import asynccontextmanager
 
 import uvicorn
@@ -23,6 +24,16 @@ logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
 )
 log = logging.getLogger("god.runtime")
+
+# Runtime version is loaded from the canonical file (single source of truth, managed via release process).
+# This replaces manual hard-coded strings in FastAPI + /health.
+# See docs/79-documentation-release.md and scripts for how releases bump this + tag.
+try:
+    RUNTIME_VERSION = (
+        (pathlib.Path(__file__).parent / "VERSION").read_text(encoding="utf-8").strip()
+    )
+except Exception:
+    RUNTIME_VERSION = "0.1.0"
 
 _background_tasks: list[asyncio.Task] = []
 
@@ -96,7 +107,7 @@ async def lifespan(app: FastAPI):
     await close_pool()
 
 
-app = FastAPI(title="God Runtime", version="0.1.0", lifespan=lifespan)
+app = FastAPI(title="God Runtime", version=RUNTIME_VERSION, lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -114,7 +125,7 @@ async def health():
     return {
         "status": "ok",
         "world_id": os.getenv("WORLD_ID", "unknown"),
-        "version": "0.1.0",
+        "version": RUNTIME_VERSION,
     }
 
 
