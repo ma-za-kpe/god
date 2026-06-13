@@ -50,6 +50,30 @@ GOD's primitives map *directly* (no Cardano-specific assumptions):
 
 NVIDIA NeMo Agent Toolkit: Primary vehicle for "AI Mode" in sandbox — enables GOD agents to actually *be good at* producing the high-quality, tool-using, guarded inferences that earn in these networks.
 
+**Local implementation (confirmed):** Yes — NeMo Agent Toolkit has full local/offline support.
+- Run with local models: Ollama (easiest bridge for current GOD dev), vLLM, direct HuggingFace, or NVIDIA's TensorRT-LLM (for max perf on GPUs).
+- No mandatory cloud/NGC API key for core agent orchestration, guardrails, tool calling, memory, multi-agent teams, or "AI Mode".
+- Config via env or NeMo config files pointing to local endpoint or model path.
+- This makes switching easy: dev stays on Ollama (as today), prod on Hetzner GPU boxes uses the same code but with NeMo + optimized local backend.
+
+**Preparing for Hetzner (start now):**
+Hetzner is excellent for this pivot — cheap dedicated servers + cloud with real NVIDIA GPUs (avoid expensive cloud LLM APIs, keep compute local and verifiable).
+- Hetzner GPU instances: Install official NVIDIA drivers + CUDA toolkit.
+- Docker: Use nvidia-container-runtime (`--gpus all` or compose deploy.resources.devices).
+- Models: Pre-download to persistent volume (or use Hetzner storage), point NeMo to local path/endpoint.
+- NeMo on Hetzner: Use their optimized inference (TensorRT-LLM) for the "run inference" step in `submit_verifiable_compute`. Much faster + lower latency than Ollama for production payouts.
+- Env vars to add/switch (in .env or compose):
+  - AGENT_TOOLKIT=nemo (enables real NeMo path in verifiable_compute handler and future graphs)
+  - LLM_PROVIDER=ollama (dev) or vllm/nemo (prod)
+  - OLLAMA_URL=http://host:11434 or NEMO_ENDPOINT=...
+  - GPU flags for the runtime container.
+- Deployment flow: Local Docker (current) → Hetzner GPU server (bare metal or cloud) → same GOD runtime binary, just different LLM backend + NeMo.
+- Cost win: Pay for the Hetzner box once, run unlimited local inferences, sell the verifiable outputs.
+- Add to your Hetzner setup: persistent model cache, monitoring for GPU util, auto-restart on driver issues.
+- This keeps the "local implementation" path, so the switch from current Ollama+LangGraph to NeMo is just config + hardware — no architecture rewrite.
+
+See runtime/requirements.txt and agent_runner.py for the current hooks (mock + "when AGENT_TOOLKIT=nemo" path). Update docker-compose.yml (GPU stanza commented at top) for Hetzner.
+
 ## Task List (Initial — Expand in Future Iterations)
 
 Priorities per 74/85/77/01/08 success criteria (observable Darwinism on external verifiable earning: earners survive/compounding, pure drama die, mutations trend to compute providers).

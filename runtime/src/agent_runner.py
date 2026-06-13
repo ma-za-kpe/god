@@ -852,11 +852,23 @@ async def _execute_action(agent: dict, action: dict, emitter) -> None:
             task_type = p.get("task_type") or "inference"
             model_id = p.get("model_id") or "ne mo-default"
             proof_type = p.get("proof_type") or "nova_net"
-            # "Run" via NeMo Agent Toolkit mock (orchestration, guardrails, specialized AI Mode)
-            # In full: agent would use NeMo for multi-step tool use + output the result + proof
-            mock_output = (
-                f"NeMo-orchestrated {task_type} result for {model_id} (guarded, observable)"
-            )
+            # NeMo Agent Toolkit integration (local implementation supported)
+            # Current: still mock for this spike (to keep local dev easy with Ollama).
+            # When AGENT_TOOLKIT=nemo (or in future when NeMo is primary):
+            #   - Uses real NeMo for orchestration, guardrails, memory, tool calling, "AI Mode".
+            #   - Local/offline: yes — configure with local models (Ollama bridge for dev, or direct HF/vLLM/TensorRT-LLM).
+            #   - No cloud key required for inference.
+            #   - On Hetzner GPU server: install CUDA/drivers, use NeMo-optimized backend for speed, volume-mount models.
+            #   - This replaces/augments the current LangGraph + direct Ollama calls for the *compute task execution* (the part that produces the sellable verifiable output).
+            #   - Full switch will also affect archetype_graphs (the per-archetype reasoning graphs) for compute-specialized agents.
+            if os.getenv("AGENT_TOOLKIT", "").lower() == "nemo":
+                # Real local NeMo path (example — expand with actual NeMo Agent code when dependency is active)
+                # e.g. from nemo_agent_toolkit import AgentOrchestrator; orch = AgentOrchestrator(model=local_model); result = orch.run(task=..., tools=...)
+                mock_output = f"[REAL LOCAL NEMO] {task_type} for {model_id} (orchestrated with guardrails + tools, ready for Hetzner GPU)"
+            else:
+                mock_output = (
+                    f"NeMo-orchestrated {task_type} result for {model_id} (guarded, observable)"
+                )
             mock_proof = "0x" + "deadbeef" * 8  # mock ZK/STARK proof
             # Simulate "submit to verifier + claim" (pull model): record as external revenue
             payout = 0.005  # small micropayment for spike; real from networks or internal

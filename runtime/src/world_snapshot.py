@@ -179,6 +179,7 @@ def _finalize_snapshot(
     world_id: str,
 ) -> dict[str, Any]:
     stats["world_id"] = world_id
+    stats["deploy_env"] = os.getenv("DEPLOY_ENV", "local").upper()
     stats["llm_provider"] = os.getenv("LLM_PROVIDER", "ollama")
     stats["llm_model"] = os.getenv("LLM_MODEL", "llama3.1:8b")
     return json_safe(

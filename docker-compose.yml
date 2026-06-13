@@ -1,6 +1,27 @@
 # God Project — Local Development Stack
 # All services run locally. No real money. No mainnet.
 # See docs/37-local-development-environment.md for setup instructions.
+#
+# To run "prod-like" locally for testing: DEPLOY_ENV=prod docker compose up -d
+# This tags all logs, health, snapshots, and field dumps with [PROD] vs [LOCAL].
+#
+# Hetzner preparation notes (for verifiable compute pivot + NeMo):
+# - Hetzner dedicated GPU servers (e.g. GEX or dedicated with NVIDIA A100/H100/RTX) are ideal for self-hosting high-perf local models.
+# - Install NVIDIA drivers + CUDA on the Hetzner box.
+# - Run with Docker nvidia runtime: add to docker-compose or use --gpus all.
+# - For NeMo: Use TensorRT-LLM or vLLM backend for speed (much faster than Ollama on GPU).
+# - Mount model volumes persistently.
+# - Env on Hetzner: AGENT_TOOLKIT=nemo, LLM_PROVIDER=... (point to local NeMo/vLLM endpoint), OLLAMA_URL or equivalent. Set DEPLOY_ENV=prod.
+# - This makes switching from local dev (current Ollama) to prod (Hetzner GPU) easy — same code paths, just config + hardware.
+# - See docs/pivot-verifiable-compute.md "Preparing for Hetzner" section.
+# Example GPU stanza (uncomment/adapt for prod compose override):
+# deploy:
+#   resources:
+#     reservations:
+#       devices:
+#         - driver: nvidia
+#           count: 1
+#           capabilities: [gpu]
 
 services:
 

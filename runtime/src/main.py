@@ -78,7 +78,9 @@ async def _ws_snapshot_daemon():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    deploy_env = os.getenv("DEPLOY_ENV", "local").upper()
     log.info("Starting God Runtime...")
+    log.info(f"  Deploy:   {deploy_env}")
     log.info(f"  World:    {os.getenv('WORLD_ID', 'local-dev-world-1')}")
     log.info(f"  IPFS:     {os.getenv('IPFS_API', 'not configured')}")
     log.info(f"  Chain:    {os.getenv('ANVIL_RPC', 'not configured')}")
@@ -124,6 +126,7 @@ app.include_router(creator_router)
 async def health():
     return {
         "status": "ok",
+        "deploy_env": os.getenv("DEPLOY_ENV", "local").upper(),
         "world_id": os.getenv("WORLD_ID", "unknown"),
         "version": RUNTIME_VERSION,
     }

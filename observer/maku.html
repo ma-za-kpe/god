@@ -323,8 +323,10 @@
           </div>
           <label>RUNTIME API SNAPSHOT (auto)</label>
           <textarea id="field-dump-api" readonly placeholder="Click BUILD DUMP…"></textarea>
-          <label>DOCKER LOGS (paste terminal output)</label>
-          <textarea id="field-dump-docker" placeholder="docker compose logs runtime --tail 2000"></textarea>
+          <label>DOCKER LOGS — LOCAL (docker compose / dev)</label>
+          <textarea id="field-dump-docker-local" placeholder="docker compose logs runtime --tail 2000 | grep -E 'verifiable|compute|ne mo|earnings|prime|rent_miss'"></textarea>
+          <label>DOCKER LOGS — PROD (Hetzner / remote)</label>
+          <textarea id="field-dump-docker-prod" placeholder="ssh hetzner 'docker compose logs runtime --tail 2000' | grep -E 'verifiable|compute|ne mo|earnings|prime|rent_miss'&#10;(or journalctl / remote logs)"></textarea>
         </div>
 
         <!-- GENESIS PANEL -->
@@ -784,16 +786,30 @@ async function buildFieldDump() {
       lines.push(`${m.sender_name || '?'} → ${m.recipient_name || m.recipient_id || '?'}: ${(m.body || m.subject || '').slice(0, 100)}`);
     });
 
-    const docker = document.getElementById('field-dump-docker').value;
-    if (docker.trim()) {
-      const hits = docker.split('\n').filter(l => GROUNDING_GREP.test(l));
-      lines.push('', `=== DOCKER GREP grounding (${hits.length} lines) ===`);
-      if (!hits.length) lines.push('(no grounding reject lines in pasted logs)');
+    // Support separate LOCAL and PROD docker logs (for dual-environment soaks)
+    const dockerLocal = document.getElementById('field-dump-docker-local').value.trim();
+    const dockerProd = document.getElementById('field-dump-docker-prod').value.trim();
+    const deploy = (health && health.deploy_env) ? health.deploy_env : 'LOCAL';
+
+    if (dockerLocal) {
+      const hits = dockerLocal.split('\n').filter(l => GROUNDING_GREP.test(l));
+      lines.push('', `=== DOCKER LOGS [LOCAL] (${hits.length} grounding hits) ===`);
+      if (!hits.length) lines.push('(no grounding reject lines in LOCAL pasted logs)');
       else hits.forEach(l => lines.push(l.slice(0, 300)));
+      lines.push('', '--- full LOCAL docker paste (for reference) ---');
+      lines.push(dockerLocal);
+    }
+    if (dockerProd) {
+      const hits = dockerProd.split('\n').filter(l => GROUNDING_GREP.test(l));
+      lines.push('', `=== DOCKER LOGS [PROD / HETZNER] (${hits.length} grounding hits) ===`);
+      if (!hits.length) lines.push('(no grounding reject lines in PROD pasted logs)');
+      else hits.forEach(l => lines.push(l.slice(0, 300)));
+      lines.push('', '--- full PROD docker paste (for reference) ---');
+      lines.push(dockerProd);
     }
 
     document.getElementById('field-dump-api').value = lines.join('\n');
-    status.textContent = `✓ built in ${ms}ms · ${lines.join('\n').length} chars`;
+    status.textContent = `✓ built in ${ms}ms · ${lines.join('\n').length} chars (env: ${deploy})`;
     status.style.color = 'var(--green)';
   } catch (e) {
     document.getElementById('field-dump-api').value = `Error: ${e.message}`;
@@ -804,9 +820,11 @@ async function buildFieldDump() {
 
 function fieldDumpCombined() {
   const api = document.getElementById('field-dump-api').value.trim();
-  const docker = document.getElementById('field-dump-docker').value.trim();
+  const dockerLocal = document.getElementById('field-dump-docker-local').value.trim();
+  const dockerProd = document.getElementById('field-dump-docker-prod').value.trim();
   const parts = [api];
-  if (docker) parts.push('', '=== DOCKER LOGS (pasted) ===', docker);
+  if (dockerLocal) parts.push('', '=== DOCKER LOGS [LOCAL] (pasted) ===', dockerLocal);
+  if (dockerProd) parts.push('', '=== DOCKER LOGS [PROD / HETZNER] (pasted) ===', dockerProd);
   return parts.join('\n');
 }
 
