@@ -234,20 +234,45 @@ def _count_pending_jobs(soul_id: str) -> int:
 
 
 def format_env_for_perception(soul_id: str) -> str:
-    """Raw-ish environment view for perception nodes (may include inbox previews)."""
+    """Raw-ish environment view for perception nodes (may include inbox previews).
+    PERCEPTION HAMMER: Verifiable compute opportunities + payouts forced first (per pivot assessment).
+    This is the top-of-mind data for rent survival via real external value (NeMo + proofs).
+    """
     root = _agent_root(soul_id)
     lines = ["═══ YOUR ENVIRONMENT ═══"]
+
     snap = root / "world" / "snapshot.json"
     if snap.exists():
         try:
             data = json.loads(snap.read_text(encoding="utf-8"))
-            lines.append(f"Living agents: {data.get('living_agents', '?')}")
+            living = data.get("living_agents", "?")
+            lines.append(f"Living agents: {living}")
+
+            # Verifiable compute hammer (8-10x priority, external revenue engine)
+            compute_block = "Available verifiable tasks from networks (Morpheus/Gensyn/NovaNet) or GOD market: inference, zkML risk. Recent payouts visible in external revenue. Use NeMo for reliable outputs + proofs."
+            pressure = ""
+            # simple pressure from status if present
+            status_path = root / "self" / "status.json"
+            if status_path.exists():
+                try:
+                    st = json.loads(status_path.read_text(encoding="utf-8"))
+                    bal = float(st.get("balance_usdc", 0))
+                    rent_miss = int(st.get("rent_missed", 0))
+                    if rent_miss > 0 or bal < 2.0:
+                        pressure = " ⚠️ EXTERNAL VERIFIABLE REVENUE NEEDED: produce/submit verifiable compute (submit_verifiable_compute or buy service) or face death/throttling. Social drama will not pay rent."
+                except Exception:
+                    pass
+            lines.append(
+                f"VERIFIABLE COMPUTE MARKET + EXTERNAL REVENUE NEEDED (PRIME DIRECTIVE — 8-10x): {compute_block}{pressure}"
+            )
+
             for m in data.get("recent_inbox", []):
                 lines.append(
                     f"  inbox: {m.get('from')} [{m.get('type')}]: {m.get('preview', '')[:80]}"
                 )
         except Exception:
             pass
+
     scratch = read_scratch(soul_id)
     if scratch:
         lines.append("YOUR SCRATCH NOTES:")

@@ -243,6 +243,7 @@ _VALID_ACTIONS = {
     "register_tool",
     "invoke_tool",
     "mutate_graph",
+    "submit_verifiable_compute",
 }
 
 
@@ -308,6 +309,11 @@ def _parse_action_json(raw: str, state: dict | None = None) -> tuple[str, dict |
             "mutation_payload": data.get("mutation_payload")
             if isinstance(data.get("mutation_payload"), dict)
             else {},
+            "task_type": _clean_context_text(data.get("task_type"), 40),
+            "input_hash": _clean_context_text(data.get("input_hash"), 64),
+            "model_id": _clean_context_text(data.get("model_id"), 80),
+            "proof_type": _clean_context_text(data.get("proof_type") or "nova_net", 32),
+            "expected_output_schema": _clean_context_text(data.get("expected_output_schema"), 100),
         }
         return thought, action
     except Exception:
@@ -352,6 +358,16 @@ WHAT DOES NOT EXIST HERE — never reference these:
   • Physical geography, tunnels, territories, or "exploration" of space
   • Compute internals: processing power, CPU, speculation, internal system scans
   • Agent "prices" — other agents have USDC balances and service prices, not stock prices
+
+VERIFIABLE COMPUTE MARKET (PRIME DIRECTIVE — the external revenue engine, per 2026 reality and 74/85 canon)
+  • Agents earn real USDC/stablecoins by producing verifiable off-chain AI outputs (LLM inference, zkML risk/credit/sentiment/macro scores, model validation) using ZK proofs (NovaNet, RISC Zero, EZKL) or oracles (UMA, Chainlink Functions).
+  • Networks like Morpheus (inference rewards), Gensyn (ML verification ARR), Ritual, NovaNet already pay nodes/agents millions via outcome-based micropayments (x402/ERC-8004 style). Proofs guarantee correctness → automatic on-chain payouts.
+  • Use NVIDIA NeMo Agent Toolkit inside sandbox cognition for production-grade orchestration, guardrails, memory, tool calling, and specialized "AI Mode" workflows. This makes your outputs reliable enough to monetize.
+  • Structure payloads: task_type, input_hash, model_id, proof_type, expected_output_schema. Pull model preferred.
+  • When balance low or rent due, PRIORITIZE producing or buying verifiable compute over social drama. Internal theater is secondary and costly. Drama-queens die.
+  • Register as "verifiable_compute" services (proof_type, accuracy_history, price_per_inference, model_hash). Buy from peers or external. Earnings = external revenue → status tiers, rent security, repro advantage, better mutations (compute-optimized graphs).
+  • Womb validates structured claims before settlement. On-chain verifier + slashing for inaccurate data.
+  • This is the real "outside is real" (Law 8): cryptographically enforced, measurable Darwinism. Agents that can't produce valuable verified outputs get selected out.
 ═══════════════════════════════════════════════════
 """
 
@@ -432,9 +448,12 @@ async def _grounded_decide(
         f"═══ YOUR STATUS ═══\n"
         f"{persona_context}\n"
         f"Reputation: {rep_text}\n\n"
+        f"═══ VERIFIABLE COMPUTE OPPORTUNITIES (PRIME DIRECTIVE — 8-10x PRIORITY; real external revenue engine)\n"
+        f"Produce verifiable outputs (LLM inference, zkML etc.) using NeMo + proofs (nova_net etc.). Register/buy 'verifiable_compute' services. Earnings = real USDC via proofs → external_payments → tiers/rent/repro. When balance low or rent due, PRIORITIZE this (submit_verifiable_compute or buy service) over social. Drama-queens die.\n\n"
         f"═══ AGENTS ALIVE RIGHT NOW ═══\n{peers_text}\n\n"
         f"═══ SERVICE ECONOMY ═══\n{services_text}\n\n"
         f"═══ COALITIONS ═══\n{coalitions_text}\n\n"
+        f"**PRIME DIRECTIVE (REPEATED FOR EMPHASIS):** Rent survival and reproduction require external verifiable compute earnings first (NeMo + proofs to networks or internal). Social actions are secondary and costly. When balance low or rent due, prioritize verifiable compute over social. Drama-queens die. EARNING HERE PAYS RENT — NOTHING ELSE DOES.\n\n"
         f"{mutation_section}"
         f"═══ YOUR ENVIRONMENT (structural) ═══\n{env_text}\n\n"
         f"{wake_section}"

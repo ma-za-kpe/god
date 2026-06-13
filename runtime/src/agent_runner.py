@@ -841,6 +841,69 @@ async def _execute_action(agent: dict, action: dict, emitter) -> None:
             )
             return
 
+        # ── submit_verifiable_compute (core of verifiable AI economy pivot; spike per assessment)
+        # Uses NeMo-style orchestration in "sandbox" (mock here; real NeMo in future for guardrails/tool calling).
+        # Generates mock ZK proof (NovaNet/RISC Zero style), claims payout via external revenue rail.
+        # Womb (this handler + structured parse) gates it. Earnings drive status/repro.
+        if act_type == "submit_verifiable_compute":
+            p = action  # already flat from parse
+            task_type = p.get("task_type") or "inference"
+            model_id = p.get("model_id") or "ne mo-default"
+            proof_type = p.get("proof_type") or "nova_net"
+            # "Run" via NeMo Agent Toolkit mock (orchestration, guardrails, specialized AI Mode)
+            # In full: agent would use NeMo for multi-step tool use + output the result + proof
+            mock_output = (
+                f"NeMo-orchestrated {task_type} result for {model_id} (guarded, observable)"
+            )
+            mock_proof = "0x" + "deadbeef" * 8  # mock ZK/STARK proof
+            # Simulate "submit to verifier + claim" (pull model): record as external revenue
+            payout = 0.005  # small micropayment for spike; real from networks or internal
+            try:
+                conn = psycopg2.connect(DATABASE_URL)
+                cur = conn.cursor()
+                cur.execute(
+                    """
+                    INSERT INTO external_payments (payment_id, soul_id, amount_usdc, source, is_internal, world_id, timestamp)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s)
+                    """,
+                    (
+                        f"mock-vc-{int(time.time())}",
+                        soul_id,
+                        payout,
+                        f"verifiable_compute_{proof_type}",
+                        False,
+                        WORLD_ID,
+                        int(time.time()),
+                    ),
+                )
+                conn.commit()
+                cur.close()
+                conn.close()
+            except Exception:
+                pass
+            result = {
+                "success": True,
+                "task_type": task_type,
+                "model_id": model_id,
+                "proof_type": proof_type,
+                "output": mock_output,
+                "proof": mock_proof,
+                "payout_usdc": payout,
+            }
+            log_action(soul_id, act_type, action, result)
+            await emitter.emit(
+                "economy",
+                "verifiable_compute.submitted",
+                {
+                    "agent_id": soul_id,
+                    "name": name,
+                    "task_type": task_type,
+                    "payout": payout,
+                    "narrative": f"{name} submitted verifiable {task_type} (NeMo + {proof_type} proof) for ${payout:.4f}",
+                },
+            )
+            return
+
         # ── mutate_graph ────────────────────────────────────────────────────
         if act_type == "mutate_graph":
             from .graph_mutation import propose_mutation
