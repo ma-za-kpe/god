@@ -24,6 +24,7 @@
 - Untracked docs 07/08/09 committed with this (risk, success, must-not-fail).
 - Pre-commit + security will pass before push. No app run (per doctrine).
 - Git on cardano; PR #65 open; always push + tag + monitor instruction in comments.
+- Branch protection enabled on main + develop (via scripts/setup-branch-protection.sh per docs/83-git-workflow.md + CONTRIBUTING: required pre-commit/gitleaks/bandit checks, PRs, enforce admins, no force-push). Runtime version now release-driven: single source runtime/src/VERSION (loaded in main.py for FastAPI + /health); future bumps happen in develop→main release PR + `gh release create` tag instead of manual string edits.
 
 **For Builder (makufarmerlyn)**:
 Pull this, `bash scripts/security-audit.sh && python3 -m pre_commit run --all-files`, docker compose build && up -d. Run the 8 agents. Watch for cardano actions in logs (trader archetype should propose when dip in env snapshot), P&L updates, rent pressure from losses, UI show in lpanel/inspector/feed (gold). Report full logs (or tail via monitor), any grounding rejects, deaths/repros tied to bad trades, mutations for risk nodes. Turn on `bash scripts/monitor-pr.sh 65` + gh notifs now. ALWAYS push your cleanups/fixes/new (even small), tag @ma-za-kpe or @maku in PR comments. We iterate fast.

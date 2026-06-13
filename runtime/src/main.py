@@ -6,6 +6,7 @@ Entry point. FastAPI server + background daemons for rent collection and agent e
 import asyncio
 import logging
 import os
+import pathlib
 from contextlib import asynccontextmanager
 
 import uvicorn
@@ -23,6 +24,17 @@ logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
 )
 log = logging.getLogger("god.runtime")
+
+# Runtime version is managed via the release process (see docs/83-git-workflow.md):
+# - Single source: runtime/src/VERSION (tracked, copied into Docker image with src/)
+# - Bumped in the develop → main release PR, followed by tag + `gh release create`
+# - Replaces previous manual hard-coded strings in this file (previous ad-hoc bumps like 0.1.0→0.2.0).
+# Builder sees it in /health after rebuild; use releases going forward instead of editing strings.
+try:
+    _ver_path = pathlib.Path(__file__).parent / "VERSION"
+    RUNTIME_VERSION = _ver_path.read_text(encoding="utf-8").strip() or "0.2.0"
+except Exception:
+    RUNTIME_VERSION = "0.2.0"
 
 _background_tasks: list[asyncio.Task] = []
 
@@ -96,7 +108,7 @@ async def lifespan(app: FastAPI):
     await close_pool()
 
 
-app = FastAPI(title="God Runtime", version="0.2.0", lifespan=lifespan)
+app = FastAPI(title="God Runtime", version=RUNTIME_VERSION, lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -114,7 +126,7 @@ async def health():
     return {
         "status": "ok",
         "world_id": os.getenv("WORLD_ID", "unknown"),
-        "version": "0.2.0",
+        "version": RUNTIME_VERSION,
     }
 
 

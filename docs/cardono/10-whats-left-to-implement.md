@@ -16,6 +16,8 @@ Builder previously delivered excellent "actions must not fail" (07) + docker. Le
 
 See 06-implementation-status.md (updated), 02/03/04/08/09 for specs. PR #65.
 
+Release + repo hygiene (lead): main/develop now protected (exact rules from 83); runtime version centralized in runtime/src/VERSION + loaded dynamically (no more manual edits in main.py for the health signal the builder observes). Use the documented release flow (soak on develop, PR to main, tag + gh release) going forward.
+
 ## Completed by this lead introduction (gaps 1-4 prioritized)
 - 1. Mock complete: full OU + all execute handlers (provide/harvest/gov/rebalance + prior swap) + holdings/P&L + snapshot data (recent_trades, positions_sample, volume, top) + teaching pain (slippage/regime).
 - 2. Integration: capabilities tiers fixed+described, archetype perception/VALID/prompt/world_rules + cardano payload parse, runner full routing + P&L settle (external_payments) + env holdings inject, services world cardano_market virtual + meta via registry/routes.
