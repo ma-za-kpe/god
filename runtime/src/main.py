@@ -96,7 +96,7 @@ async def lifespan(app: FastAPI):
     await close_pool()
 
 
-app = FastAPI(title="God Runtime", version="0.1.0", lifespan=lifespan)
+app = FastAPI(title="God Runtime", version="0.2.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -114,7 +114,7 @@ async def health():
     return {
         "status": "ok",
         "world_id": os.getenv("WORLD_ID", "unknown"),
-        "version": "0.1.0",
+        "version": "0.2.0",
     }
 
 
