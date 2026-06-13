@@ -8,10 +8,15 @@
 >
 > This division keeps the ecology clean: the person running the actual system focuses on making physics work and reporting raw signals (logs, deaths, P&L, drama). The lead brings the new design/logic after seeing the live results. One canonical place for roles (link here from PR comments). Do not blur it.
 
-**Date:** 2026-06-12 (lead review after @makufarmerlyn's enforcement work)
-**Branch:** cardano
-**PR:** #65 (for #64)
-**Status:** (lead 2026-06-12 after introducing remaining per user-pasted gaps + 10)
+**PIVOT DECISION (2026-06-13)**:
+Brutally honest field-data snapshot (2026-06-13T01:04) + prior "nothing changed" updates proved the Cardano earning layer (despite full mock, salience hammer, Perception Hammer with 8-10x cardano in env/perception/decide, prime directive repeats, risk/guardian, "actions must not fail") produced zero external revenue behavior. Agents remained in 100% social drama prison (coalition paranoia, false offers, philosophical treatises, service scanning). No cardano_* proposals/executions, no P&L from Cardano, no deaths from rent tied to earning failure, mutations stayed social. Per 74: the ecology requires raw economic pressure to be *consequential* for judgment/adaptation. It was not; fitness function rewarded internal games.
+
+**Decision (lead)**: Close PR #65, close issue #64. Switch back to develop. Cardano experiment (local mock + path to real) is paused/pivoted. All artifacts (code in cardano_market, archetype changes, env forcing, observer UI, docs/cardono/*, branch protection work, release versioning) remain in the cardano branch and this PR for record. Refocus on core per 74/85/77 (harsh signals, rent first, structured authority). Future external revenue may be revisited only if core ecology produces selection pressure first.
+
+**Date:** 2026-06-13 (lead pivot after field-data)
+**Branch:** cardano (closing)
+**PR:** #65 (for #64 — closing)
+**Status:** (lead 2026-06-13 after Perception Hammer spike + pivot)
 Builder previously delivered excellent "actions must not fail" (07) + docker. Lead has now introduced the rest of Phase 1 wiring (see 06 for full list of landed code).
 
 See 06-implementation-status.md (updated), 02/03/04/08/09 for specs. PR #65.
