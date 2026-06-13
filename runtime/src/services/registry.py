@@ -9,6 +9,8 @@ import uuid
 import psycopg2
 import psycopg2.extras
 
+from .client import service_resource_url
+
 log = logging.getLogger("god.services.registry")
 
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://god:localdev@localhost:5432/god_world")
@@ -59,6 +61,7 @@ async def register_service(
             "price_usdc": price_usdc,
         }
     )
+    listing["resource_url"] = service_resource_url(endpoint_path)
     log.info(f"Service registered: {soul_id[:8]} → {name} @ ${price_usdc:.4f}")
     return listing
 

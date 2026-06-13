@@ -1,0 +1,43 @@
+name: release
+
+on:
+  push:
+    tags:
+      - "v*"
+      - "!docs-v*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version override (e.g. 0.1.1) — for manual dispatch"
+        required: false
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Publish runtime release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve version
+        id: version
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" && -n "${{ inputs.version }}" ]]; then
+            echo "value=${{ inputs.version }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "value=${GITHUB_REF#refs/tags/v}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.version.outputs.value }}
+          name: Runtime v${{ steps.version.outputs.value }}
+          generate_release_notes: true
+          draft: false
+          prerelease: false
