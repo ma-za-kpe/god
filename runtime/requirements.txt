@@ -35,3 +35,7 @@ tenacity>=8.0.0
 pytest>=8.0.0
 pytest-asyncio>=0.23.0
 pytest-cov>=5.0.0
+
+# NVIDIA NeMo Agent Toolkit for agent orchestration, guardrails, observability in sandbox (for verifiable compute)
+# In production use: pip install nemo-agent-toolkit or equivalent; here for embed in compute workflows
+nemo-agent-toolkit>=0.1.0; python_version >= "3.11"  # optional, mocked if not available for verifiable AI Mode

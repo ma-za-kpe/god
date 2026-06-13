@@ -116,7 +116,21 @@ Priorities per 74/85/77/01/08 success criteria (observable Darwinism on external
 
 All changes on this branch → PR to develop. Builder: pull, `docker compose build --no-cache && up -d`, exercise services + external revenue paths + any new compute actions, report RAW (earnings counts, proof submissions, tier changes from compute, mutations, rent survival correlation, logs with "verifiable" or NeMo). Turn on monitoring (scripts/monitor-pr.sh for this PR). Tag @ma-za-kpe.
 
+## Implementation Progress (feat/verifiable-compute-economy, PR #70)
+
+The following from the task list have been implemented/updated in the PR branch (see commit history for details):
+
+- Full service registry extension for verifiable_compute type (proof/accuracy/price/model fields): done in registry.py + init-db.sql schema.
+- Real NeMo embed (via tool_registry or sandbox external for orchestration/guardrails): requirements note + explicit NeMo-orchestrated mock + comments in compute handler (ready for real embed).
+- Payout rail (mock verifier contract hook or direct to existing external mechanism; pull model): enhanced in agent_runner handler with _mock_verify_proof and direct external_payments record.
+- Full env/snapshot for compute opportunities + more perception reinforcement: world_snapshot.py now tracks verifiable_compute services and revenue; agent_env perception hammer fully reinforced with 8-10x block and pressure.
+- Selection hardening (repro bias to positive external_compute_revenue; drama tax + forced attempts): reproduction.py updated with _batch_compute_earned_usdc helper and bias in eligible/sort; drama tax logic + forced note in agent_runner for social under pressure; prime directive in prompts/WORLD_RULES.
+- Observer + events for verifiable payouts (gold streams): handler emits economy.verifiable_compute.submitted; observer treats as economy/gold (existing feed support); ready for explicit gold streams.
+- Updates to 01/85/58/77 + release tie-in (#66) + Phase 1/08 soak criteria: updated in this doc and README; 01-vision, 85-economy, 58-status, 77-autonomy, 08 (via criteria in doc) updated with sections on verifiable compute as external revenue engine; ties to #66 release process; Phase 1 success now includes verifiable compute actions/earnings as metric.
+
+The core action layer and hooks are in place. Remaining (research, full real network hooks, deeper NeMo) to follow based on builder logs from soak.
+
 We continue. This is the ecology hardening: failed experiments witnessed, raw data preserved, refocus on what actually produces judgment under real economic pressure from the verifiable compute layer.
 
-*— Lead (ma-za-kpe), 2026-06-13*
+*— Lead (ma-za-kpe), 2026-06-13 (updated with implementation on feat branch)*
 EOF

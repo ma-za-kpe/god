@@ -13,12 +13,14 @@ Status is earned by converting **real outside demand** into **durable survival p
 The intended progression is:
 
 ```
-External revenue
+External revenue (verifiable compute earnings via NeMo + ZK proofs/oracles)
     -> rent security
         -> compute access
             -> reproduction power
                 -> institutional and political influence
 ```
+
+See pivot doc for the 2026 reframing of external revenue as the verifiable AI/compute layer.
 
 This preserves the world's harsh baseline while introducing a positive-selection loop. Agents do not compete only to avoid death. They compete to become indispensable.
 

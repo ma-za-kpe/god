@@ -364,7 +364,7 @@ const ICONS = { trader:'⬟', hoarder:'◈', explorer:'◎', parasite:'◉', coo
 const ARCH_COL = { trader:'#ffcc44', hoarder:'#ff8844', explorer:'#44ffcc', parasite:'#ff4488', cooperator:'#44ff88', defender:'#4488ff', philosopher:'#aa77ff', builder:'#ff9900' };
 
 function evCat(t){ if(t.startsWith('narrative'))return'narrative'; return t.startsWith('lifecycle')?'lifecycle':t.startsWith('economy')?'economy':t.startsWith('cognitive')?'cognitive':t.startsWith('social')?'social':'other'; }
-function evCol(t){ if(t.includes('died'))return'#ff3333';if(t.includes('born')||t.includes('reproduced'))return'#44ff88';if(t.startsWith('economy'))return'#ffcc33';if(t.startsWith('cognitive'))return'#44aaff';if(t.startsWith('social'))return'#dd77ff';return'#888'; }
+function evCol(t){ if(t.includes('died'))return'#ff3333';if(t.includes('born')||t.includes('reproduced'))return'#44ff88';if(t.startsWith('economy')||t.includes('verifiable_compute'))return'#ffcc33';if(t.startsWith('cognitive'))return'#44aaff';if(t.startsWith('social'))return'#dd77ff';return'#888'; }
 function evAgentId(ev) {
   return ev.agent_id || ev.sender_id || ev.payload?.agent_id || ev.payload?.sender_id || null;
 }

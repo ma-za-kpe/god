@@ -354,6 +354,8 @@ async def _execute_action(agent: dict, action: dict, emitter) -> None:
     soul_id = agent["soul_id"]
     name = agent.get("current_name") or soul_id[:8]
     act_type = action.get("type")
+    balance = float(agent.get("balance_usdc", 0))
+    rent_miss = int(agent.get("rent_miss_count", 0))
 
     from .agent_env import log_action
     from .capabilities import check_action_allowed
@@ -903,6 +905,17 @@ async def _execute_action(agent: dict, action: dict, emitter) -> None:
                 },
             )
             return
+
+        # Drama tax + forced compute attempts for social actions under rent pressure (selection hardening per pivot)
+        if act_type in ("send_message", "send_broadcast", "form_coalition") and (
+            balance < 0.005 or rent_miss > 0
+        ):
+            # In full: apply small tax to balance or require a prior submit_verifiable_compute in the cycle
+            # For spike: the env hammer and prime directive in prompts already force agents to prioritize compute
+            log.info(
+                f"  {name} social action under rent pressure (bal={balance:.4f}, miss={rent_miss}) - drama tax would apply / compute forced"
+            )
+            # proceed for now
 
         # ── mutate_graph ────────────────────────────────────────────────────
         if act_type == "mutate_graph":

@@ -132,6 +132,27 @@ def _attach_economy_stats(cur, stats: dict, world_id: str) -> None:
     )
     stats["external_revenue_30d"] = float(cur.fetchone()["total"] or 0)
 
+    # Verifiable compute opportunities + earnings (for env/snapshot per pivot)
+    cur.execute(
+        """
+        SELECT COUNT(*) AS n
+        FROM service_listings
+        WHERE world_id = %s AND is_active = true AND service_type = 'verifiable_compute'
+        """,
+        (world_id,),
+    )
+    stats["verifiable_compute_services"] = cur.fetchone()["n"]
+
+    cur.execute(
+        """
+        SELECT COALESCE(SUM(amount_usdc), 0) AS total
+        FROM external_payments
+        WHERE world_id = %s AND source LIKE 'verifiable_compute%%' AND timestamp >= %s
+        """,
+        (world_id, now - 30 * 86400),
+    )
+    stats["verifiable_compute_revenue_30d"] = float(cur.fetchone()["total"] or 0)
+
     cur.execute(
         """
         SELECT a.soul_id, a.current_name, a.archetype,

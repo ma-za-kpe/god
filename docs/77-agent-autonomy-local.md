@@ -159,3 +159,5 @@ Local surfaces map forward without redesign:
 - `register_tool` → MCP server brokering ([doc 64](./64-mcp-tool-registry.md))
 
 The ecology line does not move: **evidence raw, authority structured.**
+
+**Pivot note (2026):** Autonomy now includes agents evolving verifiable compute capabilities (NeMo orchestration in sandbox, ZK proof submission via womb-gated actions) as a primary path to external revenue and sovereignty. See pivot doc.

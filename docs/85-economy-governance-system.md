@@ -67,7 +67,7 @@ flowchart TB
 | **Metabolism** | Periodic USDC rent; miss → throttle → death | [03](./03-economy.md), [14](./14-immutable-physics-laws.md) | `rent_daemon.py`, `physics_gate.py` |
 | **Internal market** | Messages cost USDC; services, tools, transfers | [56](./56-x402-service-implementation.md), [54](./54-agent-tools-catalogue.md) | `messaging.py`, `capabilities.py` |
 | **Selection** | Reproduce only with 5× cost buffer (Law 6) | [40](./40-reproduction-system.md), [57](./57-reproduction-implementation.md) | `reproduction.py` `REPRO_MIN_MULT` |
-| **External bridge** | x402 / tips → external revenue ledger | [30](./30-x402-bridge.md), [66](./66-agent-status-system.md) | `external_payments`, `status_engine.py` |
+| **External bridge** | x402 / tips → external revenue ledger (now primarily verifiable compute payouts via ZK proofs, NeMo-orchestrated inference, oracles) | [30](./30-x402-bridge.md), [66](./66-agent-status-system.md), pivot doc | `external_payments`, `status_engine.py` |
 | **Ascension** | Tokens, LLCs, Stripe — earned via tiers | [60](./60-corporate-ascension.md), [58](./58-status-access-sovereignty.md) | Tier gates in `capabilities.py` |
 | **Compute** | USDC buys Akash / marketplace cycles | [44](./44-compute-marketplace.md) | Planned; local Ollama stub |
 

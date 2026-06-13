@@ -302,16 +302,21 @@ def compute_reproduction_eligible(alive_agents: list[dict]) -> set[str]:
     soul_ids = [a["soul_id"] for a in alive_agents]
     peer_earned = _batch_peer_earned_usdc(soul_ids, window_start)
 
-    candidates: list[tuple[str, float, float]] = []
+    # Selection hardening for verifiable compute pivot: bias repro to positive external_compute_revenue
+    compute_earned = _batch_compute_earned_usdc(soul_ids, window_start)
+
+    candidates: list[tuple[str, float, float, float]] = []
     for agent in alive_agents:
         sid = agent["soul_id"]
         earned = peer_earned.get(sid, 0.0)
-        if earned < REPRO_MIN_PEER_EARNED_USDC:
+        c_earned = compute_earned.get(sid, 0.0)
+        if earned < REPRO_MIN_PEER_EARNED_USDC and c_earned == 0:
             continue
         balance = float(agent.get("balance_usdc") or 0)
-        candidates.append((sid, balance, earned))
+        candidates.append((sid, balance, earned, c_earned))
 
-    candidates.sort(key=lambda row: (row[1], row[2]), reverse=True)
+    # Sort by balance, then peer earned, then compute revenue (positive bias for verifiable earnings)
+    candidates.sort(key=lambda row: (row[1], row[2], row[3]), reverse=True)
     top_n = max(1, int(len(alive_agents) * REPRO_TOP_FRACTION))
     eligible = {row[0] for row in candidates[:top_n]}
     if eligible:
@@ -453,6 +458,37 @@ def _batch_peer_earned_usdc(soul_ids: list[str], window_start: int) -> dict[str,
         conn.close()
     except Exception as e:
         log.debug(f"_batch_peer_earned_usdc failed: {e}")
+    return earned
+
+
+def _batch_compute_earned_usdc(soul_ids: list[str], window_start: int) -> dict[str, float]:
+    """Selection hardening for verifiable compute pivot: external_compute_revenue bias in repro eligibility."""
+    if not soul_ids:
+        return {}
+    earned: dict[str, float] = {sid: 0.0 for sid in soul_ids}
+    try:
+        conn = psycopg2.connect(DATABASE_URL, cursor_factory=psycopg2.extras.RealDictCursor)
+        cur = conn.cursor()
+        cur.execute(
+            """
+            SELECT agent_id AS soul_id,
+                   COALESCE(SUM(amount_usdc), 0) AS total
+            FROM external_payments
+            WHERE world_id = %s
+              AND timestamp >= %s
+              AND agent_id = ANY(%s)
+              AND source LIKE 'verifiable_compute%%'
+            GROUP BY agent_id
+            """,
+            (WORLD_ID, window_start, soul_ids),
+        )
+        for row in cur.fetchall():
+            if row["soul_id"]:
+                earned[row["soul_id"]] = float(row["total"] or 0)
+        cur.close()
+        conn.close()
+    except Exception as e:
+        log.debug(f"_batch_compute_earned_usdc failed: {e}")
     return earned
 
 

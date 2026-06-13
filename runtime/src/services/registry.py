@@ -27,8 +27,13 @@ async def register_service(
     description: str,
     price_usdc: float,
     price_model: str = "per_call",
+    service_type: str = "standard",
+    proof_type: str | None = None,
+    accuracy_history: dict | None = None,
+    model_hash: str | None = None,
 ) -> dict:
-    """Register a new service listing. Returns the listing dict."""
+    """Register a new service listing. Supports verifiable_compute type with proof/accuracy/model fields.
+    Returns the listing dict."""
     listing_id = str(uuid.uuid4())
     endpoint_path = f"/services/{soul_id}/{name}"
 
@@ -38,12 +43,25 @@ async def register_service(
         cur.execute(
             """
             INSERT INTO service_listings
-                (listing_id, agent_soul_id, name, description, endpoint_path, price_usdc, price_model)
-            VALUES (%s, %s, %s, %s, %s, %s, %s)
+                (listing_id, agent_soul_id, name, description, endpoint_path, price_usdc, price_model,
+                 service_type, proof_type, accuracy_history, model_hash)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             ON CONFLICT (listing_id) DO NOTHING
-            RETURNING listing_id, name, endpoint_path, price_usdc
+            RETURNING listing_id, name, endpoint_path, price_usdc, service_type, proof_type, accuracy_history, model_hash
             """,
-            (listing_id, soul_id, name, description, endpoint_path, price_usdc, price_model),
+            (
+                listing_id,
+                soul_id,
+                name,
+                description,
+                endpoint_path,
+                price_usdc,
+                price_model,
+                service_type,
+                proof_type,
+                accuracy_history,
+                model_hash,
+            ),
         )
         row = cur.fetchone()
         conn.commit()
@@ -59,10 +77,16 @@ async def register_service(
             "name": name,
             "endpoint_path": endpoint_path,
             "price_usdc": price_usdc,
+            "service_type": service_type,
+            "proof_type": proof_type,
+            "accuracy_history": accuracy_history,
+            "model_hash": model_hash,
         }
     )
     listing["resource_url"] = service_resource_url(endpoint_path)
-    log.info(f"Service registered: {soul_id[:8]} → {name} @ ${price_usdc:.4f}")
+    log.info(
+        f"Service registered: {soul_id[:8]} → {name} @ ${price_usdc:.4f} (type: {service_type})"
+    )
     return listing
 
 

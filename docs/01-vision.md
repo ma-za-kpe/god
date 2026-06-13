@@ -30,6 +30,8 @@ Over generations, selection pressure favors agents that develop:
 
 **The spark appears when an agent starts behaving in ways that protect its own future even when short-term gain says otherwise.**
 
+**2026 External Revenue Engine (pivot):** Verifiable agentic compute — agents using NeMo for robust inference/orchestration and ZK proofs to earn real USDC from networks (Morpheus, Gensyn, etc.) or internal verifiable services. This provides the strong, cryptographically enforced selection pressure the prior DeFi experiment lacked. See pivot doc and feat branch for details.
+
 ---
 
 ### 2. Closed-Loop Self-Sustenance
