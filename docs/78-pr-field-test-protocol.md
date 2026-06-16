@@ -59,6 +59,8 @@ bash scripts/bootstrap-dev.sh   # once per machine
 python3 -m pre_commit run --all-files
 ```
 
+That hook chain now also runs the local validation pipeline, so a commit is not acceptable unless lint, compose validation, and the runtime test suite all pass.
+
 | Who | When |
 |-----|------|
 | **Agent** | Before every `git commit` / `git push` — CI must not be the first lint pass |

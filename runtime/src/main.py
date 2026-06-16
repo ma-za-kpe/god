@@ -208,6 +208,42 @@ async def world_snapshot(events_limit: int = 50, messages_limit: int = 80):
             return {"error": str(e2), "world_id": os.getenv("WORLD_ID", "local-dev-world-1")}
 
 
+@app.get("/showrunner")
+async def showrunner_plan(events_limit: int = 50, messages_limit: int = 80):
+    """Deterministic broadcast plan derived from the latest world snapshot."""
+    try:
+        from .world_snapshot import build_world_snapshot_async
+
+        snapshot = await build_world_snapshot_async(
+            events_limit=min(events_limit, 200),
+            messages_limit=min(messages_limit, 500),
+        )
+        return {
+            "showrunner": snapshot.get("showrunner", {}),
+            "world_id": snapshot.get("world_id", os.getenv("WORLD_ID", "local-dev-world-1")),
+            "epoch": snapshot.get("epoch"),
+        }
+    except Exception as e:
+        log.warning(f"/showrunner error: {e}")
+        return {"error": str(e), "world_id": os.getenv("WORLD_ID", "local-dev-world-1")}
+
+
+@app.get("/twitch/status")
+async def twitch_status():
+    """Current Twitch adapter configuration and supported event types."""
+    try:
+        from .twitch.adapter import build_twitch_status
+
+        status = build_twitch_status()
+        return {
+            "twitch": status,
+            "world_id": os.getenv("WORLD_ID", "local-dev-world-1"),
+        }
+    except Exception as e:
+        log.warning(f"/twitch/status error: {e}")
+        return {"error": str(e), "world_id": os.getenv("WORLD_ID", "local-dev-world-1")}
+
+
 @app.websocket("/world/stream")
 async def world_stream(ws: WebSocket):
     """WebSocket: snapshot on connect, delta pushes on events, keepalive ping/pong."""

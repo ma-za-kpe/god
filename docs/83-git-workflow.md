@@ -67,11 +67,17 @@ Feature-branch **pushes do not** run CI (saves Actions credits). Validation happ
 
 ## Local hooks
 
-`.pre-commit-config.yaml` blocks direct commits to `main` and `develop`:
+`.pre-commit-config.yaml` blocks direct commits to `main` and `develop` and runs the validation pipeline before commit:
 
 ```bash
 python3 -m pre_commit run --all-files   # required before every push
 ```
+
+That pre-commit run now includes:
+
+- compose config validation
+- runtime test execution
+- formatting and lint hooks already defined in `.pre-commit-config.yaml`
 
 ---
 

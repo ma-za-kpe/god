@@ -14,6 +14,7 @@ import psycopg2
 import psycopg2.extras
 
 from .json_safe import json_safe
+from .showrunner import build_showrunner_plan
 
 log = logging.getLogger("god.snapshot")
 
@@ -157,21 +158,24 @@ def _finalize_snapshot(
     messages: list[dict],
     world_id: str,
 ) -> dict[str, Any]:
+    epoch = int(time.time())
     stats["world_id"] = world_id
     stats["llm_provider"] = os.getenv("LLM_PROVIDER", "ollama")
     stats["llm_model"] = os.getenv("LLM_MODEL", "llama3.1:8b")
+    snapshot = {
+        "epoch": epoch,
+        "agents": agents,
+        "agent_count": len(agents),
+        "stats": stats,
+        "events": events,
+        "messages": messages,
+        "clusters": _build_clusters(agents),
+        "leaderboard": stats.get("top_earners", []),
+        "world_id": world_id,
+    }
+    snapshot["showrunner"] = build_showrunner_plan(snapshot)
     return json_safe(
-        {
-            "epoch": int(time.time()),
-            "agents": agents,
-            "agent_count": len(agents),
-            "stats": stats,
-            "events": events,
-            "messages": messages,
-            "clusters": _build_clusters(agents),
-            "leaderboard": stats.get("top_earners", []),
-            "world_id": world_id,
-        }
+        snapshot
     )
 
 

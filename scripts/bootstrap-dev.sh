@@ -11,3 +11,4 @@ python3 -m pre_commit install
 python3 -m pre_commit install --hook-type commit-msg 2>/dev/null || true
 
 echo "Pre-commit hooks installed. Run: python3 -m pre_commit run --all-files"
+echo "That hook chain now includes the local validation pipeline."
