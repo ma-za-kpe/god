@@ -204,6 +204,12 @@ def _finalize_snapshot(
         snapshot["broadcast"] = build_broadcast_state(snapshot)
     except Exception as e:
         log.debug(f"broadcast state build skipped: {e}")
+    try:
+        from .resilience import build_resilience_status
+
+        snapshot["resilience"] = build_resilience_status(snapshot)
+    except Exception as e:
+        log.debug(f"resilience state build skipped: {e}")
     return json_safe(
         snapshot
     )

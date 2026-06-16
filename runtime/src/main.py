@@ -427,6 +427,46 @@ async def broadcast_status():
         return {"error": str(e), "world_id": os.getenv("WORLD_ID", "local-dev-world-1")}
 
 
+@app.get("/resilience/status")
+async def resilience_status():
+    """Current runtime resilience and fallback posture."""
+    try:
+        from .resilience import build_resilience_status
+        from .world_snapshot import build_world_snapshot_async
+
+        snapshot = await build_world_snapshot_async(events_limit=25, messages_limit=25)
+        return {
+            "resilience": build_resilience_status(snapshot),
+            "world_id": snapshot.get("world_id", os.getenv("WORLD_ID", "local-dev-world-1")),
+            "epoch": snapshot.get("epoch"),
+        }
+    except Exception as e:
+        log.warning(f"/resilience/status error: {e}")
+        return {"error": str(e), "world_id": os.getenv("WORLD_ID", "local-dev-world-1")}
+
+
+@app.get("/resilience/state")
+async def resilience_state(events_limit: int = 50, messages_limit: int = 80):
+    """Current resilience state layered over the latest world snapshot."""
+    try:
+        from .world_snapshot import build_world_snapshot_async
+
+        snapshot = await build_world_snapshot_async(
+            events_limit=min(events_limit, 200),
+            messages_limit=min(messages_limit, 500),
+        )
+        return {
+            "resilience": snapshot.get("resilience", {}),
+            "broadcast": snapshot.get("broadcast", {}),
+            "nemo": snapshot.get("nemo", {}),
+            "world_id": snapshot.get("world_id", os.getenv("WORLD_ID", "local-dev-world-1")),
+            "epoch": snapshot.get("epoch"),
+        }
+    except Exception as e:
+        log.warning(f"/resilience/state error: {e}")
+        return {"error": str(e), "world_id": os.getenv("WORLD_ID", "local-dev-world-1")}
+
+
 @app.websocket("/world/stream")
 async def world_stream(ws: WebSocket):
     """WebSocket: snapshot on connect, delta pushes on events, keepalive ping/pong."""

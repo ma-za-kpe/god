@@ -231,6 +231,50 @@
       line-height: 1.35;
     }
 
+    #resilience-panel {
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--god-border);
+      background: linear-gradient(180deg, rgba(18, 14, 10, 0.9), rgba(10, 8, 6, 0.86));
+    }
+    #resilience-panel .resilience-title {
+      font-size: 0.56rem;
+      letter-spacing: 0.28em;
+      color: var(--god-muted);
+      margin-bottom: 8px;
+    }
+    #resilience-tier {
+      font-size: 0.78rem;
+      color: var(--god-life);
+      margin-bottom: 5px;
+    }
+    #resilience-summary {
+      font-size: 0.62rem;
+      color: var(--god-text);
+      line-height: 1.45;
+      margin-bottom: 8px;
+    }
+    #resilience-details {
+      display: grid;
+      gap: 6px;
+    }
+    .resilience-row {
+      padding: 7px 8px;
+      border-radius: 6px;
+      border: 1px solid var(--god-border);
+      background: rgba(255,255,255,0.03);
+      font-size: 0.62rem;
+      color: var(--god-text);
+      line-height: 1.35;
+    }
+    .resilience-row .k {
+      display: block;
+      font-size: 0.5rem;
+      letter-spacing: 0.18em;
+      color: var(--god-muted);
+      margin-bottom: 4px;
+      text-transform: uppercase;
+    }
+
     #inspector { flex-shrink: 0; padding: 12px 14px; border-bottom: 1px solid var(--god-border); }
     .panel-lbl { font-size: 0.56rem; letter-spacing: 0.28em; color: var(--god-muted); margin-bottom: 8px; }
     #insp-empty { color: var(--god-muted); font-size: 0.68rem; line-height: 1.7; }
@@ -397,6 +441,12 @@
       <div id="viewer-prompt">Waiting for audience prompt.</div>
       <div id="viewer-summary">No poll ready.</div>
       <div id="viewer-options"></div>
+    </section>
+    <section id="resilience-panel">
+      <div class="resilience-title">â–¸ RESILIENCE / FALLBACK</div>
+      <div id="resilience-tier">cold-start</div>
+      <div id="resilience-summary">Local-first stack waiting on live stream pressure.</div>
+      <div id="resilience-details"></div>
     </section>
     <div id="inspector">
       <div class="panel-lbl">▸ AGENT INSPECTOR</div>
@@ -1522,6 +1572,29 @@ function applyViewerState(viewer) {
   });
 }
 
+function applyResilienceState(resilience) {
+  if (!resilience) return;
+  document.getElementById('resilience-tier').textContent = resilience.tier || 'unknown';
+  document.getElementById('resilience-summary').textContent = resilience.notes?.[0] || 'Runtime resilience status unavailable.';
+  const details = document.getElementById('resilience-details');
+  details.innerHTML = '';
+  const stream = resilience.stream || {};
+  const rows = [
+    ['Stream', `${stream.has_subscribers ? 'live' : 'fallback'} · ${stream.subscriber_count || 0} subscriber(s)`],
+    ['Freshness', resilience.snapshot_age_seconds != null ? `${resilience.snapshot_age_seconds}s old` : 'unknown'],
+    ['NeMo', resilience.fallbacks?.nemo || 'stub'],
+    ['Twitch', resilience.fallbacks?.twitch || 'stub'],
+    ['Voice', resilience.fallbacks?.voice || 'stub'],
+    ['OBS', resilience.fallbacks?.obs || 'dry-run'],
+  ];
+  rows.forEach(([label, value]) => {
+    const row = document.createElement('div');
+    row.className = 'resilience-row';
+    row.innerHTML = `<span class="k">${label}</span><span class="v">${value}</span>`;
+    details.appendChild(row);
+  });
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 // API — single snapshot poll (replaces 4 parallel pollers)
 // ═══════════════════════════════════════════════════════════════════════════
@@ -1666,6 +1739,7 @@ function applySnapshotMsg(snap) {
   applyMessages(snap.messages, { silent: true });
   applyBroadcastState(snap.broadcast);
   applyViewerState(snap.viewer);
+  applyResilienceState(snap.resilience);
   const d = snap.stats || {};
   if (d.world_start_ts && (!S.worldStart || d.world_start_ts < S.worldStart)) S.worldStart = d.world_start_ts;
   document.getElementById('s-born').textContent   = d.total_born || '0';

@@ -84,6 +84,8 @@ The target deployment is a Hetzner GPU server running the world, NeMo orchestrat
 
 This creates a tighter selection loop than static observer UI alone: agents that can generate compelling, coherent, streamable interaction are rewarded by viewers and the world; agents that cannot are background noise.
 
+Phase 8 hardening adds the local-first resilience layer around that stack: stream freshness, subscriber visibility, fallback posture, and observer-facing resilience state are now explicit runtime surfaces, not assumptions hidden in logs.
+
 See [docs/pivot-verifiable-compute.md](./docs/pivot-verifiable-compute.md) for the prior pivot record. The Twitch/NeMo pivot becomes the next implementation track.
 
 (Branch protection, pre-commit, security-audit, and gitflow discipline were exercised throughout. See issue #68 for tracking.)
