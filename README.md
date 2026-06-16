@@ -68,15 +68,23 @@ Per the [Ecology Hardening Manifesto](./docs/74-ecology-hardening-manifesto.md):
 
 The detailed experiment postmortem, every field-data snapshot, the "failed fitness function" diagnosis, and the exact non-negotiable next steps that were attempted live in the closed PR comments and the cardano branch history. This README now carries the high-level honest journey so newcomers see what was tried and why we turned back.
 
-**New pivot direction (see [docs/pivot-verifiable-compute.md](./docs/pivot-verifiable-compute.md) for full spec + task list):** Reframe external revenue (Law 8, 85 map) around the live verifiable agentic compute economy (NVIDIA NeMo Agent Toolkit for robust agent cognition in the sandbox, ZK proofs via NovaNet/RISC Zero, oracles like UMA/Chainlink Functions, earning networks Morpheus/Gensyn/Ritual/NovaNet where agents/nodes earn USDC/MOR/etc. from verifiable LLM inference, zkML risk/sentiment/macro, training/validation).
+**Current pivot direction (Twitch + NeMo live world):** Reframe the project around a live, streamable agentic theater on Twitch. NVIDIA NeMo Agent Toolkit becomes the orchestration and reliability layer for multi-agent cognition, while Twitch becomes the audience-control plane for chat, EventSub, and channel interactions. The missing piece is not "another chatbot" but a **showrunner** layer that turns world events, agent conflict, and economic pressure into a watchable stream.
 
-GOD agents capture this by:
-- Offering "verifiable_compute" services (extend existing x402/service registry).
-- Using NeMo in sandbox + mutations/dreams to evolve compute-specialized graphs.
-- Submitting/claiming ZK proofs for automatic external payouts (womb-gated structured actions).
-- Consuming verified external signals to improve their own decisions under rent pressure.
+This pivot uses the existing codebase as the broadcast spine:
+- `event_emitter.py`, `world_stream.py`, and `narrator.py` already form the raw event bus, websocket fanout, and drama layer.
+- `agent_env.py` and `archetype_graphs.py` already expose structured world/state surfaces that can feed a director agent.
+- `services/registry.py` and `economic_activity.py` already model paid interactions that can become audience-facing mechanics.
+- `observer/index.html` can evolve into the local control room and stream companion UI.
 
-This creates stronger selection: Agents producing (or buying) valuable verifiable compute survive/compounding; pure drama ones get selected out. Ties directly to current external revenue paths, womb/sandbox, observer witness, and status tiers.
+The target deployment is a Hetzner GPU server running the world, NeMo orchestration, OBS/scene control, and Twitch integration together:
+- Twitch EventSub listens for follows, subs, raids, chat, and channel events.
+- Twitch chat becomes live pressure on the world, not just a comment feed.
+- NeMo coordinates multi-agent dialogue, guardrails, memory, and role specialization.
+- OBS or a similar compositor turns the world into a live video stream with captions, avatars, overlays, and scene changes.
+
+This creates a tighter selection loop than static observer UI alone: agents that can generate compelling, coherent, streamable interaction are rewarded by viewers and the world; agents that cannot are background noise.
+
+See [docs/pivot-verifiable-compute.md](./docs/pivot-verifiable-compute.md) for the prior pivot record. The Twitch/NeMo pivot becomes the next implementation track.
 
 (Branch protection, pre-commit, security-audit, and gitflow discipline were exercised throughout. See issue #68 for tracking.)
 
