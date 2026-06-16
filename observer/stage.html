@@ -213,6 +213,7 @@
 
     .agent-tile {
       position: relative;
+      --accent: var(--cyan);
       border-radius: 22px;
       border: 1px solid rgba(255,255,255,0.06);
       background:
@@ -225,16 +226,46 @@
       display: grid;
       grid-template-rows: auto 1fr auto;
       gap: 10px;
-      transition: transform 0.35s ease, border-color 0.35s ease, box-shadow 0.35s ease, opacity 0.35s ease;
+      transition: border-color 0.35s ease, box-shadow 0.35s ease, opacity 0.35s ease;
+      will-change: transform;
+    }
+
+    .agent-tile::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background:
+        radial-gradient(circle at 50% 24%, color-mix(in srgb, var(--accent) 18%, transparent), transparent 38%),
+        linear-gradient(180deg, transparent 0%, rgba(255,255,255,0.01) 100%);
+      opacity: 0.55;
+      pointer-events: none;
     }
 
     .agent-tile.active {
-      transform: scale(1.02);
       border-color: rgba(244, 201, 93, 0.35);
       box-shadow:
         inset 0 0 0 1px rgba(244,201,93,0.12),
         0 0 30px rgba(244, 201, 93, 0.18),
         0 0 60px rgba(84, 200, 255, 0.08);
+    }
+
+    .agent-tile.lead-shift {
+      animation: leadTile 720ms cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .agent-tile.lead-prior {
+      animation: priorTile 720ms cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    @keyframes leadTile {
+      0% { transform: scale(0.96) translateY(10px); filter: brightness(0.85); }
+      55% { transform: scale(1.025) translateY(-2px); filter: brightness(1.08); }
+      100% { transform: scale(1); filter: brightness(1); }
+    }
+
+    @keyframes priorTile {
+      0% { transform: scale(1.04) translateY(0); opacity: 1; }
+      100% { transform: scale(1) translateY(0); opacity: 0.9; }
     }
 
     .agent-head {
@@ -369,6 +400,21 @@
         linear-gradient(180deg, rgba(9, 12, 22, 0.9), rgba(4, 6, 14, 0.95));
       box-shadow: inset 0 0 60px rgba(255,255,255,0.02);
       padding: 14px;
+      transition: transform 0.35s ease, box-shadow 0.35s ease, border-color 0.35s ease;
+    }
+
+    .focus.lead-shift {
+      animation: focusPulse 720ms cubic-bezier(0.16, 1, 0.3, 1);
+      border-color: rgba(244, 201, 93, 0.28);
+      box-shadow:
+        inset 0 0 60px rgba(255,255,255,0.02),
+        0 0 36px rgba(244, 201, 93, 0.12);
+    }
+
+    @keyframes focusPulse {
+      0% { transform: translateX(0) scale(0.985); filter: brightness(0.92); }
+      55% { transform: translateX(0) scale(1.01); filter: brightness(1.05); }
+      100% { transform: translateX(0) scale(1); filter: brightness(1); }
     }
 
     .focus-head {
@@ -409,8 +455,8 @@
       border-radius: 24px;
       border: 1px solid rgba(255,255,255,0.06);
       background:
-        radial-gradient(circle at 50% 22%, rgba(84,200,255,0.18), transparent 22%),
-        radial-gradient(circle at 50% 50%, rgba(244,201,93,0.14), transparent 42%),
+        radial-gradient(circle at 50% 22%, color-mix(in srgb, var(--accent, var(--cyan)) 18%, transparent), transparent 22%),
+        radial-gradient(circle at 50% 50%, color-mix(in srgb, var(--accent, var(--cyan)) 12%, transparent), transparent 42%),
         rgba(255,255,255,0.02);
       display: grid;
       place-items: center;
@@ -430,16 +476,17 @@
     }
 
     .focus-orb {
+      --accent: var(--cyan);
       width: min(52%, 280px);
       aspect-ratio: 3 / 4;
       border-radius: 40px;
       background:
         radial-gradient(circle at 36% 28%, rgba(255,255,255,0.8), rgba(255,255,255,0.14) 12%, transparent 14%),
-        radial-gradient(circle at center, rgba(84,200,255,0.92), rgba(84,200,255,0.48) 38%, rgba(5,8,16,0.1) 75%),
+        radial-gradient(circle at center, var(--accent), color-mix(in srgb, var(--accent) 48%, transparent) 38%, rgba(5,8,16,0.1) 75%),
         linear-gradient(180deg, rgba(17,24,48,0.5), rgba(5,8,16,0.18));
       box-shadow:
         0 0 0 1px rgba(255,255,255,0.12),
-        0 0 40px rgba(84,200,255,0.25),
+        0 0 40px color-mix(in srgb, var(--accent) 28%, transparent),
         0 0 88px rgba(244,201,93,0.1);
       animation: float 4.8s ease-in-out infinite;
     }
@@ -1038,6 +1085,7 @@
       ping: null,
       startAt: Date.now(),
       activeId: null,
+      previousActiveId: null,
       agents: [],
       seenEvents: new Set()
     };
@@ -1063,6 +1111,45 @@
 
     function pressureFromAudience(audience = {}) {
       return Math.max(0, Math.min(100, Math.round((audience.patronage_index || 0) * 4)));
+    }
+
+    function accentFor(agent, index) {
+      if (!agent || agent.soul_id?.startsWith('empty-')) return 'rgba(84,200,255,0.45)';
+      return AGENT_COLORS[index % AGENT_COLORS.length];
+    }
+
+    function colorScaleFromRect(oldRect, newRect) {
+      const scaleX = oldRect.width / newRect.width;
+      const scaleY = oldRect.height / newRect.height;
+      const translateX = oldRect.left - newRect.left;
+      const translateY = oldRect.top - newRect.top;
+      return { translateX, translateY, scaleX, scaleY };
+    }
+
+    function animateTileReflow(tile, oldRect) {
+      if (!oldRect) {
+        tile.animate(
+          [
+            { opacity: 0, transform: 'translateY(12px) scale(0.96)' },
+            { opacity: 1, transform: 'translateY(0) scale(1)' }
+          ],
+          { duration: 340, easing: 'cubic-bezier(0.16, 1, 0.3, 1)' }
+        );
+        return;
+      }
+      const newRect = tile.getBoundingClientRect();
+      const { translateX, translateY, scaleX, scaleY } = colorScaleFromRect(oldRect, newRect);
+      tile.animate(
+        [
+          {
+            transformOrigin: 'top left',
+            transform: `translate(${translateX}px, ${translateY}px) scale(${scaleX}, ${scaleY})`,
+            opacity: 0.7,
+          },
+          { transformOrigin: 'top left', transform: 'translate(0, 0) scale(1, 1)', opacity: 1 }
+        ],
+        { duration: 520, easing: 'cubic-bezier(0.16, 1, 0.3, 1)' }
+      );
     }
 
     function fmtClock(date) {
@@ -1114,9 +1201,20 @@
       const agents = (snap.agents || []).filter(a => a && a.is_alive !== false).slice(0, 8);
       STATE.agents = agents;
       const active = pickActiveAgent(snap) || agents[0] || null;
+      const previousActiveId = STATE.activeId;
+      const activeChanged = previousActiveId !== (active?.soul_id || null);
+      STATE.previousActiveId = previousActiveId;
       STATE.activeId = active?.soul_id || null;
 
+      const previousRects = new Map(
+        Array.from(grid.children).map((child) => [
+          child.dataset.agentId,
+          child.getBoundingClientRect(),
+        ])
+      );
+
       grid.innerHTML = '';
+      grid.classList.toggle('reflowing', activeChanged);
       const ordered = [...agents].sort((a, b) => {
         if (a.soul_id === STATE.activeId) return 1;
         if (b.soul_id === STATE.activeId) return -1;
@@ -1136,6 +1234,8 @@
         const isActive = agent.soul_id === STATE.activeId;
         const tile = document.createElement('article');
         tile.className = `agent-tile${isActive ? ' active' : ''}`;
+        tile.dataset.agentId = agent.soul_id;
+        tile.style.setProperty('--accent', accentFor(agent, index));
         const state = isActive ? 'LEAD' : (agent.is_sleeping ? 'SLEEPING' : 'SUPPORT');
         const tags = agentTags(agent, snap, isActive);
         tile.innerHTML = `
@@ -1155,8 +1255,22 @@
           tile.style.gridRow = 'span 2';
           tile.querySelector('.avatar-orb').style.width = '132px';
           tile.querySelector('.avatar-orb').style.height = '132px';
+          tile.classList.add('lead-shift');
+        } else if (agent.soul_id === previousActiveId) {
+          tile.classList.add('lead-prior');
         }
         grid.appendChild(tile);
+      });
+
+      requestAnimationFrame(() => {
+        Array.from(grid.children).forEach((tile) => {
+          const key = tile.dataset.agentId;
+          animateTileReflow(tile, previousRects.get(key));
+        });
+        if (activeChanged) {
+          clearTimeout(STATE.reflowTimer);
+          STATE.reflowTimer = setTimeout(() => grid.classList.remove('reflowing'), 760);
+        }
       });
     }
 
@@ -1201,6 +1315,23 @@
         avatar.renderer,
         resilience.restart_safe ? 'restart-safe' : null
       ].filter(Boolean).slice(0, 4).map(tag => `<span class="chip"><i></i>${tag}</span>`).join('');
+
+      const focusOrb = document.getElementById('focus-orb');
+      const accent = active
+        ? accentFor(active, (STATE.agents || []).findIndex(a => a.soul_id === active.soul_id))
+        : 'rgba(84,200,255,0.85)';
+      focusOrb.style.setProperty('--accent', accent);
+      focusOrb.parentElement.style.borderColor = active ? 'rgba(244,201,93,0.16)' : 'rgba(255,255,255,0.06)';
+
+      const focusPanel = document.querySelector('.focus');
+      if (active && active.soul_id !== STATE.previousActiveId) {
+        focusPanel.classList.remove('lead-shift');
+        void focusPanel.offsetWidth;
+        focusPanel.classList.add('lead-shift');
+        clearTimeout(STATE.focusTimer);
+        STATE.focusTimer = setTimeout(() => focusPanel.classList.remove('lead-shift'), 760);
+      }
+
       const pressure = pressureFromAudience(audience);
       document.getElementById('pressure-fill').style.height = `${Math.max(12, pressure)}%`;
       document.getElementById('pressure-readout').textContent = `${pressure}%`;
