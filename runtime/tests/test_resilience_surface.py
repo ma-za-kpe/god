@@ -20,11 +20,14 @@ def test_resilience_status_reports_local_first_defaults(monkeypatch):
     assert status["tier"] in {"cold-start", "degraded", "warming-up"}
     assert status["fallbacks"]["nemo"] == "stub"
     assert status["fallbacks"]["voice"] == "stub"
+    assert status["fallbacks"]["avatar"] == "stub"
     assert status["fallbacks"]["twitch"] == "stub"
     assert status["fallbacks"]["obs"] == "dry-run"
     assert status["snapshot_age_seconds"] >= 0
     assert "adapters" in status
     assert "twitch" in status["adapters"]
+    assert "voice" in status["adapters"]
+    assert "avatar" in status["adapters"]
     assert "broadcast" in status["adapters"]
 
 

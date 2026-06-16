@@ -199,6 +199,18 @@ def _finalize_snapshot(
     except Exception as e:
         log.debug(f"nemo directive build skipped: {e}")
     try:
+        from .voice import build_voice_state
+
+        snapshot["voice"] = build_voice_state(snapshot)
+    except Exception as e:
+        log.debug(f"voice state build skipped: {e}")
+    try:
+        from .avatar import build_avatar_state
+
+        snapshot["avatar"] = build_avatar_state(snapshot)
+    except Exception as e:
+        log.debug(f"avatar state build skipped: {e}")
+    try:
         from .broadcast import build_broadcast_state
 
         snapshot["broadcast"] = build_broadcast_state(snapshot)

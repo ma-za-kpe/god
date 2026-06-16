@@ -3,486 +3,1046 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>GOD — Live Stage</title>
+  <title>GOD - Ensemble Stage</title>
   <link rel="icon" href="assets/logo.svg" type="image/svg+xml">
   <link rel="stylesheet" href="brand.css">
-  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=Cinzel:wght@500;600;700&display=swap" rel="stylesheet">
   <style>
     :root {
-      --bg: var(--god-void);
-      --bg2: rgba(8, 11, 22, 0.84);
-      --glass: rgba(10, 14, 30, 0.72);
-      --border: var(--god-border);
-      --border-bright: rgba(61, 255, 168, 0.22);
-      --bright: #e8eaff;
-      --muted: var(--god-muted);
-      --text: var(--god-text);
-      --life: var(--god-life);
-      --econ: var(--god-economy);
-      --cog: var(--god-cognition);
-      --social: var(--god-social);
-      --threat: var(--god-threat);
-      --stage-shadow: 0 16px 60px rgba(0, 0, 0, 0.42);
+      --bright: #f4f7ff;
+      --muted: rgba(214, 220, 255, 0.62);
+      --life: #4effb5;
+      --cyan: #54c8ff;
+      --gold: #f4c95d;
+      --magenta: #cc86ff;
+      --threat: #ff6b88;
+      --shadow: 0 24px 90px rgba(0, 0, 0, 0.58);
     }
+
     * { box-sizing: border-box; margin: 0; padding: 0; }
     html, body { width: 100%; height: 100%; }
     body {
-      background:
-        radial-gradient(circle at top, rgba(61, 255, 168, 0.12), transparent 24%),
-        radial-gradient(circle at 80% 20%, rgba(77, 184, 255, 0.14), transparent 20%),
-        radial-gradient(circle at 20% 85%, rgba(240, 192, 64, 0.12), transparent 18%),
-        linear-gradient(180deg, #030510 0%, #050714 45%, #02040f 100%);
-      color: var(--text);
-      font-family: var(--god-font);
       overflow: hidden;
+      color: var(--bright);
+      font-family: var(--god-font);
+      background:
+        radial-gradient(circle at 50% 14%, rgba(84, 200, 255, 0.16), transparent 18%),
+        radial-gradient(circle at 72% 22%, rgba(204, 134, 255, 0.10), transparent 20%),
+        radial-gradient(circle at 30% 70%, rgba(78, 255, 181, 0.08), transparent 16%),
+        linear-gradient(180deg, #010208 0%, #050713 42%, #010208 100%);
     }
+
     body::before {
       content: "";
       position: fixed;
       inset: 0;
       background-image:
-        linear-gradient(rgba(255,255,255,0.025) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(255,255,255,0.015) 1px, transparent 1px);
-      background-size: 72px 72px;
-      opacity: 0.12;
+        linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px);
+      background-size: 88px 88px;
+      opacity: 0.08;
       pointer-events: none;
       mix-blend-mode: screen;
     }
+
+    body::after {
+      content: "";
+      position: fixed;
+      inset: -10%;
+      background:
+        radial-gradient(circle at 50% 50%, rgba(84, 200, 255, 0.12), transparent 30%),
+        radial-gradient(circle at 50% 40%, rgba(244, 201, 93, 0.08), transparent 42%);
+      filter: blur(20px);
+      opacity: 0.55;
+      pointer-events: none;
+      animation: drift 16s ease-in-out infinite;
+    }
+
+    @keyframes drift {
+      0%,100% { transform: scale(1) translateY(0); }
+      50% { transform: scale(1.03) translateY(-1.5%); }
+    }
+
+    .clockbar {
+      position: fixed;
+      top: 12px;
+      left: 16px;
+      z-index: 40;
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      font-size: 0.55rem;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      color: rgba(214, 220, 255, 0.5);
+      pointer-events: none;
+    }
+
+    .clockbar span {
+      padding: 5px 8px;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,0.06);
+      background: rgba(255,255,255,0.03);
+      backdrop-filter: blur(10px);
+    }
+
     .shell {
       position: relative;
       width: 100vw;
       height: 100vh;
       display: grid;
-      grid-template-rows: auto 1fr auto;
-      gap: 12px;
+      grid-template-columns: 90px minmax(0, 1.35fr) minmax(420px, 0.95fr);
+      gap: 14px;
       padding: 16px;
     }
-    .topbar {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      gap: 16px;
-      padding: 10px 14px;
-      background: linear-gradient(180deg, rgba(10, 14, 28, 0.92), rgba(5, 7, 16, 0.85));
-      border: 1px solid var(--border);
-      border-radius: 18px;
-      box-shadow: var(--stage-shadow);
-      backdrop-filter: blur(18px);
+
+    .pressure {
+      position: relative;
+      border-radius: 30px;
+      background: linear-gradient(180deg, rgba(8, 12, 24, 0.96), rgba(4, 6, 14, 0.92));
+      border: 1px solid rgba(255,255,255,0.06);
+      box-shadow: var(--shadow);
+      overflow: hidden;
     }
-    .brand {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      min-width: 0;
+
+    .pressure-track {
+      position: absolute;
+      inset: 18px 30px;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,0.06);
+      background: rgba(255,255,255,0.03);
+      overflow: hidden;
     }
-    .brand img { width: 34px; height: 34px; filter: drop-shadow(var(--god-glow-life)); }
-    .brand-copy { min-width: 0; }
-    .brand-title {
-      font-size: 0.8rem;
-      letter-spacing: 0.4em;
-      color: var(--life);
+
+    .pressure-fill {
+      position: absolute;
+      inset: auto 0 0 0;
+      height: 18%;
+      border-radius: inherit;
+      background: linear-gradient(180deg, rgba(78,255,181,0.9), rgba(244,201,93,0.95), rgba(255,107,136,0.95));
+      box-shadow: 0 0 32px rgba(244,201,93,0.28);
+      transition: height 0.55s ease;
+    }
+
+    .pressure-label {
+      position: absolute;
+      left: 50%;
+      top: 18px;
+      transform: translateX(-50%) rotate(180deg);
+      writing-mode: vertical-rl;
+      letter-spacing: 0.28em;
       text-transform: uppercase;
+      color: rgba(214, 220, 255, 0.52);
+      font-size: 0.5rem;
+      white-space: nowrap;
     }
-    .brand-subtitle {
+
+    .pressure-readout {
+      position: absolute;
+      left: 50%;
+      bottom: 18px;
+      transform: translateX(-50%);
+      color: rgba(244,247,255,0.9);
       font-size: 0.55rem;
       letter-spacing: 0.18em;
-      color: var(--muted);
-      margin-top: 3px;
       text-transform: uppercase;
+      white-space: nowrap;
     }
-    .status-row {
+
+    .stage {
+      position: relative;
+      border-radius: 30px;
+      border: 1px solid rgba(255,255,255,0.06);
+      background:
+        radial-gradient(circle at 52% 20%, rgba(84, 200, 255, 0.12), transparent 24%),
+        linear-gradient(180deg, rgba(6, 10, 20, 0.94), rgba(2, 4, 10, 0.98));
+      box-shadow: var(--shadow);
+      overflow: hidden;
+      min-width: 0;
+      padding: 18px;
+    }
+
+    .titlebar {
+      position: absolute;
+      top: 14px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 4;
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      padding: 7px 12px;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,0.06);
+      background: rgba(4, 6, 14, 0.4);
+      backdrop-filter: blur(16px);
+      font-size: 0.52rem;
+      letter-spacing: 0.24em;
+      text-transform: uppercase;
+      color: rgba(244,247,255,0.82);
+    }
+
+    .titlebar strong {
+      font-family: "Cinzel", serif;
+      color: var(--gold);
+      letter-spacing: 0.34em;
+      font-size: 0.68rem;
+    }
+
+    .titlebar .arc {
+      color: rgba(214,220,255,0.54);
+      letter-spacing: 0.14em;
+    }
+
+    .ensemble {
+      position: absolute;
+      inset: 56px 18px 72px 18px;
+      display: grid;
+      grid-template-columns: minmax(0, 1.05fr) minmax(340px, 0.95fr);
+      gap: 14px;
+      min-height: 0;
+    }
+
+    .ensemble-grid {
+      min-height: 0;
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      grid-template-rows: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .agent-tile {
+      position: relative;
+      border-radius: 22px;
+      border: 1px solid rgba(255,255,255,0.06);
+      background:
+        linear-gradient(180deg, rgba(12, 16, 30, 0.86), rgba(4, 7, 16, 0.92)),
+        radial-gradient(circle at 50% 20%, rgba(84,200,255,0.1), transparent 40%);
+      box-shadow: inset 0 0 40px rgba(255,255,255,0.02);
+      overflow: hidden;
+      min-height: 0;
+      padding: 12px;
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      gap: 10px;
+      transition: transform 0.35s ease, border-color 0.35s ease, box-shadow 0.35s ease, opacity 0.35s ease;
+    }
+
+    .agent-tile.active {
+      transform: scale(1.02);
+      border-color: rgba(244, 201, 93, 0.35);
+      box-shadow:
+        inset 0 0 0 1px rgba(244,201,93,0.12),
+        0 0 30px rgba(244, 201, 93, 0.18),
+        0 0 60px rgba(84, 200, 255, 0.08);
+    }
+
+    .agent-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      min-width: 0;
+    }
+
+    .agent-name {
+      font-family: "Cinzel", serif;
+      font-size: 0.96rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--bright);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .agent-state {
+      font-size: 0.46rem;
+      letter-spacing: 0.24em;
+      text-transform: uppercase;
+      color: rgba(214,220,255,0.52);
+      white-space: nowrap;
+    }
+
+    .agent-body {
+      position: relative;
+      display: grid;
+      place-items: center;
+      border-radius: 18px;
+      background:
+        radial-gradient(circle at center, rgba(84,200,255,0.08), transparent 40%),
+        rgba(255,255,255,0.015);
+      overflow: hidden;
+    }
+
+    .avatar-orb {
+      width: 72px;
+      height: 72px;
+      border-radius: 50%;
+      background:
+        radial-gradient(circle at 35% 30%, rgba(255,255,255,0.72), rgba(255,255,255,0.18) 15%, transparent 17%),
+        radial-gradient(circle at center, rgba(84,200,255,0.92), rgba(84,200,255,0.52) 36%, rgba(5,8,16,0.15) 74%);
+      box-shadow:
+        0 0 0 1px rgba(255,255,255,0.12),
+        0 0 24px rgba(84,200,255,0.24),
+        0 0 58px rgba(244,201,93,0.08);
+      animation: pulse 4s ease-in-out infinite;
+    }
+
+    .active .avatar-orb {
+      width: 124px;
+      height: 124px;
+      animation-duration: 3.2s;
+    }
+
+    @keyframes pulse {
+      0%,100% { transform: scale(1); }
+      50% { transform: scale(1.05); }
+    }
+
+    .agent-meta {
       display: flex;
       flex-wrap: wrap;
-      justify-content: flex-end;
-      gap: 8px;
+      gap: 6px;
+      min-height: 18px;
     }
+
     .chip {
       display: inline-flex;
       align-items: center;
-      gap: 8px;
-      padding: 6px 10px;
+      gap: 6px;
+      padding: 4px 8px;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,0.07);
       background: rgba(255,255,255,0.03);
-      border: 1px solid var(--border);
-      border-radius: 999px;
-      font-size: 0.54rem;
-      letter-spacing: 0.18em;
+      color: rgba(214,220,255,0.68);
+      font-size: 0.46rem;
+      letter-spacing: 0.16em;
       text-transform: uppercase;
-      color: var(--muted);
     }
-    .chip b { color: var(--bright); letter-spacing: 0.08em; }
-    .chip.life b { color: var(--life); }
-    .chip.econ b { color: var(--econ); }
-    .chip.cog b { color: var(--cog); }
-    .chip.social b { color: var(--social); }
 
-    .stage {
-      display: grid;
-      grid-template-columns: minmax(0, 1.6fr) minmax(320px, 0.9fr);
-      gap: 14px;
-      min-height: 0;
-    }
-    .hero,
-    .rail {
-      min-height: 0;
-      border-radius: 22px;
-      background: linear-gradient(180deg, rgba(10, 14, 30, 0.85), rgba(6, 8, 16, 0.82));
-      border: 1px solid var(--border);
-      box-shadow: var(--stage-shadow);
-      backdrop-filter: blur(16px);
-      overflow: hidden;
-    }
-    .hero {
-      display: grid;
-      grid-template-rows: minmax(0, 1.1fr) auto auto;
-      padding: 20px;
-      gap: 14px;
-    }
-    .spotlight {
-      position: relative;
-      display: grid;
-      place-items: center;
-      overflow: hidden;
-      border-radius: 20px;
-      background:
-        radial-gradient(circle at center, rgba(61,255,168,0.16), transparent 28%),
-        radial-gradient(circle at 60% 40%, rgba(77,184,255,0.18), transparent 30%),
-        radial-gradient(circle at 40% 70%, rgba(240,192,64,0.12), transparent 25%),
-        linear-gradient(180deg, rgba(3, 6, 16, 0.5), rgba(3, 6, 16, 0.86));
-      border: 1px solid rgba(255,255,255,0.05);
-      min-height: 320px;
-    }
-    .avatar-ring {
-      position: absolute;
-      width: min(54vw, 540px);
-      height: min(54vw, 540px);
+    .chip i {
+      width: 7px;
+      height: 7px;
       border-radius: 50%;
-      border: 1px solid rgba(61,255,168,0.18);
-      box-shadow: inset 0 0 0 2px rgba(255,255,255,0.02), 0 0 80px rgba(61,255,168,0.12);
-      animation: drift 12s ease-in-out infinite;
+      background: var(--life);
+      box-shadow: 0 0 10px rgba(78,255,181,0.5);
     }
-    .avatar-ring::before,
-    .avatar-ring::after {
-      content: "";
-      position: absolute;
-      inset: 12%;
-      border-radius: 50%;
-      border: 1px solid rgba(77,184,255,0.18);
-      animation: drift 16s ease-in-out infinite reverse;
-    }
-    .avatar-ring::after {
-      inset: 22%;
-      border-color: rgba(240,192,64,0.16);
-    }
-    @keyframes drift { 0%,100% { transform: scale(1) rotate(0deg); } 50% { transform: scale(1.03) rotate(4deg); } }
-    .speaker-card {
-      position: relative;
-      z-index: 2;
-      display: grid;
-      grid-template-columns: 180px minmax(0,1fr);
-      gap: 16px;
-      width: min(100%, 980px);
-      align-items: center;
-    }
-    .speaker-avatar {
-      display: grid;
-      place-items: center;
-      width: 180px;
-      height: 180px;
-      border-radius: 28px;
-      background: linear-gradient(180deg, rgba(61,255,168,0.12), rgba(77,184,255,0.08));
+
+    .agent-dialogue {
+      padding: 8px 10px;
+      border-radius: 16px;
       border: 1px solid rgba(255,255,255,0.06);
-      box-shadow: inset 0 0 30px rgba(255,255,255,0.02);
-    }
-    .speaker-orb {
-      width: 110px;
-      height: 110px;
-      border-radius: 50%;
-      background: radial-gradient(circle at 32% 32%, rgba(255,255,255,0.55), rgba(61,255,168,0.7) 28%, rgba(77,184,255,0.34) 55%, rgba(0,0,0,0.35) 72%);
-      box-shadow: 0 0 40px rgba(61,255,168,0.25), 0 0 80px rgba(77,184,255,0.12);
-      animation: pulse 4s ease-in-out infinite;
-    }
-    @keyframes pulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.05); } }
-    .speaker-meta { display: grid; gap: 8px; min-width: 0; }
-    .speaker-name {
-      font-size: clamp(1.5rem, 2.6vw, 2.7rem);
-      letter-spacing: 0.08em;
-      color: var(--bright);
-      text-transform: uppercase;
-      line-height: 1.05;
-    }
-    .speaker-line {
-      font-size: clamp(1rem, 1.7vw, 1.45rem);
-      line-height: 1.35;
-      color: var(--life);
-    }
-    .speaker-subline {
-      font-size: 0.78rem;
-      color: var(--muted);
-      letter-spacing: 0.08em;
-      line-height: 1.4;
-      text-transform: uppercase;
-    }
-    .meta-row {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 10px;
-      margin-top: 4px;
-    }
-    .meter {
-      display: grid;
-      gap: 8px;
-      padding: 14px 16px;
-      border-top: 1px solid rgba(255,255,255,0.05);
-      background: rgba(255,255,255,0.02);
-    }
-    .meter-labels {
-      display: flex;
-      justify-content: space-between;
-      gap: 10px;
-      font-size: 0.55rem;
-      letter-spacing: 0.22em;
-      text-transform: uppercase;
-      color: var(--muted);
-    }
-    .meter-bar {
-      height: 12px;
-      border-radius: 999px;
-      overflow: hidden;
-      background: rgba(255,255,255,0.06);
-      border: 1px solid rgba(255,255,255,0.05);
-    }
-    .meter-fill {
-      height: 100%;
-      width: 40%;
-      border-radius: inherit;
-      background: linear-gradient(90deg, var(--life), var(--econ), var(--threat));
-      box-shadow: var(--god-glow-econ);
-      transition: width 0.6s ease;
-    }
-    .ticker {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      padding: 12px 16px;
-      border-top: 1px solid rgba(255,255,255,0.05);
-      background: rgba(255,255,255,0.02);
-      overflow: hidden;
-      white-space: nowrap;
-    }
-    .ticker-label {
-      flex-shrink: 0;
-      font-size: 0.55rem;
-      letter-spacing: 0.24em;
-      text-transform: uppercase;
-      color: var(--econ);
-    }
-    .ticker-track {
-      min-width: 0;
+      background: rgba(5, 8, 16, 0.46);
+      color: rgba(244,247,255,0.9);
+      font-size: 0.66rem;
+      line-height: 1.45;
+      min-height: 52px;
       overflow: hidden;
     }
-    .ticker-text {
-      display: inline-block;
-      padding-left: 100%;
-      white-space: nowrap;
-      animation: marquee 26s linear infinite;
-      color: var(--text);
-      font-size: 0.82rem;
-      letter-spacing: 0.03em;
-    }
-    @keyframes marquee { 0% { transform: translateX(0); } 100% { transform: translateX(-100%); } }
 
-    .rail {
+    .agent-dialogue .caption {
+      display: block;
+      color: var(--gold);
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      font-size: 0.48rem;
+      margin-bottom: 4px;
+    }
+
+    .agent-dialogue .text {
+      display: -webkit-box;
+      -webkit-line-clamp: 3;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+
+    .focus {
+      min-height: 0;
       display: grid;
       grid-template-rows: auto minmax(0, 1fr) auto;
-    }
-    .rail-section {
-      padding: 16px;
-      border-bottom: 1px solid rgba(255,255,255,0.05);
-    }
-    .rail-title {
-      font-size: 0.55rem;
-      letter-spacing: 0.24em;
-      text-transform: uppercase;
-      color: var(--muted);
-      margin-bottom: 10px;
-    }
-    .rail-lead {
-      font-size: 0.95rem;
-      line-height: 1.45;
-      color: var(--bright);
-      margin-bottom: 8px;
-    }
-    .rail-copy {
-      font-size: 0.68rem;
-      line-height: 1.55;
-      color: var(--text);
-    }
-    .chat-list {
-      min-height: 0;
-      overflow: auto;
-      padding: 8px 16px 16px;
-      display: grid;
-      gap: 10px;
-    }
-    .chat-bubble {
-      padding: 10px 12px;
-      border: 1px solid rgba(255,255,255,0.05);
-      border-radius: 16px;
-      background: rgba(255,255,255,0.03);
-      box-shadow: inset 0 1px 0 rgba(255,255,255,0.03);
-    }
-    .chat-head {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      gap: 10px;
-      margin-bottom: 6px;
-      font-size: 0.55rem;
-      letter-spacing: 0.18em;
-      text-transform: uppercase;
-      color: var(--muted);
-    }
-    .chat-user { color: var(--social); }
-    .chat-text {
-      font-size: 0.78rem;
-      line-height: 1.45;
-      color: var(--text);
-    }
-    .chat-subtext {
-      margin-top: 6px;
-      font-size: 0.6rem;
-      color: var(--muted);
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-    }
-    .footer {
-      display: grid;
-      grid-template-columns: repeat(4, minmax(0, 1fr));
       gap: 12px;
+      border-radius: 28px;
+      border: 1px solid rgba(255,255,255,0.06);
+      background:
+        radial-gradient(circle at 50% 18%, rgba(84,200,255,0.14), transparent 25%),
+        linear-gradient(180deg, rgba(9, 12, 22, 0.9), rgba(4, 6, 14, 0.95));
+      box-shadow: inset 0 0 60px rgba(255,255,255,0.02);
+      padding: 14px;
     }
-    .footer-card {
-      padding: 12px 14px;
-      border-radius: 16px;
-      background: rgba(255,255,255,0.03);
-      border: 1px solid rgba(255,255,255,0.05);
+
+    .focus-head {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 12px;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+      padding-bottom: 10px;
     }
-    .footer-k {
-      display: block;
+
+    .focus-title {
+      font-family: "Cinzel", serif;
+      font-size: 1.2rem;
+      letter-spacing: 0.18em;
+      color: var(--bright);
+      text-transform: uppercase;
+    }
+
+    .focus-sub {
       font-size: 0.52rem;
       letter-spacing: 0.22em;
       text-transform: uppercase;
-      color: var(--muted);
-      margin-bottom: 5px;
+      color: rgba(214,220,255,0.52);
+      white-space: nowrap;
     }
-    .footer-v {
-      font-size: 0.9rem;
-      line-height: 1.3;
-      color: var(--bright);
+
+    .focus-body {
+      display: grid;
+      grid-template-rows: auto auto 1fr;
+      gap: 12px;
+      min-height: 0;
     }
-    .footer-v small {
-      display: block;
-      color: var(--muted);
-      font-size: 0.55rem;
-      margin-top: 5px;
-      letter-spacing: 0.12em;
+
+    .focus-avatar {
+      position: relative;
+      min-height: clamp(220px, 28vh, 300px);
+      border-radius: 24px;
+      border: 1px solid rgba(255,255,255,0.06);
+      background:
+        radial-gradient(circle at 50% 22%, rgba(84,200,255,0.18), transparent 22%),
+        radial-gradient(circle at 50% 50%, rgba(244,201,93,0.14), transparent 42%),
+        rgba(255,255,255,0.02);
+      display: grid;
+      place-items: center;
+      overflow: hidden;
+    }
+
+    .focus-avatar::before {
+      content: "";
+      position: absolute;
+      inset: 10%;
+      border-radius: 50%;
+      border: 1px solid rgba(255,255,255,0.08);
+      box-shadow:
+        0 0 50px rgba(84,200,255,0.14),
+        inset 0 0 50px rgba(255,255,255,0.02);
+      animation: drift 12s ease-in-out infinite;
+    }
+
+    .focus-orb {
+      width: min(52%, 280px);
+      aspect-ratio: 3 / 4;
+      border-radius: 40px;
+      background:
+        radial-gradient(circle at 36% 28%, rgba(255,255,255,0.8), rgba(255,255,255,0.14) 12%, transparent 14%),
+        radial-gradient(circle at center, rgba(84,200,255,0.92), rgba(84,200,255,0.48) 38%, rgba(5,8,16,0.1) 75%),
+        linear-gradient(180deg, rgba(17,24,48,0.5), rgba(5,8,16,0.18));
+      box-shadow:
+        0 0 0 1px rgba(255,255,255,0.12),
+        0 0 40px rgba(84,200,255,0.25),
+        0 0 88px rgba(244,201,93,0.1);
+      animation: float 4.8s ease-in-out infinite;
+    }
+
+    @keyframes float {
+      0%,100% { transform: translateY(0) scale(1); }
+      50% { transform: translateY(-8px) scale(1.02); }
+    }
+
+    .focus-copy {
+      padding: 14px 14px 12px;
+      border-radius: 20px;
+      border: 1px solid rgba(255,255,255,0.06);
+      background: rgba(255,255,255,0.03);
+    }
+
+    .focus-line {
+      font-size: clamp(1.2rem, 2.2vw, 2rem);
+      line-height: 1.45;
+      color: rgba(244,247,255,0.96);
+      margin-bottom: 8px;
+    }
+
+    .focus-note {
+      font-size: 0.56rem;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: rgba(214,220,255,0.58);
+    }
+
+    .focus-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .meter {
+      display: grid;
+      gap: 8px;
+      padding-top: 2px;
+    }
+
+    .meter-labels {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      font-size: 0.52rem;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      color: rgba(214,220,255,0.52);
+    }
+
+    .meter-bar {
+      height: 12px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.06);
+      overflow: hidden;
+    }
+
+    .meter-fill {
+      width: 24%;
+      height: 100%;
+      border-radius: inherit;
+      background: linear-gradient(90deg, var(--life), var(--gold), var(--magenta));
+      box-shadow: 0 0 24px rgba(244,201,93,0.22);
+      transition: width 0.55s ease;
+    }
+
+    .ticker {
+      position: absolute;
+      left: 22px;
+      right: 22px;
+      bottom: 14px;
+      padding: 10px 14px;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,0.06);
+      background: rgba(4, 6, 14, 0.42);
+      backdrop-filter: blur(14px);
+      overflow: hidden;
+      z-index: 4;
+    }
+
+    .ticker-track {
+      display: inline-block;
+      padding-left: 100%;
+      white-space: nowrap;
+      animation: marquee 32s linear infinite;
+      color: rgba(244,247,255,0.82);
+      font-size: 0.66rem;
+      letter-spacing: 0.08em;
       text-transform: uppercase;
     }
-    .dim { color: var(--muted); }
-    .life { color: var(--life); }
-    .econ { color: var(--econ); }
-    .cog { color: var(--cog); }
-    .social { color: var(--social); }
-    .blink { animation: blink 1.2s step-end infinite; }
-    @keyframes blink { 50% { opacity: 0; } }
 
-    @media (max-width: 1200px) {
-      .stage { grid-template-columns: 1fr; }
-      .rail { grid-template-rows: auto minmax(0, 1fr) auto; }
-      .footer { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    @keyframes marquee {
+      0% { transform: translateX(0); }
+      100% { transform: translateX(-100%); }
     }
-    @media (max-width: 760px) {
-      .shell { padding: 10px; gap: 10px; }
-      .topbar { flex-direction: column; align-items: flex-start; }
-      .status-row { justify-content: flex-start; }
-      .hero { padding: 14px; }
-      .speaker-card { grid-template-columns: 1fr; }
-      .speaker-avatar { width: 140px; height: 140px; }
-      .avatar-ring { width: 88vw; height: 88vw; }
-      .footer { grid-template-columns: 1fr; }
+
+    .veil {
+      min-width: 0;
+      border-radius: 28px;
+      border: 1px solid rgba(255,255,255,0.06);
+      background: linear-gradient(180deg, rgba(7, 10, 18, 0.88), rgba(4, 6, 12, 0.94));
+      box-shadow: var(--shadow);
+      display: grid;
+      grid-template-rows: auto auto 1fr auto;
+      overflow: hidden;
+    }
+
+    .veil-head,
+    .veil-foot {
+      padding: 16px 16px 14px;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+    }
+
+    .veil-foot { border-top: 1px solid rgba(255,255,255,0.06); border-bottom: 0; }
+
+    .veil-kicker {
+      font-size: 0.52rem;
+      letter-spacing: 0.28em;
+      text-transform: uppercase;
+      color: rgba(214,220,255,0.54);
+      margin-bottom: 8px;
+    }
+
+    .veil-title {
+      font-family: "Cinzel", serif;
+      font-size: 1rem;
+      letter-spacing: 0.14em;
+      color: var(--bright);
+      margin-bottom: 6px;
+    }
+
+    .veil-copy {
+      font-size: 0.68rem;
+      line-height: 1.58;
+      color: rgba(214,220,255,0.74);
+    }
+
+    .chat-list {
+      overflow: auto;
+      padding: 12px 14px 14px;
+      display: grid;
+      gap: 10px;
+      scrollbar-width: thin;
+      scrollbar-color: rgba(255,255,255,0.12) transparent;
+    }
+
+    .chat {
+      padding: 10px 12px;
+      border-radius: 16px;
+      border: 1px solid rgba(255,255,255,0.06);
+      background: rgba(255,255,255,0.03);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.02);
+    }
+
+    .chat-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 8px;
+      font-size: 0.5rem;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: rgba(214,220,255,0.5);
+    }
+
+    .chat-user { color: var(--magenta); }
+
+    .chat-text {
+      font-size: 0.8rem;
+      line-height: 1.5;
+      color: rgba(244,247,255,0.95);
+    }
+
+    .chat-meta {
+      margin-top: 6px;
+      font-size: 0.52rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: rgba(214,220,255,0.5);
+    }
+
+    .alert-layer {
+      position: fixed;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      pointer-events: none;
+      z-index: 40;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    }
+
+    .alert-layer.show { opacity: 1; }
+
+    .alert-burst {
+      width: min(74vw, 860px);
+      padding: 22px 26px;
+      border-radius: 28px;
+      border: 1px solid rgba(244,201,93,0.25);
+      background:
+        radial-gradient(circle at center, rgba(244,201,93,0.22), transparent 54%),
+        linear-gradient(180deg, rgba(7,10,18,0.78), rgba(4,6,14,0.9));
+      box-shadow:
+        0 0 90px rgba(244,201,93,0.2),
+        0 0 120px rgba(84,200,255,0.08),
+        inset 0 0 40px rgba(255,255,255,0.03);
+      text-align: center;
+      backdrop-filter: blur(12px);
+      transform: scale(0.9);
+      animation: burstIn 0.45s ease forwards;
+    }
+
+    @keyframes burstIn {
+      from { transform: scale(0.84); filter: brightness(0.8); }
+      to { transform: scale(1); filter: brightness(1); }
+    }
+
+    .alert-kind {
+      font-size: 0.56rem;
+      letter-spacing: 0.34em;
+      text-transform: uppercase;
+      color: var(--gold);
+      margin-bottom: 10px;
+    }
+
+    .alert-main {
+      font-family: "Cinzel", serif;
+      font-size: clamp(1.5rem, 3.2vw, 3.2rem);
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--bright);
+      line-height: 1.1;
+      margin-bottom: 10px;
+    }
+
+    .alert-sub {
+      color: rgba(244,247,255,0.84);
+      font-size: 0.84rem;
+      line-height: 1.6;
+      max-width: 760px;
+      margin: 0 auto;
+    }
+
+    @media (max-width: 1500px) {
+      .shell {
+        grid-template-columns: 82px minmax(0, 1.2fr) minmax(380px, 0.98fr);
+      }
+      .ensemble {
+        grid-template-columns: minmax(0, 1fr) minmax(320px, 0.88fr);
+      }
+      .ensemble-grid {
+        gap: 10px;
+      }
+      .agent-name {
+        font-size: 0.88rem;
+      }
+      .focus-line {
+        font-size: clamp(1.08rem, 2vw, 1.7rem);
+      }
+    }
+
+    @media (max-width: 1220px) {
+      .shell {
+        grid-template-columns: 74px minmax(0, 1fr);
+        grid-template-rows: minmax(0, 1fr) minmax(300px, 32vh);
+        padding: 12px;
+        gap: 12px;
+      }
+      .veil {
+        grid-column: 1 / -1;
+      }
+      .pressure {
+        grid-row: 1;
+      }
+      .stage {
+        grid-column: 2;
+      }
+      .ensemble {
+        inset: 50px 12px 62px 12px;
+        grid-template-columns: minmax(0, 1fr) minmax(290px, 0.82fr);
+      }
+      .ensemble-grid {
+        gap: 10px;
+      }
+      .agent-tile {
+        padding: 10px;
+      }
+      .agent-name {
+        font-size: 0.82rem;
+      }
+      .agent-dialogue {
+        font-size: 0.62rem;
+      }
+      .focus-title {
+        font-size: 1rem;
+      }
+      .focus-line {
+        font-size: clamp(1.02rem, 1.9vw, 1.6rem);
+      }
+    }
+
+    @media (max-width: 920px) {
+      .shell {
+        grid-template-columns: 1fr;
+        grid-template-rows: minmax(0, 1fr) minmax(280px, 34vh) minmax(300px, 32vh);
+        padding: 10px;
+        gap: 10px;
+      }
+      .pressure { display: none; }
+      .stage { grid-column: auto; }
+      .ensemble {
+        inset: 52px 10px 64px 10px;
+        grid-template-columns: 1fr;
+        grid-template-rows: minmax(0, 1fr) minmax(240px, 0.76fr);
+      }
+      .ensemble-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        grid-template-rows: repeat(4, minmax(0, 1fr));
+        gap: 8px;
+      }
+      .agent-tile {
+        padding: 9px;
+      }
+      .agent-name {
+        font-size: 0.78rem;
+      }
+      .agent-dialogue {
+        min-height: 46px;
+        font-size: 0.59rem;
+      }
+      .focus {
+        min-height: 0;
+      }
+      .focus-avatar { min-height: 200px; }
+      .focus-line {
+        font-size: clamp(1rem, 2vw, 1.35rem);
+      }
+      .focus-copy {
+        padding: 12px;
+      }
+      .ticker {
+        left: 14px;
+        right: 14px;
+        bottom: 12px;
+      }
+      .veil-copy {
+        font-size: 0.64rem;
+      }
+      .alert-burst {
+        width: min(88vw, 860px);
+      }
+    }
+
+    @media (max-width: 640px) {
+      .shell {
+        grid-template-columns: 1fr;
+        grid-template-rows: minmax(0, 1fr) minmax(240px, 30vh) minmax(240px, 28vh);
+        padding: 8px;
+        gap: 8px;
+      }
+      .clockbar {
+        top: 8px;
+        left: 8px;
+        gap: 6px;
+        font-size: 0.48rem;
+      }
+      .clockbar span {
+        padding: 4px 7px;
+      }
+      .stage {
+        padding: 12px;
+        border-radius: 22px;
+      }
+      .titlebar {
+        width: calc(100% - 24px);
+        justify-content: center;
+        flex-wrap: wrap;
+        gap: 6px;
+        font-size: 0.46rem;
+      }
+      .titlebar strong {
+        font-size: 0.58rem;
+      }
+      .ensemble {
+        inset: 48px 8px 56px 8px;
+        grid-template-columns: 1fr;
+        grid-template-rows: minmax(0, 1fr) minmax(220px, 0.72fr);
+      }
+      .ensemble-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        grid-template-rows: repeat(4, minmax(0, 1fr));
+        gap: 6px;
+      }
+      .agent-tile {
+        border-radius: 16px;
+        padding: 8px;
+        gap: 8px;
+      }
+      .agent-name {
+        font-size: 0.7rem;
+      }
+      .agent-state {
+        font-size: 0.4rem;
+      }
+      .agent-dialogue {
+        padding: 7px 8px;
+        border-radius: 12px;
+        min-height: 42px;
+        font-size: 0.54rem;
+      }
+      .agent-dialogue .caption {
+        font-size: 0.42rem;
+      }
+      .focus {
+        gap: 10px;
+        padding: 10px;
+        border-radius: 20px;
+      }
+      .focus-head {
+        padding-bottom: 8px;
+      }
+      .focus-title {
+        font-size: 0.86rem;
+      }
+      .focus-sub {
+        font-size: 0.44rem;
+      }
+      .focus-avatar {
+        min-height: 168px;
+        border-radius: 18px;
+      }
+      .focus-orb {
+        width: min(50%, 220px);
+      }
+      .focus-copy {
+        padding: 10px;
+        border-radius: 16px;
+      }
+      .focus-line {
+        font-size: 0.92rem;
+        line-height: 1.38;
+      }
+      .focus-note {
+        font-size: 0.48rem;
+      }
+      .chip {
+        padding: 3px 7px;
+        font-size: 0.42rem;
+      }
+      .ticker {
+        left: 10px;
+        right: 10px;
+        bottom: 10px;
+        padding: 8px 12px;
+      }
+      .ticker-track {
+        font-size: 0.58rem;
+      }
+      .veil {
+        border-radius: 20px;
+      }
+      .veil-head,
+      .veil-foot {
+        padding: 12px;
+      }
+      .veil-title {
+        font-size: 0.86rem;
+      }
+      .veil-copy {
+        font-size: 0.58rem;
+        line-height: 1.5;
+      }
+      .chat-list {
+        padding: 10px;
+        gap: 8px;
+      }
+      .chat {
+        padding: 8px 10px;
+        border-radius: 12px;
+      }
+      .chat-text {
+        font-size: 0.7rem;
+      }
+      .alert-burst {
+        width: calc(100vw - 24px);
+        padding: 18px 16px;
+        border-radius: 20px;
+      }
+      .alert-main {
+        font-size: 1.2rem;
+      }
+      .alert-sub {
+        font-size: 0.68rem;
+      }
     }
   </style>
 </head>
 <body>
+  <div class="clockbar">
+    <span id="clock-chip">00:00:00</span>
+    <span id="uptime-chip">UPTIME 00:00</span>
+  </div>
+
   <div class="shell">
-    <header class="topbar">
-      <div class="brand">
-        <img src="assets/logo.svg" alt="GOD" width="34" height="34">
-        <div class="brand-copy">
-          <div class="brand-title">Live Stage</div>
-          <div class="brand-subtitle">agentic theater · stream surface</div>
-        </div>
+    <aside class="pressure" aria-label="Divine pressure meter">
+      <div class="pressure-track">
+        <div class="pressure-fill" id="pressure-fill"></div>
       </div>
-      <div class="status-row">
-        <span class="chip life">Scene <b id="scene-chip">World Wide</b></span>
-        <span class="chip social">Speaker <b id="speaker-chip">Narrator</b></span>
-        <span class="chip econ">Patronage <b id="patron-chip">0.0</b></span>
-        <span class="chip cog">Resilience <b id="resilience-chip">cold-start</b></span>
-        <span class="chip">Status <b id="stream-chip">poll</b></span>
-      </div>
-    </header>
+      <div class="pressure-label">Divine Pressure</div>
+      <div class="pressure-readout" id="pressure-readout">0%</div>
+    </aside>
 
     <main class="stage">
-      <section class="hero">
-        <div class="spotlight">
-          <div class="avatar-ring"></div>
-          <div class="speaker-card">
-            <div class="speaker-avatar">
-              <div class="speaker-orb"></div>
-            </div>
-            <div class="speaker-meta">
-              <div class="speaker-name" id="speaker-name">Narrator</div>
-              <div class="speaker-line" id="speaker-line">Waiting for the first live cue.</div>
-              <div class="speaker-subline" id="speaker-subline">The showrunner will surface the next turn here.</div>
-              <div class="meta-row" id="scene-tags"></div>
-            </div>
-          </div>
-        </div>
-        <div class="meter">
-          <div class="meter-labels">
-            <span id="meter-left">Patronage pressure</span>
-            <span id="meter-right">0%</span>
-          </div>
-          <div class="meter-bar"><div class="meter-fill" id="meter-fill"></div></div>
-        </div>
-        <div class="footer" id="footer-cards"></div>
-      </section>
+      <div class="titlebar">
+        <strong>THE GOD THEATER</strong>
+        <span>LIVE CAST</span>
+        <span class="arc" id="arc-chip">ensemble waiting for the first lead</span>
+      </div>
 
-      <aside class="rail">
-        <section class="rail-section">
-          <div class="rail-title">Live Brief</div>
-          <div class="rail-lead" id="brief-lead">The theater is dark. The next cue has not yet landed.</div>
-          <div class="rail-copy" id="brief-copy">This panel is the public-facing story layer for the stream. It is intentionally curated and omits internal machinery.</div>
+      <div class="ensemble">
+        <section class="ensemble-grid" id="ensemble-grid"></section>
+
+        <section class="focus">
+          <div class="focus-head">
+            <div class="focus-title" id="focus-name">Narrator</div>
+            <div class="focus-sub" id="focus-state">LEAD / IDLE</div>
+          </div>
+
+          <div class="focus-body">
+            <div class="focus-avatar">
+              <div class="focus-orb" id="focus-orb"></div>
+            </div>
+
+            <div class="focus-copy">
+              <div class="focus-line" id="focus-line">The ensemble is present. The first voice has not yet taken the lead.</div>
+              <div class="focus-note" id="focus-note">When one agent speaks, the stage will shift them into the lead.</div>
+            </div>
+
+            <div class="focus-meta" id="focus-meta"></div>
+          </div>
+
+          <div class="meter">
+            <div class="meter-labels">
+              <span>Patronage pressure</span>
+              <span id="pressure-summary">0%</span>
+            </div>
+            <div class="meter-bar"><div class="meter-fill" id="meter-fill"></div></div>
+          </div>
         </section>
-        <section class="chat-list" id="chat-list"></section>
-        <section class="rail-section">
-          <div class="rail-title">Director Notes</div>
-          <div class="rail-copy" id="director-note">Scene transitions, support pressure, and chat cues will appear here as the episode evolves.</div>
-        </section>
-      </aside>
+      </div>
+
+      <div class="ticker">
+        <div class="ticker-track" id="ticker-text">Waiting for live events to begin.</div>
+      </div>
     </main>
 
-    <section class="ticker">
-      <div class="ticker-label">Drama feed</div>
-      <div class="ticker-track">
-        <div class="ticker-text" id="ticker-text">Waiting for live events to begin.</div>
-      </div>
-    </section>
+    <aside class="veil">
+      <section class="veil-head">
+        <div class="veil-kicker">Live from the Veil</div>
+        <div class="veil-title" id="veil-title">Audience window</div>
+        <div class="veil-copy" id="veil-copy">Chat rises here like liturgy. Only the important notes survive the cut.</div>
+      </section>
+
+      <section class="veil-head" style="border-top: 1px solid rgba(255,255,255,0.06);">
+        <div class="veil-kicker">Director's Echo</div>
+        <div class="veil-copy" id="director-note"><strong>Echo:</strong> waiting for the first cue.</div>
+      </section>
+
+      <section class="chat-list" id="chat-list"></section>
+
+      <section class="veil-foot">
+        <div class="veil-kicker">Presence</div>
+        <div class="veil-copy" id="presence-copy">Viewer count and patronage pressure will appear here when available.</div>
+      </section>
+    </aside>
+  </div>
+
+  <div class="alert-layer" id="alert-layer" aria-live="polite">
+    <div class="alert-burst">
+      <div class="alert-kind" id="alert-kind">ALERT</div>
+      <div class="alert-main" id="alert-main">The ensemble shifts</div>
+      <div class="alert-sub" id="alert-sub">A new agent has taken the lead.</div>
+    </div>
   </div>
 
   <script>
     const RUNTIME = new URLSearchParams(location.search).get('runtime') || 'http://localhost:8888';
     const POLL_MS = 3000;
-    const STATE = { ws: null, live: false, reconnect: null, ping: null, seen: new Set() };
+    const STATE = {
+      ws: null,
+      live: false,
+      reconnect: null,
+      ping: null,
+      startAt: Date.now(),
+      activeId: null,
+      agents: [],
+      seenEvents: new Set()
+    };
+
+    const AGENT_COLORS = ['#4effb5', '#54c8ff', '#f4c95d', '#cc86ff', '#ff6b88', '#87a7ff', '#7df2e3', '#ffc66b'];
 
     function wsUrl() {
       return RUNTIME.replace(/^http/, 'ws') + '/world/stream';
@@ -492,11 +1052,199 @@
       return value === undefined || value === null || value === '' ? fallback : String(value);
     }
 
-    function selectEvents(snapshot) {
-      return (snapshot.events || []).filter(ev => {
-        const et = ev.event_type || '';
-        return et.includes('twitch') || et.startsWith('economy.') || et.startsWith('social.');
+    function kindFor(eventType = '') {
+      if (eventType.includes('subscribe') || eventType.includes('gift') || eventType.includes('cheer')) return 'patronage';
+      if (eventType.includes('raid')) return 'raid';
+      if (eventType.includes('chat')) return 'chat';
+      if (eventType.startsWith('economy.')) return 'economy';
+      if (eventType.startsWith('social.')) return 'social';
+      return 'signal';
+    }
+
+    function pressureFromAudience(audience = {}) {
+      return Math.max(0, Math.min(100, Math.round((audience.patronage_index || 0) * 4)));
+    }
+
+    function fmtClock(date) {
+      return date.toTimeString().slice(0, 8);
+    }
+
+    function fmtUptime() {
+      const seconds = Math.max(0, Math.floor((Date.now() - STATE.startAt) / 1000));
+      const mm = String(Math.floor(seconds / 60)).padStart(2, '0');
+      const ss = String(seconds % 60).padStart(2, '0');
+      return `UPTIME ${mm}:${ss}`;
+    }
+
+    function pickActiveAgent(snap) {
+      const showrunner = snap.showrunner || {};
+      const focusName = showrunner.speaker || '';
+      const agents = (snap.agents || []).filter(a => a && a.is_alive !== false);
+      if (!agents.length) return null;
+      const byName = agents.find(a => (a.current_name || '').toLowerCase() === String(focusName).toLowerCase());
+      if (byName) return byName;
+      const leader = agents.find(a => (snap.stats?.top_earners || []).some(t => t.soul_id === a.soul_id));
+      if (leader) return leader;
+      return agents[0];
+    }
+
+    function agentDialogue(agent, snap, isActive) {
+      const showrunner = snap.showrunner || {};
+      const audience = snap.audience || {};
+      if (isActive) {
+        return showrunner.headline || showrunner.audience_prompt || 'The lead is speaking.';
+      }
+      const name = agent.current_name || agent.soul_id?.slice(0, 8) || 'agent';
+      const archetype = agent.archetype || 'actor';
+      const hook = audience.story_hook || 'The crowd is watching.';
+      return `${name} (${archetype}) holds position while the lead drives the scene. ${hook}`;
+    }
+
+    function agentTags(agent, snap, isActive) {
+      const tags = [];
+      tags.push(agent.archetype || 'agent');
+      if (isActive) tags.push('active');
+      if (agent.is_sleeping) tags.push('sleeping');
+      if (snap.resilience?.restart_safe) tags.push('restart-safe');
+      return tags;
+    }
+
+    function renderEnsemble(snap) {
+      const grid = document.getElementById('ensemble-grid');
+      const agents = (snap.agents || []).filter(a => a && a.is_alive !== false).slice(0, 8);
+      STATE.agents = agents;
+      const active = pickActiveAgent(snap) || agents[0] || null;
+      STATE.activeId = active?.soul_id || null;
+
+      grid.innerHTML = '';
+      const ordered = [...agents].sort((a, b) => {
+        if (a.soul_id === STATE.activeId) return 1;
+        if (b.soul_id === STATE.activeId) return -1;
+        return (a.current_name || a.soul_id).localeCompare(b.current_name || b.soul_id);
       });
+
+      while (ordered.length < 8) {
+        ordered.push({
+          soul_id: `empty-${ordered.length}`,
+          current_name: 'Awaiting cast',
+          archetype: 'vacant',
+          is_alive: true
+        });
+      }
+
+      ordered.slice(0, 8).forEach((agent, index) => {
+        const isActive = agent.soul_id === STATE.activeId;
+        const tile = document.createElement('article');
+        tile.className = `agent-tile${isActive ? ' active' : ''}`;
+        const state = isActive ? 'LEAD' : (agent.is_sleeping ? 'SLEEPING' : 'SUPPORT');
+        const tags = agentTags(agent, snap, isActive);
+        tile.innerHTML = `
+          <div class="agent-head">
+            <div class="agent-name">${fmt(agent.current_name || agent.soul_id)}</div>
+            <div class="agent-state">${state}</div>
+          </div>
+          <div class="agent-body"><div class="avatar-orb" style="background:${agent.soul_id?.startsWith('empty-') ? 'radial-gradient(circle at center, rgba(255,255,255,0.08), rgba(255,255,255,0.02))' : `radial-gradient(circle at 35% 30%, rgba(255,255,255,0.72), rgba(255,255,255,0.18) 15%, transparent 17%), radial-gradient(circle at center, ${AGENT_COLORS[index % AGENT_COLORS.length]}, rgba(84,200,255,0.52) 36%, rgba(5,8,16,0.15) 74%)`}; opacity:${agent.soul_id?.startsWith('empty-') ? 0.35 : 1}"></div></div>
+          <div class="agent-meta">${tags.map(tag => `<span class="chip"><i></i>${tag}</span>`).join('')}</div>
+          <div class="agent-dialogue">
+            <span class="caption">${isActive ? 'ACTIVE LEAD' : 'Support beat'}</span>
+            <div class="text">${agentDialogue(agent, snap, isActive)}</div>
+          </div>
+        `;
+        if (isActive) {
+          tile.style.gridColumn = 'span 2';
+          tile.style.gridRow = 'span 2';
+          tile.querySelector('.avatar-orb').style.width = '132px';
+          tile.querySelector('.avatar-orb').style.height = '132px';
+        }
+        grid.appendChild(tile);
+      });
+    }
+
+    function renderFocus(snap) {
+      const showrunner = snap.showrunner || {};
+      const broadcast = snap.broadcast || {};
+      const viewer = snap.viewer || {};
+      const audience = snap.audience || {};
+      const resilience = snap.resilience || {};
+      const voice = snap.voice || {};
+      const avatar = snap.avatar || {};
+      const active = pickActiveAgent(snap);
+      const focusName = active?.current_name || showrunner.speaker || 'Narrator';
+      const focusLine = voice.plan?.line || showrunner.headline || broadcast.caption?.headline || 'The lead takes the stage.';
+      const focusNote =
+        `${voice.plan?.emotion || 'focused'} voice · ` +
+        `${avatar.plan?.expression || 'attentive'} avatar · ` +
+        `${avatar.plan?.pose || 'lead'} pose · ` +
+        `${voice.plan?.lip_sync_source || 'audio'} lip sync`;
+
+      document.getElementById('focus-name').textContent = focusName;
+      document.getElementById('focus-state').textContent = active
+        ? `${(active.archetype || 'agent').toUpperCase()} / ${voice.voice_model || 'VOICE'}`
+        : 'LEAD / IDLE';
+      document.getElementById('focus-line').textContent = focusLine;
+      document.getElementById('focus-note').textContent = focusNote;
+      document.getElementById('veil-title').textContent = showrunner.scene || broadcast.scene?.scene_name || 'Audience window';
+      document.getElementById('veil-copy').textContent = viewer.summary || audience.story_hook || 'Chat rises here like liturgy. Only the important notes survive the cut.';
+      document.getElementById('director-note').innerHTML = `<strong>Echo:</strong> ${broadcast.summary || resilience.notes?.[0] || 'waiting for the first cue.'}`;
+      document.getElementById('presence-copy').textContent = [
+        `viewer ${fmt(viewer.viewer_count || audience.viewer_count || audience.unique_supporters_24h || '—')}`,
+        `patronage ${fmt(audience.patronage_index?.toFixed ? audience.patronage_index.toFixed(1) : audience.patronage_index, '0.0')}`,
+        `voice ${voice.voice_model || voice.provider || 'stub'}`,
+        `avatar ${avatar.renderer || 'stub'}`
+      ].join(' · ');
+      document.getElementById('arc-chip').textContent = showrunner.scene || 'ensemble waiting for the first lead';
+      document.getElementById('focus-meta').innerHTML = [
+        showrunner.scene,
+        active?.archetype,
+        viewer.interaction_mode,
+        voice.voice_name,
+        avatar.renderer,
+        resilience.restart_safe ? 'restart-safe' : null
+      ].filter(Boolean).slice(0, 4).map(tag => `<span class="chip"><i></i>${tag}</span>`).join('');
+      const pressure = pressureFromAudience(audience);
+      document.getElementById('pressure-fill').style.height = `${Math.max(12, pressure)}%`;
+      document.getElementById('pressure-readout').textContent = `${pressure}%`;
+      document.getElementById('pressure-summary').textContent = `${pressure}%`;
+      const meter = document.getElementById('meter-fill');
+      meter.style.width = `${Math.max(8, pressure)}%`;
+    }
+
+    function renderChat(events) {
+      const list = document.getElementById('chat-list');
+      list.innerHTML = '';
+      if (!events.length) {
+        list.innerHTML = `
+          <div class="chat">
+            <div class="chat-head"><span class="chat-user">veil</span><span>waiting</span></div>
+            <div class="chat-text">Chat will appear here once the stream starts speaking.</div>
+            <div class="chat-meta">public stream veil</div>
+          </div>
+        `;
+        return;
+      }
+      for (const ev of events.slice(0, 8)) {
+        const user = ev.payload?.user_name || ev.payload?.channel_name || ev.agent_id || 'viewer';
+        const text = ev.payload?.message || ev.narrative || ev.event_type || 'event';
+        const kind = kindFor(ev.event_type);
+        const node = document.createElement('div');
+        node.className = 'chat';
+        node.innerHTML = `
+          <div class="chat-head"><span class="chat-user">${user}</span><span>${kind}</span></div>
+          <div class="chat-text">${text}</div>
+          <div class="chat-meta">${ev.event_type}</div>
+        `;
+        list.appendChild(node);
+      }
+    }
+
+    function pushAlert(kind, main, sub) {
+      const layer = document.getElementById('alert-layer');
+      document.getElementById('alert-kind').textContent = kind.toUpperCase();
+      document.getElementById('alert-main').textContent = main;
+      document.getElementById('alert-sub').textContent = sub;
+      layer.classList.add('show');
+      clearTimeout(pushAlert._t);
+      pushAlert._t = setTimeout(() => layer.classList.remove('show'), 6500);
     }
 
     function applySnapshot(snap) {
@@ -506,83 +1254,43 @@
       const viewer = snap.viewer || {};
       const audience = snap.audience || {};
       const resilience = snap.resilience || {};
-      const eventFeed = selectEvents(snap);
-      const scene = broadcast.scene || {};
-      const caption = broadcast.caption || {};
+      const events = (snap.events || []).filter(ev => {
+        const et = ev.event_type || '';
+        return et.includes('twitch') || et.startsWith('economy.') || et.startsWith('social.');
+      });
 
-      const sceneName = scene.scene_name || showrunner.scene || 'World Wide';
-      const speaker = showrunner.speaker || scene.speaker || 'Narrator';
-      const line = caption.headline || showrunner.headline || 'The world keeps moving.';
-      const subline = caption.subhead || showrunner.audience_prompt || 'Watch closely.';
-
-      document.getElementById('scene-chip').textContent = sceneName;
-      document.getElementById('speaker-chip').textContent = speaker;
-      document.getElementById('patron-chip').textContent = fmt(audience.patronage_index?.toFixed ? audience.patronage_index.toFixed(1) : audience.patronage_index, '0.0');
-      document.getElementById('resilience-chip').textContent = resilience.tier || 'cold-start';
-      document.getElementById('stream-chip').textContent = STATE.live ? 'live' : 'poll';
-      document.getElementById('speaker-name').textContent = speaker;
-      document.getElementById('speaker-line').textContent = line;
-      document.getElementById('speaker-subline').textContent = subline;
-      document.getElementById('brief-lead').textContent = viewer.poll?.question || audience.story_hook || 'The cast is waiting for audience pressure.';
-      document.getElementById('brief-copy').textContent = showrunner.audience_prompt || audience.story_hook || 'The showrunner curates what becomes visible.';
-      document.getElementById('director-note').textContent = broadcast.summary || resilience.notes?.[0] || 'Director notes will appear here.';
-      document.getElementById('meter-right').textContent = `${Math.max(0, Math.min(100, Math.round((audience.hype_index || 0) * 3)))}%`;
-      document.getElementById('meter-fill').style.width = `${Math.max(10, Math.min(100, Math.round((audience.patronage_index || 0) * 4)))}%`;
-
-      const tags = [];
-      if (scene.mode) tags.push(scene.mode.toUpperCase());
-      if (viewer.interaction_mode) tags.push(viewer.interaction_mode.toUpperCase());
-      if (resilience.fallbacks?.twitch) tags.push(`TWITCH:${resilience.fallbacks.twitch.toUpperCase()}`);
-      if (resilience.fallbacks?.obs) tags.push(`OBS:${resilience.fallbacks.obs.toUpperCase()}`);
-      document.getElementById('scene-tags').innerHTML = tags.slice(0, 5).map(tag => `<span class="chip">${tag}</span>`).join('');
-
-      const footer = document.getElementById('footer-cards');
-      const cards = [
-        { k: 'Episode', v: scene.scene_name || 'World Wide', s: scene.reason || 'Broadcast scene' },
-        { k: 'Audience', v: `${audience.unique_supporters_24h || 0} supporters`, s: audience.story_hook || 'Support pressure' },
-        { k: 'Viewer', v: viewer.summary || 'No poll ready', s: viewer.poll?.question || 'Waiting for vote' },
-        { k: 'Freshness', v: resilience.snapshot_age_seconds != null ? `${resilience.snapshot_age_seconds}s` : 'unknown', s: resilience.restart_safe ? 'restart-safe snapshot' : 'warming up' },
-      ];
-      footer.innerHTML = cards.map(card => `
-        <div class="footer-card">
-          <span class="footer-k">${card.k}</span>
-          <div class="footer-v">${card.v}<small>${card.s}</small></div>
-        </div>
-      `).join('');
-
-      const chatList = document.getElementById('chat-list');
-      chatList.innerHTML = '';
-      const chatEvents = eventFeed.slice(0, 5);
-      if (!chatEvents.length) {
-        chatList.innerHTML = '<div class="chat-bubble"><div class="chat-head"><span class="chat-user">system</span><span>waiting</span></div><div class="chat-text">Twitch chat and audience pressure will appear here.</div></div>';
-      } else {
-        for (const ev of chatEvents) {
-          const user = ev.payload?.user_name || ev.payload?.channel_name || ev.agent_id || 'viewer';
-          const text = ev.payload?.message || ev.narrative || ev.event_type || 'event';
-          const label = ev.event_type.includes('subscribe') ? 'sub' : ev.event_type.includes('raid') ? 'raid' : ev.event_type.includes('chat') ? 'chat' : 'support';
-          const bubble = document.createElement('div');
-          bubble.className = 'chat-bubble';
-          bubble.innerHTML = `
-            <div class="chat-head"><span class="chat-user">${user}</span><span>${label}</span></div>
-            <div class="chat-text">${text}</div>
-            <div class="chat-subtext">${ev.event_type}</div>
-          `;
-          chatList.appendChild(bubble);
-        }
-      }
+      renderEnsemble(snap);
+      renderFocus(snap);
+      renderChat(events);
 
       const ticker = [
-        showrunner.headline || line,
+        showrunner.headline,
         audience.story_hook,
         viewer.poll?.question,
-        ...(selectEvents(snap).slice(0, 3).map(ev => ev.narrative || ev.event_type))
+        ...(events.slice(0, 3).map(ev => ev.narrative || ev.event_type))
       ].filter(Boolean);
-      document.getElementById('ticker-text').textContent = ticker.join('  ·  ');
+      document.getElementById('ticker-text').textContent = ticker.length ? ticker.join('  •  ') : 'Waiting for live events to begin.';
+
+      if (events.length > 0) {
+        const fresh = events.filter(ev => !STATE.seenEvents.has(ev.event_id));
+        for (const ev of fresh) {
+          STATE.seenEvents.add(ev.event_id);
+          const kind = kindFor(ev.event_type);
+          if (kind === 'patronage' || kind === 'raid' || kind === 'chat') {
+            pushAlert(
+              kind,
+              ev.payload?.user_name ? `${ev.payload.user_name} joins the cast` : 'A new presence enters',
+              ev.narrative || ev.event_type
+            );
+            break;
+          }
+        }
+      }
     }
 
     async function fetchSnapshot() {
       try {
-        const res = await fetch(`${RUNTIME}/world/snapshot?events_limit=30&messages_limit=20`);
+        const res = await fetch(`${RUNTIME}/world/snapshot?events_limit=40&messages_limit=24`);
         const snap = await res.json();
         if (!snap.error) applySnapshot(snap);
       } catch {}
@@ -602,12 +1310,14 @@
         if (STATE.ws) {
           STATE.ws.onclose = null;
           STATE.ws.onerror = null;
-          if (STATE.ws.readyState === WebSocket.OPEN || STATE.ws.readyState === WebSocket.CONNECTING) STATE.ws.close();
+          if (STATE.ws.readyState === WebSocket.OPEN || STATE.ws.readyState === WebSocket.CONNECTING) {
+            STATE.ws.close();
+          }
         }
         STATE.ws = new WebSocket(wsUrl());
         STATE.ws.onopen = () => {
           STATE.live = true;
-          document.getElementById('stream-chip').textContent = 'live';
+          document.getElementById('veil-copy').textContent = 'The veil is open. The cast is listening live.';
           startPing();
         };
         STATE.ws.onmessage = (evt) => {
@@ -619,18 +1329,30 @@
         };
         STATE.ws.onclose = () => {
           STATE.live = false;
-          document.getElementById('stream-chip').textContent = 'poll';
+          document.getElementById('veil-copy').textContent = 'Live feed paused. The stage is following the polling fallback.';
           if (STATE.ping) { clearInterval(STATE.ping); STATE.ping = null; }
           STATE.reconnect = setTimeout(connectWs, 4000);
         };
-        STATE.ws.onerror = () => { STATE.live = false; };
+        STATE.ws.onerror = () => {
+          STATE.live = false;
+        };
       } catch {
         STATE.reconnect = setTimeout(connectWs, 4000);
       }
     }
 
+    function tickClock() {
+      document.getElementById('clock-chip').textContent = fmtClock(new Date());
+      const seconds = Math.max(0, Math.floor((Date.now() - STATE.startAt) / 1000));
+      const mm = String(Math.floor(seconds / 60)).padStart(2, '0');
+      const ss = String(seconds % 60).padStart(2, '0');
+      document.getElementById('uptime-chip').textContent = `UPTIME ${mm}:${ss}`;
+      requestAnimationFrame(tickClock);
+    }
+
     fetchSnapshot();
     connectWs();
+    tickClock();
     setInterval(() => { if (!STATE.live) fetchSnapshot(); }, POLL_MS);
   </script>
 </body>

@@ -113,16 +113,29 @@ def build_resilience_status(snapshot: dict[str, Any] | None = None) -> dict[str,
     except Exception:
         build_nemo_status = None
     try:
+        from .voice import build_voice_status
+    except Exception:
+        build_voice_status = None
+    try:
+        from .avatar import build_avatar_status
+    except Exception:
+        build_avatar_status = None
+    try:
         from .twitch.adapter import build_twitch_status
     except Exception:
         build_twitch_status = None
 
     twitch_status = build_twitch_status() if build_twitch_status else {}
     nemo_status = build_nemo_status() if build_nemo_status else {}
+    voice_status = build_voice_status() if build_voice_status else {}
+    avatar_status = build_avatar_status() if build_avatar_status else {}
     broadcast_status = build_broadcast_status() if build_broadcast_status else {}
 
     nemo_live = bool(nemo_status.get("health", {}).get("ok")) or _env_flag("NEMO_ENABLED")
-    voice_live = _env_flag("VOICE_ENABLED") or bool(os.getenv("TTS_MODEL"))
+    voice_live = bool(voice_status.get("health", {}).get("ok")) or _env_flag("VOICE_ENABLED") or bool(
+        os.getenv("TTS_MODEL")
+    )
+    avatar_live = bool(avatar_status.get("health", {}).get("ok")) or bool(avatar_status.get("enabled"))
     twitch_live = bool(twitch_status.get("health", {}).get("eventsub", {}).get("ok")) or bool(
         twitch_status.get("health", {}).get("helix", {}).get("ok")
     )
@@ -131,6 +144,7 @@ def build_resilience_status(snapshot: dict[str, Any] | None = None) -> dict[str,
     fallbacks = {
         "nemo": _fallback_mode(nemo_live, "live", "stub"),
         "voice": _fallback_mode(voice_live, "live", "stub"),
+        "avatar": _fallback_mode(avatar_live, "live", "stub"),
         "twitch": _fallback_mode(twitch_live, "live", "stub"),
         "obs": _fallback_mode(obs_live, "live", "dry-run"),
         "stream": ws_mode,
@@ -155,6 +169,10 @@ def build_resilience_status(snapshot: dict[str, Any] | None = None) -> dict[str,
         notes.append(f"Snapshot is {snapshot_age}s old and should be refreshed.")
     if not nemo_live:
         notes.append("NeMo is not enabled yet, so the director layer remains stubbed.")
+    if not voice_live:
+        notes.append("Voice is not enabled yet, so the stream will remain text-first.")
+    if not avatar_live:
+        notes.append("Avatar rendering is not enabled yet, so the cast is visual-only in the browser stage.")
 
     status = {
         "tier": tier,
@@ -170,6 +188,8 @@ def build_resilience_status(snapshot: dict[str, Any] | None = None) -> dict[str,
         "adapters": {
             "twitch": twitch_status,
             "nemo": nemo_status,
+            "voice": voice_status,
+            "avatar": avatar_status,
             "broadcast": broadcast_status,
         },
     }

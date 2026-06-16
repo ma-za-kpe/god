@@ -220,6 +220,25 @@ services:
       - OBS_WEBSOCKET_URL=${OBS_WEBSOCKET_URL:-}
       - VOICE_ENABLED=${VOICE_ENABLED:-false}
       - VOICE_HEALTH_URL=${VOICE_HEALTH_URL:-}
+      - VOICE_PROVIDER=${VOICE_PROVIDER:-kokoro}
+      - VOICE_MODEL=${VOICE_MODEL:-kokoro}
+      - VOICE_NAME=${VOICE_NAME:-narrator}
+      - VOICE_PROFILE=${VOICE_PROFILE:-dramatic}
+      - VOICE_SPEED=${VOICE_SPEED:-1.0}
+      - VOICE_PITCH=${VOICE_PITCH:-0.5}
+      - VOICE_SAMPLE_RATE=${VOICE_SAMPLE_RATE:-48000}
+      - VOICE_TRANSPORT=${VOICE_TRANSPORT:-local-tts}
+      - VOICE_DRY_RUN=${VOICE_DRY_RUN:-true}
+      - LIP_SYNC_SOURCE=${LIP_SYNC_SOURCE:-audio}
+      - AVATAR_ENABLED=${AVATAR_ENABLED:-false}
+      - AVATAR_HEALTH_URL=${AVATAR_HEALTH_URL:-}
+      - AVATAR_RENDERER=${AVATAR_RENDERER:-vrm}
+      - AVATAR_FORMAT=${AVATAR_FORMAT:-vrm}
+      - AVATAR_ASSET=${AVATAR_ASSET:-}
+      - AVATAR_RENDER_TARGET=${AVATAR_RENDER_TARGET:-obs-virtual-camera}
+      - AVATAR_TRANSPORT=${AVATAR_TRANSPORT:-local-avatar}
+      - AVATAR_DRY_RUN=${AVATAR_DRY_RUN:-true}
+      - AVATAR_LIP_SYNC_SOURCE=${AVATAR_LIP_SYNC_SOURCE:-audio}
       # Set after deploying contracts: forge script contracts/script/Deploy.s.sol ...
       - RENT_COLLECTOR_ADDRESS=${RENT_COLLECTOR_ADDRESS:-}
       - SOUL_NFT_ADDRESS=${SOUL_NFT_ADDRESS:-}

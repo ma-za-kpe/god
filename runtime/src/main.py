@@ -390,6 +390,80 @@ async def nemo_director(events_limit: int = 50, messages_limit: int = 80):
         return {"error": str(e), "world_id": os.getenv("WORLD_ID", "local-dev-world-1")}
 
 
+@app.get("/voice/status")
+async def voice_status():
+    """Current voice stack configuration and health."""
+    try:
+        from .voice import build_voice_status
+
+        return {
+            "voice": build_voice_status(),
+            "world_id": os.getenv("WORLD_ID", "local-dev-world-1"),
+        }
+    except Exception as e:
+        log.warning(f"/voice/status error: {e}")
+        return {"error": str(e), "world_id": os.getenv("WORLD_ID", "local-dev-world-1")}
+
+
+@app.get("/voice/state")
+async def voice_state(events_limit: int = 50, messages_limit: int = 80):
+    """Current voice plan layered over the latest world snapshot."""
+    try:
+        from .world_snapshot import build_world_snapshot_async
+
+        snapshot = await build_world_snapshot_async(
+            events_limit=min(events_limit, 200),
+            messages_limit=min(messages_limit, 500),
+        )
+        return {
+            "voice": snapshot.get("voice", {}),
+            "showrunner": snapshot.get("showrunner", {}),
+            "broadcast": snapshot.get("broadcast", {}),
+            "world_id": snapshot.get("world_id", os.getenv("WORLD_ID", "local-dev-world-1")),
+            "epoch": snapshot.get("epoch"),
+        }
+    except Exception as e:
+        log.warning(f"/voice/state error: {e}")
+        return {"error": str(e), "world_id": os.getenv("WORLD_ID", "local-dev-world-1")}
+
+
+@app.get("/avatar/status")
+async def avatar_status():
+    """Current avatar stack configuration and health."""
+    try:
+        from .avatar import build_avatar_status
+
+        return {
+            "avatar": build_avatar_status(),
+            "world_id": os.getenv("WORLD_ID", "local-dev-world-1"),
+        }
+    except Exception as e:
+        log.warning(f"/avatar/status error: {e}")
+        return {"error": str(e), "world_id": os.getenv("WORLD_ID", "local-dev-world-1")}
+
+
+@app.get("/avatar/state")
+async def avatar_state(events_limit: int = 50, messages_limit: int = 80):
+    """Current avatar plan layered over the latest world snapshot."""
+    try:
+        from .world_snapshot import build_world_snapshot_async
+
+        snapshot = await build_world_snapshot_async(
+            events_limit=min(events_limit, 200),
+            messages_limit=min(messages_limit, 500),
+        )
+        return {
+            "avatar": snapshot.get("avatar", {}),
+            "showrunner": snapshot.get("showrunner", {}),
+            "voice": snapshot.get("voice", {}),
+            "world_id": snapshot.get("world_id", os.getenv("WORLD_ID", "local-dev-world-1")),
+            "epoch": snapshot.get("epoch"),
+        }
+    except Exception as e:
+        log.warning(f"/avatar/state error: {e}")
+        return {"error": str(e), "world_id": os.getenv("WORLD_ID", "local-dev-world-1")}
+
+
 @app.get("/broadcast/state")
 async def broadcast_state(events_limit: int = 50, messages_limit: int = 80):
     """Broadcast scene, captions, overlays, and OBS command plan."""
