@@ -25,6 +25,16 @@ def _snapshot() -> dict:
             "unique_supporters_24h": 4,
             "hype_index": 19.0,
         },
+        "content_bank": {
+            "bank_id": "bank-123",
+            "summary": "3 future arc(s), 3 dialogue beats, 3 scene prompts, focus=patron-funded escalation.",
+            "horizon_days": 30,
+            "arc_count": 3,
+            "dialogue_count": 3,
+            "scene_count": 3,
+            "clip_count": 3,
+            "focus": "patron-funded escalation",
+        },
         "showrunner": {
             "scene": "economy-pan",
             "speaker": "Alpha",
@@ -52,7 +62,8 @@ def test_broadcast_surface_builds_scene_and_caption():
     assert state.scene.scene_id == "obs/economy-pan"
     assert state.scene.scene_name == "Economy Pan"
     assert state.caption.headline.startswith("Alpha:")
-    assert "Patrons are funding" in state.caption.subhead
+    assert "future arc" in state.caption.ticker_lines[-1].lower()
+    assert "future arc" in state.overlay.cards[8]["label"].lower()
     assert "Live Stage" == state.overlay.title
     assert len(state.commands) == 3
     assert state.commands[0]["action"] == "set_scene"
@@ -63,7 +74,7 @@ def test_broadcast_state_serializes():
     payload = build_broadcast_state(_snapshot())
 
     assert payload["scene"]["scene_id"] == "obs/economy-pan"
-    assert payload["caption"]["subhead"].startswith("Patrons are funding")
+    assert payload["caption"]["ticker_lines"][-1].startswith("Future arcs")
     assert payload["overlay"]["labels"][0] == "Economy Pan"
 
 

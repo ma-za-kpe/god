@@ -181,6 +181,12 @@ def _finalize_snapshot(
         log.debug(f"audience state build skipped: {e}")
     snapshot["showrunner"] = build_showrunner_plan(snapshot)
     try:
+        from .content_bank import build_content_bank_state
+
+        snapshot["content_bank"] = build_content_bank_state(snapshot)
+    except Exception as e:
+        log.debug(f"content bank build skipped: {e}")
+    try:
         from .nemo import build_nemo_directive
 
         snapshot["nemo"] = build_nemo_directive(snapshot)
