@@ -174,6 +174,12 @@ def _finalize_snapshot(
         "world_id": world_id,
     }
     snapshot["showrunner"] = build_showrunner_plan(snapshot)
+    try:
+        from .nemo import build_nemo_directive
+
+        snapshot["nemo"] = build_nemo_directive(snapshot)
+    except Exception as e:
+        log.debug(f"nemo directive build skipped: {e}")
     return json_safe(
         snapshot
     )

@@ -244,6 +244,42 @@ async def twitch_status():
         return {"error": str(e), "world_id": os.getenv("WORLD_ID", "local-dev-world-1")}
 
 
+@app.get("/nemo/status")
+async def nemo_status():
+    """Current NeMo director status and configuration."""
+    try:
+        from .nemo import build_nemo_status
+
+        return {
+            "nemo": build_nemo_status(),
+            "world_id": os.getenv("WORLD_ID", "local-dev-world-1"),
+        }
+    except Exception as e:
+        log.warning(f"/nemo/status error: {e}")
+        return {"error": str(e), "world_id": os.getenv("WORLD_ID", "local-dev-world-1")}
+
+
+@app.get("/nemo/director")
+async def nemo_director(events_limit: int = 50, messages_limit: int = 80):
+    """Current NeMo directive layered over the latest world snapshot."""
+    try:
+        from .world_snapshot import build_world_snapshot_async
+
+        snapshot = await build_world_snapshot_async(
+            events_limit=min(events_limit, 200),
+            messages_limit=min(messages_limit, 500),
+        )
+        return {
+            "nemo": snapshot.get("nemo", {}),
+            "showrunner": snapshot.get("showrunner", {}),
+            "world_id": snapshot.get("world_id", os.getenv("WORLD_ID", "local-dev-world-1")),
+            "epoch": snapshot.get("epoch"),
+        }
+    except Exception as e:
+        log.warning(f"/nemo/director error: {e}")
+        return {"error": str(e), "world_id": os.getenv("WORLD_ID", "local-dev-world-1")}
+
+
 @app.websocket("/world/stream")
 async def world_stream(ws: WebSocket):
     """WebSocket: snapshot on connect, delta pushes on events, keepalive ping/pong."""
