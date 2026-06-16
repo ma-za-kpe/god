@@ -33,11 +33,11 @@ class Showrunner:
         if self._state.last_signature == signature and self._state.last_plan:
             return self._state.last_plan
 
-        scene = select_scene(cues, stats)
+        scene = select_scene(cues, snapshot)
         speaker = speaker_for(cues, snapshot)
         headline = self._headline(cues, stats)
         audience_prompt = audience_prompt_for(cues, snapshot)
-        reasoning = self._reasoning(cues, stats, scene, speaker)
+        reasoning = self._reasoning(cues, snapshot, scene, speaker)
 
         plan = ShowrunnerPlan(
             mode="live-weave",
@@ -77,7 +77,9 @@ class Showrunner:
             return "The market is moving."
         return "The world is holding."
 
-    def _reasoning(self, cues, stats: dict[str, Any], scene: str, speaker: str) -> list[str]:
+    def _reasoning(self, cues, snapshot: dict[str, Any], scene: str, speaker: str) -> list[str]:
+        stats = snapshot.get("stats") or {}
+        audience = snapshot.get("audience") or {}
         notes = [
             f"scene={scene}",
             f"speaker={speaker}",
@@ -90,6 +92,12 @@ class Showrunner:
             notes.append("economy_active")
         if int(stats.get("service_purchases_24h") or 0) > 0:
             notes.append("patronage_visible")
+        if float(audience.get("patronage_index") or 0) >= 12:
+            notes.append("audience_funded")
+        if int(audience.get("raid_waves_24h") or 0) > 0:
+            notes.append("raid_pressure")
+        if int(audience.get("chat_pressure") or 0) >= 8:
+            notes.append("chat_drives_scene")
         return notes
 
     def _signature(self, snapshot: dict[str, Any], cues) -> str:

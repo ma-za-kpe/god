@@ -17,6 +17,14 @@ def _snapshot() -> dict:
             "total_usdc_in_world": 44.2,
             "top_earners": [{"current_name": "Alpha"}],
         },
+        "audience": {
+            "scene": "market-watch",
+            "story_hook": "Patrons are funding the cast; reward the room with a stronger turn.",
+            "patronage_index": 16.5,
+            "chat_pressure": 7,
+            "unique_supporters_24h": 4,
+            "hype_index": 19.0,
+        },
         "showrunner": {
             "scene": "economy-pan",
             "speaker": "Alpha",
@@ -44,16 +52,18 @@ def test_broadcast_surface_builds_scene_and_caption():
     assert state.scene.scene_id == "obs/economy-pan"
     assert state.scene.scene_name == "Economy Pan"
     assert state.caption.headline.startswith("Alpha:")
+    assert "Patrons are funding" in state.caption.subhead
     assert "Live Stage" == state.overlay.title
     assert len(state.commands) == 3
     assert state.commands[0]["action"] == "set_scene"
+    assert state.overlay.cards[5]["label"] == "Patrons"
 
 
 def test_broadcast_state_serializes():
     payload = build_broadcast_state(_snapshot())
 
     assert payload["scene"]["scene_id"] == "obs/economy-pan"
-    assert payload["caption"]["lower_third"] == "Economy Pan · Alpha"
+    assert payload["caption"]["subhead"].startswith("Patrons are funding")
     assert payload["overlay"]["labels"][0] == "Economy Pan"
 
 

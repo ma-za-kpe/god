@@ -41,6 +41,23 @@ def test_ingest_chat_becomes_world_event():
     assert "viewer_one" in world_event["narrative"]
 
 
+def test_ingest_subscribe_becomes_patronage_event():
+    adapter = TwitchAdapter(channel_name="godshow", dry_run=True)
+    world_event = adapter.ingest(
+        "channel.subscribe",
+        {
+            "channel_name": "godshow",
+            "user_name": "viewer_two",
+            "user_id": "u2",
+        },
+    )
+
+    assert world_event is not None
+    assert world_event["category"] == "economy"
+    assert world_event["event_type"] == "economy.twitch.subscribe"
+    assert "patron" in world_event["narrative"].lower() or "subscribed" in world_event["narrative"].lower()
+
+
 @pytest.mark.asyncio
 async def test_send_chat_defaults_to_dry_run():
     adapter = TwitchAdapter(channel_name="godshow", dry_run=True)

@@ -67,6 +67,32 @@ def _economy_snapshot() -> dict:
     return snap
 
 
+def _audience_snapshot() -> dict:
+    snap = _snapshot()
+    snap["events"] = [
+        {
+            "event_id": "evt-1",
+            "event_type": "economy.twitch.subscribe",
+            "agent_id": "viewer_two",
+            "payload": {
+                "user_name": "viewer_two",
+                "narrative": "viewer_two becomes a patron.",
+            },
+        },
+        {
+            "event_id": "evt-2",
+            "event_type": "social.twitch.chat.message",
+            "agent_id": "viewer_one",
+            "payload": {
+                "user_name": "viewer_one",
+                "message": "keep going",
+                "narrative": "viewer_one pushes the room forward.",
+            },
+        },
+    ]
+    return snap
+
+
 def test_showrunner_prefers_highest_signal_event():
     plan = Showrunner().build_plan(_snapshot())
 
@@ -94,3 +120,16 @@ def test_showrunner_public_bank_prompt_tracks_economy():
     economy_plan = build_showrunner_plan(_economy_snapshot())
     assert "economic move" in economy_plan["audience_prompt"]
     assert economy_plan["cues"][0]["cue_type"] == "economy.service.purchased"
+
+
+def test_showrunner_audience_state_changes_scene_prompt():
+    snap = _audience_snapshot()
+    snap["audience"] = {
+        "patronage_index": 16.0,
+        "chat_pressure": 1,
+        "raid_waves_24h": 0,
+    }
+    plan = build_showrunner_plan(snap)
+
+    assert plan["scene"] == "market-watch"
+    assert "patrons are funding" in plan["audience_prompt"].lower()

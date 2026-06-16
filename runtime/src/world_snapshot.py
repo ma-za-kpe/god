@@ -173,6 +173,12 @@ def _finalize_snapshot(
         "leaderboard": stats.get("top_earners", []),
         "world_id": world_id,
     }
+    try:
+        from .audience import build_audience_state
+
+        snapshot["audience"] = build_audience_state(snapshot)
+    except Exception as e:
+        log.debug(f"audience state build skipped: {e}")
     snapshot["showrunner"] = build_showrunner_plan(snapshot)
     try:
         from .nemo import build_nemo_directive

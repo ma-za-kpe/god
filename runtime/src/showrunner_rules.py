@@ -26,6 +26,14 @@ PRIORITY_BY_EVENT = {
     "social.agent.broadcast": 76,
     "social.agent.message_sent": 50,
     "social.coalition.formed": 84,
+    "social.twitch.chat.message": 58,
+    "social.twitch.follow": 62,
+    "social.twitch.raid": 88,
+    "social.twitch.channel_point": 66,
+    "economy.twitch.subscribe": 92,
+    "economy.twitch.subscription_gift": 94,
+    "economy.twitch.subscription_message": 78,
+    "economy.twitch.cheer": 86,
     "agent.throttled": 88,
     "cognitive.agent.thought": 20,
 }
@@ -35,18 +43,24 @@ def event_priority(event_type: str) -> int:
     return PRIORITY_BY_EVENT.get(event_type, 10)
 
 
-def select_scene(cues: Iterable[ShowrunnerCue], state: dict[str, Any]) -> str:
+def select_scene(cues: Iterable[ShowrunnerCue], snapshot: dict[str, Any]) -> str:
     cue_list = list(cues)
+    stats = snapshot.get("stats") or {}
+    audience = snapshot.get("audience") or {}
     top_tags = set(cue_list[0].tags) if cue_list else set()
+    if int(audience.get("raid_waves_24h") or 0) > 0:
+        return "banter-table"
+    if float(audience.get("patronage_index") or 0) >= 12:
+        return "market-watch"
     if "death" in top_tags:
         return "graveyard-cut"
     if "economy" in top_tags:
         return "economy-pan"
     if "social" in top_tags:
         return "banter-table"
-    if state.get("living_count", 0) == 0:
+    if int(stats.get("living_count") or 0) == 0:
         return "void-silence"
-    if state.get("transfers_24h", 0) > 0:
+    if int(stats.get("transfers_24h") or 0) > 0:
         return "market-watch"
     return "world-wide"
 
@@ -59,6 +73,13 @@ def speaker_for(cues: list[ShowrunnerCue], snapshot: dict[str, Any]) -> str:
 
 
 def audience_prompt_for(cues: list[ShowrunnerCue], snapshot: dict[str, Any]) -> str:
+    audience = snapshot.get("audience") or {}
+    if float(audience.get("patronage_index") or 0) >= 12:
+        return "The patrons are funding the drama; let chat see the return."
+    if int(audience.get("raid_waves_24h") or 0) > 0:
+        return "A raid has arrived; give the new viewers a sharp first impression."
+    if int(audience.get("chat_pressure") or 0) >= 8:
+        return "Chat is steering the tempo; let the agents answer the room directly."
     if not cues:
         return "Watch the world for the next major turn."
     best = max(cues, key=lambda cue: (cue.priority, cue.agent_name, cue.agent_id))
@@ -125,6 +146,10 @@ def _tags_for_event(event_type: str, payload: dict[str, Any]) -> tuple[str, ...]
     if "broadcast" in event_type or "message" in event_type:
         tags.append("social")
     if "patron" in event_type or any(k in payload for k in ("sub_count", "gift_count", "bits", "donation")):
+        tags.append("patronage")
+    if event_type.startswith("social.twitch"):
+        tags.append("twitch")
+    if event_type.startswith("economy.twitch"):
         tags.append("patronage")
     if "throttle" in event_type:
         tags.append("pressure")
