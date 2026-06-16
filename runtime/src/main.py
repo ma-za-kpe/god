@@ -280,6 +280,43 @@ async def nemo_director(events_limit: int = 50, messages_limit: int = 80):
         return {"error": str(e), "world_id": os.getenv("WORLD_ID", "local-dev-world-1")}
 
 
+@app.get("/broadcast/state")
+async def broadcast_state(events_limit: int = 50, messages_limit: int = 80):
+    """Broadcast scene, captions, overlays, and OBS command plan."""
+    try:
+        from .world_snapshot import build_world_snapshot_async
+
+        snapshot = await build_world_snapshot_async(
+            events_limit=min(events_limit, 200),
+            messages_limit=min(messages_limit, 500),
+        )
+        return {
+            "broadcast": snapshot.get("broadcast", {}),
+            "showrunner": snapshot.get("showrunner", {}),
+            "nemo": snapshot.get("nemo", {}),
+            "world_id": snapshot.get("world_id", os.getenv("WORLD_ID", "local-dev-world-1")),
+            "epoch": snapshot.get("epoch"),
+        }
+    except Exception as e:
+        log.warning(f"/broadcast/state error: {e}")
+        return {"error": str(e), "world_id": os.getenv("WORLD_ID", "local-dev-world-1")}
+
+
+@app.get("/broadcast/status")
+async def broadcast_status():
+    """Current broadcast adapter mode and transport configuration."""
+    try:
+        from .broadcast import build_broadcast_status
+
+        return {
+            "broadcast": build_broadcast_status(),
+            "world_id": os.getenv("WORLD_ID", "local-dev-world-1"),
+        }
+    except Exception as e:
+        log.warning(f"/broadcast/status error: {e}")
+        return {"error": str(e), "world_id": os.getenv("WORLD_ID", "local-dev-world-1")}
+
+
 @app.websocket("/world/stream")
 async def world_stream(ws: WebSocket):
     """WebSocket: snapshot on connect, delta pushes on events, keepalive ping/pong."""

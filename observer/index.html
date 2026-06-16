@@ -108,6 +108,82 @@
     #rpanel-toggle:hover { background: var(--god-surface-solid); color: var(--god-life); }
     #rpanel-toggle.open { right: 292px; }
 
+    #stage-panel {
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--god-border);
+      background: linear-gradient(180deg, rgba(14, 18, 38, 0.92), rgba(8, 10, 20, 0.88));
+    }
+    #stage-panel .stage-title {
+      font-size: 0.56rem;
+      letter-spacing: 0.28em;
+      color: var(--god-muted);
+      margin-bottom: 8px;
+    }
+    #stage-scene {
+      font-size: 1rem;
+      letter-spacing: 0.08em;
+      color: var(--god-life);
+      margin-bottom: 4px;
+    }
+    #stage-caption {
+      font-size: 0.68rem;
+      color: var(--god-text);
+      line-height: 1.5;
+      margin-bottom: 6px;
+    }
+    #stage-subhead {
+      font-size: 0.62rem;
+      color: var(--god-cognition);
+      line-height: 1.5;
+      margin-bottom: 8px;
+    }
+    #stage-lower {
+      font-size: 0.56rem;
+      letter-spacing: 0.16em;
+      color: var(--god-economy);
+      margin-bottom: 8px;
+      text-transform: uppercase;
+    }
+    #stage-tags {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      margin-bottom: 10px;
+    }
+    .stage-tag {
+      font-size: 0.52rem;
+      padding: 2px 7px;
+      border-radius: 999px;
+      border: 1px solid var(--god-border);
+      color: var(--god-muted);
+      background: rgba(255,255,255,0.03);
+      letter-spacing: 0.14em;
+    }
+    #stage-cards {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 6px;
+    }
+    .stage-card {
+      padding: 7px 8px;
+      border: 1px solid var(--god-border);
+      border-radius: 6px;
+      background: rgba(255,255,255,0.03);
+    }
+    .stage-card .k {
+      display: block;
+      font-size: 0.5rem;
+      letter-spacing: 0.18em;
+      color: var(--god-muted);
+      margin-bottom: 4px;
+      text-transform: uppercase;
+    }
+    .stage-card .v {
+      font-size: 0.75rem;
+      color: var(--god-text);
+      line-height: 1.3;
+    }
+
     #inspector { flex-shrink: 0; padding: 12px 14px; border-bottom: 1px solid var(--god-border); }
     .panel-lbl { font-size: 0.56rem; letter-spacing: 0.28em; color: var(--god-muted); margin-bottom: 8px; }
     #insp-empty { color: var(--god-muted); font-size: 0.68rem; line-height: 1.7; }
@@ -260,6 +336,15 @@
   <!-- Right panel: Inspector + Feed -->
   <div id="rpanel-toggle" onclick="togglePanel('r')">▶</div>
   <aside id="rpanel">
+    <section id="stage-panel">
+      <div class="stage-title">▸ LIVE STAGE</div>
+      <div id="stage-scene">World Wide</div>
+      <div id="stage-caption">The world keeps moving.</div>
+      <div id="stage-subhead">Watch closely.</div>
+      <div id="stage-lower">OBS READY · DRY RUN</div>
+      <div id="stage-tags"></div>
+      <div id="stage-cards"></div>
+    </section>
     <div id="inspector">
       <div class="panel-lbl">▸ AGENT INSPECTOR</div>
       <div id="insp-empty">No agent selected.<br>Click any entity on the canvas.</div>
@@ -1343,6 +1428,33 @@ function updateEcon(d) {
   for(const n of S.actBins) chart.innerHTML+=`<div class="act-bar" style="height:${Math.round(n/maxB*100)}%;opacity:${0.25+n/maxB*0.7}"></div>`;
 }
 
+function applyBroadcastState(broadcast) {
+  if (!broadcast) return;
+  const scene = broadcast.scene || {};
+  const caption = broadcast.caption || {};
+  const overlay = broadcast.overlay || {};
+  document.getElementById('stage-scene').textContent = scene.scene_name || 'World Wide';
+  document.getElementById('stage-caption').textContent = caption.headline || 'The world keeps moving.';
+  document.getElementById('stage-subhead').textContent = caption.subhead || 'Watch closely.';
+  document.getElementById('stage-lower').textContent = `${scene.scene_name || 'World Wide'} · ${scene.mode || 'dry-run'}`.toUpperCase();
+  const tags = document.getElementById('stage-tags');
+  tags.innerHTML = '';
+  (overlay.labels || []).slice(0, 4).forEach(label => {
+    const el = document.createElement('span');
+    el.className = 'stage-tag';
+    el.textContent = label;
+    tags.appendChild(el);
+  });
+  const cards = document.getElementById('stage-cards');
+  cards.innerHTML = '';
+  (overlay.cards || []).slice(0, 4).forEach(card => {
+    const wrap = document.createElement('div');
+    wrap.className = 'stage-card';
+    wrap.innerHTML = `<span class="k">${card.label || ''}</span><span class="v">${card.value ?? ''}</span>`;
+    cards.appendChild(wrap);
+  });
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 // API — single snapshot poll (replaces 4 parallel pollers)
 // ═══════════════════════════════════════════════════════════════════════════
@@ -1485,6 +1597,7 @@ function applySnapshotMsg(snap) {
   S.hydrating = true;
   applyAgents(snap.agents, true);
   applyMessages(snap.messages, { silent: true });
+  applyBroadcastState(snap.broadcast);
   const d = snap.stats || {};
   if (d.world_start_ts && (!S.worldStart || d.world_start_ts < S.worldStart)) S.worldStart = d.world_start_ts;
   document.getElementById('s-born').textContent   = d.total_born || '0';

@@ -180,6 +180,12 @@ def _finalize_snapshot(
         snapshot["nemo"] = build_nemo_directive(snapshot)
     except Exception as e:
         log.debug(f"nemo directive build skipped: {e}")
+    try:
+        from .broadcast import build_broadcast_state
+
+        snapshot["broadcast"] = build_broadcast_state(snapshot)
+    except Exception as e:
+        log.debug(f"broadcast state build skipped: {e}")
     return json_safe(
         snapshot
     )
