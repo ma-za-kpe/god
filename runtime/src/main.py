@@ -317,6 +317,43 @@ async def content_bank_state(events_limit: int = 50, messages_limit: int = 80):
         return {"error": str(e), "world_id": os.getenv("WORLD_ID", "local-dev-world-1")}
 
 
+@app.get("/viewer/status")
+async def viewer_status():
+    """Current viewer overlay / extension configuration."""
+    try:
+        from .viewer import build_viewer_status
+
+        return {
+            "viewer": build_viewer_status(),
+            "world_id": os.getenv("WORLD_ID", "local-dev-world-1"),
+        }
+    except Exception as e:
+        log.warning(f"/viewer/status error: {e}")
+        return {"error": str(e), "world_id": os.getenv("WORLD_ID", "local-dev-world-1")}
+
+
+@app.get("/viewer/state")
+async def viewer_state(events_limit: int = 50, messages_limit: int = 80):
+    """Current viewer interaction state layered over the latest world snapshot."""
+    try:
+        from .world_snapshot import build_world_snapshot_async
+
+        snapshot = await build_world_snapshot_async(
+            events_limit=min(events_limit, 200),
+            messages_limit=min(messages_limit, 500),
+        )
+        return {
+            "viewer": snapshot.get("viewer", {}),
+            "content_bank": snapshot.get("content_bank", {}),
+            "audience": snapshot.get("audience", {}),
+            "world_id": snapshot.get("world_id", os.getenv("WORLD_ID", "local-dev-world-1")),
+            "epoch": snapshot.get("epoch"),
+        }
+    except Exception as e:
+        log.warning(f"/viewer/state error: {e}")
+        return {"error": str(e), "world_id": os.getenv("WORLD_ID", "local-dev-world-1")}
+
+
 @app.get("/nemo/status")
 async def nemo_status():
     """Current NeMo director status and configuration."""

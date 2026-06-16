@@ -187,6 +187,12 @@ def _finalize_snapshot(
     except Exception as e:
         log.debug(f"content bank build skipped: {e}")
     try:
+        from .viewer import build_viewer_state
+
+        snapshot["viewer"] = build_viewer_state(snapshot)
+    except Exception as e:
+        log.debug(f"viewer state build skipped: {e}")
+    try:
         from .nemo import build_nemo_directive
 
         snapshot["nemo"] = build_nemo_directive(snapshot)
