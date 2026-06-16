@@ -6,6 +6,9 @@ import os
 import time
 from typing import Any
 
+import psycopg2
+import psycopg2.extras
+
 
 def _env_flag(name: str, default: str = "0") -> bool:
     return os.getenv(name, default).strip().lower() in {"1", "true", "yes", "on"}
@@ -15,9 +18,63 @@ def _fallback_mode(enabled: bool, live_value: str, fallback_value: str) -> str:
     return live_value if enabled else fallback_value
 
 
+def _db():
+    return psycopg2.connect(DATABASE_URL, cursor_factory=psycopg2.extras.RealDictCursor)
+
+
+def _load_persisted_snapshot() -> dict[str, Any] | None:
+    try:
+        conn = _db()
+        cur = conn.cursor()
+        cur.execute(
+            """
+            SELECT snapshot, created_at
+            FROM resilience_snapshots
+            WHERE world_id = %s
+            ORDER BY created_at DESC
+            LIMIT 1
+            """,
+            (WORLD_ID,),
+        )
+        row = cur.fetchone()
+        cur.close()
+        conn.close()
+        if not row:
+            return None
+        snapshot = dict(row["snapshot"] or {})
+        snapshot["persisted_at"] = int(row["created_at"])
+        snapshot["source"] = "persisted"
+        return snapshot
+    except Exception:
+        return None
+
+
+def _persist_snapshot(status: dict[str, Any]) -> None:
+    try:
+        conn = psycopg2.connect(DATABASE_URL)
+        cur = conn.cursor()
+        cur.execute(
+            """
+            INSERT INTO resilience_snapshots (world_id, created_at, snapshot)
+            VALUES (%s, %s, %s)
+            """,
+            (
+                WORLD_ID,
+                int(time.time()),
+                psycopg2.extras.Json(status),
+            ),
+        )
+        conn.commit()
+        cur.close()
+        conn.close()
+    except Exception:
+        pass
+
+
 def build_resilience_status(snapshot: dict[str, Any] | None = None) -> dict[str, Any]:
     """Compose a deterministic local-first resilience summary."""
-    snapshot = snapshot or {}
+    persisted = _load_persisted_snapshot() or {}
+    snapshot = {**persisted, **(snapshot or {})}
 
     try:
         from .world_stream import current_epoch, has_subscribers, stream_status
@@ -47,12 +104,29 @@ def build_resilience_status(snapshot: dict[str, Any] | None = None) -> dict[str,
     live_stream = bool(has_subscribers())
     ws_mode = "live" if live_stream else "poll-fallback"
 
-    nemo_live = _env_flag("NEMO_ENABLED") or bool(os.getenv("NEMO_ENDPOINT"))
+    try:
+        from .broadcast import build_broadcast_status
+    except Exception:
+        build_broadcast_status = None
+    try:
+        from .nemo import build_nemo_status
+    except Exception:
+        build_nemo_status = None
+    try:
+        from .twitch.adapter import build_twitch_status
+    except Exception:
+        build_twitch_status = None
+
+    twitch_status = build_twitch_status() if build_twitch_status else {}
+    nemo_status = build_nemo_status() if build_nemo_status else {}
+    broadcast_status = build_broadcast_status() if build_broadcast_status else {}
+
+    nemo_live = bool(nemo_status.get("health", {}).get("ok")) or _env_flag("NEMO_ENABLED")
     voice_live = _env_flag("VOICE_ENABLED") or bool(os.getenv("TTS_MODEL"))
-    twitch_live = _env_flag("TWITCH_EVENTSUB_ENABLED") or bool(
-        os.getenv("TWITCH_EVENTSUB_TOKEN") or os.getenv("TWITCH_BOT_TOKEN")
+    twitch_live = bool(twitch_status.get("health", {}).get("eventsub", {}).get("ok")) or bool(
+        twitch_status.get("health", {}).get("helix", {}).get("ok")
     )
-    obs_live = _env_flag("OBS_ENABLED") or bool(os.getenv("OBS_WEBSOCKET_URL"))
+    obs_live = bool(broadcast_status.get("health", {}).get("ok")) or _env_flag("OBS_ENABLED")
 
     fallbacks = {
         "nemo": _fallback_mode(nemo_live, "live", "stub"),
@@ -82,7 +156,7 @@ def build_resilience_status(snapshot: dict[str, Any] | None = None) -> dict[str,
     if not nemo_live:
         notes.append("NeMo is not enabled yet, so the director layer remains stubbed.")
 
-    return {
+    status = {
         "tier": tier,
         "epoch": current_epoch(),
         "snapshot_age_seconds": snapshot_age,
@@ -90,4 +164,14 @@ def build_resilience_status(snapshot: dict[str, Any] | None = None) -> dict[str,
         "fallbacks": fallbacks,
         "notes": notes,
         "local_first": True,
+        "restart_safe": bool(persisted),
+        "source": snapshot.get("source", "live"),
+        "persisted_at": snapshot.get("persisted_at"),
+        "adapters": {
+            "twitch": twitch_status,
+            "nemo": nemo_status,
+            "broadcast": broadcast_status,
+        },
     }
+    _persist_snapshot(status)
+    return status

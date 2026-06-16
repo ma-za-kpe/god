@@ -10,6 +10,7 @@ RUN apt-get update && apt-get install -y \
 
 # Python dependencies
 COPY requirements.txt .
+ENV PIP_REQUIRE_HASHES=0
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy source (overridden by volume mount in dev)

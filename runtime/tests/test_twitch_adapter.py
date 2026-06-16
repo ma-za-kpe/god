@@ -23,7 +23,8 @@ def test_normalizes_chat_message():
     assert event.user_name == "viewer_one"
 
 
-def test_ingest_chat_becomes_world_event():
+def test_ingest_chat_becomes_world_event(monkeypatch):
+    monkeypatch.setattr("twitch.adapter._register_replay_key", lambda *args, **kwargs: True)
     adapter = TwitchAdapter(channel_name="godshow", dry_run=True)
     world_event = adapter.ingest(
         "channel.chat.message",
@@ -41,7 +42,8 @@ def test_ingest_chat_becomes_world_event():
     assert "viewer_one" in world_event["narrative"]
 
 
-def test_ingest_subscribe_becomes_patronage_event():
+def test_ingest_subscribe_becomes_patronage_event(monkeypatch):
+    monkeypatch.setattr("twitch.adapter._register_replay_key", lambda *args, **kwargs: True)
     adapter = TwitchAdapter(channel_name="godshow", dry_run=True)
     world_event = adapter.ingest(
         "channel.subscribe",
@@ -73,3 +75,36 @@ def test_status_reflects_support():
 
     assert "supported_event_types" in status
     assert "channel.chat.message" in status["supported_event_types"]
+    assert "health" in status
+
+
+def test_ingest_rejects_duplicate_replay(monkeypatch):
+    adapter = TwitchAdapter(channel_name="godshow", dry_run=True)
+
+    calls = iter([True, False])
+
+    monkeypatch.setattr("twitch.adapter._register_replay_key", lambda *args, **kwargs: next(calls))
+
+    first = adapter.ingest(
+        "channel.chat.message",
+        {
+            "channel_name": "godshow",
+            "user_name": "viewer_one",
+            "user_id": "u1",
+            "message": "hello again",
+            "event_id": "evt-1",
+        },
+    )
+    second = adapter.ingest(
+        "channel.chat.message",
+        {
+            "channel_name": "godshow",
+            "user_name": "viewer_one",
+            "user_id": "u1",
+            "message": "hello again",
+            "event_id": "evt-1",
+        },
+    )
+
+    assert first is not None
+    assert second is None

@@ -209,6 +209,17 @@ services:
       - LLM_PROVIDER=${LLM_PROVIDER:-ollama}
       - LLM_MODEL=${LLM_MODEL:-llama3.1:8b}
       - OLLAMA_BASE_URL=http://host.docker.internal:11434
+      - TWITCH_ENABLED=${TWITCH_ENABLED:-false}
+      - TWITCH_DRY_RUN=${TWITCH_DRY_RUN:-true}
+      - TWITCH_EVENTSUB_TRANSPORT=${TWITCH_EVENTSUB_TRANSPORT:-dry-run}
+      - TWITCH_HELIX_HEALTH_URL=${TWITCH_HELIX_HEALTH_URL:-}
+      - TWITCH_EVENTSUB_HEALTH_URL=${TWITCH_EVENTSUB_HEALTH_URL:-}
+      - NEMO_ENABLED=${NEMO_ENABLED:-true}
+      - NEMO_ENDPOINT=${NEMO_ENDPOINT:-}
+      - OBS_ENABLED=${OBS_ENABLED:-false}
+      - OBS_WEBSOCKET_URL=${OBS_WEBSOCKET_URL:-}
+      - VOICE_ENABLED=${VOICE_ENABLED:-false}
+      - VOICE_HEALTH_URL=${VOICE_HEALTH_URL:-}
       # Set after deploying contracts: forge script contracts/script/Deploy.s.sol ...
       - RENT_COLLECTOR_ADDRESS=${RENT_COLLECTOR_ADDRESS:-}
       - SOUL_NFT_ADDRESS=${SOUL_NFT_ADDRESS:-}

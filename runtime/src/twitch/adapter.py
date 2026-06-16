@@ -12,10 +12,17 @@ import os
 import time
 from typing import Any
 
+import psycopg2
+
 try:  # pragma: no cover - runtime package import path
     from ..json_safe import json_safe
 except ImportError:  # pragma: no cover - tests import via flat path
     from json_safe import json_safe
+
+try:  # pragma: no cover - runtime package import path
+    from ..health_checks import probe_url
+except ImportError:  # pragma: no cover - tests import via flat path
+    from health_checks import probe_url
 
 from .models import TwitchChatMessage, TwitchEvent, TwitchOutgoingChat
 
@@ -58,6 +65,44 @@ def _stable_event_id(event_type: str, payload: dict[str, Any]) -> str:
         }
     ).encode("utf-8")
     return hashlib.sha256(raw).hexdigest()[:24]
+
+
+def _replay_key(event_type: str, payload: dict[str, Any]) -> str:
+    raw = repr(
+        {
+            "event_type": event_type,
+            "channel_name": payload.get("channel_name", ""),
+            "user_name": payload.get("user_name", ""),
+            "user_id": payload.get("user_id", ""),
+            "message": payload.get("message", ""),
+            "metadata": payload.get("metadata", {}),
+            "event_id": payload.get("event_id", ""),
+        }
+    ).encode("utf-8")
+    return hashlib.sha256(raw).hexdigest()
+
+
+def _register_replay_key(replay_key: str, event_id: str, event_type: str) -> bool:
+    world_id = os.getenv("WORLD_ID", "local-dev-world-1")
+    db = os.getenv("DATABASE_URL", "postgresql://god:localdev@localhost:5432/god_world")
+    try:
+        conn = psycopg2.connect(db)
+        cur = conn.cursor()
+        cur.execute(
+            """
+            INSERT INTO twitch_event_replays (replay_key, event_id, event_type, created_at, world_id)
+            VALUES (%s, %s, %s, %s, %s)
+            ON CONFLICT (replay_key) DO NOTHING
+            """,
+            (replay_key, event_id, event_type, int(time.time()), world_id),
+        )
+        inserted = cur.rowcount > 0
+        conn.commit()
+        cur.close()
+        conn.close()
+        return inserted
+    except Exception:
+        return True
 
 
 def normalize_twitch_event(event_type: str, payload: dict[str, Any]) -> TwitchEvent | None:
@@ -105,6 +150,10 @@ class TwitchAdapter:
         if twitch_event is None:
             return None
 
+        replay_key = _replay_key(event_type, payload)
+        if not _register_replay_key(replay_key, twitch_event.event_id, event_type):
+            return None
+
         world_category, world_event_type = EVENT_TO_WORLD[event_type]
         world_event = {
             "event_id": twitch_event.event_id,
@@ -114,6 +163,7 @@ class TwitchAdapter:
             "agent_id": twitch_event.user_id or None,
             "narrative": self._narrative_for(twitch_event),
             "payload": twitch_event.to_dict(),
+            "replay_key": replay_key,
         }
         return json_safe(world_event)
 
@@ -151,11 +201,16 @@ class TwitchAdapter:
         )
 
     def status(self) -> dict[str, Any]:
+        health = {
+            "helix": probe_url(os.getenv("TWITCH_HELIX_HEALTH_URL"), timeout=1.5),
+            "eventsub": probe_url(os.getenv("TWITCH_EVENTSUB_HEALTH_URL"), timeout=1.5),
+        }
         return {
             "enabled": self.enabled,
             "dry_run": self.dry_run,
             "channel_name": self.channel_name,
             "transport": self.transport,
+            "health": health,
             "supported_event_types": sorted(SUPPORTED_EVENT_TYPES),
         }
 

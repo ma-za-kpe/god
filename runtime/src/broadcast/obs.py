@@ -7,6 +7,11 @@ from dataclasses import asdict, dataclass, field
 from typing import Any
 
 try:  # pragma: no cover - runtime package import path
+    from ..health_checks import probe_url
+except ImportError:  # pragma: no cover - flat test path
+    from health_checks import probe_url
+
+try:  # pragma: no cover - runtime package import path
     from .captions import build_caption
     from .overlays import build_overlay
     from .scenes import select_scene
@@ -78,11 +83,13 @@ class BroadcastSurface:
         )
 
     def status(self) -> dict[str, Any]:
+        health = probe_url(os.getenv("OBS_WEBSOCKET_URL"), timeout=1.5)
         return {
             "enabled": self.enabled,
             "dry_run": self.dry_run,
             "transport": self.transport,
             "obs_scene_prefix": self.obs_scene_prefix,
+            "health": health,
         }
 
     def _summary(self, scene_profile: dict[str, Any], caption: dict[str, Any]) -> str:

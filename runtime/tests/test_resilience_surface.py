@@ -23,6 +23,9 @@ def test_resilience_status_reports_local_first_defaults(monkeypatch):
     assert status["fallbacks"]["twitch"] == "stub"
     assert status["fallbacks"]["obs"] == "dry-run"
     assert status["snapshot_age_seconds"] >= 0
+    assert "adapters" in status
+    assert "twitch" in status["adapters"]
+    assert "broadcast" in status["adapters"]
 
 
 def test_resilience_status_exposes_delivery_state():
@@ -32,3 +35,4 @@ def test_resilience_status_exposes_delivery_state():
     assert "stream" in status
     assert "subscriber_count" in status["stream"]
     assert "push_age_seconds" in status["stream"]
+    assert "restart_safe" in status

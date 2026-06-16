@@ -73,6 +73,23 @@ _MIGRATIONS: list[str] = [
     )
     """,
     """
+    CREATE TABLE IF NOT EXISTS resilience_snapshots (
+        snapshot_id     BIGSERIAL PRIMARY KEY,
+        world_id        TEXT NOT NULL DEFAULT 'local-dev-world-1',
+        created_at      BIGINT NOT NULL,
+        snapshot        JSONB NOT NULL DEFAULT '{}'
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS twitch_event_replays (
+        replay_key      TEXT PRIMARY KEY,
+        event_id        TEXT NOT NULL,
+        event_type      TEXT NOT NULL,
+        created_at      BIGINT NOT NULL,
+        world_id        TEXT NOT NULL DEFAULT 'local-dev-world-1'
+    )
+    """,
+    """
     CREATE TABLE IF NOT EXISTS agent_graph_mutations (
         mutation_id     TEXT PRIMARY KEY,
         soul_id         TEXT NOT NULL,
@@ -101,6 +118,8 @@ _MIGRATIONS: list[str] = [
     "CREATE INDEX IF NOT EXISTS idx_jobs_soul ON agent_scheduled_jobs(soul_id, status)",
     "CREATE INDEX IF NOT EXISTS idx_reg_tools_owner ON agent_registered_tools(owner_soul_id, is_active)",
     "CREATE INDEX IF NOT EXISTS idx_graph_mut_soul ON agent_graph_mutations(soul_id, status)",
+    "CREATE INDEX IF NOT EXISTS idx_resilience_world_created ON resilience_snapshots(world_id, created_at DESC)",
+    "CREATE INDEX IF NOT EXISTS idx_twitch_replays_world_created ON twitch_event_replays(world_id, created_at DESC)",
 ]
 
 

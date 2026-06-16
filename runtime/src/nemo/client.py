@@ -5,16 +5,23 @@ from __future__ import annotations
 import os
 from typing import Any
 
+try:  # pragma: no cover - runtime package import path
+    from ..health_checks import probe_url
+except ImportError:  # pragma: no cover - tests import via flat path
+    from health_checks import probe_url
+
 from .evals import score_directive
 
 
 def build_nemo_status() -> dict[str, Any]:
+    endpoint = os.getenv("NEMO_ENDPOINT")
     return {
         "enabled": os.getenv("NEMO_ENABLED", "true").lower() in ("1", "true", "yes"),
         "provider": os.getenv("NEMO_PROVIDER", "stub"),
         "mode": os.getenv("NEMO_MODE", "director"),
         "guardrails": os.getenv("NEMO_GUARDRAILS", "enabled"),
         "memory": os.getenv("NEMO_MEMORY", "ephemeral"),
+        "health": probe_url(endpoint, timeout=1.5),
     }
 
 

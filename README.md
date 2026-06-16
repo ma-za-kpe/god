@@ -226,6 +226,7 @@ On low-RAM field hosts, switch to **LITE** (cluster layout, flat orbs, 30fps, no
 | `http://localhost:3000/` | **FULL** (default) |
 | `http://localhost:3000/?lite=1` | **LITE** — use when RAM is tight (<2 GiB free) |
 | `http://localhost:3000/?lite=0` | **FULL** (explicit) |
+| `http://localhost:3000/stage` | **Stage** — public OBS/browser-source overlay |
 | `http://localhost:3000/maku` | **MAKU** — creator console + FIELD DUMP for PR logs |
 
 The header pill shows `FULL` or `LITE`. After changing mode, hard refresh (Ctrl+Shift+R).
