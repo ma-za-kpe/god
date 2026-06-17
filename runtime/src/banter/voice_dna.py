@@ -155,6 +155,7 @@ def _build_profile(data: dict) -> VoiceDNAProfile:
         rhetorical_devices=list(data["rhetorical_devices"]),
         opening_patterns=list(data["opening_patterns"]),
         closing_patterns=list(data["closing_patterns"]),
+        system_prompt=data.get("system_prompt", ""),
     )
 
 
@@ -255,19 +256,23 @@ class VoiceDNA:
         return True
 
     def get_prompt_injection(self, archetype: str) -> str | None:
-        """Return structured linguistic instructions for prompt injection.
+        """Return archetype identity prompt for injection.
 
-        Formats the VoiceDNA profile as concise instructions that guide
-        the generation model's sentence construction and word choice.
+        When a system_prompt is present (T2.1 nuclear prompt), returns it
+        directly — worldview-first, not a linguistic checklist.
+        Falls back to structured checklist for profiles without system_prompt.
+
         Returns None if the archetype profile is unavailable (triggers fallback).
-
-        The output is constrained to fit within the 250-token budget.
         """
         profile = self._profiles.get(archetype)
         if profile is None:
             return None
 
-        # Build structured instruction text
+        # T2.1: Nuclear system prompt takes full priority when present
+        if profile.system_prompt:
+            return profile.system_prompt
+
+        # Legacy checklist fallback (for profiles without system_prompt)
         sections: list[str] = []
 
         # Sentence structures
@@ -303,18 +308,13 @@ class VoiceDNA:
         sections.append(f"OPENERS: {openers_str}")
         sections.append(f"CLOSERS: {closers_str}")
 
-        # Compose final injection
         injection = (
             f"[VOICE DNA — {archetype.upper()}]\n"
             + "\n".join(sections)
         )
 
-        # Trim to stay within token budget
         budget = self._config.voice_dna_token_budget
-        estimated_tokens = _estimate_token_count(injection)
-
-        if estimated_tokens > budget:
-            # Progressively trim from the bottom
+        if _estimate_token_count(injection) > budget:
             while _estimate_token_count(injection) > budget and sections:
                 sections.pop()
                 injection = (

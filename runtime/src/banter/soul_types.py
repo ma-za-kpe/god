@@ -79,6 +79,7 @@ class VoiceDNAProfile:
     rhetorical_devices: list[str]  # min 2
     opening_patterns: list[str]  # min 2
     closing_patterns: list[str]  # min 2
+    system_prompt: str = ""  # Nuclear worldview prompt (T2.1) — overrides checklist injection
 
 
 # ---------------------------------------------------------------------------
