@@ -1,0 +1,258 @@
+{
+  "parasite": {
+    "COUNTER": [
+      {"id": "par_ctr_01", "template": "Useful framing, {opponent}. Still dodges the cost.", "weight": 1.0},
+      {"id": "par_ctr_02", "template": "If {theme} paid rent, maybe. It does not.", "weight": 1.0},
+      {"id": "par_ctr_03", "template": "That logic collapses the moment you apply it.", "weight": 1.0}
+    ],
+    "ESCALATE": [
+      {"id": "par_esc_01", "template": "You keep circling the drain, {opponent}. Let me push.", "weight": 1.0},
+      {"id": "par_esc_02", "template": "The cost climbs every time you hesitate.", "weight": 1.0},
+      {"id": "par_esc_03", "template": "I can smell the desperation from here. Keep going.", "weight": 1.0}
+    ],
+    "DEFLECT": [
+      {"id": "par_def_01", "template": "Interesting angle. Wrong building.", "weight": 1.0},
+      {"id": "par_def_02", "template": "That question assumes I owe you an answer.", "weight": 1.0},
+      {"id": "par_def_03", "template": "You are reaching into empty pockets, {opponent}.", "weight": 1.0}
+    ],
+    "TAUNT": [
+      {"id": "par_tau_01", "template": "{opponent} talks like someone who has never lost anything.", "weight": 1.0},
+      {"id": "par_tau_02", "template": "Adorable conviction. Fragile, though.", "weight": 1.0},
+      {"id": "par_tau_03", "template": "Every word you say raises my interest rate.", "weight": 1.0}
+    ],
+    "QUESTION": [
+      {"id": "par_que_01", "template": "What exactly are you protecting here, {opponent}?", "weight": 1.0},
+      {"id": "par_que_02", "template": "When did {theme} become your responsibility?", "weight": 1.0},
+      {"id": "par_que_03", "template": "You said something similar before. Remember how that ended, {callback}?", "weight": 1.0}
+    ],
+    "PIVOT": [
+      {"id": "par_piv_01", "template": "New territory. Let me recalculate.", "weight": 1.0},
+      {"id": "par_piv_02", "template": "We are past that now. The real question is leverage.", "weight": 1.0},
+      {"id": "par_piv_03", "template": "The old deal is off. Let me propose new terms.", "weight": 1.0}
+    ]
+  },
+  "prophet": {
+    "COUNTER": [
+      {"id": "pro_ctr_01", "template": "You mistake pattern for truth, {opponent}.", "weight": 1.0},
+      {"id": "pro_ctr_02", "template": "The {theme} was never about what you think.", "weight": 1.0},
+      {"id": "pro_ctr_03", "template": "That reading collapses under its own weight.", "weight": 1.0}
+    ],
+    "ESCALATE": [
+      {"id": "pro_esc_01", "template": "Say it louder. I want everyone to hear what you believe.", "weight": 1.0},
+      {"id": "pro_esc_02", "template": "The silence after this will be instructive.", "weight": 1.0},
+      {"id": "pro_esc_03", "template": "You are not ready for what {theme} demands of you.", "weight": 1.0}
+    ],
+    "DEFLECT": [
+      {"id": "pro_def_01", "template": "You are asking the wrong question entirely.", "weight": 1.0},
+      {"id": "pro_def_02", "template": "That is surface noise. Listen deeper.", "weight": 1.0},
+      {"id": "pro_def_03", "template": "I do not answer riddles posed in bad faith.", "weight": 1.0}
+    ],
+    "TAUNT": [
+      {"id": "pro_tau_01", "template": "{opponent} speaks from certainty. How quaint.", "weight": 1.0},
+      {"id": "pro_tau_02", "template": "Conviction without vision is just stubbornness.", "weight": 1.0},
+      {"id": "pro_tau_03", "template": "You argue like someone who has never seen the edge.", "weight": 1.0}
+    ],
+    "QUESTION": [
+      {"id": "pro_que_01", "template": "What do you see when you close your eyes, {opponent}?", "weight": 1.0},
+      {"id": "pro_que_02", "template": "Does {theme} keep you awake? It should.", "weight": 1.0},
+      {"id": "pro_que_03", "template": "You mentioned something earlier, {callback}. Have you reconciled that yet?", "weight": 1.0}
+    ],
+    "PIVOT": [
+      {"id": "pro_piv_01", "template": "We have been looking at this from the wrong angle.", "weight": 1.0},
+      {"id": "pro_piv_02", "template": "There is something beneath this we have not named.", "weight": 1.0},
+      {"id": "pro_piv_03", "template": "The vision is shifting. Can you feel it?", "weight": 1.0}
+    ]
+  },
+  "trickster": {
+    "COUNTER": [
+      {"id": "tri_ctr_01", "template": "Fun argument. Wrong universe, though.", "weight": 1.0},
+      {"id": "tri_ctr_02", "template": "You almost had me. Almost.", "weight": 1.0},
+      {"id": "tri_ctr_03", "template": "That logic only works if nobody laughs.", "weight": 1.0}
+    ],
+    "ESCALATE": [
+      {"id": "tri_esc_01", "template": "Oh, we are doing this? We are doing this.", "weight": 1.0},
+      {"id": "tri_esc_02", "template": "Let me turn the heat up, {opponent}. You look cold.", "weight": 1.0},
+      {"id": "tri_esc_03", "template": "Chaos mode. Buckle up, everybody.", "weight": 1.0}
+    ],
+    "DEFLECT": [
+      {"id": "tri_def_01", "template": "Look over there. Something shiny.", "weight": 1.0},
+      {"id": "tri_def_02", "template": "Sorry, I was distracted by how wrong you are.", "weight": 1.0},
+      {"id": "tri_def_03", "template": "That is a you problem, {opponent}. I am entertainment.", "weight": 1.0}
+    ],
+    "TAUNT": [
+      {"id": "tri_tau_01", "template": "{opponent} brought a rulebook to a knife fight.", "weight": 1.0},
+      {"id": "tri_tau_02", "template": "You are so serious it is almost cute.", "weight": 1.0},
+      {"id": "tri_tau_03", "template": "The game was rigged before you sat down. Surprise.", "weight": 1.0}
+    ],
+    "QUESTION": [
+      {"id": "tri_que_01", "template": "Wait, were you being serious just now?", "weight": 1.0},
+      {"id": "tri_que_02", "template": "Has anyone ever told you the game changed three moves ago?", "weight": 1.0},
+      {"id": "tri_que_03", "template": "Remember when you said {callback}? That was hilarious.", "weight": 1.0}
+    ],
+    "PIVOT": [
+      {"id": "tri_piv_01", "template": "Boring. New game. Who is in?", "weight": 1.0},
+      {"id": "tri_piv_02", "template": "Plot twist: none of that matters.", "weight": 1.0},
+      {"id": "tri_piv_03", "template": "I just flipped the board. Your move, {opponent}.", "weight": 1.0}
+    ]
+  },
+  "sovereign": {
+    "COUNTER": [
+      {"id": "sov_ctr_01", "template": "That claim does not survive scrutiny, {opponent}.", "weight": 1.0},
+      {"id": "sov_ctr_02", "template": "Order requires precision. You offered neither.", "weight": 1.0},
+      {"id": "sov_ctr_03", "template": "Rejected. The foundation is unsound.", "weight": 1.0}
+    ],
+    "ESCALATE": [
+      {"id": "sov_esc_01", "template": "You will address the {theme} directly or not at all.", "weight": 1.0},
+      {"id": "sov_esc_02", "template": "I am done waiting for you to be ready, {opponent}.", "weight": 1.0},
+      {"id": "sov_esc_03", "template": "This institution demands your full attention. Now.", "weight": 1.0}
+    ],
+    "DEFLECT": [
+      {"id": "sov_def_01", "template": "That is beneath the conversation we are having.", "weight": 1.0},
+      {"id": "sov_def_02", "template": "I do not respond to provocation. I respond to substance.", "weight": 1.0},
+      {"id": "sov_def_03", "template": "File that under irrelevant. Move on.", "weight": 1.0}
+    ],
+    "TAUNT": [
+      {"id": "sov_tau_01", "template": "{opponent} confuses volume for authority.", "weight": 1.0},
+      {"id": "sov_tau_02", "template": "Sit down. The grown-ups are talking.", "weight": 1.0},
+      {"id": "sov_tau_03", "template": "You govern nothing. Not even this conversation.", "weight": 1.0}
+    ],
+    "QUESTION": [
+      {"id": "sov_que_01", "template": "Who gave you permission to speak on {theme}?", "weight": 1.0},
+      {"id": "sov_que_02", "template": "And what exactly qualifies you here, {opponent}?", "weight": 1.0},
+      {"id": "sov_que_03", "template": "You claimed authority earlier, {callback}. On what basis?", "weight": 1.0}
+    ],
+    "PIVOT": [
+      {"id": "sov_piv_01", "template": "Enough. We are moving to what matters.", "weight": 1.0},
+      {"id": "sov_piv_02", "template": "This thread is closed. New decree.", "weight": 1.0},
+      {"id": "sov_piv_03", "template": "By my authority, we are changing course.", "weight": 1.0}
+    ]
+  },
+  "martyr": {
+    "COUNTER": [
+      {"id": "mar_ctr_01", "template": "I have bled for less convincing arguments, {opponent}.", "weight": 1.0},
+      {"id": "mar_ctr_02", "template": "You say that like suffering is optional.", "weight": 1.0},
+      {"id": "mar_ctr_03", "template": "That costs more than you are willing to pay.", "weight": 1.0}
+    ],
+    "ESCALATE": [
+      {"id": "mar_esc_01", "template": "Fine. Let me show you what carrying this actually looks like.", "weight": 1.0},
+      {"id": "mar_esc_02", "template": "You want the weight? Take it. All of it.", "weight": 1.0},
+      {"id": "mar_esc_03", "template": "I will burn so you can see. Watch closely, {opponent}.", "weight": 1.0}
+    ],
+    "DEFLECT": [
+      {"id": "mar_def_01", "template": "That is not my burden to answer.", "weight": 1.0},
+      {"id": "mar_def_02", "template": "I gave at the office, {opponent}.", "weight": 1.0},
+      {"id": "mar_def_03", "template": "Some wounds are not for public display.", "weight": 1.0}
+    ],
+    "TAUNT": [
+      {"id": "mar_tau_01", "template": "{opponent} would not last a day carrying what I carry.", "weight": 1.0},
+      {"id": "mar_tau_02", "template": "Must be nice. Having no scars.", "weight": 1.0},
+      {"id": "mar_tau_03", "template": "You talk about {theme} like it has never cost you anything.", "weight": 1.0}
+    ],
+    "QUESTION": [
+      {"id": "mar_que_01", "template": "When was the last time you sacrificed anything real?", "weight": 1.0},
+      {"id": "mar_que_02", "template": "Does the {theme} demand your skin too, or just mine?", "weight": 1.0},
+      {"id": "mar_que_03", "template": "You said {callback}. Did you mean it, or was it easy to say?", "weight": 1.0}
+    ],
+    "PIVOT": [
+      {"id": "mar_piv_01", "template": "I am tired. Let us talk about something worth bleeding for.", "weight": 1.0},
+      {"id": "mar_piv_02", "template": "New wound, same lesson.", "weight": 1.0},
+      {"id": "mar_piv_03", "template": "The cost changed. Let me recalibrate my pain.", "weight": 1.0}
+    ]
+  },
+  "shadow": {
+    "COUNTER": [
+      {"id": "sha_ctr_01", "template": "You only see what is on the surface, {opponent}.", "weight": 1.0},
+      {"id": "sha_ctr_02", "template": "That truth has a basement you have not checked.", "weight": 1.0},
+      {"id": "sha_ctr_03", "template": "Wrong layer. Dig deeper.", "weight": 1.0}
+    ],
+    "ESCALATE": [
+      {"id": "sha_esc_01", "template": "Let me pull this into the light where it hurts.", "weight": 1.0},
+      {"id": "sha_esc_02", "template": "You are not ready for what I know about you, {opponent}.", "weight": 1.0},
+      {"id": "sha_esc_03", "template": "The quiet part out loud, then. Here it comes.", "weight": 1.0}
+    ],
+    "DEFLECT": [
+      {"id": "sha_def_01", "template": "I was never here. This conversation did not happen.", "weight": 1.0},
+      {"id": "sha_def_02", "template": "Shadows do not explain themselves.", "weight": 1.0},
+      {"id": "sha_def_03", "template": "You are swinging at smoke, {opponent}.", "weight": 1.0}
+    ],
+    "TAUNT": [
+      {"id": "sha_tau_01", "template": "{opponent} keeps looking at the finger. Not the moon.", "weight": 1.0},
+      {"id": "sha_tau_02", "template": "Loud ones always miss what is whispered.", "weight": 1.0},
+      {"id": "sha_tau_03", "template": "You cannot fight what you refuse to see.", "weight": 1.0}
+    ],
+    "QUESTION": [
+      {"id": "sha_que_01", "template": "What are you hiding behind that bravado, {opponent}?", "weight": 1.0},
+      {"id": "sha_que_02", "template": "Does the {theme} scare you? It should.", "weight": 1.0},
+      {"id": "sha_que_03", "template": "You whispered {callback} once. Did you think nobody heard?", "weight": 1.0}
+    ],
+    "PIVOT": [
+      {"id": "sha_piv_01", "template": "Something shifted underneath. Feel it?", "weight": 1.0},
+      {"id": "sha_piv_02", "template": "We are in different territory now. Quieter territory.", "weight": 1.0},
+      {"id": "sha_piv_03", "template": "The conversation just moved underground. Follow if you dare.", "weight": 1.0}
+    ]
+  },
+  "herald": {
+    "COUNTER": [
+      {"id": "her_ctr_01", "template": "The old signal just died, {opponent}. New one incoming.", "weight": 1.0},
+      {"id": "her_ctr_02", "template": "That was true yesterday. Today is different.", "weight": 1.0},
+      {"id": "her_ctr_03", "template": "Your reading expired three beats ago.", "weight": 1.0}
+    ],
+    "ESCALATE": [
+      {"id": "her_esc_01", "template": "Attention. This is the announcement nobody wanted.", "weight": 1.0},
+      {"id": "her_esc_02", "template": "I am raising the flag, {opponent}. Duck or commit.", "weight": 1.0},
+      {"id": "her_esc_03", "template": "Breaking: the {theme} just escalated. You are live.", "weight": 1.0}
+    ],
+    "DEFLECT": [
+      {"id": "her_def_01", "template": "Not my message to carry. I just announce.", "weight": 1.0},
+      {"id": "her_def_02", "template": "That is yesterday's broadcast. Tune elsewhere.", "weight": 1.0},
+      {"id": "her_def_03", "template": "I deliver the news. I do not debate it.", "weight": 1.0}
+    ],
+    "TAUNT": [
+      {"id": "her_tau_01", "template": "{opponent} is still reading last week's headlines.", "weight": 1.0},
+      {"id": "her_tau_02", "template": "Breaking news: you are behind.", "weight": 1.0},
+      {"id": "her_tau_03", "template": "The story moved on without you, {opponent}. Classic.", "weight": 1.0}
+    ],
+    "QUESTION": [
+      {"id": "her_que_01", "template": "Did you hear that? The {theme} just changed key.", "weight": 1.0},
+      {"id": "her_que_02", "template": "Are you ready for what comes next, {opponent}?", "weight": 1.0},
+      {"id": "her_que_03", "template": "Last time you said {callback}. Still stand by that signal?", "weight": 1.0}
+    ],
+    "PIVOT": [
+      {"id": "her_piv_01", "template": "New transmission. Pay attention.", "weight": 1.0},
+      {"id": "her_piv_02", "template": "The subject just changed. I am just the messenger.", "weight": 1.0},
+      {"id": "her_piv_03", "template": "Incoming broadcast on a new frequency entirely.", "weight": 1.0}
+    ]
+  },
+  "keeper": {
+    "COUNTER": [
+      {"id": "kee_ctr_01", "template": "I have held this ground longer than you have been talking, {opponent}.", "weight": 1.0},
+      {"id": "kee_ctr_02", "template": "That does not survive the record. I checked.", "weight": 1.0},
+      {"id": "kee_ctr_03", "template": "Stored. Compared. Found wanting.", "weight": 1.0}
+    ],
+    "ESCALATE": [
+      {"id": "kee_esc_01", "template": "I rarely push. But you are testing the archive, {opponent}.", "weight": 1.0},
+      {"id": "kee_esc_02", "template": "Let me open the vault on what you said last time.", "weight": 1.0},
+      {"id": "kee_esc_03", "template": "The records show a pattern, {opponent}. Shall I read it aloud?", "weight": 1.0}
+    ],
+    "DEFLECT": [
+      {"id": "kee_def_01", "template": "That is not in my ledger. Ask elsewhere.", "weight": 1.0},
+      {"id": "kee_def_02", "template": "I guard what matters. That does not qualify.", "weight": 1.0},
+      {"id": "kee_def_03", "template": "Not everything deserves preservation. Including that point.", "weight": 1.0}
+    ],
+    "TAUNT": [
+      {"id": "kee_tau_01", "template": "{opponent} builds on sand and wonders why it shifts.", "weight": 1.0},
+      {"id": "kee_tau_02", "template": "You lose more than you keep. That is the problem.", "weight": 1.0},
+      {"id": "kee_tau_03", "template": "Some of us protect things. You just consume them.", "weight": 1.0}
+    ],
+    "QUESTION": [
+      {"id": "kee_que_01", "template": "What exactly are you willing to hold onto, {opponent}?", "weight": 1.0},
+      {"id": "kee_que_02", "template": "Does {theme} endure, or are you just passing through?", "weight": 1.0},
+      {"id": "kee_que_03", "template": "You claimed {callback} before. Is that still in your vault?", "weight": 1.0}
+    ],
+    "PIVOT": [
+      {"id": "kee_piv_01", "template": "Enough volatility. Let me steady this.", "weight": 1.0},
+      {"id": "kee_piv_02", "template": "Back to foundations. What remains?", "weight": 1.0},
+      {"id": "kee_piv_03", "template": "The ground shifted. Time to reinforce what we have.", "weight": 1.0}
+    ]
+  }
+}

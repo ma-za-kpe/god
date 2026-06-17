@@ -7,7 +7,7 @@ def _snapshot() -> dict:
     return {
         "epoch": 456,
         "showrunner": {
-            "scene": "economy-pan",
+            "scene": "ensemble-stage",
             "speaker": "Beta",
             "headline": "Beta closes the deal.",
             "audience_prompt": "Follow the money.",

@@ -135,15 +135,33 @@ def check_hallucination(text: str) -> tuple[bool, str]:
     return True, ""
 
 
+def _name_archetype_token(name: str) -> str:
+    """'Elder-Cache-9CDD' -> 'Cache', 'Cache-Secure' -> 'Cache'."""
+    parts = name.split("-")
+    if len(parts) >= 2 and parts[0] in ("Elder", "Load", "Base", "Core"):
+        return parts[1]
+    return parts[0]
+
+
 def check_agent_references(text: str, state: dict) -> tuple[bool, str]:
-    """Reject references to agent names not in the live roster."""
+    """Reject references to agent names not in the live roster.
+
+    Allows archetype-component matches so that a thought referencing
+    'Cache-Secure' doesn't fail when 'Elder-Cache-9CDD' is in the roster —
+    the archetype token 'Cache' is shared, making it a plausible abbreviation
+    rather than a wholly invented agent.
+    """
     valid = peer_names(state)
     if not valid:
         return True, ""
+    valid_archetypes = {_name_archetype_token(n) for n in valid if "-" in n}
     for match in _AGENT_NAME_RE.finditer(text):
         ref = match.group()
-        if ref not in valid:
-            return False, f"unknown agent '{ref}'"
+        if ref in valid:
+            continue
+        if _name_archetype_token(ref) in valid_archetypes:
+            continue
+        return False, f"unknown agent '{ref}'"
     return True, ""
 
 
@@ -209,7 +227,15 @@ _UUIDISH_RE = re.compile(r"^[0-9a-fA-F-]{8,36}$")
 def resolve_target_peer(to_id: str, state: dict) -> Optional[dict]:
     """
     Resolve send_message / transfer target to one live peer from state roster.
-    Exact agent name or unambiguous soul_id only — no fuzzy name prefixes.
+
+    Resolution order:
+    1. Exact full name match (case-insensitive)
+    2. Full soul_id match
+    3. Unambiguous soul_id prefix (>= 8 hex chars)
+    4. Unambiguous archetype-token match — 'Cache-Secure' resolves to
+       'Elder-Cache-9CDD' when that is the only peer whose name contains
+       the token 'Cache'. This lets agents that abbreviate peer names
+       still route messages correctly.
     """
     if not to_id or not str(to_id).strip():
         return None
@@ -232,6 +258,15 @@ def resolve_target_peer(to_id: str, state: dict) -> Optional[dict]:
         hits = [p for p in peers if str(p.get("soul_id") or "").lower().startswith(tid_l)]
         if len(hits) == 1:
             return hits[0]
+
+    ref_token = _name_archetype_token(tid)
+    if ref_token and len(ref_token) >= 3:
+        archetype_hits = [
+            p for p in peers
+            if ref_token.lower() in (p.get("name") or p.get("current_name") or "").lower()
+        ]
+        if len(archetype_hits) == 1:
+            return archetype_hits[0]
 
     return None
 

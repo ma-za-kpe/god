@@ -59,7 +59,7 @@ async def _agent_jobs_daemon():
 
 async def _ws_snapshot_daemon():
     """Periodic full snapshot push for WebSocket observers."""
-    interval = int(os.getenv("WS_SNAPSHOT_INTERVAL_S", "30"))
+    interval = int(os.getenv("WS_SNAPSHOT_INTERVAL_S", "8"))
     while True:
         try:
             await asyncio.sleep(interval)

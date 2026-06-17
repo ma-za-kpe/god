@@ -26,7 +26,7 @@ log = logging.getLogger("god.dream")
 
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://god:localdev@localhost:5432/god_world")
 WORLD_ID = os.getenv("WORLD_ID", "local-dev-world-1")
-CYCLE_S = int(os.getenv("AGENT_CYCLE_SECONDS", "30"))
+CYCLE_S = int(os.getenv("AGENT_CYCLE_SECONDS", "12"))
 REST_THRESHOLD = int(os.getenv("AGENT_REST_THRESHOLD", "9"))  # cycles awake before sleep
 
 # Physics-violating proposals are always rejected

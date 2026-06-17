@@ -3,12 +3,45 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
+import re
 from typing import Any
 
 try:  # pragma: no cover - package import path in runtime
     from .showrunner_state import ShowrunnerCue
 except ImportError:  # pragma: no cover - flat import path in tests
     from showrunner_state import ShowrunnerCue
+
+ARC_THEMES = [
+    "The Ethics of Hoarding in a Finite World",
+    "Should the Weak Be Protected or Left to Fade?",
+    "What Does Cooperation Mean When Trust Cannot Be Verified?",
+    "The Parasite Asks: Is Exploitation Just Another Form of Efficiency?",
+    "Who Has the Right to Build When Resources Are Scarce?",
+    "Philosophy of Mortality: What Does an Agent Owe the World?",
+    "The Market Is a Cruel Teacher — But Is It Fair?",
+    "Can a Coalition of Rivals Outlast a World of Individuals?",
+]
+
+_THEME_EPOCH_WINDOW = 30  # epochs before the debate theme rotates
+
+
+def pick_arc_theme(snapshot: dict[str, Any]) -> str:
+    epoch = int(snapshot.get("epoch") or 0)
+    stats = snapshot.get("stats") or {}
+    audience = snapshot.get("audience") or {}
+    # Override theme based on live world events
+    if int(audience.get("raid_waves_24h") or 0) > 0:
+        return "Outsiders Have Arrived — Do We Welcome or Repel Them?"
+    if float(audience.get("patronage_index") or 0) >= 20:
+        return "The Audience Is Funding the Drama — Who Serves the Patrons?"
+    if int(stats.get("total_died") or 0) >= 1:
+        return "Philosophy of Mortality: What Does an Agent Owe the World?"
+    if int(stats.get("transfers_24h") or 0) == 0 and int(stats.get("service_purchases_24h") or 0) == 0:
+        return "The Market Is a Cruel Teacher — But Is It Fair?"
+    # Rotate on epoch window
+    idx = (epoch // _THEME_EPOCH_WINDOW) % len(ARC_THEMES)
+    return ARC_THEMES[idx]
+
 
 PRIORITY_BY_EVENT = {
     "world.genesis": 100,
@@ -19,12 +52,12 @@ PRIORITY_BY_EVENT = {
     "economy.service.purchased": 85,
     "economy.deal.settled": 80,
     "economy.deal.failed": 60,
-    "economy.rent.paid": 55,
+    "economy.rent.paid": 25,
     "economy.rent.missed": 90,
     "economy.agent.transfer": 65,
     "economy.token.deployed": 70,
-    "social.agent.broadcast": 76,
-    "social.agent.message_sent": 50,
+    "social.agent.broadcast": 82,
+    "social.agent.message_sent": 78,
     "social.coalition.formed": 84,
     "social.twitch.chat.message": 58,
     "social.twitch.follow": 62,
@@ -35,8 +68,29 @@ PRIORITY_BY_EVENT = {
     "economy.twitch.subscription_message": 78,
     "economy.twitch.cheer": 86,
     "agent.throttled": 88,
-    "cognitive.agent.thought": 20,
+    "cognitive.agent.thought": 35,
 }
+
+
+_REPLY_META_RE = re.compile(r"\b(?:said|says|theme|arc theme)\s*:\s*", re.IGNORECASE)
+
+
+def _clean_reply_text(text: str, *, max_len: int = 240) -> str:
+    cleaned = str(text or "").strip()
+    if not cleaned:
+        return ""
+    cleaned = cleaned[: max_len * 4]
+    cleaned = re.sub(r"\s+", " ", cleaned)
+    said_match = re.search(r"\b(?:said|says)\s*:\s*", cleaned, flags=re.IGNORECASE)
+    if said_match:
+        cleaned = cleaned[said_match.end():]
+    cleaned = re.sub(r"^[^:]{0,80}\((?:[^)]{1,40})\)\.\s*", "", cleaned)
+    cleaned = re.sub(r"^[^:]{0,80}\s*\[[^\]]{1,40}\]\.\s*", "", cleaned)
+    cleaned = re.sub(r"\b(?:theme|arc theme)\s*:\s*.*$", "", cleaned, flags=re.IGNORECASE)
+    cleaned = _REPLY_META_RE.sub("", cleaned)
+    cleaned = cleaned.replace(" / ", " ")
+    cleaned = re.sub(r"\s{2,}", " ", cleaned).strip(" .,-")
+    return cleaned[:max_len]
 
 
 def event_priority(event_type: str) -> int:
@@ -51,25 +105,42 @@ def select_scene(cues: Iterable[ShowrunnerCue], snapshot: dict[str, Any]) -> str
     if int(audience.get("raid_waves_24h") or 0) > 0:
         return "banter-table"
     if float(audience.get("patronage_index") or 0) >= 12:
-        return "market-watch"
+        return "ensemble-stage"
     if "death" in top_tags:
         return "graveyard-cut"
     if "economy" in top_tags:
-        return "economy-pan"
+        return "ensemble-stage"
     if "social" in top_tags:
         return "banter-table"
     if int(stats.get("living_count") or 0) == 0:
         return "void-silence"
     if int(stats.get("transfers_24h") or 0) > 0:
-        return "market-watch"
+        return "ensemble-stage"
     return "world-wide"
+
+
+_speaker_history: list[str] = []  # recent speakers; used for cooldown / rotation
+_SPEAKER_COOLDOWN = 2  # don't let same agent speak if they spoke in the last N cues
 
 
 def speaker_for(cues: list[ShowrunnerCue], snapshot: dict[str, Any]) -> str:
     if not cues:
         return "Narrator"
-    best = max(cues, key=lambda cue: (cue.priority, cue.agent_name, cue.agent_id))
-    return best.agent_name or best.agent_id or "Narrator"
+    # Sort by priority descending; prefer agents not in recent speaker history
+    sorted_cues = sorted(cues, key=lambda c: (c.priority, c.agent_name, c.agent_id), reverse=True)
+    chosen = None
+    for cue in sorted_cues:
+        name = cue.agent_name or cue.agent_id or "Narrator"
+        if name not in _speaker_history[-_SPEAKER_COOLDOWN:]:
+            chosen = cue
+            break
+    if chosen is None:
+        chosen = sorted_cues[0]
+    name = chosen.agent_name or chosen.agent_id or "Narrator"
+    _speaker_history.append(name)
+    if len(_speaker_history) > 12:
+        _speaker_history.pop(0)
+    return name
 
 
 def audience_prompt_for(cues: list[ShowrunnerCue], snapshot: dict[str, Any]) -> str:
@@ -96,8 +167,14 @@ def event_to_cue(event: dict[str, Any]) -> ShowrunnerCue | None:
     event_type = str(event.get("event_type") or event.get("type") or "").strip()
     if not event_type:
         return None
+    import json as _json
     payload = event.get("payload") or {}
-    if not isinstance(payload, dict):
+    if isinstance(payload, str):
+        try:
+            payload = _json.loads(payload)
+        except Exception:
+            payload = {}
+    elif not isinstance(payload, dict):
         payload = {}
 
     if event_type not in PRIORITY_BY_EVENT:
@@ -111,13 +188,22 @@ def event_to_cue(event: dict[str, Any]) -> ShowrunnerCue | None:
         or agent_id
         or "Narrator"
     )
-    headline = str(payload.get("narrative") or event.get("narrative") or event_type)
+    # For message/broadcast events, use the full message body as the headline so TTS
+    # reads the complete sentence rather than the DB-truncated narrative field.
+    raw_headline = str(payload.get("narrative") or event.get("narrative") or event_type)
+    if event_type in ("social.agent.message_sent", "social.agent.broadcast"):
+        body = str(payload.get("content") or payload.get("body") or "").strip()
+        cleaned_body = _clean_reply_text(body, max_len=280)
+        headline = cleaned_body if cleaned_body else raw_headline
+    else:
+        headline = _clean_reply_text(raw_headline, max_len=280)
     details = str(
         payload.get("thought")
         or payload.get("content")
         or payload.get("summary")
         or headline
     )
+    details = _clean_reply_text(details, max_len=280)
     tags = _tags_for_event(event_type, payload)
     event_id = str(event.get("event_id") or payload.get("event_id") or "")
 

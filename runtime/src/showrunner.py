@@ -7,10 +7,10 @@ import hashlib
 from typing import Any
 
 try:  # pragma: no cover - package import path in runtime
-    from .showrunner_rules import audience_prompt_for, event_to_cue, select_scene, speaker_for
+    from .showrunner_rules import audience_prompt_for, event_to_cue, pick_arc_theme, select_scene, speaker_for
     from .showrunner_state import ShowrunnerPlan, ShowrunnerState
 except ImportError:  # pragma: no cover - flat import path in tests
-    from showrunner_rules import audience_prompt_for, event_to_cue, select_scene, speaker_for
+    from showrunner_rules import audience_prompt_for, event_to_cue, pick_arc_theme, select_scene, speaker_for
     from showrunner_state import ShowrunnerPlan, ShowrunnerState
 
 
@@ -37,6 +37,7 @@ class Showrunner:
         speaker = speaker_for(cues, snapshot)
         headline = self._headline(cues, stats)
         audience_prompt = audience_prompt_for(cues, snapshot)
+        arc_theme = pick_arc_theme(snapshot)
         reasoning = self._reasoning(cues, snapshot, scene, speaker)
 
         plan = ShowrunnerPlan(
@@ -45,6 +46,7 @@ class Showrunner:
             speaker=speaker,
             headline=headline,
             audience_prompt=audience_prompt,
+            arc_theme=arc_theme,
             cues=tuple(cues[:5]),
             reasoning=tuple(reasoning),
             source_epoch=epoch,
@@ -68,9 +70,11 @@ class Showrunner:
     def _headline(self, cues, stats: dict[str, Any]) -> str:
         if cues:
             top = cues[0]
-            if top.agent_name and top.headline:
-                return f"{top.agent_name}: {top.headline}"
-            return top.headline or top.cue_type
+            headline = top.headline or top.cue_type
+            speaker = (top.agent_name or "").strip()
+            if speaker and not headline.startswith(f"{speaker}:"):
+                return f"{speaker}: {headline}"
+            return headline
         if int(stats.get("living_count") or 0) == 0:
             return "The world is silent."
         if int(stats.get("transfers_24h") or 0) > 0:
@@ -101,10 +105,12 @@ class Showrunner:
         return notes
 
     def _signature(self, snapshot: dict[str, Any], cues) -> str:
+        # Exclude epoch — it increments on every poll and would defeat caching entirely.
+        # The cues (derived from events) capture all meaningful world changes.
+        stats = snapshot.get("stats") or {}
         payload = {
-            "epoch": snapshot.get("epoch"),
             "agent_count": snapshot.get("agent_count"),
-            "stats": snapshot.get("stats") or {},
+            "living_count": stats.get("living_count"),
             "cues": [cue.to_dict() for cue in cues[:5]],
         }
         raw = repr(payload).encode("utf-8")
@@ -112,10 +118,18 @@ class Showrunner:
 
 
 _DEFAULT_SHOWRUNNER = Showrunner()
+_current_arc_theme: str = ""
 
 
 def build_showrunner_plan(snapshot: dict[str, Any]) -> dict[str, Any]:
-    return _DEFAULT_SHOWRUNNER.build_plan_dict(snapshot)
+    plan_dict = _DEFAULT_SHOWRUNNER.build_plan_dict(snapshot)
+    global _current_arc_theme
+    _current_arc_theme = str(plan_dict.get("arc_theme") or "")
+    return plan_dict
+
+
+def get_arc_theme() -> str:
+    return _current_arc_theme
 
 
 def get_showrunner_state() -> dict[str, Any]:

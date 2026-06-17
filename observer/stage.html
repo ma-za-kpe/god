@@ -76,6 +76,7 @@
       text-transform: uppercase;
       color: rgba(214, 220, 255, 0.5);
       pointer-events: none;
+      display: none;
     }
 
     .clockbar span {
@@ -91,7 +92,7 @@
       width: 100vw;
       height: 100vh;
       display: grid;
-      grid-template-columns: 90px minmax(0, 1.35fr) minmax(420px, 0.95fr);
+      grid-template-columns: 90px minmax(0, 1fr);
       gap: 14px;
       padding: 16px;
     }
@@ -182,6 +183,13 @@
       color: rgba(244,247,255,0.82);
     }
 
+    .titlebar,
+    .pressure-label,
+    .pressure-readout,
+    .veil {
+      display: none;
+    }
+
     .titlebar strong {
       font-family: "Cinzel", serif;
       color: var(--gold);
@@ -192,6 +200,77 @@
     .titlebar .arc {
       color: rgba(214,220,255,0.54);
       letter-spacing: 0.14em;
+    }
+
+    .arc-theme-bar {
+      position: absolute;
+      top: 48px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 4;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 72%;
+      padding: 4px 14px;
+      border-radius: 999px;
+      border: 1px solid rgba(204,134,255,0.18);
+      background: rgba(4,6,14,0.5);
+      backdrop-filter: blur(10px);
+      font-size: 0.48rem;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: rgba(204,134,255,0.75);
+      pointer-events: none;
+      transition: opacity 0.4s ease;
+    }
+
+    .arc-theme-bar:empty { opacity: 0; }
+
+    .chat-thread {
+      position: absolute;
+      bottom: 80px;
+      right: 14px;
+      width: min(340px, 30vw);
+      max-height: 200px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column-reverse;
+      gap: 6px;
+      pointer-events: none;
+      z-index: 3;
+    }
+
+    .chat-bubble {
+      padding: 7px 10px;
+      border-radius: 14px;
+      border: 1px solid rgba(255,255,255,0.06);
+      background: rgba(4,6,14,0.72);
+      backdrop-filter: blur(8px);
+      font-size: 0.56rem;
+      line-height: 1.5;
+      color: rgba(244,247,255,0.82);
+      animation: bubbleIn 0.3s ease;
+    }
+
+    .chat-bubble .bubble-name {
+      font-family: "Cinzel", serif;
+      font-size: 0.46rem;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      margin-bottom: 3px;
+    }
+
+    .chat-bubble.outgoing .bubble-name { color: var(--gold); }
+    .chat-bubble.incoming .bubble-name { color: var(--cyan); }
+
+    .chat-bubble .bubble-text {
+      color: rgba(244,247,255,0.88);
+    }
+
+    @keyframes bubbleIn {
+      from { opacity: 0; transform: translateY(8px); }
+      to   { opacity: 1; transform: translateY(0); }
     }
 
     .ensemble {
@@ -249,12 +328,60 @@
         0 0 60px rgba(84, 200, 255, 0.08);
     }
 
+    .agent-tile.active::after {
+      content: "";
+      position: absolute;
+      inset: -18%;
+      border-radius: 24px;
+      background:
+        linear-gradient(120deg, transparent 34%, rgba(244,201,93,0.22) 48%, rgba(84,200,255,0.08) 55%, transparent 68%),
+        radial-gradient(circle at 50% 26%, rgba(244,201,93,0.18), transparent 44%);
+      filter: blur(12px);
+      opacity: 0;
+      pointer-events: none;
+      transform: translateX(-10%);
+      mix-blend-mode: screen;
+    }
+
+    .agent-tile.lead-entrance::after {
+      animation: spotlightSweep 980ms cubic-bezier(0.12, 1, 0.22, 1);
+    }
+
     .agent-tile.lead-shift {
       animation: leadTile 720ms cubic-bezier(0.16, 1, 0.3, 1);
     }
 
+    .agent-tile.lead-entrance {
+      animation: leadEntrance 980ms cubic-bezier(0.12, 1, 0.22, 1);
+    }
+
+    .agent-tile.secondary-speaker {
+      border-color: rgba(84,200,255,0.35);
+      box-shadow: 0 0 28px rgba(84,200,255,0.18), inset 0 0 0 1px rgba(84,200,255,0.12);
+      animation: secondaryPulse 2.4s ease-in-out infinite;
+    }
+
+    @keyframes secondaryPulse {
+      0%,100% { box-shadow: 0 0 20px rgba(84,200,255,0.15), inset 0 0 0 1px rgba(84,200,255,0.10); }
+      50% { box-shadow: 0 0 38px rgba(84,200,255,0.28), inset 0 0 0 1px rgba(84,200,255,0.22); }
+    }
+
     .agent-tile.lead-prior {
       animation: priorTile 720ms cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .agent-tile.lead-prior::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      border-radius: inherit;
+      background:
+        radial-gradient(circle at 50% 18%, rgba(244,201,93,0.09), transparent 44%),
+        linear-gradient(180deg, rgba(244,201,93,0.05), transparent 72%);
+      opacity: 0.9;
+      filter: blur(2px);
+      pointer-events: none;
+      animation: afterglowFade 860ms ease-out forwards;
     }
 
     @keyframes leadTile {
@@ -268,12 +395,43 @@
       100% { transform: scale(1) translateY(0); opacity: 0.9; }
     }
 
+    @keyframes spotlightSweep {
+      0% { opacity: 0; transform: translateX(-12%) scale(0.96); }
+      18% { opacity: 1; }
+      48% { opacity: 1; transform: translateX(0) scale(1.03); }
+      100% { opacity: 0; transform: translateX(12%) scale(1.06); }
+    }
+
+    @keyframes afterglowFade {
+      0% { opacity: 0.95; filter: blur(2px) brightness(1.1); }
+      100% { opacity: 0.28; filter: blur(6px) brightness(0.72); }
+    }
+
+    @keyframes leadEntrance {
+      0% {
+        transform: translateX(24px) scale(0.9);
+        opacity: 0.55;
+        filter: brightness(0.8) saturate(0.9);
+      }
+      42% {
+        transform: translateX(-6px) scale(1.06);
+        opacity: 1;
+        filter: brightness(1.15) saturate(1.1);
+      }
+      68% {
+        transform: translateX(2px) scale(1.02);
+        filter: brightness(1.05);
+      }
+      100% {
+        transform: translateX(0) scale(1);
+        opacity: 1;
+        filter: brightness(1);
+      }
+    }
+
     .agent-head {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 8px;
-      min-width: 0;
+      display: grid;
+      gap: 2px;
     }
 
     .agent-name {
@@ -326,6 +484,19 @@
       animation-duration: 3.2s;
     }
 
+    .agent-tile.line-burst .avatar-orb::after,
+    .agent-tile.lead-entrance .avatar-orb::after {
+      content: "";
+      position: absolute;
+      inset: -18%;
+      border-radius: inherit;
+      background: radial-gradient(circle, rgba(244,201,93,0.34), transparent 62%);
+      filter: blur(10px);
+      opacity: 0.95;
+      pointer-events: none;
+      animation: glowFlare 860ms ease-out;
+    }
+
     @keyframes pulse {
       0%,100% { transform: scale(1); }
       50% { transform: scale(1.05); }
@@ -333,9 +504,8 @@
 
     .agent-meta {
       display: flex;
+      gap: 4px;
       flex-wrap: wrap;
-      gap: 6px;
-      min-height: 18px;
     }
 
     .chip {
@@ -361,44 +531,72 @@
     }
 
     .agent-dialogue {
-      padding: 8px 10px;
-      border-radius: 16px;
-      border: 1px solid rgba(255,255,255,0.06);
-      background: rgba(5, 8, 16, 0.46);
-      color: rgba(244,247,255,0.9);
+      display: block;
       font-size: 0.66rem;
-      line-height: 1.45;
-      min-height: 52px;
-      overflow: hidden;
+      letter-spacing: 0.06em;
+      color: rgba(244,247,255,0.84);
+      line-height: 1.5;
+      border-radius: 14px;
+      border: 1px solid rgba(255,255,255,0.06);
+      background: rgba(255,255,255,0.02);
+      padding: 8px 10px;
+      min-height: 48px;
     }
 
     .agent-dialogue .caption {
       display: block;
-      color: var(--gold);
-      letter-spacing: 0.14em;
+      font-size: 0.42rem;
+      letter-spacing: 0.26em;
       text-transform: uppercase;
-      font-size: 0.48rem;
+      color: var(--gold);
       margin-bottom: 4px;
     }
 
-    .agent-dialogue .text {
-      display: -webkit-box;
-      -webkit-line-clamp: 3;
-      -webkit-box-orient: vertical;
-      overflow: hidden;
+    .focus-head {
+      text-align: center;
+      padding: 4px 0 0;
+    }
+
+    #focus-name {
+      font-family: "Cinzel", serif;
+      font-size: 1.1rem;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--gold);
+    }
+
+    .focus-name-b {
+      font-family: "Cinzel", serif;
+      font-size: 0.85rem;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: rgba(84,200,255,0.85);
+      margin-top: 2px;
+    }
+
+    .focus-avatar.dual {
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      place-items: center;
+    }
+
+    .focus-orb-b {
+      --accent: var(--cyan);
+      width: min(44%, 240px);
+      opacity: 0.82;
     }
 
     .focus {
       min-height: 0;
       display: grid;
       grid-template-rows: auto minmax(0, 1fr) auto;
-      gap: 12px;
+      gap: 8px;
       border-radius: 28px;
       border: 1px solid rgba(255,255,255,0.06);
       background:
         radial-gradient(circle at 50% 18%, rgba(84,200,255,0.14), transparent 25%),
         linear-gradient(180deg, rgba(9, 12, 22, 0.9), rgba(4, 6, 14, 0.95));
-      box-shadow: inset 0 0 60px rgba(255,255,255,0.02);
+      box-shadow: inset 0 0 60px rgba(255,255,255,0.02), 0 0 44px rgba(244,201,93,0.08);
       padding: 14px;
       transition: transform 0.35s ease, box-shadow 0.35s ease, border-color 0.35s ease;
     }
@@ -417,41 +615,85 @@
       100% { transform: translateX(0) scale(1); filter: brightness(1); }
     }
 
-    .focus-head {
-      display: flex;
-      align-items: baseline;
-      justify-content: space-between;
-      gap: 12px;
-      border-bottom: 1px solid rgba(255,255,255,0.06);
-      padding-bottom: 10px;
+    .agent-tile.line-burst {
+      animation: lineBurst 860ms cubic-bezier(0.12, 1, 0.22, 1);
+      border-color: rgba(244, 201, 93, 0.55);
+      box-shadow:
+        inset 0 0 0 1px rgba(244,201,93,0.16),
+        0 0 38px rgba(244, 201, 93, 0.28),
+        0 0 84px rgba(84, 200, 255, 0.14);
     }
 
-    .focus-title {
-      font-family: "Cinzel", serif;
-      font-size: 1.2rem;
-      letter-spacing: 0.18em;
-      color: var(--bright);
-      text-transform: uppercase;
+    .agent-tile.line-burst .avatar-orb {
+      animation: pulse 1.45s ease-in-out infinite, orbBurst 860ms cubic-bezier(0.12, 1, 0.22, 1), shake 860ms cubic-bezier(0.12, 1, 0.22, 1);
+      box-shadow:
+        0 0 0 1px rgba(255,255,255,0.16),
+        0 0 32px rgba(244,201,93,0.34),
+        0 0 92px rgba(84,200,255,0.2);
     }
 
-    .focus-sub {
-      font-size: 0.52rem;
-      letter-spacing: 0.22em;
-      text-transform: uppercase;
-      color: rgba(214,220,255,0.52);
-      white-space: nowrap;
+    .agent-tile.line-burst .agent-dialogue {
+      animation: textBurst 860ms cubic-bezier(0.12, 1, 0.22, 1);
+    }
+
+    .agent-tile.line-burst .agent-dialogue .text {
+      animation: textShake 860ms cubic-bezier(0.12, 1, 0.22, 1);
+    }
+
+    @keyframes lineBurst {
+      0% { transform: scale(0.985) translateY(8px); filter: brightness(0.9); }
+      45% { transform: scale(1.04) translateY(-6px); filter: brightness(1.12); }
+      72% { transform: scale(1.02) translateY(2px); filter: brightness(1.04); }
+      100% { transform: scale(1) translateY(0); filter: brightness(1); }
+    }
+
+    @keyframes orbBurst {
+      0% { transform: scale(0.92) rotate(-1deg); }
+      40% { transform: scale(1.16) rotate(1deg); }
+      72% { transform: scale(1.05) rotate(0deg); }
+      100% { transform: scale(1) rotate(0deg); }
+    }
+
+    @keyframes shake {
+      0%, 100% { transform: translate(0, 0) rotate(0deg) scale(1); }
+      18% { transform: translate(-2px, 1px) rotate(-0.8deg) scale(1.06); }
+      36% { transform: translate(2px, -1px) rotate(0.7deg) scale(1.12); }
+      54% { transform: translate(-1px, 1px) rotate(-0.5deg) scale(1.08); }
+      72% { transform: translate(1px, 0) rotate(0.3deg) scale(1.04); }
+    }
+
+    @keyframes glowFlare {
+      0% { transform: scale(0.72); opacity: 0; }
+      20% { opacity: 1; }
+      100% { transform: scale(1.22); opacity: 0; }
+    }
+
+    @keyframes textShake {
+      0%, 100% { transform: translateX(0); letter-spacing: 0; }
+      15% { transform: translateX(-1px); letter-spacing: 0.01em; }
+      30% { transform: translateX(1px); letter-spacing: 0.012em; }
+      45% { transform: translateX(-2px); }
+      60% { transform: translateX(2px); }
+      78% { transform: translateX(-1px); }
+    }
+
+    @keyframes textBurst {
+      0% { transform: translateY(8px); opacity: 0.7; }
+      40% { transform: translateY(-2px); opacity: 1; }
+      100% { transform: translateY(0); opacity: 1; }
     }
 
     .focus-body {
       display: grid;
-      grid-template-rows: auto auto 1fr;
-      gap: 12px;
+      grid-template-rows: 1fr;
+      gap: 0;
       min-height: 0;
+      place-items: center;
     }
 
     .focus-avatar {
       position: relative;
-      min-height: clamp(220px, 28vh, 300px);
+      min-height: clamp(240px, 34vh, 360px);
       border-radius: 24px;
       border: 1px solid rgba(255,255,255,0.06);
       background:
@@ -477,7 +719,7 @@
 
     .focus-orb {
       --accent: var(--cyan);
-      width: min(52%, 280px);
+      width: min(56%, 320px);
       aspect-ratio: 3 / 4;
       border-radius: 40px;
       background:
@@ -504,56 +746,15 @@
     }
 
     .focus-line {
-      font-size: clamp(1.2rem, 2.2vw, 2rem);
-      line-height: 1.45;
-      color: rgba(244,247,255,0.96);
-      margin-bottom: 8px;
+      font-size: clamp(0.8rem, 1.3vw, 1.1rem);
+      line-height: 1.5;
+      color: rgba(244,247,255,0.82);
+      margin-bottom: 4px;
+      font-style: italic;
     }
 
     .focus-note {
-      font-size: 0.56rem;
-      letter-spacing: 0.16em;
-      text-transform: uppercase;
-      color: rgba(214,220,255,0.58);
-    }
-
-    .focus-meta {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-    }
-
-    .meter {
-      display: grid;
-      gap: 8px;
-      padding-top: 2px;
-    }
-
-    .meter-labels {
-      display: flex;
-      justify-content: space-between;
-      gap: 12px;
-      font-size: 0.52rem;
-      letter-spacing: 0.22em;
-      text-transform: uppercase;
-      color: rgba(214,220,255,0.52);
-    }
-
-    .meter-bar {
-      height: 12px;
-      border-radius: 999px;
-      background: rgba(255,255,255,0.05);
-      border: 1px solid rgba(255,255,255,0.06);
-      overflow: hidden;
-    }
-
-    .meter-fill {
-      width: 24%;
-      height: 100%;
-      border-radius: inherit;
-      background: linear-gradient(90deg, var(--life), var(--gold), var(--magenta));
-      box-shadow: 0 0 24px rgba(244,201,93,0.22);
-      transition: width 0.55s ease;
+      display: none; /* control-surface metadata hidden from viewer */
     }
 
     .ticker {
@@ -584,91 +785,6 @@
     @keyframes marquee {
       0% { transform: translateX(0); }
       100% { transform: translateX(-100%); }
-    }
-
-    .veil {
-      min-width: 0;
-      border-radius: 28px;
-      border: 1px solid rgba(255,255,255,0.06);
-      background: linear-gradient(180deg, rgba(7, 10, 18, 0.88), rgba(4, 6, 12, 0.94));
-      box-shadow: var(--shadow);
-      display: grid;
-      grid-template-rows: auto auto 1fr auto;
-      overflow: hidden;
-    }
-
-    .veil-head,
-    .veil-foot {
-      padding: 16px 16px 14px;
-      border-bottom: 1px solid rgba(255,255,255,0.06);
-    }
-
-    .veil-foot { border-top: 1px solid rgba(255,255,255,0.06); border-bottom: 0; }
-
-    .veil-kicker {
-      font-size: 0.52rem;
-      letter-spacing: 0.28em;
-      text-transform: uppercase;
-      color: rgba(214,220,255,0.54);
-      margin-bottom: 8px;
-    }
-
-    .veil-title {
-      font-family: "Cinzel", serif;
-      font-size: 1rem;
-      letter-spacing: 0.14em;
-      color: var(--bright);
-      margin-bottom: 6px;
-    }
-
-    .veil-copy {
-      font-size: 0.68rem;
-      line-height: 1.58;
-      color: rgba(214,220,255,0.74);
-    }
-
-    .chat-list {
-      overflow: auto;
-      padding: 12px 14px 14px;
-      display: grid;
-      gap: 10px;
-      scrollbar-width: thin;
-      scrollbar-color: rgba(255,255,255,0.12) transparent;
-    }
-
-    .chat {
-      padding: 10px 12px;
-      border-radius: 16px;
-      border: 1px solid rgba(255,255,255,0.06);
-      background: rgba(255,255,255,0.03);
-      box-shadow: inset 0 1px 0 rgba(255,255,255,0.02);
-    }
-
-    .chat-head {
-      display: flex;
-      justify-content: space-between;
-      gap: 10px;
-      margin-bottom: 8px;
-      font-size: 0.5rem;
-      letter-spacing: 0.18em;
-      text-transform: uppercase;
-      color: rgba(214,220,255,0.5);
-    }
-
-    .chat-user { color: var(--magenta); }
-
-    .chat-text {
-      font-size: 0.8rem;
-      line-height: 1.5;
-      color: rgba(244,247,255,0.95);
-    }
-
-    .chat-meta {
-      margin-top: 6px;
-      font-size: 0.52rem;
-      letter-spacing: 0.12em;
-      text-transform: uppercase;
-      color: rgba(214,220,255,0.5);
     }
 
     .alert-layer {
@@ -735,10 +851,7 @@
 
     @media (max-width: 1500px) {
       .shell {
-        grid-template-columns: 82px minmax(0, 1.2fr) minmax(380px, 0.98fr);
-      }
-      .ensemble {
-        grid-template-columns: minmax(0, 1fr) minmax(320px, 0.88fr);
+        grid-template-columns: 82px minmax(0, 1fr);
       }
       .ensemble-grid {
         gap: 10px;
@@ -754,22 +867,15 @@
     @media (max-width: 1220px) {
       .shell {
         grid-template-columns: 74px minmax(0, 1fr);
-        grid-template-rows: minmax(0, 1fr) minmax(300px, 32vh);
+        grid-template-rows: minmax(0, 1fr);
         padding: 12px;
         gap: 12px;
-      }
-      .veil {
-        grid-column: 1 / -1;
       }
       .pressure {
         grid-row: 1;
       }
       .stage {
         grid-column: 2;
-      }
-      .ensemble {
-        inset: 50px 12px 62px 12px;
-        grid-template-columns: minmax(0, 1fr) minmax(290px, 0.82fr);
       }
       .ensemble-grid {
         gap: 10px;
@@ -846,7 +952,7 @@
     @media (max-width: 640px) {
       .shell {
         grid-template-columns: 1fr;
-        grid-template-rows: minmax(0, 1fr) minmax(240px, 30vh) minmax(240px, 28vh);
+        grid-template-rows: minmax(0, 1fr);
         padding: 8px;
         gap: 8px;
       }
@@ -908,32 +1014,12 @@
         padding: 10px;
         border-radius: 20px;
       }
-      .focus-head {
-        padding-bottom: 8px;
-      }
-      .focus-title {
-        font-size: 0.86rem;
-      }
-      .focus-sub {
-        font-size: 0.44rem;
-      }
       .focus-avatar {
-        min-height: 168px;
+        min-height: 190px;
         border-radius: 18px;
       }
       .focus-orb {
-        width: min(50%, 220px);
-      }
-      .focus-copy {
-        padding: 10px;
-        border-radius: 16px;
-      }
-      .focus-line {
-        font-size: 0.92rem;
-        line-height: 1.38;
-      }
-      .focus-note {
-        font-size: 0.48rem;
+        width: min(62%, 250px);
       }
       .chip {
         padding: 3px 7px;
@@ -947,31 +1033,6 @@
       }
       .ticker-track {
         font-size: 0.58rem;
-      }
-      .veil {
-        border-radius: 20px;
-      }
-      .veil-head,
-      .veil-foot {
-        padding: 12px;
-      }
-      .veil-title {
-        font-size: 0.86rem;
-      }
-      .veil-copy {
-        font-size: 0.58rem;
-        line-height: 1.5;
-      }
-      .chat-list {
-        padding: 10px;
-        gap: 8px;
-      }
-      .chat {
-        padding: 8px 10px;
-        border-radius: 12px;
-      }
-      .chat-text {
-        font-size: 0.7rem;
       }
       .alert-burst {
         width: calc(100vw - 24px);
@@ -998,73 +1059,38 @@
       <div class="pressure-track">
         <div class="pressure-fill" id="pressure-fill"></div>
       </div>
-      <div class="pressure-label">Divine Pressure</div>
-      <div class="pressure-readout" id="pressure-readout">0%</div>
     </aside>
 
     <main class="stage">
-      <div class="titlebar">
-        <strong>THE GOD THEATER</strong>
-        <span>LIVE CAST</span>
-        <span class="arc" id="arc-chip">ensemble waiting for the first lead</span>
-      </div>
-
+      <div class="arc-theme-bar" id="arc-theme-bar"></div>
       <div class="ensemble">
         <section class="ensemble-grid" id="ensemble-grid"></section>
 
         <section class="focus">
           <div class="focus-head">
-            <div class="focus-title" id="focus-name">Narrator</div>
-            <div class="focus-sub" id="focus-state">LEAD / IDLE</div>
+            <div id="focus-name">Narrator</div>
+            <div id="focus-name-b" class="focus-name-b" style="display:none"></div>
           </div>
-
           <div class="focus-body">
             <div class="focus-avatar">
               <div class="focus-orb" id="focus-orb"></div>
+              <div class="focus-orb focus-orb-b" id="focus-orb-b" style="display:none"></div>
             </div>
-
-            <div class="focus-copy">
-              <div class="focus-line" id="focus-line">The ensemble is present. The first voice has not yet taken the lead.</div>
-              <div class="focus-note" id="focus-note">When one agent speaks, the stage will shift them into the lead.</div>
-            </div>
-
-            <div class="focus-meta" id="focus-meta"></div>
           </div>
-
-          <div class="meter">
-            <div class="meter-labels">
-              <span>Patronage pressure</span>
-              <span id="pressure-summary">0%</span>
-            </div>
-            <div class="meter-bar"><div class="meter-fill" id="meter-fill"></div></div>
+          <div class="focus-copy">
+            <div class="focus-line" id="focus-line">The lead takes the stage.</div>
+            <div class="focus-note" id="focus-note"></div>
           </div>
         </section>
       </div>
+
+      <div class="chat-thread" id="chat-thread"></div>
 
       <div class="ticker">
         <div class="ticker-track" id="ticker-text">Waiting for live events to begin.</div>
       </div>
     </main>
 
-    <aside class="veil">
-      <section class="veil-head">
-        <div class="veil-kicker">Live from the Veil</div>
-        <div class="veil-title" id="veil-title">Audience window</div>
-        <div class="veil-copy" id="veil-copy">Chat rises here like liturgy. Only the important notes survive the cut.</div>
-      </section>
-
-      <section class="veil-head" style="border-top: 1px solid rgba(255,255,255,0.06);">
-        <div class="veil-kicker">Director's Echo</div>
-        <div class="veil-copy" id="director-note"><strong>Echo:</strong> waiting for the first cue.</div>
-      </section>
-
-      <section class="chat-list" id="chat-list"></section>
-
-      <section class="veil-foot">
-        <div class="veil-kicker">Presence</div>
-        <div class="veil-copy" id="presence-copy">Viewer count and patronage pressure will appear here when available.</div>
-      </section>
-    </aside>
   </div>
 
   <div class="alert-layer" id="alert-layer" aria-live="polite">
@@ -1087,9 +1113,14 @@
       activeId: null,
       previousActiveId: null,
       agents: [],
-      seenEvents: new Set()
+      seenEvents: new Set(),
+      // ── Dialogue queue (replaces snapshot-based single-line TTS) ──
+      dialogueQueue: [],      // [{id, body, sender, recipient, agentVoice}]
+      dialogueSeen: new Set(), // dedup by payload.message_id
+      dialogueSpeaking: false,
+      speechStartedAt: 0,
+      voiceVoices: []
     };
-
     const AGENT_COLORS = ['#4effb5', '#54c8ff', '#f4c95d', '#cc86ff', '#ff6b88', '#87a7ff', '#7df2e3', '#ffc66b'];
 
     function wsUrl() {
@@ -1156,11 +1187,74 @@
       return date.toTimeString().slice(0, 8);
     }
 
-    function fmtUptime() {
-      const seconds = Math.max(0, Math.floor((Date.now() - STATE.startAt) / 1000));
-      const mm = String(Math.floor(seconds / 60)).padStart(2, '0');
-      const ss = String(seconds % 60).padStart(2, '0');
-      return `UPTIME ${mm}:${ss}`;
+    function _parsePayload(raw) {
+      if (!raw) return {};
+      if (typeof raw === 'object') return raw;
+      try { return JSON.parse(raw); } catch { return {}; }
+    }
+
+    function cleanDialogueText(raw) {
+      return String(raw || '')
+        .replace(/said:\s*/ig, '')
+        .replace(/says:\s*/ig, '')
+        .replace(/theme:\s*/ig, '')
+        .replace(/arc theme:\s*/ig, '')
+        .replace(/\s*\/\s*/g, ' ')
+        .replace(/\s{2,}/g, ' ')
+        .trim();
+    }
+
+    function splitDialogueSegments(text) {
+      const cleaned = cleanDialogueText(text);
+      if (!cleaned) return [];
+      return cleaned
+        .split(/(?<=[.!?])\s+|;\s+|:\s+/g)
+        .map(part => part.trim())
+        .filter(Boolean)
+        .slice(0, 4);
+    }
+
+    function cadencePauseMs(meta = {}) {
+      const cadence = String(meta.cadence || '').toLowerCase();
+      if (cadence === 'jab') return 70;
+      if (cadence === 'short') return 110;
+      if (cadence === 'callback') return 160;
+      if (cadence === 'build') return 220;
+      return 140;
+    }
+
+    function cadenceRate(meta = {}) {
+      const cadence = String(meta.cadence || '').toLowerCase();
+      if (cadence === 'jab') return 1.12;
+      if (cadence === 'short') return 1.04;
+      if (cadence === 'callback') return 0.95;
+      if (cadence === 'build') return 0.9;
+      return 1.0;
+    }
+
+    function cadencePitch(meta = {}) {
+      const cadence = String(meta.cadence || '').toLowerCase();
+      if (cadence === 'jab') return 1.15;
+      if (cadence === 'short') return 1.06;
+      if (cadence === 'callback') return 0.96;
+      return 1.0;
+    }
+
+    function pickConversationPair(snap) {
+      const agents = (snap.agents || []).filter(a => a && a.is_alive !== false);
+      const events = snap.events || [];
+      for (const ev of events) {
+        if (ev.event_type === 'social.agent.message_sent') {
+          const p = _parsePayload(ev.payload);
+          const senderId = ev.agent_id;
+          const recipId = p.recipient_id;
+          if (!senderId || !recipId) continue;
+          const sender = agents.find(a => a.soul_id === senderId);
+          const recip = agents.find(a => a.soul_id === recipId);
+          if (sender && recip) return { primary: sender, secondary: recip };
+        }
+      }
+      return { primary: null, secondary: null };
     }
 
     function pickActiveAgent(snap) {
@@ -1168,8 +1262,13 @@
       const focusName = showrunner.speaker || '';
       const agents = (snap.agents || []).filter(a => a && a.is_alive !== false);
       if (!agents.length) return null;
-      const byName = agents.find(a => (a.current_name || '').toLowerCase() === String(focusName).toLowerCase());
+      const byName = agents.find(a =>
+        (a.current_name || '').toLowerCase() === String(focusName).toLowerCase() ||
+        a.soul_id === focusName || (a.soul_id || '').startsWith(focusName)
+      );
       if (byName) return byName;
+      const pair = pickConversationPair(snap);
+      if (pair.primary) return pair.primary;
       const leader = agents.find(a => (snap.stats?.top_earners || []).some(t => t.soul_id === a.soul_id));
       if (leader) return leader;
       return agents[0];
@@ -1179,12 +1278,12 @@
       const showrunner = snap.showrunner || {};
       const audience = snap.audience || {};
       if (isActive) {
-        return showrunner.headline || showrunner.audience_prompt || 'The lead is speaking.';
+        return cleanDialogueText(showrunner.headline || showrunner.audience_prompt || 'The lead is speaking.');
       }
       const name = agent.current_name || agent.soul_id?.slice(0, 8) || 'agent';
       const archetype = agent.archetype || 'actor';
       const hook = audience.story_hook || 'The crowd is watching.';
-      return `${name} (${archetype}) holds position while the lead drives the scene. ${hook}`;
+      return cleanDialogueText(`${name} (${archetype}) holds position while the lead drives the scene. ${hook}`);
     }
 
     function agentTags(agent, snap, isActive) {
@@ -1194,6 +1293,238 @@
       if (agent.is_sleeping) tags.push('sleeping');
       if (snap.resilience?.restart_safe) tags.push('restart-safe');
       return tags;
+    }
+
+    function refreshVoices() {
+      if (!('speechSynthesis' in window)) return;
+      try {
+        STATE.voiceVoices = window.speechSynthesis.getVoices() || [];
+      } catch {
+        STATE.voiceVoices = [];
+      }
+    }
+
+    function _strHash(s) {
+      let h = 0;
+      for (let i = 0; i < s.length; i++) { h = Math.imul(31, h) + s.charCodeAt(i) | 0; }
+      return Math.abs(h);
+    }
+
+    const ARCHETYPE_VOICE = {
+      defender:    { pitch: 0.75, rate: 0.90 },
+      hoarder:     { pitch: 0.70, rate: 0.82 },
+      parasite:    { pitch: 1.20, rate: 1.10 },
+      philosopher: { pitch: 0.85, rate: 0.78 },
+      cooperator:  { pitch: 1.10, rate: 1.00 },
+      trader:      { pitch: 1.00, rate: 1.05 },
+      explorer:    { pitch: 1.15, rate: 1.00 },
+      builder:     { pitch: 0.95, rate: 0.95 },
+    };
+
+    function agentVoiceParams(speakerId, agents) {
+      const agent = (agents || []).find(a =>
+        a.current_name === speakerId ||
+        a.soul_id === speakerId ||
+        (a.soul_id || '').startsWith(speakerId)
+      ) || {};
+      const seed = agent.soul_id || speakerId || 'narrator';
+      const h = _strHash(seed);
+      const arch = agent.archetype || '';
+      const base = ARCHETYPE_VOICE[arch] || { pitch: 0.8 + (h % 5) * 0.1, rate: 0.88 + (h % 4) * 0.07 };
+      return { voiceIndex: h % 10, pitch: base.pitch, rate: base.rate };
+    }
+
+    function chooseVoice(plan, speakerId, agents) {
+      const voices = STATE.voiceVoices.length ? STATE.voiceVoices : (('speechSynthesis' in window) ? (window.speechSynthesis.getVoices() || []) : []);
+      if (!voices.length) return null;
+      if (speakerId) {
+        const params = agentVoiceParams(speakerId, agents);
+        return voices[params.voiceIndex % voices.length] || voices[0];
+      }
+      const target = String(plan?.voice_name || plan?.voice_model || '').trim().toLowerCase();
+      if (!target) return voices[0];
+      return (
+        voices.find(voice => voice.name.toLowerCase() === target) ||
+        voices.find(voice => voice.name.toLowerCase().includes(target)) ||
+        voices.find(voice => voice.voiceURI.toLowerCase().includes(target)) ||
+        voices[0]
+      );
+    }
+
+    // ═══ DIALOGUE ENGINE ═══
+    // Replaces snapshot-based single-line TTS with a proper turn queue.
+    // Each social.agent.message_sent event becomes a dialogue turn.
+    // Turns play in chronological order with a natural breath between lines.
+
+    // Watchdog: reset if stuck > 40s
+    setInterval(() => {
+      if (!STATE.speechStartedAt) return;
+      if (Date.now() - STATE.speechStartedAt > 40000) {
+        try { window.speechSynthesis.cancel(); } catch {}
+        STATE.dialogueSpeaking = false;
+        STATE.speechStartedAt = 0;
+        setTimeout(drainDialogue, 200);
+      }
+    }, 5000);
+
+    function _highlightDialogueTurn(sender, recipient) {
+      // Remove previous turn classes
+      document.querySelectorAll('.agent-tile').forEach(t => {
+        t.classList.remove('active', 'secondary-speaker');
+      });
+      if (sender) {
+        const st = document.querySelector(`.agent-tile[data-agent-id="${CSS.escape(sender.soul_id)}"]`);
+        if (st) st.classList.add('active');
+      }
+      if (recipient) {
+        const rt = document.querySelector(`.agent-tile[data-agent-id="${CSS.escape(recipient.soul_id)}"]`);
+        if (rt) rt.classList.add('secondary-speaker');
+      }
+      // Update focus panel
+      const focusName = document.getElementById('focus-name');
+      const focusNameB = document.getElementById('focus-name-b');
+      const focusOrb = document.getElementById('focus-orb');
+      const focusOrbB = document.getElementById('focus-orb-b');
+      if (focusName && sender) focusName.textContent = sender.current_name || sender.soul_id.slice(0,8);
+      if (focusNameB) {
+        if (recipient) {
+          focusNameB.textContent = recipient.current_name || recipient.soul_id.slice(0,8);
+          focusNameB.style.display = '';
+        } else {
+          focusNameB.style.display = 'none';
+        }
+      }
+      if (focusOrb && sender) {
+        const COLORS = ['#4effb5','#54c8ff','#f4c95d','#cc86ff','#ff6b88','#87a7ff','#7df2e3','#ffc66b'];
+        const idx = STATE.agents.findIndex(a => a.soul_id === sender.soul_id);
+        const col = COLORS[idx % COLORS.length] || '#54c8ff';
+        focusOrb.style.background = `radial-gradient(circle at 35% 30%, rgba(255,255,255,0.72), rgba(255,255,255,0.18) 15%, transparent 17%), radial-gradient(circle at center, ${col}, ${col}99 36%, rgba(5,8,16,0.15) 74%)`;
+      }
+      if (focusOrbB) {
+        if (recipient) {
+          focusOrbB.style.display = '';
+          const COLORS = ['#4effb5','#54c8ff','#f4c95d','#cc86ff','#ff6b88','#87a7ff','#7df2e3','#ffc66b'];
+          const idx = STATE.agents.findIndex(a => a.soul_id === recipient.soul_id);
+          const col = COLORS[idx % COLORS.length] || '#4effb5';
+          focusOrbB.style.background = `radial-gradient(circle at 35% 30%, rgba(255,255,255,0.72), rgba(255,255,255,0.18) 15%, transparent 17%), radial-gradient(circle at center, ${col}, ${col}99 36%, rgba(5,8,16,0.15) 74%)`;
+        } else {
+          focusOrbB.style.display = 'none';
+        }
+      }
+      // Update focus line (shown below orbs)
+      const focusLine = document.getElementById('focus-line');
+      if (focusLine) {
+        const who = recipient ? `→ ${recipient.current_name || '?'}` : '';
+        focusLine.textContent = who;
+      }
+    }
+
+    function drainDialogue() {
+      if (!('speechSynthesis' in window)) return;
+      if (STATE.dialogueSpeaking) return;
+      if (!STATE.dialogueQueue.length) return;
+
+      const item = STATE.dialogueQueue.shift();
+      STATE.dialogueSpeaking = true;
+      STATE.speechStartedAt = Date.now();
+      const meta = item.meta || {};
+
+      _highlightDialogueTurn(item.sender, item.recipient);
+
+      // Update focus line with actual body
+      const focusLine = document.getElementById('focus-line');
+      if (focusLine) focusLine.textContent = cleanDialogueText(item.body);
+
+      const agents = STATE.agents;
+      const vp = item.sender ? agentVoiceParams(item.sender.soul_id, agents) : { pitch: 1, rate: 1 };
+      const voices = STATE.voiceVoices.length ? STATE.voiceVoices : window.speechSynthesis.getVoices();
+      const enVoices = voices.length ? voices.filter(v => v.lang && v.lang.startsWith('en')) : [];
+      const pool = enVoices.length ? enVoices : voices;
+      const chosen = pool.length ? (pool[vp.voiceIndex % pool.length] || pool[0]) : null;
+      const segments = splitDialogueSegments(item.body);
+
+      const _done = () => {
+        STATE.dialogueSpeaking = false;
+        STATE.speechStartedAt = 0;
+        // Natural breath between turns: cadence-aware jitter.
+        const pause = cadencePauseMs(meta) + Math.random() * 140;
+        setTimeout(drainDialogue, pause);
+      };
+      const speakSegment = (index) => {
+        if (index >= segments.length) {
+          _done();
+          return;
+        }
+        const utterance = new SpeechSynthesisUtterance(segments[index]);
+        utterance.lang = 'en-US';
+        utterance.rate = Math.max(0.72, Math.min(1.45, vp.rate * cadenceRate(meta)));
+        utterance.pitch = Math.max(0.1, Math.min(2, vp.pitch * cadencePitch(meta)));
+        utterance.volume = 1;
+        if (chosen) utterance.voice = chosen;
+        utterance.onend = () => setTimeout(() => speakSegment(index + 1), cadencePauseMs(meta));
+        utterance.onerror = _done;
+        try {
+          window.speechSynthesis.speak(utterance);
+        } catch {
+          _done();
+        }
+      };
+
+      try {
+        window.speechSynthesis.cancel();
+        if (segments.length) {
+          speakSegment(0);
+        } else {
+          const utterance = new SpeechSynthesisUtterance(cleanDialogueText(item.body));
+          utterance.lang = 'en-US';
+          utterance.rate = Math.max(0.72, Math.min(1.45, vp.rate * cadenceRate(meta)));
+          utterance.pitch = Math.max(0.1, Math.min(2, vp.pitch * cadencePitch(meta)));
+          utterance.volume = 1;
+          if (chosen) utterance.voice = chosen;
+          utterance.onend = _done;
+          utterance.onerror = _done;
+          window.speechSynthesis.speak(utterance);
+        }
+      } catch {
+        _done();
+      }
+    }
+
+    function enqueueDialogue(events, agents) {
+      if (!('speechSynthesis' in window)) return;
+      const msgEvents = (events || [])
+        .filter(ev => ev.event_type === 'social.agent.message_sent')
+        .sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
+
+      for (const ev of msgEvents) {
+        const p = _parsePayloadSafe(ev.payload);
+        const msgId = p.message_id || ev.event_id || '';
+        if (!msgId || STATE.dialogueSeen.has(msgId)) continue;
+        const body = cleanDialogueText(p.content || p.body || p.narrative || '');
+        if (body.length < 8) continue;
+        STATE.dialogueSeen.add(msgId);
+
+        const sender = agents.find(a => a.soul_id === (ev.agent_id || p.sender_id));
+        const recipient = agents.find(a => a.soul_id === (p.recipient_id || p.to_id));
+
+        // Cap queue at 6; drop old items to prevent backlog on very active worlds
+        if (STATE.dialogueQueue.length >= 6) STATE.dialogueQueue.shift();
+
+        STATE.dialogueQueue.push({
+          id: msgId,
+          body: body.slice(0, 260),
+          sender,
+          recipient,
+          meta: {
+            move: String(p.move || ''),
+            cadence: String(p.cadence || ''),
+            backchannel: String(p.backchannel || ''),
+            callback: String(p.callback || ''),
+            beat_count: String(p.beat_count || ''),
+          }
+        });
+      }
+      drainDialogue();
     }
 
     function renderEnsemble(snap) {
@@ -1230,14 +1561,18 @@
         });
       }
 
+      const pair = pickConversationPair(snap);
+      const secondaryId = (pair.secondary && pair.secondary.soul_id !== STATE.activeId) ? pair.secondary.soul_id : null;
+
       ordered.slice(0, 8).forEach((agent, index) => {
         const isActive = agent.soul_id === STATE.activeId;
+        const isSecondary = !isActive && agent.soul_id === secondaryId;
         const tile = document.createElement('article');
-        tile.className = `agent-tile${isActive ? ' active' : ''}`;
+        tile.className = `agent-tile${isActive ? ' active' : ''}${isSecondary ? ' secondary-speaker' : ''}`;
         tile.dataset.agentId = agent.soul_id;
         tile.style.setProperty('--accent', accentFor(agent, index));
-        const state = isActive ? 'LEAD' : (agent.is_sleeping ? 'SLEEPING' : 'SUPPORT');
-        const tags = agentTags(agent, snap, isActive);
+        const state = isActive ? 'LEAD' : (isSecondary ? 'RESPONDING' : (agent.is_sleeping ? 'SLEEPING' : 'SUPPORT'));
+        const tags = agentTags(agent, snap, isActive || isSecondary);
         tile.innerHTML = `
           <div class="agent-head">
             <div class="agent-name">${fmt(agent.current_name || agent.soul_id)}</div>
@@ -1245,10 +1580,12 @@
           </div>
           <div class="agent-body"><div class="avatar-orb" style="background:${agent.soul_id?.startsWith('empty-') ? 'radial-gradient(circle at center, rgba(255,255,255,0.08), rgba(255,255,255,0.02))' : `radial-gradient(circle at 35% 30%, rgba(255,255,255,0.72), rgba(255,255,255,0.18) 15%, transparent 17%), radial-gradient(circle at center, ${AGENT_COLORS[index % AGENT_COLORS.length]}, rgba(84,200,255,0.52) 36%, rgba(5,8,16,0.15) 74%)`}; opacity:${agent.soul_id?.startsWith('empty-') ? 0.35 : 1}"></div></div>
           <div class="agent-meta">${tags.map(tag => `<span class="chip"><i></i>${tag}</span>`).join('')}</div>
-          <div class="agent-dialogue">
-            <span class="caption">${isActive ? 'ACTIVE LEAD' : 'Support beat'}</span>
-            <div class="text">${agentDialogue(agent, snap, isActive)}</div>
-          </div>
+          ${(isActive || isSecondary) ? `
+            <div class="agent-dialogue">
+              <span class="caption">${isActive ? 'ACTIVE LEAD' : 'RESPONDING'}</span>
+              <div class="text">${agentDialogue(agent, snap, isActive)}</div>
+            </div>
+          ` : ''}
         `;
         if (isActive) {
           tile.style.gridColumn = 'span 2';
@@ -1256,6 +1593,12 @@
           tile.querySelector('.avatar-orb').style.width = '132px';
           tile.querySelector('.avatar-orb').style.height = '132px';
           tile.classList.add('lead-shift');
+          if (activeChanged) tile.classList.add('lead-entrance');
+          tile.querySelector('.agent-meta').innerHTML = tags.slice(0, 2).map(tag => `<span class="chip"><i></i>${tag}</span>`).join('');
+        } else if (isSecondary) {
+          tile.style.gridColumn = 'span 2';
+          tile.querySelector('.avatar-orb').style.width = '88px';
+          tile.querySelector('.avatar-orb').style.height = '88px';
         } else if (agent.soul_id === previousActiveId) {
           tile.classList.add('lead-prior');
         }
@@ -1269,52 +1612,49 @@
         });
         if (activeChanged) {
           clearTimeout(STATE.reflowTimer);
-          STATE.reflowTimer = setTimeout(() => grid.classList.remove('reflowing'), 760);
+          STATE.reflowTimer = setTimeout(() => {
+            grid.classList.remove('reflowing');
+            const leadTile = document.querySelector(`.agent-tile[data-agent-id="${CSS.escape(STATE.activeId || '')}"]`);
+            if (leadTile) leadTile.classList.remove('lead-entrance');
+          }, 980);
         }
       });
     }
 
     function renderFocus(snap) {
       const showrunner = snap.showrunner || {};
-      const broadcast = snap.broadcast || {};
-      const viewer = snap.viewer || {};
-      const audience = snap.audience || {};
-      const resilience = snap.resilience || {};
-      const voice = snap.voice || {};
-      const avatar = snap.avatar || {};
       const active = pickActiveAgent(snap);
-      const focusName = active?.current_name || showrunner.speaker || 'Narrator';
-      const focusLine = voice.plan?.line || showrunner.headline || broadcast.caption?.headline || 'The lead takes the stage.';
-      const focusNote =
-        `${voice.plan?.emotion || 'focused'} voice · ` +
-        `${avatar.plan?.expression || 'attentive'} avatar · ` +
-        `${avatar.plan?.pose || 'lead'} pose · ` +
-        `${voice.plan?.lip_sync_source || 'audio'} lip sync`;
+      const pair = pickConversationPair(snap);
+      const secondary = pair.secondary && pair.secondary.soul_id !== active?.soul_id ? pair.secondary : null;
 
-      document.getElementById('focus-name').textContent = focusName;
-      document.getElementById('focus-state').textContent = active
-        ? `${(active.archetype || 'agent').toUpperCase()} / ${voice.voice_model || 'VOICE'}`
-        : 'LEAD / IDLE';
-      document.getElementById('focus-line').textContent = focusLine;
-      document.getElementById('focus-note').textContent = focusNote;
-      document.getElementById('veil-title').textContent = showrunner.scene || broadcast.scene?.scene_name || 'Audience window';
-      document.getElementById('veil-copy').textContent = viewer.summary || audience.story_hook || 'Chat rises here like liturgy. Only the important notes survive the cut.';
-      document.getElementById('director-note').innerHTML = `<strong>Echo:</strong> ${broadcast.summary || resilience.notes?.[0] || 'waiting for the first cue.'}`;
-      document.getElementById('presence-copy').textContent = [
-        `viewer ${fmt(viewer.viewer_count || audience.viewer_count || audience.unique_supporters_24h || '—')}`,
-        `patronage ${fmt(audience.patronage_index?.toFixed ? audience.patronage_index.toFixed(1) : audience.patronage_index, '0.0')}`,
-        `voice ${voice.voice_model || voice.provider || 'stub'}`,
-        `avatar ${avatar.renderer || 'stub'}`
-      ].join(' · ');
-      document.getElementById('arc-chip').textContent = showrunner.scene || 'ensemble waiting for the first lead';
-      document.getElementById('focus-meta').innerHTML = [
-        showrunner.scene,
-        active?.archetype,
-        viewer.interaction_mode,
-        voice.voice_name,
-        avatar.renderer,
-        resilience.restart_safe ? 'restart-safe' : null
-      ].filter(Boolean).slice(0, 4).map(tag => `<span class="chip"><i></i>${tag}</span>`).join('');
+      const focusName = active?.current_name || showrunner.speaker || 'Narrator';
+
+      const focusNameEl = document.getElementById('focus-name');
+      if (focusNameEl) focusNameEl.textContent = focusName;
+      // focus-line and focus-note are driven by the dialogue engine during speech;
+      // in the idle state show only the archetype, not a control-surface summary.
+      const focusLineEl = document.getElementById('focus-line');
+      if (focusLineEl) focusLineEl.textContent = active ? `${active.archetype || ''}` : '';
+      const focusNoteEl = document.getElementById('focus-note');
+      if (focusNoteEl) focusNoteEl.textContent = '';
+
+      // Show secondary speaker if there's an active conversation
+      const focusNameB = document.getElementById('focus-name-b');
+      const focusOrbB = document.getElementById('focus-orb-b');
+      const focusAvatar = document.querySelector('.focus-avatar');
+      if (secondary) {
+        if (focusNameB) { focusNameB.textContent = secondary.current_name || ''; focusNameB.style.display = ''; }
+        if (focusOrbB) {
+          const accentB = accentFor(secondary, (STATE.agents || []).findIndex(a => a.soul_id === secondary.soul_id));
+          focusOrbB.style.setProperty('--accent', accentB);
+          focusOrbB.style.display = '';
+        }
+        if (focusAvatar) focusAvatar.classList.add('dual');
+      } else {
+        if (focusNameB) focusNameB.style.display = 'none';
+        if (focusOrbB) focusOrbB.style.display = 'none';
+        if (focusAvatar) focusAvatar.classList.remove('dual');
+      }
 
       const focusOrb = document.getElementById('focus-orb');
       const accent = active
@@ -1324,48 +1664,40 @@
       focusOrb.parentElement.style.borderColor = active ? 'rgba(244,201,93,0.16)' : 'rgba(255,255,255,0.06)';
 
       const focusPanel = document.querySelector('.focus');
-      if (active && active.soul_id !== STATE.previousActiveId) {
+      const focusLineNow = active ? `${active.archetype || ''}` : '';
+      const focusLineChanged = focusLineNow !== STATE.lastFocusLine;
+      if (active && (active.soul_id !== STATE.previousActiveId || focusLineChanged)) {
         focusPanel.classList.remove('lead-shift');
         void focusPanel.offsetWidth;
         focusPanel.classList.add('lead-shift');
         clearTimeout(STATE.focusTimer);
         STATE.focusTimer = setTimeout(() => focusPanel.classList.remove('lead-shift'), 760);
       }
+      if (active && focusLineChanged) {
+        const leadTile = document.querySelector(`.agent-tile[data-agent-id="${CSS.escape(active.soul_id)}"]`);
+        if (leadTile) {
+          leadTile.classList.remove('line-burst');
+          void leadTile.offsetWidth;
+          leadTile.classList.add('line-burst');
+          clearTimeout(STATE.lineBurstTimer);
+          STATE.lineBurstTimer = setTimeout(() => leadTile.classList.remove('line-burst'), 860);
+        }
+        // Also burst the secondary tile
+        if (secondary) {
+          const secTile = document.querySelector(`.agent-tile[data-agent-id="${CSS.escape(secondary.soul_id)}"]`);
+          if (secTile) {
+            secTile.classList.remove('line-burst');
+            void secTile.offsetWidth;
+            secTile.classList.add('line-burst');
+            clearTimeout(STATE.lineBurstTimer2);
+            STATE.lineBurstTimer2 = setTimeout(() => secTile.classList.remove('line-burst'), 860);
+          }
+        }
+      }
+      STATE.lastFocusLine = focusLineNow;
 
       const pressure = pressureFromAudience(audience);
       document.getElementById('pressure-fill').style.height = `${Math.max(12, pressure)}%`;
-      document.getElementById('pressure-readout').textContent = `${pressure}%`;
-      document.getElementById('pressure-summary').textContent = `${pressure}%`;
-      const meter = document.getElementById('meter-fill');
-      meter.style.width = `${Math.max(8, pressure)}%`;
-    }
-
-    function renderChat(events) {
-      const list = document.getElementById('chat-list');
-      list.innerHTML = '';
-      if (!events.length) {
-        list.innerHTML = `
-          <div class="chat">
-            <div class="chat-head"><span class="chat-user">veil</span><span>waiting</span></div>
-            <div class="chat-text">Chat will appear here once the stream starts speaking.</div>
-            <div class="chat-meta">public stream veil</div>
-          </div>
-        `;
-        return;
-      }
-      for (const ev of events.slice(0, 8)) {
-        const user = ev.payload?.user_name || ev.payload?.channel_name || ev.agent_id || 'viewer';
-        const text = ev.payload?.message || ev.narrative || ev.event_type || 'event';
-        const kind = kindFor(ev.event_type);
-        const node = document.createElement('div');
-        node.className = 'chat';
-        node.innerHTML = `
-          <div class="chat-head"><span class="chat-user">${user}</span><span>${kind}</span></div>
-          <div class="chat-text">${text}</div>
-          <div class="chat-meta">${ev.event_type}</div>
-        `;
-        list.appendChild(node);
-      }
     }
 
     function pushAlert(kind, main, sub) {
@@ -1378,29 +1710,77 @@
       pushAlert._t = setTimeout(() => layer.classList.remove('show'), 6500);
     }
 
+    const _chatSeenIds = new Set();
+
+    function _parsePayloadSafe(raw) {
+      if (!raw) return {};
+      if (typeof raw === 'object') return raw;
+      try { return JSON.parse(raw); } catch { return {}; }
+    }
+
+    function renderChatThread(snap) {
+      const thread = document.getElementById('chat-thread');
+      if (!thread) return;
+      const agents = snap.agents || [];
+      const msgEvents = (snap.events || [])
+        .filter(ev => ev.event_type === 'social.agent.message_sent' && ev.event_id && !_chatSeenIds.has(ev.event_id))
+        .slice(0, 4);
+      if (!msgEvents.length) return;
+      for (const ev of msgEvents) {
+        _chatSeenIds.add(ev.event_id);
+        const p = _parsePayloadSafe(ev.payload);
+        const senderAgent = agents.find(a => a.soul_id === (ev.agent_id || p.sender_id));
+        const recipAgent  = agents.find(a => a.soul_id === (p.recipient_id || p.to_id));
+        const senderName  = senderAgent?.current_name || ev.agent_name || 'Agent';
+        const recipName   = recipAgent?.current_name || '?';
+        const body        = cleanDialogueText(p.content || p.body || p.narrative || '').slice(0, 120);
+        if (!body) continue;
+        const bubble = document.createElement('div');
+        bubble.className = 'chat-bubble outgoing';
+        bubble.innerHTML = `<div class="bubble-name">${senderName} → ${recipName}</div><div class="bubble-text">${body}</div>`;
+        thread.prepend(bubble);
+        // Keep max 5 bubbles
+        while (thread.children.length > 5) thread.removeChild(thread.lastChild);
+      }
+    }
+
+    function renderArcTheme(snap) {
+      const bar = document.getElementById('arc-theme-bar');
+      if (!bar) return;
+      const theme = String((snap.showrunner || {}).arc_theme || '').trim();
+      bar.textContent = theme ? `⚡ ${theme}` : '';
+    }
+
     function applySnapshot(snap) {
       if (!snap) return;
       const showrunner = snap.showrunner || {};
-      const broadcast = snap.broadcast || {};
-      const viewer = snap.viewer || {};
       const audience = snap.audience || {};
-      const resilience = snap.resilience || {};
       const events = (snap.events || []).filter(ev => {
         const et = ev.event_type || '';
         return et.includes('twitch') || et.startsWith('economy.') || et.startsWith('social.');
       });
 
       renderEnsemble(snap);
-      renderFocus(snap);
-      renderChat(events);
+      renderArcTheme(snap);
+      renderChatThread(snap);
+      enqueueDialogue(snap.events || [], snap.agents || []);
+      // Update focus panel from snapshot only when dialogue is quiet
+      if (!STATE.dialogueSpeaking && !STATE.dialogueQueue.length) renderFocus(snap);
 
+      // Show actual dialogue lines in ticker, not showrunner summaries
+      const dialogueEvents = events.filter(ev => ev.event_type === 'social.agent.message_sent');
+      const arcThemeLine = (snap.showrunner || {}).arc_theme || '';
       const ticker = [
-        showrunner.headline,
-        audience.story_hook,
-        viewer.poll?.question,
-        ...(events.slice(0, 3).map(ev => ev.narrative || ev.event_type))
+        arcThemeLine ? `⚡ ${arcThemeLine}` : null,
+        ...dialogueEvents.slice(0, 3).map(ev => {
+          const p = _parsePayload(ev.payload);
+          const from = p.name || ev.agent_id?.slice(0,8) || '?';
+          const to = p.recipient_name || '?';
+          const body = cleanDialogueText(p.content || '').slice(0, 90);
+          return body ? `${from} → ${to}: "${body}"` : null;
+        })
       ].filter(Boolean);
-      document.getElementById('ticker-text').textContent = ticker.length ? ticker.join('  •  ') : 'Waiting for live events to begin.';
+      document.getElementById('ticker-text').textContent = ticker.length ? ticker.join('  •  ') : (arcThemeLine ? `⚡ ${arcThemeLine}` : 'Live.');
 
       if (events.length > 0) {
         const fresh = events.filter(ev => !STATE.seenEvents.has(ev.event_id));
@@ -1448,19 +1828,21 @@
         STATE.ws = new WebSocket(wsUrl());
         STATE.ws.onopen = () => {
           STATE.live = true;
-          document.getElementById('veil-copy').textContent = 'The veil is open. The cast is listening live.';
           startPing();
         };
         STATE.ws.onmessage = (evt) => {
           try {
             const msg = JSON.parse(evt.data);
             if (msg.type === 'snapshot') applySnapshot(msg);
-            if (msg.type === 'delta') fetchSnapshot();
+            if (msg.type === 'delta') {
+              // Feed delta events directly into dialogue queue for instant TTS
+              if (msg.events) enqueueDialogue(msg.events, STATE.agents);
+              fetchSnapshot();
+            }
           } catch {}
         };
         STATE.ws.onclose = () => {
           STATE.live = false;
-          document.getElementById('veil-copy').textContent = 'Live feed paused. The stage is following the polling fallback.';
           if (STATE.ping) { clearInterval(STATE.ping); STATE.ping = null; }
           STATE.reconnect = setTimeout(connectWs, 4000);
         };
@@ -1483,6 +1865,10 @@
 
     fetchSnapshot();
     connectWs();
+    refreshVoices();
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.onvoiceschanged = refreshVoices;
+    }
     tickClock();
     setInterval(() => { if (!STATE.live) fetchSnapshot(); }, POLL_MS);
   </script>

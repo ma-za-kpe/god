@@ -11,22 +11,16 @@ SCENE_MAP = {
         "layout": "dramatic-close-up",
         "fallback_scene": "obs/world-wide",
     },
-    "economy-pan": {
-        "scene_id": "obs/economy-pan",
-        "scene_name": "Economy Pan",
-        "layout": "market-dashboard",
-        "fallback_scene": "obs/world-wide",
-    },
     "banter-table": {
         "scene_id": "obs/banter-table",
         "scene_name": "Banter Table",
         "layout": "talk-show",
         "fallback_scene": "obs/world-wide",
     },
-    "market-watch": {
-        "scene_id": "obs/market-watch",
-        "scene_name": "Market Watch",
-        "layout": "ticker-heavy",
+    "ensemble-stage": {
+        "scene_id": "obs/ensemble-stage",
+        "scene_name": "Ensemble Stage",
+        "layout": "avatar-led-grid",
         "fallback_scene": "obs/world-wide",
     },
     "void-silence": {

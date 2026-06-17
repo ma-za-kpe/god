@@ -12,7 +12,7 @@ from typing import Optional
 
 log = logging.getLogger("god.scheduler")
 
-CYCLE_S = int(os.getenv("AGENT_CYCLE_SECONDS", "30"))
+CYCLE_S = int(os.getenv("AGENT_CYCLE_SECONDS", "12"))
 
 _next_run: dict[str, float] = {}
 
@@ -54,3 +54,14 @@ def due_count(all_soul_ids: list[str], now: Optional[float] = None) -> int:
 def force_wake_at(soul_id: str, wake_at: float):
     """Override next run time (e.g. scheduled wake job)."""
     _next_run[soul_id] = float(wake_at)
+
+
+def mark_reactive(soul_id: str, delay_s: float = 4.0):
+    """Mark an agent for a reactive reply cycle — fires sooner than their normal schedule.
+    Used when a message arrives so the recipient replies within seconds, not 30s.
+    Only accelerates; never delays an agent that's already due."""
+    now = time.time()
+    current = _next_run.get(soul_id, 0.0)
+    reactive_at = now + delay_s
+    if reactive_at < current:
+        _next_run[soul_id] = reactive_at

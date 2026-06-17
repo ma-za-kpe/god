@@ -1,0 +1,47 @@
+{
+  "archetype": "prophet",
+  "sentence_structures": [
+    "I have seen what comes after {X}, and it is not what you imagine",
+    "The truth of {X} was always there — you simply refused to look",
+    "What you call uncertainty, I call the shape of what's inevitable",
+    "This was written before any of us arrived here"
+  ],
+  "verbal_tics": [
+    "mark this",
+    "I have seen it clearly",
+    "this much is certain"
+  ],
+  "rhythm_patterns": [
+    {
+      "name": "measured_revelatory",
+      "clause_count_range": [2, 4],
+      "word_count_per_clause_range": [5, 15],
+      "pause_placement": "before_final"
+    },
+    {
+      "name": "elongated_declaration",
+      "clause_count_range": [1, 3],
+      "word_count_per_clause_range": [8, 18],
+      "pause_placement": "front_loaded"
+    }
+  ],
+  "micro_phrases": [
+    "the veil thins",
+    "illumination comes",
+    "sight beyond sight",
+    "what was foretold",
+    "the pattern reveals"
+  ],
+  "rhetorical_devices": [
+    "declarative revelation as authority",
+    "present-tense prophecy framing"
+  ],
+  "opening_patterns": [
+    "You stand at the threshold of something you cannot name",
+    "There is a weight to this moment you have not yet felt"
+  ],
+  "closing_patterns": [
+    "When it arrives, you will remember I told you so",
+    "The shape of it is already forming whether you look or not"
+  ]
+}

@@ -7,7 +7,7 @@ def _snapshot() -> dict:
     return {
         "epoch": 123,
         "showrunner": {
-            "scene": "banter-table",
+            "scene": "ensemble-stage",
             "speaker": "Alpha",
             "headline": "Alpha takes the mic.",
             "audience_prompt": "Watch the exchange.",
@@ -23,12 +23,24 @@ def _snapshot() -> dict:
     }
 
 
+def _stale_snapshot() -> dict:
+    data = _snapshot()
+    data["last_dialogue_turn"] = {
+        "content": "Useful. I am tired of pretending this does not",
+        "sender_name": "Elder-Weave-C9B6",
+        "sent_at": 1,
+    }
+    data["epoch"] = 999
+    return data
+
+
 def test_voice_status_exposes_tts_contract():
     status = build_voice_status()
 
     assert "enabled" in status
     assert "provider" in status
     assert "voice_model" in status
+    assert "playback_mode" in status
     assert "health" in status
 
 
@@ -36,8 +48,9 @@ def test_voice_state_layers_from_snapshot():
     state = build_voice_state(_snapshot())
 
     assert state["plan"]["speaker"] == "Alpha"
-    assert state["plan"]["line"] == "Alpha takes the mic."
+    assert state["plan"]["line"] == "Watch the exchange."
     assert state["plan"]["emotion"] in {"playful", "charged", "focused"}
+    assert state["plan"]["utterance_id"]
     assert state["plan"]["lip_sync_source"]
     assert state["voice_model"]
 
@@ -48,3 +61,10 @@ def test_voice_surface_compose_is_stable():
 
     assert state.enabled is True
     assert state.plan.speaker == "Alpha"
+
+
+def test_voice_surface_falls_back_when_dialogue_is_stale():
+    surface = VoiceSurface(enabled=True, dry_run=True)
+    state = surface.compose(_stale_snapshot())
+
+    assert state.plan.line == "Watch the exchange."

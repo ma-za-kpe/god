@@ -475,3 +475,102 @@ CREATE INDEX IF NOT EXISTS idx_jobs_due           ON agent_scheduled_jobs(run_at
 CREATE INDEX IF NOT EXISTS idx_jobs_soul          ON agent_scheduled_jobs(soul_id, status);
 CREATE INDEX IF NOT EXISTS idx_reg_tools_owner    ON agent_registered_tools(owner_soul_id, is_active);
 CREATE INDEX IF NOT EXISTS idx_graph_mut_soul     ON agent_graph_mutations(soul_id, status);
+
+
+-- ============================================================
+-- Banter Engine — Relationship Memory
+-- See docs: broadcast-quality-banter-engine spec
+-- ============================================================
+
+-- Relationship pair state (one row per unique elder pair)
+CREATE TABLE IF NOT EXISTS relationship_pairs (
+    pair_id                 TEXT PRIMARY KEY,
+    elder_a                 TEXT NOT NULL,
+    elder_b                 TEXT NOT NULL,
+    tension_level           INTEGER DEFAULT 0 CHECK (tension_level >= 0 AND tension_level <= 10),
+    last_interaction_ts     BIGINT DEFAULT 0,
+    reconciliation_arc      BOOLEAN DEFAULT FALSE,
+    reconciliation_remaining INTEGER DEFAULT 0,
+    peak_tension_summary    TEXT DEFAULT '',
+    created_at              BIGINT DEFAULT (EXTRACT(EPOCH FROM NOW())::BIGINT),
+    updated_at              BIGINT DEFAULT (EXTRACT(EPOCH FROM NOW())::BIGINT)
+);
+
+-- Interaction records (append-only log per pair)
+CREATE TABLE IF NOT EXISTS interaction_records (
+    id                  SERIAL PRIMARY KEY,
+    pair_id             TEXT REFERENCES relationship_pairs(pair_id),
+    timestamp           BIGINT NOT NULL,
+    elder_acting        TEXT NOT NULL,
+    move_used           TEXT NOT NULL,
+    emotional_valence   TEXT CHECK (emotional_valence IN ('positive', 'negative', 'neutral')),
+    betrayal            BOOLEAN DEFAULT FALSE,
+    alliance            BOOLEAN DEFAULT FALSE,
+    concession          BOOLEAN DEFAULT FALSE,
+    summary             TEXT DEFAULT ''
+);
+
+-- Indexes for relationship memory
+CREATE INDEX IF NOT EXISTS idx_interaction_pair_ts
+    ON interaction_records(pair_id, timestamp DESC);
+
+CREATE INDEX IF NOT EXISTS idx_interaction_significant
+    ON interaction_records(pair_id, timestamp DESC)
+    WHERE emotional_valence != 'neutral' OR betrayal OR alliance OR concession;
+
+
+-- ============================================================
+-- Callback Registry tables (Soul Engine)
+-- ============================================================
+
+-- Memorable moments (high-scoring lines stored for future callback)
+CREATE TABLE IF NOT EXISTS callback_moments (
+    id              SERIAL PRIMARY KEY,
+    pair_id         VARCHAR(16) NOT NULL,
+    speaker         VARCHAR(64) NOT NULL,
+    target          VARCHAR(64) NOT NULL,
+    line            TEXT NOT NULL,
+    move            VARCHAR(32) NOT NULL,
+    arc_theme       VARCHAR(128) NOT NULL,
+    valence         VARCHAR(16) NOT NULL,
+    summary         VARCHAR(256) NOT NULL,
+    score           INTEGER NOT NULL,
+    beat_number     INTEGER NOT NULL,
+    created_at      BIGINT NOT NULL
+);
+
+-- Running gags (recurring patterns between Elder pairs)
+CREATE TABLE IF NOT EXISTS callback_running_gags (
+    id                  SERIAL PRIMARY KEY,
+    pair_id             VARCHAR(16) NOT NULL,
+    pattern_description TEXT NOT NULL,
+    topic               VARCHAR(128) NOT NULL,
+    interaction_count   INTEGER NOT NULL DEFAULT 0,
+    created_at          BIGINT NOT NULL
+);
+
+-- Sore spots (known vulnerabilities for targeted provocation)
+CREATE TABLE IF NOT EXISTS callback_sore_spots (
+    id              SERIAL PRIMARY KEY,
+    elder_name      VARCHAR(64) NOT NULL,
+    topic           VARCHAR(128) NOT NULL,
+    trigger_phrase  TEXT,
+    tension_delta   INTEGER NOT NULL,
+    created_at      BIGINT NOT NULL
+);
+
+-- Indexes for callback registry
+CREATE INDEX IF NOT EXISTS idx_callback_moments_pair
+    ON callback_moments(pair_id, created_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_callback_moments_speaker
+    ON callback_moments(speaker);
+
+CREATE INDEX IF NOT EXISTS idx_callback_gags_pair
+    ON callback_running_gags(pair_id);
+
+CREATE INDEX IF NOT EXISTS idx_callback_sore_spots_elder
+    ON callback_sore_spots(elder_name);
+
+CREATE INDEX IF NOT EXISTS idx_callback_sore_spots_elder_topic
+    ON callback_sore_spots(elder_name, topic);

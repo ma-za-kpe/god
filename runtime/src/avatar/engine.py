@@ -24,7 +24,7 @@ def _pick_expression(snapshot: dict[str, Any]) -> str:
     pressure = float(audience.get("patronage_index") or 0)
     if pressure >= 20:
         return "intense"
-    if "banter" in scene or "chat" in scene:
+    if "banter" in scene or "chat" in scene or "ensemble" in scene or "stage" in scene or "avatar" in scene:
         return "animated"
     if "economy" in scene or "market" in scene:
         return "focused"
@@ -36,7 +36,7 @@ def _pick_expression(snapshot: dict[str, Any]) -> str:
 def _pick_pose(snapshot: dict[str, Any]) -> str:
     showrunner = snapshot.get("showrunner") or {}
     scene = str(showrunner.get("scene") or "").lower()
-    if "banter" in scene:
+    if "banter" in scene or "ensemble" in scene or "stage" in scene or "avatar" in scene:
         return "debate"
     if "economy" in scene or "market" in scene:
         return "presenting"

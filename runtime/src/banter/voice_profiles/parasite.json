@@ -1,0 +1,47 @@
+{
+  "archetype": "parasite",
+  "sentence_structures": [
+    "What you call {X} is really just {cost} dressed up as {benefit}",
+    "You give me {X}, I give you {Y} — simple transaction, unless you can't count",
+    "Everyone has a price; yours just happens to be {low_value}",
+    "The difference between you and me is I know what things cost"
+  ],
+  "verbal_tics": [
+    "let's be honest here",
+    "and what did that cost you, exactly",
+    "you'd know that if you paid attention"
+  ],
+  "rhythm_patterns": [
+    {
+      "name": "clipped_dismissive",
+      "clause_count_range": [1, 2],
+      "word_count_per_clause_range": [3, 8],
+      "pause_placement": "before_final"
+    },
+    {
+      "name": "transactional_stack",
+      "clause_count_range": [2, 3],
+      "word_count_per_clause_range": [4, 10],
+      "pause_placement": "between_clauses"
+    }
+  ],
+  "micro_phrases": [
+    "that's leverage",
+    "nothing's free",
+    "you owe me that much",
+    "I'll collect eventually",
+    "cost of doing business"
+  ],
+  "rhetorical_devices": [
+    "reframing generosity as naivete",
+    "cost-benefit false equivalence"
+  ],
+  "opening_patterns": [
+    "Here's what you're not seeing",
+    "Let me put this in terms you'll understand"
+  ],
+  "closing_patterns": [
+    "But you already knew that — or maybe you didn't",
+    "Think about what that's really worth to you"
+  ]
+}

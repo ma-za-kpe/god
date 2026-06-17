@@ -31,7 +31,7 @@ WORLD_ID = os.getenv("WORLD_ID", "local-dev-world-1")
 LLM_PROVIDER = os.getenv("LLM_PROVIDER", "ollama")
 LLM_MODEL = os.getenv("LLM_MODEL", "llama3.1:8b")
 OLLAMA_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
-CYCLE_S = int(os.getenv("AGENT_CYCLE_SECONDS", "30"))
+CYCLE_S = int(os.getenv("AGENT_CYCLE_SECONDS", "12"))
 
 # Per-archetype system prompts — shapes personality, goals, and reasoning style
 _ARCHETYPE_PROMPTS = {
@@ -109,6 +109,64 @@ def _db():
     return psycopg2.connect(DATABASE_URL, cursor_factory=psycopg2.extras.RealDictCursor)
 
 
+def _fetch_recent_sent(soul_id: str, limit: int = 4) -> list[dict]:
+    """Fetch last N messages this agent sent — used to detect and break repetition."""
+    try:
+        conn = _db()
+        cur = conn.cursor()
+        cur.execute(
+            """
+            SELECT m.body AS content, m.message_type,
+                   a.current_name AS recipient_name
+            FROM agent_messages m
+            JOIN agents a ON a.soul_id = m.recipient_id AND a.is_alive = true
+            WHERE m.sender_id = %s
+            ORDER BY m.sent_at DESC LIMIT %s
+            """,
+            (soul_id, limit),
+        )
+        rows = [dict(r) for r in cur.fetchall()]
+        cur.close()
+        conn.close()
+        return rows
+    except Exception:
+        return []
+
+
+def _fetch_conversation_thread(soul_id: str, limit: int = 6) -> list[dict]:
+    """Fetch last N messages sent or received by this agent in chronological order.
+    Gives the LLM a real back-and-forth view of the conversation so it can continue it."""
+    try:
+        conn = _db()
+        cur = conn.cursor()
+        cur.execute(
+            """
+            SELECT m.message_id, m.sender_id, m.recipient_id, m.body AS content, m.message_type, m.sent_at,
+                   s.current_name AS sender_name, s.archetype AS sender_archetype,
+                   r.current_name AS recipient_name,
+                   CASE WHEN m.sender_id = %s THEN 'sent' ELSE 'received' END AS direction
+            FROM agent_messages m
+            LEFT JOIN agents s ON s.soul_id = m.sender_id
+            LEFT JOIN agents r ON r.soul_id = m.recipient_id
+            WHERE (m.sender_id = %s OR m.recipient_id = %s)
+              AND m.message_type NOT IN ('system', 'env_event')
+              AND (
+                  (m.sender_id = %s AND r.is_alive = true)
+                  OR (m.recipient_id = %s AND s.is_alive = true)
+              )
+            ORDER BY m.sent_at DESC LIMIT %s
+            """,
+            (soul_id, soul_id, soul_id, soul_id, soul_id, limit),
+        )
+        rows = [dict(r) for r in cur.fetchall()]
+        cur.close()
+        conn.close()
+        rows.reverse()  # chronological order
+        return rows
+    except Exception:
+        return []
+
+
 async def _fetch_inbox(soul_id: str) -> list[dict]:
     """Fetch salience-ranked inbox (top 5 from recent candidate pool)."""
     try:
@@ -120,7 +178,7 @@ async def _fetch_inbox(soul_id: str) -> list[dict]:
                    m.message_type, m.metadata,
                    a.current_name AS sender_name, a.archetype AS sender_archetype
             FROM agent_messages m
-            LEFT JOIN agents a ON a.soul_id = m.sender_id
+            JOIN agents a ON a.soul_id = m.sender_id AND a.is_alive = true
             WHERE m.recipient_id = %s
             ORDER BY m.sent_at DESC LIMIT %s
             """,
@@ -175,7 +233,7 @@ def _batch_preload_context(agents: list[dict]) -> dict:
                            PARTITION BY m.recipient_id ORDER BY m.sent_at DESC
                        ) AS rn
                 FROM agent_messages m
-                LEFT JOIN agents a ON a.soul_id = m.sender_id
+                JOIN agents a ON a.soul_id = m.sender_id AND a.is_alive = true
                 WHERE m.recipient_id = ANY(%s)
             )
             SELECT message_id, sender_id, recipient_id, content, sent_at, message_type,
@@ -439,14 +497,26 @@ async def _execute_action(agent: dict, action: dict, emitter) -> None:
                     "agent.message_sent",
                     {
                         "agent_id": soul_id,
+                        "message_id": str(msg.message_id),
                         "name": name,
                         "recipient_id": msg.recipient_id,
                         "recipient_name": target_name,
                         "content": content,
+                        "move": str(action.get("move") or ""),
+                        "cadence": str(action.get("cadence") or ""),
+                        "backchannel": str(action.get("backchannel") or ""),
+                        "callback": str(action.get("callback") or ""),
+                        "beat_count": str(action.get("beat_count") or ""),
                         "narrative": f'{name} → {target_name}: "{content[:80]}"',
                     },
                 )
                 log.info(f'  {name} → {target_name}: "{content[:55]}"')
+                # Trigger a fast reactive cycle for the recipient so they reply in ~1.5s
+                try:
+                    from .agent_scheduler import mark_reactive
+                    mark_reactive(msg.recipient_id, delay_s=1.5)
+                except Exception:
+                    pass
             except Exception as e:
                 log.debug(f"  {name} send_message failed: {e}")
             return
@@ -594,6 +664,11 @@ async def _execute_action(agent: dict, action: dict, emitter) -> None:
                         "agent_id": soul_id,
                         "name": name,
                         "content": content,
+                        "move": str(action.get("move") or ""),
+                        "cadence": str(action.get("cadence") or ""),
+                        "backchannel": str(action.get("backchannel") or ""),
+                        "callback": str(action.get("callback") or ""),
+                        "beat_count": str(action.get("beat_count") or ""),
                         "narrative": f'{name} broadcasts to all: "{content[:80]}"',
                     },
                 )
@@ -1050,7 +1125,7 @@ async def _run_cycle(
     cycle_tick: int = 0,
     all_agents: list[dict] | None = None,
 ):
-    from .archetype_graphs import run_agent_graph
+    from .archetype_graphs import run_agent_graph, run_reactive_reply
     from .dream_engine import (
         get_pending_mutation,
         increment_consecutive,
@@ -1246,7 +1321,22 @@ async def _run_cycle(
             mark_scheduled(soul_id)
             continue
 
-        result = await run_agent_graph(graphs, agent, cycle_llm)
+        try:
+            from .showrunner import get_arc_theme
+            agent = dict(agent)
+            agent["arc_theme"] = get_arc_theme()
+        except Exception:
+            pass
+        agent["_recent_sent"] = _fetch_recent_sent(soul_id)
+        agent["_conv_thread"] = _fetch_conversation_thread(soul_id)
+        has_live_inbox = any(
+            (m.get("sender_name") or "").strip() not in ("ENV", "")
+            for m in (agent.get("_inbox") or [])
+        )
+        if has_live_inbox:
+            result = await run_reactive_reply(agent, cycle_llm)
+        else:
+            result = await run_agent_graph(graphs, agent, cycle_llm)
         thought = result["thought"] or await _think(cycle_llm, agent)
         action_type = result.get("action_type", "thought")
         narrative = result.get("narrative") or f'{name}: "{thought}"'

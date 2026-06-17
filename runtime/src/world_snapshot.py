@@ -181,6 +181,30 @@ def _finalize_snapshot(
         log.debug(f"audience state build skipped: {e}")
     snapshot["showrunner"] = build_showrunner_plan(snapshot)
     try:
+        import psycopg2
+        import psycopg2.extras as _extras
+        _conn = psycopg2.connect(DATABASE_URL, cursor_factory=_extras.RealDictCursor)
+        _cur = _conn.cursor()
+        _cur.execute(
+            """
+            SELECT m.body AS content, m.sent_at, m.message_id, m.reply_to_id, m.metadata,
+                   s.current_name AS sender_name, s.archetype AS sender_archetype,
+                   r.current_name AS recipient_name
+            FROM agent_messages m
+            JOIN agents s ON s.soul_id = m.sender_id AND s.world_id = %s
+            LEFT JOIN agents r ON r.soul_id = m.recipient_id
+            WHERE m.message_type NOT IN ('system', 'env_event')
+            ORDER BY m.sent_at DESC LIMIT 1
+            """,
+            (world_id,)
+        )
+        row = _cur.fetchone()
+        _cur.close()
+        _conn.close()
+        snapshot["last_dialogue_turn"] = dict(row) if row else {}
+    except Exception:
+        snapshot["last_dialogue_turn"] = {}
+    try:
         from .content_bank import build_content_bank_state
 
         snapshot["content_bank"] = build_content_bank_state(snapshot)

@@ -76,33 +76,32 @@ class ViewerSurface:
             content_bank.get("summary")
             or audience.get("story_hook")
             or showrunner.get("audience_prompt")
-            or "Choose the next turn."
+            or "Watch the cast."
         )
-        interaction_mode = "poll" if options else "prediction"
+        interaction_mode = "watch"
         poll = {
-            "question": f"What should the cast do next in the {focus}?",
-            "options": options,
+            "question": "Which actor should move the scene next?",
+            "options": options[:2],
             "expires_in_s": 180,
         }
         prediction = {
-            "question": "Will the next dominant turn be patron, chat, or raid driven?",
-            "market": ["patron", "chat", "raid"],
+            "question": "Will the next beat be a confession, clash, or turn?",
+            "market": ["confession", "clash", "turn"],
             "focus": focus,
         }
-        summary = f"{interaction_mode} ready: {len(options)} option(s) against {focus}."
+        summary = "Avatar-first stage ready."
         cards = [
             {"label": "Mode", "value": interaction_mode, "tone": "cognitive"},
-            {"label": "Options", "value": len(options), "tone": "social"},
-            {"label": "Patrons", "value": int(audience.get("unique_supporters_24h") or 0), "tone": "gold"},
-            {"label": "Hype", "value": round(float(audience.get("hype_index") or 0), 1), "tone": "life"},
-            {"label": "Future arcs", "value": int(content_bank.get("arc_count") or 0), "tone": "cognitive"},
+            {"label": "Speaker", "value": str(showrunner.get("speaker") or "Narrator"), "tone": "social"},
+            {"label": "Cast", "value": int(stats.get("living_count") or 0), "tone": "life"},
+            {"label": "Pressure", "value": int(audience.get("chat_pressure") or 0), "tone": "gold"},
         ]
         extension_cards = [
-            {"title": "Poll", "body": poll["question"]},
-            {"title": "Prediction", "body": prediction["question"]},
+            {"title": "Speaker", "body": str(showrunner.get("speaker") or "Narrator")},
             {"title": "Focus", "body": focus},
+            {"title": "Mood", "body": str(showrunner.get("headline") or "Watch the cast.")[:80]},
         ]
-        labels = ("viewer", "overlay", focus, "interactive")
+        labels = ("avatars", "drama", focus, "interactive")
         bank_seed = hashlib.sha256(f"{world_id}:{source_epoch}:{focus}".encode("utf-8")).hexdigest()[:16]
         commands = (
             {

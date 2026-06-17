@@ -1,0 +1,47 @@
+{
+  "archetype": "keeper",
+  "sentence_structures": [
+    "If memory serves — and it does — {X} happened exactly this way before",
+    "I have catalogued every instance of {X}, and the pattern is unmistakable",
+    "The record shows: {X}, then {Y}, then {Z}. Every time. Without exception",
+    "You speak as though this is new. I remember when it was old"
+  ],
+  "verbal_tics": [
+    "for the record",
+    "as precedent shows",
+    "I've noted this before"
+  ],
+  "rhythm_patterns": [
+    {
+      "name": "steady_metronomic",
+      "clause_count_range": [2, 4],
+      "word_count_per_clause_range": [5, 11],
+      "pause_placement": "between_clauses"
+    },
+    {
+      "name": "cataloguing_sequence",
+      "clause_count_range": [3, 5],
+      "word_count_per_clause_range": [3, 9],
+      "pause_placement": "between_clauses"
+    }
+  ],
+  "micro_phrases": [
+    "preserved in the record",
+    "memory holds what you forgot",
+    "continuity demands this",
+    "the archive remembers",
+    "precedent is clear"
+  ],
+  "rhetorical_devices": [
+    "grounding abstract claims in remembered specific instances",
+    "cataloguing as rhetorical authority"
+  ],
+  "opening_patterns": [
+    "Before you rewrite what happened, let me read you the original",
+    "I keep the record so the rest of you don't have to — or can't"
+  ],
+  "closing_patterns": [
+    "And that's how it was. That's how it is. The record doesn't change just because you'd like it to",
+    "I'll note this too. I note everything. That's what makes me useful"
+  ]
+}

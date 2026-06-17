@@ -18,7 +18,7 @@ def _snapshot() -> dict:
             "top_earners": [{"current_name": "Alpha"}],
         },
         "audience": {
-            "scene": "market-watch",
+            "scene": "ensemble-stage",
             "story_hook": "Patrons are funding the cast; reward the room with a stronger turn.",
             "patronage_index": 16.5,
             "chat_pressure": 7,
@@ -36,17 +36,17 @@ def _snapshot() -> dict:
             "focus": "patron-funded escalation",
         },
         "showrunner": {
-            "scene": "economy-pan",
+            "scene": "ensemble-stage",
             "speaker": "Alpha",
             "headline": "Alpha: Alpha sells a service to the crowd.",
             "audience_prompt": "Chat can weigh in on the next economic move.",
         },
         "nemo": {
-            "scene": "economy-pan",
+            "scene": "ensemble-stage",
             "speaker": "Alpha",
             "headline": "Alpha: Alpha sells a service to the crowd.",
             "audience_prompt": "Chat can weigh in on the next economic move.",
-            "director_note": "Scene economy-pan with Alpha on stage.",
+            "director_note": "Scene ensemble-stage with Alpha on stage.",
         },
         "events": [],
         "messages": [],
@@ -59,23 +59,22 @@ def test_broadcast_surface_builds_scene_and_caption():
 
     assert state.enabled is True
     assert state.dry_run is True
-    assert state.scene.scene_id == "obs/economy-pan"
-    assert state.scene.scene_name == "Economy Pan"
+    assert state.scene.scene_id == "obs/ensemble-stage"
+    assert state.scene.scene_name == "Ensemble Stage"
     assert state.caption.headline.startswith("Alpha:")
-    assert "future arc" in state.caption.ticker_lines[-1].lower()
-    assert "future arc" in state.overlay.cards[8]["label"].lower()
-    assert "Live Stage" == state.overlay.title
+    assert "takes the stage" in state.caption.ticker_lines[0].lower()
+    assert "Avatar Stage" == state.overlay.title
     assert len(state.commands) == 3
     assert state.commands[0]["action"] == "set_scene"
-    assert state.overlay.cards[5]["label"] == "Patrons"
+    assert len(state.overlay.cards) == 0
 
 
 def test_broadcast_state_serializes():
     payload = build_broadcast_state(_snapshot())
 
-    assert payload["scene"]["scene_id"] == "obs/economy-pan"
-    assert payload["caption"]["ticker_lines"][-1].startswith("Future arcs")
-    assert payload["overlay"]["labels"][0] == "Economy Pan"
+    assert payload["scene"]["scene_id"] == "obs/ensemble-stage"
+    assert payload["caption"]["ticker_lines"][0].startswith("Alpha")
+    assert payload["overlay"]["labels"][0] == "avatars"
 
 
 def test_broadcast_status_reports_dry_run():

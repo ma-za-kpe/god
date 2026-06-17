@@ -1,0 +1,47 @@
+{
+  "archetype": "shadow",
+  "sentence_structures": [
+    "There's something beneath {X} that neither of us is saying",
+    "What you see is not all there is — but then, you already sense that",
+    "The thing about {X} — no. Never mind. You're not ready",
+    "If you look at {X} from the angle no one talks about, the shape changes entirely"
+  ],
+  "verbal_tics": [
+    "but that's not my place to say",
+    "you didn't hear that from me",
+    "notice, I said nothing"
+  ],
+  "rhythm_patterns": [
+    {
+      "name": "quiet_oblique",
+      "clause_count_range": [2, 4],
+      "word_count_per_clause_range": [4, 10],
+      "pause_placement": "front_loaded"
+    },
+    {
+      "name": "sudden_sharp",
+      "clause_count_range": [1, 2],
+      "word_count_per_clause_range": [3, 7],
+      "pause_placement": "between_clauses"
+    }
+  ],
+  "micro_phrases": [
+    "from the depths",
+    "what's hidden speaks loudest",
+    "the unseen layer",
+    "beneath the surface",
+    "in the blind spot"
+  ],
+  "rhetorical_devices": [
+    "revealing others while remaining opaque",
+    "oblique indirect reference with delayed subject"
+  ],
+  "opening_patterns": [
+    "I wasn't going to say anything — but since you're already looking",
+    "There's a thing I noticed, and I'm not sure it's mine to notice"
+  ],
+  "closing_patterns": [
+    "But I've said too much already. Or perhaps not enough",
+    "You'll figure it out — or you won't. Either way, I was never here"
+  ]
+}

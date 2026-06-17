@@ -11,6 +11,7 @@ class VoicePlan:
     speaker: str
     line: str
     emotion: str
+    utterance_id: str
     voice_provider: str
     voice_model: str
     voice_name: str
@@ -32,6 +33,7 @@ class VoiceState:
     provider: str
     voice_model: str
     voice_name: str
+    playback_mode: str
     speech_profile: str
     lip_sync_source: str
     transport: str

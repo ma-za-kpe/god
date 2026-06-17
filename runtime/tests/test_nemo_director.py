@@ -42,7 +42,7 @@ def _snapshot() -> dict:
             {"soul_id": "s-beta", "current_name": "Beta"},
         ],
         "showrunner": {
-            "scene": "economy-pan",
+            "scene": "ensemble-stage",
             "speaker": "Alpha",
             "headline": "Alpha: Alpha sells a service to the crowd.",
             "audience_prompt": "Chat can weigh in on the next economic move.",
@@ -53,7 +53,7 @@ def _snapshot() -> dict:
                     "tags": ["economy"],
                 }
             ],
-            "reasoning": ["scene=economy-pan", "speaker=Alpha"],
+            "reasoning": ["scene=ensemble-stage", "speaker=Alpha"],
         },
     }
 
@@ -62,7 +62,7 @@ def test_nemo_directive_builds_from_snapshot():
     directive = build_nemo_directive(_snapshot())
 
     assert directive["guardrail_status"] == "ok"
-    assert directive["scene"] == "economy-pan"
+    assert directive["scene"] == "ensemble-stage"
     assert directive["speaker"] == "Alpha"
     assert "Summary:" in directive["director_note"]
     assert "prompt" in directive

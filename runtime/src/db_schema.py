@@ -120,6 +120,41 @@ _MIGRATIONS: list[str] = [
     "CREATE INDEX IF NOT EXISTS idx_graph_mut_soul ON agent_graph_mutations(soul_id, status)",
     "CREATE INDEX IF NOT EXISTS idx_resilience_world_created ON resilience_snapshots(world_id, created_at DESC)",
     "CREATE INDEX IF NOT EXISTS idx_twitch_replays_world_created ON twitch_event_replays(world_id, created_at DESC)",
+    # ── Banter Engine: Relationship Memory ──────────────────────────────
+    """
+    CREATE TABLE IF NOT EXISTS relationship_pairs (
+        pair_id                 TEXT PRIMARY KEY,
+        elder_a                 TEXT NOT NULL,
+        elder_b                 TEXT NOT NULL,
+        tension_level           INTEGER DEFAULT 0 CHECK (tension_level >= 0 AND tension_level <= 10),
+        last_interaction_ts     BIGINT DEFAULT 0,
+        reconciliation_arc      BOOLEAN DEFAULT FALSE,
+        reconciliation_remaining INTEGER DEFAULT 0,
+        peak_tension_summary    TEXT DEFAULT '',
+        created_at              BIGINT DEFAULT (EXTRACT(EPOCH FROM NOW())::BIGINT),
+        updated_at              BIGINT DEFAULT (EXTRACT(EPOCH FROM NOW())::BIGINT)
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS interaction_records (
+        id                  SERIAL PRIMARY KEY,
+        pair_id             TEXT REFERENCES relationship_pairs(pair_id),
+        timestamp           BIGINT NOT NULL,
+        elder_acting        TEXT NOT NULL,
+        move_used           TEXT NOT NULL,
+        emotional_valence   TEXT CHECK (emotional_valence IN ('positive', 'negative', 'neutral')),
+        betrayal            BOOLEAN DEFAULT FALSE,
+        alliance            BOOLEAN DEFAULT FALSE,
+        concession          BOOLEAN DEFAULT FALSE,
+        summary             TEXT DEFAULT ''
+    )
+    """,
+    "CREATE INDEX IF NOT EXISTS idx_interaction_pair_ts ON interaction_records(pair_id, timestamp DESC)",
+    """
+    CREATE INDEX IF NOT EXISTS idx_interaction_significant
+        ON interaction_records(pair_id, timestamp DESC)
+        WHERE emotional_valence != 'neutral' OR betrayal OR alliance OR concession
+    """,
 ]
 
 

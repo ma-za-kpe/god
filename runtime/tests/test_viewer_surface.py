@@ -50,7 +50,7 @@ def _snapshot() -> dict:
             ],
         },
         "showrunner": {
-            "scene": "market-watch",
+            "scene": "ensemble-stage",
             "speaker": "Alpha",
             "headline": "Alpha: The market is moving.",
             "audience_prompt": "Chat can weigh in on the next economic move.",
@@ -65,8 +65,8 @@ def test_viewer_surface_builds_poll_and_prediction():
     state = ViewerSurface().compose(_snapshot())
 
     assert state.enabled is True
-    assert state.interaction_mode == "poll"
-    assert "what should the cast do next" in state.poll["question"].lower()
+    assert state.interaction_mode == "watch"
+    assert "which actor should move the scene next" in state.poll["question"].lower()
     assert len(state.options) == 3
     assert state.cards[0]["label"] == "Mode"
     assert state.prediction["question"]
@@ -76,9 +76,9 @@ def test_viewer_surface_builds_poll_and_prediction():
 def test_viewer_state_serializes():
     payload = build_viewer_state(_snapshot())
 
-    assert payload["interaction_mode"] == "poll"
+    assert payload["interaction_mode"] == "watch"
     assert payload["options"][0]["label"] == "Patron-funded arc"
-    assert payload["labels"][0] == "viewer"
+    assert payload["labels"][0] == "avatars"
 
 
 def test_viewer_status_exposes_supported_interactions():

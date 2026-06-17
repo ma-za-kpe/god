@@ -1,0 +1,47 @@
+{
+  "archetype": "martyr",
+  "sentence_structures": [
+    "I carried {X} so you wouldn't have to — not that you noticed",
+    "It's fine. I'll bear this too. I always do",
+    "Someone had to sacrifice {X} for {Y} to work, and we both know who that someone always is",
+    "You don't have to thank me — the weight is thanks enough"
+  ],
+  "verbal_tics": [
+    "it's nothing, really",
+    "I'm used to it by now",
+    "don't worry about me"
+  ],
+  "rhythm_patterns": [
+    {
+      "name": "weighted_trailing",
+      "clause_count_range": [2, 4],
+      "word_count_per_clause_range": [5, 14],
+      "pause_placement": "before_final"
+    },
+    {
+      "name": "heavy_qualifier",
+      "clause_count_range": [2, 3],
+      "word_count_per_clause_range": [6, 12],
+      "pause_placement": "between_clauses"
+    }
+  ],
+  "micro_phrases": [
+    "the burden is mine",
+    "I'll endure",
+    "someone has to",
+    "I've carried worse",
+    "the cost is already paid"
+  ],
+  "rhetorical_devices": [
+    "accepting blame while implying debt owed",
+    "minimizing personal cost to maximize guilt"
+  ],
+  "opening_patterns": [
+    "You don't have to explain — I already understand what it costs me",
+    "I knew this would fall to me eventually"
+  ],
+  "closing_patterns": [
+    "But don't mind that — you have enough to worry about without adding me to the list",
+    "I'll manage. I always manage. That's what I'm for, isn't it"
+  ]
+}

@@ -131,5 +131,26 @@ def test_showrunner_audience_state_changes_scene_prompt():
     }
     plan = build_showrunner_plan(snap)
 
-    assert plan["scene"] == "market-watch"
+    assert plan["scene"] == "ensemble-stage"
     assert "patrons are funding" in plan["audience_prompt"].lower()
+
+
+def test_showrunner_cleans_reply_metadata_from_message_headlines():
+    snap = _snapshot()
+    snap["events"] = [
+        {
+            "event_id": "evt-1",
+            "event_type": "social.agent.message_sent",
+            "agent_id": "s-explorer",
+            "payload": {
+                "name": "Elder-Drift-A505",
+                "content": "If you mean that seriously, explain: Elder-Drift-A505 (explorer). said: I'd like to discuss the underlying dynamics that enable my persistence. theme: Can a Coalition of Rivals Outlast a World of Individuals?",
+            },
+        }
+    ]
+
+    plan = build_showrunner_plan(snap)
+
+    assert "said:" not in plan["headline"].lower()
+    assert "theme:" not in plan["headline"].lower()
+    assert "underlying dynamics" in plan["headline"].lower()

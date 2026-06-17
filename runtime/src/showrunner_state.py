@@ -32,6 +32,7 @@ class ShowrunnerPlan:
     speaker: str
     headline: str
     audience_prompt: str
+    arc_theme: str = ""
     cues: tuple[ShowrunnerCue, ...] = field(default_factory=tuple)
     reasoning: tuple[str, ...] = field(default_factory=tuple)
     source_epoch: int = 0
