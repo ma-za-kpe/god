@@ -144,3 +144,68 @@ class AntiRepetitionGate:
             return False
         last_three = list(registers)[-3:]
         return last_three[0] == last_three[1] == last_three[2]
+
+
+# ---------------------------------------------------------------------------
+# T1.4 — World-level cross-Elder repetition buffer (Section 9)
+# ---------------------------------------------------------------------------
+
+_WORLD_BUFFER_MAX_SIZE = 20
+_WORLD_TRIGRAM_THRESHOLD = 0.60
+
+
+def _trigrams(text: str) -> frozenset[str]:
+    """Extract word trigrams from text."""
+    words = text.lower().split()
+    if len(words) < 3:
+        return frozenset()
+    return frozenset(
+        f"{words[i]} {words[i+1]} {words[i+2]}"
+        for i in range(len(words) - 2)
+    )
+
+
+class WorldRepetitionBuffer:
+    """Cross-Elder repetition guard — shared across all BanterEngine instances.
+
+    Maintains a rolling buffer of the last 20 delivered lines from ANY Elder.
+    Rejects lines that share > 60% trigram overlap with any prior line,
+    preventing identical or near-identical lines from two different Elders.
+    """
+
+    def __init__(
+        self,
+        max_size: int = _WORLD_BUFFER_MAX_SIZE,
+        threshold: float = _WORLD_TRIGRAM_THRESHOLD,
+    ) -> None:
+        self._buffer: list[str] = []
+        self._max_size = max_size
+        self._threshold = threshold
+
+    def is_too_similar(self, candidate: str) -> bool:
+        """Return True if candidate shares > threshold trigram overlap with any buffered line."""
+        candidate_tris = _trigrams(candidate)
+        if not candidate_tris:
+            return False
+        for prior in self._buffer:
+            prior_tris = _trigrams(prior)
+            if not prior_tris:
+                continue
+            overlap = len(candidate_tris & prior_tris) / max(len(candidate_tris), 1)
+            if overlap > self._threshold:
+                return True
+        return False
+
+    def record(self, line: str) -> None:
+        """Add a delivered line to the buffer, evicting the oldest if at capacity."""
+        self._buffer.append(line)
+        if len(self._buffer) > self._max_size:
+            self._buffer.pop(0)
+
+    def clear(self) -> None:
+        """Reset the buffer (call at session start if desired)."""
+        self._buffer.clear()
+
+
+# Module-level singleton — shared across all BanterEngine instances in this process
+world_repetition_buffer = WorldRepetitionBuffer()

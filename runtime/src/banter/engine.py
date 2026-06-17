@@ -16,7 +16,7 @@ import time
 import uuid
 from typing import TYPE_CHECKING, Callable, Protocol
 
-from .anti_repetition import AntiRepetitionGate
+from .anti_repetition import AntiRepetitionGate, WorldRepetitionBuffer
 from .arc_context import arc_context_builder
 from .fallback_pool import FallbackPool
 from .veil_layer import VeilLayer
@@ -127,6 +127,7 @@ class BanterEngine:
         subtlety_director: SubtletyDirector | None = None,
         soul_config: SoulEngineConfig | None = None,
         veil_layer: VeilLayer | None = None,
+        world_buffer: WorldRepetitionBuffer | None = None,
     ) -> None:
         self._quality_judge = quality_judge
         self._move_selector = move_selector
@@ -145,6 +146,7 @@ class BanterEngine:
         self._subtlety_director = subtlety_director
         self._soul_config = soul_config
         self._veil_layer = veil_layer or VeilLayer()
+        self._world_buffer = world_buffer or WorldRepetitionBuffer()
 
         # Session state
         self._session = SessionState(
@@ -282,9 +284,10 @@ class BanterEngine:
             landed_hit=landed_hit,
         )
 
-        # Record delivery for anti-repetition tracking
+        # Record delivery for anti-repetition tracking (per-Elder + world buffer)
         register = self._infer_register(move, score)
         self._anti_repetition.record_delivery(elder, line, register)
+        self._world_buffer.record(line)
 
         # Store memorable moments when soul is active and quality is high
         soul_active = self._soul_config is not None and self._soul_config.enabled
@@ -462,11 +465,13 @@ class BanterEngine:
         elif self._next_move_override is not None:
             parts.append(self._SNAP_BACK_PROMPT)
 
-        # Core generation instruction
+        # Core generation instruction (T1.3: grammar enforcement in prompt)
         parts.append(
             f"You are {elder} ({archetype}). Move: {move}. "
             f"{'Opponent: ' + opponent + '. ' if opponent else ''}"
-            f"Generate a single broadcast-quality banter line."
+            f"Generate a single broadcast-quality banter line. "
+            f"Each sentence must end with punctuation (. ! ?). "
+            f"No run-on sentences. Maximum 2 sentences."
         )
 
         # Recent conversation for context (pair-filtered)
@@ -773,8 +778,11 @@ class BanterEngine:
         rejection_count = 0
 
         while rejection_count < self._config.max_rejection_rounds:
+            # Per-Elder gate
             verdict = self._anti_repetition.check(elder, line)
-            if verdict.accepted:
+            # World-level cross-Elder gate (T1.4)
+            world_rejected = verdict.accepted and self._world_buffer.is_too_similar(line)
+            if verdict.accepted and not world_rejected:
                 return line, score, source, None
 
             # Rejected — re-generate
