@@ -289,6 +289,9 @@ class BanterEngine:
         self._anti_repetition.record_delivery(elder, line, register)
         self._world_buffer.record(line)
 
+        # Record for cross-pair eavesdropping (T3.2)
+        self._scene_context.record_pair_line(elder, opponent or "", line)
+
         # Store memorable moments when soul is active and quality is high
         soul_active = self._soul_config is not None and self._soul_config.enabled
         if soul_active and self._callback_registry is not None and opponent is not None:
@@ -473,6 +476,13 @@ class BanterEngine:
             f"Each sentence must end with punctuation (. ! ?). "
             f"No run-on sentences. Maximum 2 sentences."
         )
+
+        # Cross-pair eavesdropping injection (T3.2) — 1-in-10 beats
+        if opponent and random.random() < 0.1:
+            overheard = self._scene_context.get_other_pair_line(elder, opponent)
+            if overheard:
+                ox, oy, oline = overheard
+                parts.append(f'[OVERHEARD] {ox} to {oy}: "{oline}"')
 
         # Recent conversation for context (pair-filtered)
         if conv_thread and opponent:

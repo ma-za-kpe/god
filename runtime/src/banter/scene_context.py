@@ -33,6 +33,8 @@ class SceneContext:
             landed_hit_remaining=0,
             scene_energy="neutral",
         )
+        # Cross-pair eavesdropping buffer: sorted-pair-key → (elder_x, elder_y, line)
+        self._pair_lines: dict[tuple[str, str], tuple[str, str, str]] = {}
 
     # ------------------------------------------------------------------
     # Public API
@@ -198,6 +200,28 @@ class SceneContext:
                 return beat.speaker
 
         return tied[0]
+
+    def record_pair_line(self, elder: str, opponent: str, line: str) -> None:
+        """Record the most recent delivered line for an elder↔opponent pair.
+
+        Used by cross-pair eavesdropping (T3.2) so other engines can see
+        what was said in a different pair's conversation.
+        """
+        key: tuple[str, str] = tuple(sorted([elder, opponent]))  # type: ignore[assignment]
+        self._pair_lines[key] = (elder, opponent, line)
+
+    def get_other_pair_line(
+        self, current_elder: str, current_opponent: str
+    ) -> tuple[str, str, str] | None:
+        """Return (elder_x, elder_y, line) from any pair other than current.
+
+        Returns None if no other pair has delivered a line yet.
+        """
+        current_key: tuple[str, str] = tuple(sorted([current_elder, current_opponent]))  # type: ignore[assignment]
+        for key, entry in self._pair_lines.items():
+            if key != current_key:
+                return entry
+        return None
 
     def _reset(self) -> None:
         """Reset to empty state on corruption."""
