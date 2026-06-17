@@ -18,6 +18,7 @@ from typing import TYPE_CHECKING, Callable, Protocol
 from .anti_repetition import AntiRepetitionGate
 from .arc_context import arc_context_builder
 from .fallback_pool import FallbackPool
+from .veil_layer import VeilLayer
 from .model_router import ModelRouter
 from .move_selector import compute_distribution as _compute_distribution
 from .pacing_controller import PacingController
@@ -124,6 +125,7 @@ class BanterEngine:
         callback_registry: CallbackRegistry | None = None,
         subtlety_director: SubtletyDirector | None = None,
         soul_config: SoulEngineConfig | None = None,
+        veil_layer: VeilLayer | None = None,
     ) -> None:
         self._quality_judge = quality_judge
         self._move_selector = move_selector
@@ -141,6 +143,7 @@ class BanterEngine:
         self._callback_registry = callback_registry
         self._subtlety_director = subtlety_director
         self._soul_config = soul_config
+        self._veil_layer = veil_layer or VeilLayer()
 
         # Session state
         self._session = SessionState(
@@ -396,6 +399,15 @@ class BanterEngine:
 
         # Arc pressure — never injects raw theme title (T1.1 fix)
         parts.append(arc_context_builder.format_injection(arc_theme))
+
+        # VeilLayer — meta-awareness injection (T5.2, Section 6)
+        if self._veil_layer.should_inject(
+            beat_number=self._beat_number,
+            move=move,
+            pair_state=pair_state,
+            twitch_event_fired=False,
+        ):
+            parts.append(self._veil_layer.get_injection())
 
         # Core generation instruction
         parts.append(
