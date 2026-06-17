@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import random
 import time
 import uuid
 from typing import TYPE_CHECKING, Callable, Protocol
@@ -161,6 +162,15 @@ class BanterEngine:
         self._session_callback_count: int = 0
         self._beat_number: int = 0
 
+        # CRACK move state (T4.1)
+        self._crack_active: bool = False  # True during a CRACK beat
+        self._next_move_override: str | None = None  # snap-back override
+        self._consecutive_counters: int = 0  # tracks consecutive COUNTER moves per elder
+
+        # Chaos window state (T3.1)
+        self._consecutive_escalating: int = 0  # tracks consecutive ESCALATE/TAUNT moves
+        self._last_tension: int = 5  # last known tension level
+
     # ------------------------------------------------------------------
     # Public API
     # ------------------------------------------------------------------
@@ -210,7 +220,42 @@ class BanterEngine:
 
         # --- Step 2: Move selection ---
         scene_data = self._scene_context.get_context_for_generation(elder)
-        move = self._select_move(elder, archetype, arc_theme, conv_thread, scene_data)
+
+        # Apply snap-back override if previous beat was CRACK (T4.1)
+        if self._next_move_override is not None:
+            move = self._next_move_override
+            self._next_move_override = None
+        else:
+            move = self._select_move(elder, archetype, arc_theme, conv_thread, scene_data)
+
+        # CRACK move override — check trigger conditions (T4.1)
+        if move != "CRACK":
+            # Build a minimal pair_state preview for CRACK evaluation
+            _pair_state_preview = None
+            if opponent:
+                _pair_state_preview = await self._get_pair_state(elder, opponent)
+            _tension_preview = (
+                _pair_state_preview.tension_level if _pair_state_preview is not None else 5
+            )
+            if self._should_crack(_tension_preview, _pair_state_preview, self._consecutive_counters):
+                move = "CRACK"
+
+        # Track consecutive COUNTER for CRACK trigger
+        if move == "COUNTER":
+            self._consecutive_counters += 1
+        else:
+            self._consecutive_counters = 0
+
+        # Track consecutive ESCALATE/TAUNT for chaos window (T3.1)
+        if move in ("ESCALATE", "TAUNT"):
+            self._consecutive_escalating += 1
+        else:
+            self._consecutive_escalating = 0
+
+        # If CRACK, set snap-back for next beat
+        self._crack_active = move == "CRACK"
+        if self._crack_active:
+            self._next_move_override = "COUNTER" if random.random() < 0.5 else "ESCALATE"
 
         # --- Step 3: Prompt building ---
         prompt = await self._build_prompt(
@@ -342,6 +387,7 @@ class BanterEngine:
             pair_state = await self._get_pair_state(elder, opponent)
 
         tension: int = pair_state.tension_level if pair_state is not None else 5
+        self._last_tension = tension  # cache for chaos window check
         reconciliation_active: bool = (
             pair_state is not None
             and pair_state.reconciliation_arc
@@ -408,6 +454,13 @@ class BanterEngine:
             twitch_event_fired=False,
         ):
             parts.append(self._veil_layer.get_injection())
+
+        # CRACK override — replaces archetype prompt for this beat (T4.1)
+        if move == "CRACK":
+            parts.append(self._CRACK_PROMPT)
+        # Snap-back — fires when previous beat was CRACK
+        elif self._next_move_override is not None:
+            parts.append(self._SNAP_BACK_PROMPT)
 
         # Core generation instruction
         parts.append(
@@ -565,14 +618,23 @@ class BanterEngine:
         """
         route_decision = self._model_router.route("broadcast")
         soul_active = self._soul_config is not None and self._soul_config.enabled
-        threshold = get_pass_threshold(soul_active) if soul_active else route_decision.quality_threshold
+
+        # Chaos window check (T3.1) — must read tension from last known pair_state
+        chaos = self._is_chaos_window()
+        if chaos:
+            threshold = 6  # Hard floor — raw is the point
+        elif move == "CRACK":
+            threshold = 5  # CRACK floor (Section 8.4)
+        else:
+            threshold = get_pass_threshold(soul_active) if soul_active else route_decision.quality_threshold
 
         # Attempt probe if circuit is broken and cooldown expired
         if self._model_router.should_probe():
             probed = await self._model_router.probe_remote()
             if probed:
                 route_decision = self._model_router.route("broadcast")
-                threshold = route_decision.quality_threshold
+                if not chaos and move != "CRACK":
+                    threshold = route_decision.quality_threshold
 
         # Initial generation
         line = await self._call_model(prompt, route_decision)
@@ -580,9 +642,20 @@ class BanterEngine:
             # Model failed entirely — use fallback immediately
             return self._select_fallback(archetype, move, elder, arc_theme)
 
-        # Score and refine loop
         source = route_decision.target
         score = 0
+
+        # Chaos window and CRACK: no refinement loop (raw is the point)
+        if chaos or move == "CRACK":
+            score, scoring_failed = await self._score_candidate(
+                line, archetype, move, arc_theme, scene_data
+            )
+            word_count = len(line.split())
+            if 4 <= word_count <= 30:
+                return line, score if not scoring_failed else 0, source, route_decision
+            return self._select_fallback(archetype, move, elder, arc_theme)
+
+        # Normal score and refine loop
         refinement_round = 0
 
         while refinement_round <= self._config.max_refinement_rounds:
@@ -899,6 +972,11 @@ class BanterEngine:
         self._fallback_pool.reset_session()
         self._session_callback_count = 0
         self._beat_number = 0
+        self._crack_active = False
+        self._next_move_override = None
+        self._consecutive_counters = 0
+        self._consecutive_escalating = 0
+        self._last_tension = 5
 
     def _extract_last_moves(self, elder: str, conv_thread: list[dict]) -> list[str]:
         """Extract the last 3 moves made by this elder from the conversation thread."""
@@ -1019,5 +1097,55 @@ class BanterEngine:
             "QUESTION": "measured",
             "COUNTER": "sardonic",
             "CALLBACK": "playful",
+            "CRACK": "vulnerable",
         }
         return register_map.get(move, "measured")
+
+    # ------------------------------------------------------------------
+    # Internal: CRACK vulnerability trigger (T4.1)
+    # ------------------------------------------------------------------
+
+    _CRACK_PROMPT = (
+        "[CRACK — OVERRIDE]\n"
+        "You are exhausted. Not physically. The kind of exhaustion that comes from holding\n"
+        "your position for too long against someone who has earned the right to see through it.\n\n"
+        "For this one line: do not defend your archetype. Do not perform your role.\n"
+        "Say something true about what this exchange is actually costing you right now.\n"
+        "You don't have to be broken — just honest for exactly one sentence before\n"
+        "you recover.\n\n"
+        "After this line, you will never speak this way again in this session."
+    )
+
+    _SNAP_BACK_PROMPT = (
+        "[SNAP-BACK]\n"
+        "You showed something last turn. That was a mistake. The being across from you\n"
+        "witnessed it. Make them regret it. Recover completely. Be worse to them than\n"
+        "before you slipped."
+    )
+
+    def _should_crack(
+        self,
+        tension: int,
+        pair_state,
+        consecutive_counters: int,
+        rng: random.Random | None = None,
+    ) -> bool:
+        """Return True if this beat should be a CRACK (vulnerability) moment."""
+        if pair_state is None:
+            return False
+        if not getattr(pair_state, "betrayal", False):
+            return False
+        if tension <= 8:
+            return False
+        if consecutive_counters < 3:
+            return False
+        _rng = rng or random
+        return _rng.random() < 0.20
+
+    def _is_chaos_window(self) -> bool:
+        """Return True if this beat qualifies as a chaos window (T3.1).
+
+        Chaos window: tension >= 8 OR 4+ consecutive escalating moves.
+        Lasts exactly 1 beat; callers reset _consecutive_escalating after the beat.
+        """
+        return self._last_tension >= 8 or self._consecutive_escalating >= 4

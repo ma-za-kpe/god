@@ -26,6 +26,7 @@ MOVE_TYPES = Literal[
     "PIVOT",
     "CONCEDE",
     "CALLBACK",
+    "CRACK",
 ]
 
 
