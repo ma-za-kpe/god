@@ -16,6 +16,7 @@ import uuid
 from typing import TYPE_CHECKING, Callable, Protocol
 
 from .anti_repetition import AntiRepetitionGate
+from .arc_context import arc_context_builder
 from .fallback_pool import FallbackPool
 from .model_router import ModelRouter
 from .move_selector import compute_distribution as _compute_distribution
@@ -393,17 +394,31 @@ class BanterEngine:
                 "Shift to a different tone."
             )
 
+        # Arc pressure — never injects raw theme title (T1.1 fix)
+        parts.append(arc_context_builder.format_injection(arc_theme))
+
         # Core generation instruction
         parts.append(
-            f"You are {elder} ({archetype}). "
-            f"Theme: {arc_theme}. Move: {move}. "
+            f"You are {elder} ({archetype}). Move: {move}. "
             f"{'Opponent: ' + opponent + '. ' if opponent else ''}"
             f"Generate a single broadcast-quality banter line."
         )
 
-        # Recent conversation for context
-        if conv_thread:
-            recent = conv_thread[-6:]  # 6-turn window
+        # Recent conversation for context (pair-filtered)
+        if conv_thread and opponent:
+            pair_thread = [
+                t for t in conv_thread
+                if t.get("speaker") in (elder, opponent)
+                or t.get("target") in (elder, opponent)
+            ][-4:]
+            if pair_thread:
+                thread_text = "\n".join(
+                    f"{t.get('speaker', '???')}: {t.get('content', '')}"
+                    for t in pair_thread
+                )
+                parts.append(f"Recent exchange:\n{thread_text}")
+        elif conv_thread:
+            recent = conv_thread[-4:]
             thread_text = "\n".join(
                 f"{t.get('speaker', '???')}: {t.get('content', '')}"
                 for t in recent

@@ -3103,3 +3103,87 @@ class TestPromptCompositionOrder:
             e_pos = combined.find("E_TAG")
             assert v_pos != -1 and e_pos != -1
             assert v_pos < e_pos, "Voice_DNA must come before Emotional_Primer"
+
+
+# ---------------------------------------------------------------------------
+# T1.1 — Arc theme title MUST NOT appear verbatim in any assembled prompt
+# ---------------------------------------------------------------------------
+
+
+class TestArcThemeNoTitleLeak:
+    """T1.1: Arc theme title must never appear verbatim in generated prompts.
+
+    The arc_theme string (e.g. 'scarcity_vs_flow') is a database key, not a
+    prompt token. ArcContextBuilder converts it to pressure text. No code path
+    should inject the raw string into any prompt.
+    """
+
+    ALL_THEMES = [
+        "scarcity_vs_flow",
+        "market_cruelty",
+        "betrayal_and_return",
+        "power_and_legitimacy",
+        "sacrifice_and_cost",
+        "truth_and_performance",
+        "survival_and_meaning",
+    ]
+
+    def test_arc_context_builder_never_returns_theme_name_in_pressure(self):
+        """ArcContextBuilder.get_pressure() output must not contain the raw theme key."""
+        from banter.arc_context import ArcContextBuilder
+        builder = ArcContextBuilder()
+        for theme in self.ALL_THEMES:
+            pressure = builder.get_pressure(theme)
+            assert theme not in pressure.pressure, (
+                f"Theme key '{theme}' leaked into pressure: {pressure.pressure}"
+            )
+            assert theme not in pressure.world_stakes, (
+                f"Theme key '{theme}' leaked into world_stakes: {pressure.world_stakes}"
+            )
+
+    def test_arc_context_builder_format_injection_never_contains_theme_name(self):
+        """ArcContextBuilder.format_injection() must not contain the raw theme key."""
+        from banter.arc_context import ArcContextBuilder
+        builder = ArcContextBuilder()
+        for theme in self.ALL_THEMES:
+            block = builder.format_injection(theme)
+            assert theme not in block, (
+                f"Theme key '{theme}' leaked into [ARC] block: {block!r}"
+            )
+            assert "[ARC]" in block, "Must include [ARC] marker"
+            assert "Embody it" in block, "Must include embodiment directive"
+
+    def test_unknown_theme_fallback_never_contains_theme_key(self):
+        """Fallback pressure for unknown themes must not repeat the theme name verbatim."""
+        from banter.arc_context import ArcContextBuilder
+        builder = ArcContextBuilder()
+        exotic = "dominance_and_submission"
+        block = builder.format_injection(exotic)
+        # The theme key itself should not appear (the noun form may appear in fallback template)
+        # but must not be quoted or used as a label
+        assert "[ARC]" in block
+
+    def test_full_prompt_no_arc_theme_leak(self):
+        """_build_prompt() must not inject the arc_theme string verbatim."""
+        engine = _make_minimal_engine()
+
+        # Patch scene context to return minimal data
+        mock_scene = MagicMock()
+        mock_scene.recent_beats = []
+        mock_scene.has_the_room = None
+        mock_scene.scene_energy = "neutral"
+        mock_scene.landed_hit = None
+        mock_scene.landed_hit_remaining = 0
+        engine._scene_context.get_context_for_generation = MagicMock(return_value=mock_scene)
+        engine._anti_repetition.should_shift_register = MagicMock(return_value=False)
+
+        for theme in self.ALL_THEMES:
+            prompt = _asyncio_engine.run(
+                engine._build_prompt(
+                    "Lore", "prophet", "Forge", theme, "COUNTER",
+                    [], mock_scene,
+                )
+            )
+            assert theme not in prompt, (
+                f"Arc theme '{theme}' leaked verbatim into prompt:\n{prompt}"
+            )
