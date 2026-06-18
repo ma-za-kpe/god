@@ -563,6 +563,9 @@ class BanterEngine:
             and tension <= 3
         )
 
+        # Commentary mode (T2.2) — parasite and shadow may use subjectless third-person
+        commentary_mode = archetype in ("parasite", "shadow")
+
         # Core generation instruction (T1.3: grammar enforcement in prompt)
         if interrupt_mode:
             # Extract opponent's last line from conv_thread for reference
@@ -585,11 +588,21 @@ class BanterEngine:
                 f"Generate a line that trails off or hesitates — incomplete thoughts, ellipses, "
                 f"or a retraction mid-sentence are appropriate here. Show reluctance or exhaustion."
             )
+        elif commentary_mode:
+            parts.append(
+                f"You are {elder} ({archetype}). Move: {move}. "
+                f"{'Opponent: ' + opponent + '. ' if opponent else ''}"
+                f"Generate a single broadcast-quality banter line. "
+                f"You may use third-person declarative commentary ('confuses volume for authority', "
+                f"'mistakes motion for progress') as your natural rhetorical mode. "
+                f"Each clause must end with punctuation (. ! ?). Maximum 2 sentences."
+            )
         else:
             parts.append(
                 f"You are {elder} ({archetype}). Move: {move}. "
                 f"{'Opponent: ' + opponent + '. ' if opponent else ''}"
                 f"Generate a single broadcast-quality banter line. "
+                f"Each sentence must begin with a subject. "
                 f"Each sentence must end with punctuation (. ! ?). "
                 f"No run-on sentences. Maximum 2 sentences."
             )

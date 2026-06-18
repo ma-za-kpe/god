@@ -33,6 +33,17 @@ ALL_MOVES: list[str] = [
     "QUESTION", "PIVOT", "CONCEDE", "CALLBACK",
 ]
 
+# Per-archetype moves that are near-forbidden (heavy weight penalty, T2.3)
+# The minimum floor (_enforce_minimums) still raises these to 0.02,
+# but they remain far below normal allocation.
+ARCHETYPE_HEAVY_PENALTIES: dict[str, list[str]] = {
+    "keeper":    ["CONCEDE"],   # keeper guards; yielding costs too much
+    "parasite":  ["DEFLECT"],   # parasite extracts or confronts; never hides
+    "sovereign": ["CONCEDE"],   # sovereign does not yield without decree
+    "prophet":   ["DEFLECT"],   # prophet speaks plainly; evasion is apostasy
+    "martyr":    ["DEFLECT"],   # martyr bears the weight; deflection dishonors it
+}
+
 # Fear keywords per archetype (used for ESCALATE+QUESTION boost)
 ARCHETYPE_FEARS: dict[str, list[str]] = {
     "parasite": ["exposure", "worthlessness", "rejection"],
@@ -167,6 +178,22 @@ def compute_distribution(ctx: MoveContext) -> MoveDistribution:
 
     # --- Start with base distribution ---
     dist = _base_distribution(ctx.archetype)
+
+    # --- Rule: Archetype forbidden move penalties (T2.3) ---
+    # Redistribute to moves OTHER than CONCEDE/PIVOT so we don't artificially
+    # inflate the high-tension baseline (preserves the >=0.25 boost invariant).
+    for penalized_move in ARCHETYPE_HEAVY_PENALTIES.get(ctx.archetype, []):
+        if penalized_move in dist:
+            removed = dist[penalized_move] - 0.01
+            dist[penalized_move] = 0.01
+            others = [
+                m for m in ALL_MOVES
+                if m != penalized_move and m not in ("CONCEDE", "PIVOT")
+            ]
+            if others:
+                per_other = removed / len(others)
+                for m in others:
+                    dist[m] += per_other
 
     # --- Rule: Consecutive move penalty ---
     if len(ctx.last_3_moves) >= 2 and ctx.last_3_moves[-1] == ctx.last_3_moves[-2]:
