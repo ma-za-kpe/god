@@ -23,6 +23,7 @@ SEED_BALANCE_USDC = Decimal(os.getenv("SEED_BALANCE_USDC", "0.10"))
 WORLD_ID = os.getenv("WORLD_ID", "local-dev-world-1")
 IPFS_API = os.getenv("IPFS_API", "http://localhost:5001")
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://god:localdev@localhost:5432/god_world")
+AVATAR_GENESIS_ENABLED = os.getenv("AVATAR_GENESIS_ENABLED", "true").lower() in ("1", "true", "yes", "on")
 
 
 def _persist_agent(agent: dict):
@@ -110,6 +111,15 @@ async def seed_one_agent(
         _persist_agent(result)
     except Exception as e:
         log.warning(f"  DB persist failed for {soul_id[:8]}: {e}")
+
+    if AVATAR_GENESIS_ENABLED:
+        try:
+            from .avatar import GenesisPipeline
+
+            pipeline = GenesisPipeline()
+            asyncio.create_task(pipeline.execute(soul_id, archetype, graph))
+        except Exception as exc:
+            log.warning("  Avatar genesis schedule failed for %s: %s", soul_id[:8], exc)
 
     try:
         from .chain_rent import fund_agent_wallet, is_configured, register_agent_on_chain

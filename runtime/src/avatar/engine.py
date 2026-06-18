@@ -1,8 +1,9 @@
-"""Avatar planning surface for renderer and lip-sync wiring."""
+"""Avatar planning surface for renderer, lip-sync, and scene wiring."""
 
 from __future__ import annotations
 
 import os
+import time
 from typing import Any
 
 try:  # pragma: no cover - runtime package import path
@@ -10,7 +11,19 @@ try:  # pragma: no cover - runtime package import path
 except ImportError:  # pragma: no cover - flat test path
     from health_checks import probe_url
 
-from .state import AvatarPlan, AvatarState
+try:  # pragma: no cover - runtime package import path
+    from ..banter.types import Beat, PairState, SceneContextData
+except ImportError:  # pragma: no cover - flat test path
+    from banter.types import Beat, PairState, SceneContextData
+
+try:  # pragma: no cover - runtime package import path
+    from .scene_composer import SceneComposer
+    from .state import AvatarPlan, AvatarState
+    from .visual_reactor import VisualReactor
+except ImportError:  # pragma: no cover - flat test path
+    from avatar.scene_composer import SceneComposer
+    from avatar.state import AvatarPlan, AvatarState
+    from avatar.visual_reactor import VisualReactor
 
 
 def _env_bool(name: str, default: str = "false") -> bool:
@@ -45,19 +58,58 @@ def _pick_pose(snapshot: dict[str, Any]) -> str:
     return "lead"
 
 
-def build_avatar_status() -> dict[str, Any]:
-    endpoint = os.getenv("AVATAR_HEALTH_URL") or os.getenv("AVATAR_ENDPOINT")
+def _default_visual_state() -> dict[str, Any]:
     return {
-        "enabled": _env_bool("AVATAR_ENABLED") or bool(os.getenv("AVATAR_ASSET")) or bool(endpoint),
-        "dry_run": _env_bool("AVATAR_DRY_RUN", "true"),
-        "renderer": os.getenv("AVATAR_RENDERER", "vrm"),
-        "avatar_format": os.getenv("AVATAR_FORMAT", "vrm"),
-        "avatar_asset": os.getenv("AVATAR_ASSET", ""),
-        "lip_sync_source": os.getenv("AVATAR_LIP_SYNC_SOURCE", os.getenv("LIP_SYNC_SOURCE", "audio")),
-        "render_target": os.getenv("AVATAR_RENDER_TARGET", "obs-virtual-camera"),
-        "transport": os.getenv("AVATAR_TRANSPORT", "local-avatar"),
-        "health": probe_url(endpoint, timeout=1.5),
+        "current_expression": "neutral",
+        "expression_override": "",
+        "override_expiry_epoch": 0,
+        "scar_layers": [],
+        "presentation_mode": "standard",
     }
+
+
+def _agent_identity(agent: Any) -> Any:
+    if isinstance(agent, dict):
+        return agent
+    return getattr(agent, "identity", agent)
+
+
+def _visual_state(agent: Any) -> dict[str, Any]:
+    identity = _agent_identity(agent)
+    if isinstance(identity, dict):
+        return identity.setdefault("visual_state", _default_visual_state())
+    visual_state = getattr(identity, "visual_state", None)
+    if not isinstance(visual_state, dict):
+        visual_state = _default_visual_state()
+        setattr(identity, "visual_state", visual_state)
+    else:
+        visual_state.setdefault("current_expression", "neutral")
+        visual_state.setdefault("expression_override", "")
+        visual_state.setdefault("override_expiry_epoch", 0)
+        visual_state.setdefault("scar_layers", [])
+        visual_state.setdefault("presentation_mode", "standard")
+    return visual_state
+
+
+def _agent_key(agent: Any) -> str:
+    if isinstance(agent, dict):
+        return str(agent.get("soul_id") or agent.get("identity", {}).get("soul_id") or agent.get("current_name") or "")
+    identity = getattr(agent, "identity", None)
+    if identity is not None:
+        return str(getattr(identity, "soul_id", "") or getattr(identity, "current_name", "") or "")
+    return str(getattr(agent, "soul_id", "") or getattr(agent, "current_name", "") or "")
+
+
+def _beat_speaker(beat: Any) -> str:
+    if isinstance(beat, dict):
+        return str(beat.get("speaker") or beat.get("sender_name") or "")
+    return str(getattr(beat, "speaker", "") or "")
+
+
+def _beat_quality(beat: Any) -> int:
+    if isinstance(beat, dict):
+        return int(beat.get("quality_score") or 0)
+    return int(getattr(beat, "quality_score", 0) or 0)
 
 
 class AvatarSurface:
@@ -69,30 +121,80 @@ class AvatarSurface:
         self.renderer = os.getenv("AVATAR_RENDERER", "vrm")
         self.avatar_format = os.getenv("AVATAR_FORMAT", "vrm")
         self.transport = os.getenv("AVATAR_TRANSPORT", "local-avatar")
+        self._visual_reactor = VisualReactor()
+        self._scene_composer = SceneComposer()
+        self._last_scene_layout: dict[str, Any] | None = None
 
     def compose(self, snapshot: dict[str, Any]) -> AvatarState:
         showrunner = snapshot.get("showrunner") or {}
         broadcast = snapshot.get("broadcast") or {}
         agents = snapshot.get("agents") or []
+        current_epoch = int(snapshot.get("epoch") or time.time())
         active_name = str(showrunner.get("speaker") or broadcast.get("scene", {}).get("speaker") or "Narrator")
-        active_agent = next(
-            (
-                a
-                for a in agents
-                if str(a.get("current_name") or "").lower() == active_name.lower()
-            ),
-            agents[0] if agents else {},
-        )
-        agent_id = str(active_agent.get("soul_id") or "")
-        expression = _pick_expression(snapshot)
+        if agents and isinstance(agents[0], dict):
+            active_agent = next(
+                (
+                    a
+                    for a in agents
+                    if str(a.get("current_name") or a.get("identity", {}).get("current_name") or "").lower()
+                    == active_name.lower()
+                ),
+                None,
+            )
+        else:
+            active_agent = next(
+                (a for a in agents if _agent_key(a).lower() == active_name.lower()),
+                None,
+            )
+        if active_agent is None:
+            active_agent = agents[0] if agents else {}
+        agent_id = _agent_key(active_agent)
+        visual_state = _visual_state(active_agent) if active_agent else _default_visual_state()
+
+        override = str(visual_state.get("expression_override") or "")
+        override_expiry = int(visual_state.get("override_expiry_epoch") or 0)
+        if override and override_expiry > current_epoch:
+            expression = override
+        else:
+            if override and override_expiry <= current_epoch:
+                visual_state["expression_override"] = ""
+                visual_state["override_expiry_epoch"] = 0
+            expression = _pick_expression(snapshot)
+        visual_state["current_expression"] = expression
+
         pose = _pick_pose(snapshot)
         health = probe_url(os.getenv("AVATAR_HEALTH_URL") or os.getenv("AVATAR_ENDPOINT"), timeout=1.5)
         avatar_asset = (
             os.getenv("AVATAR_ASSET")
-            or active_agent.get("avatar_cid")
-            or active_agent.get("voice_model_cid")
+            or (active_agent.get("avatar_cid") if isinstance(active_agent, dict) else getattr(active_agent, "avatar_cid", ""))
+            or (active_agent.get("voice_model_cid") if isinstance(active_agent, dict) else getattr(active_agent, "voice_model_cid", ""))
             or ""
         )
+
+        beat = snapshot.get("last_beat") or snapshot.get("beat")
+        pair_state = snapshot.get("pair_state")
+        if beat is not None:
+            self._visual_reactor.on_beat_delivered(
+                beat,
+                pair_state if isinstance(pair_state, PairState) else pair_state,
+                agents,
+                current_epoch=current_epoch,
+            )
+            if _beat_quality(beat) > 12 and _beat_speaker(beat):
+                receiver_id = str(snapshot.get("receiver_soul_id") or snapshot.get("receiver") or "")
+                if receiver_id:
+                    self._visual_reactor.on_landed_hit(beat, receiver_id, agents, current_epoch=current_epoch)
+
+        if len(agents) > 1:
+            scene_ctx = self._build_scene_context(snapshot)
+            pair_states = snapshot.get("pair_states") or {}
+            visual_states = self._agent_visual_state_map(agents)
+            scene_layout = self._scene_composer.compose_scene(scene_ctx, pair_states, visual_states)
+            self._last_scene_layout = scene_layout.to_dict()
+        else:
+            self._last_scene_layout = None
+
+        motion = "idle" if snapshot.get("resilience", {}).get("tier") == "cold-start" else "live-reactive"
         plan = AvatarPlan(
             speaker=active_name,
             agent_id=agent_id,
@@ -100,7 +202,7 @@ class AvatarSurface:
             avatar_format=self.avatar_format,
             expression=expression,
             pose=pose,
-            motion="idle" if snapshot.get("resilience", {}).get("tier") == "cold-start" else "live-reactive",
+            motion=motion,
             lip_sync_source=os.getenv("AVATAR_LIP_SYNC_SOURCE", os.getenv("LIP_SYNC_SOURCE", "audio")),
             render_target=os.getenv("AVATAR_RENDER_TARGET", "obs-virtual-camera"),
             notes=tuple(
@@ -111,6 +213,7 @@ class AvatarSurface:
                         f"agent={agent_id[:8] if agent_id else 'none'}",
                         f"expression={expression}",
                         f"pose={pose}",
+                        f"scene_layout={self._last_scene_layout['composition_type']}" if self._last_scene_layout else "",
                     ],
                 )
             ),
@@ -129,8 +232,60 @@ class AvatarSurface:
             plan=plan,
         )
 
+    def _build_scene_context(self, snapshot: dict[str, Any]) -> SceneContextData:
+        context = snapshot.get("scene_context")
+        if isinstance(context, SceneContextData):
+            return context
+        scene_ctx = SceneContextData()
+        recent_beats = snapshot.get("recent_beats") or []
+        if isinstance(recent_beats, list):
+            for beat in recent_beats[-3:]:
+                if isinstance(beat, Beat):
+                    scene_ctx.recent_beats.append(beat)
+                elif isinstance(beat, dict):
+                    try:
+                        scene_ctx.recent_beats.append(Beat(**beat))
+                    except Exception:
+                        continue
+        scene_ctx.has_the_room = snapshot.get("has_the_room")
+        scene_ctx.scene_energy = str(snapshot.get("scene_energy") or "neutral")
+        landed_hit = snapshot.get("landed_hit")
+        if isinstance(landed_hit, Beat):
+            scene_ctx.landed_hit = landed_hit
+        elif isinstance(landed_hit, dict):
+            try:
+                scene_ctx.landed_hit = Beat(**landed_hit)
+            except Exception:
+                scene_ctx.landed_hit = None
+        scene_ctx.landed_hit_remaining = int(snapshot.get("landed_hit_remaining") or 0)
+        return scene_ctx
+
+    def _agent_visual_state_map(self, agents: list[Any]) -> dict[str, Any]:
+        mapping: dict[str, Any] = {}
+        for agent in agents:
+            key = _agent_key(agent)
+            if not key:
+                continue
+            mapping[key] = _visual_state(agent)
+        return mapping
+
     def status(self) -> dict[str, Any]:
         return build_avatar_status()
+
+
+def build_avatar_status() -> dict[str, Any]:
+    endpoint = os.getenv("AVATAR_HEALTH_URL") or os.getenv("AVATAR_ENDPOINT")
+    return {
+        "enabled": _env_bool("AVATAR_ENABLED") or bool(os.getenv("AVATAR_ASSET")) or bool(endpoint),
+        "dry_run": _env_bool("AVATAR_DRY_RUN", "true"),
+        "renderer": os.getenv("AVATAR_RENDERER", "vrm"),
+        "avatar_format": os.getenv("AVATAR_FORMAT", "vrm"),
+        "avatar_asset": os.getenv("AVATAR_ASSET", ""),
+        "lip_sync_source": os.getenv("AVATAR_LIP_SYNC_SOURCE", os.getenv("LIP_SYNC_SOURCE", "audio")),
+        "render_target": os.getenv("AVATAR_RENDER_TARGET", "obs-virtual-camera"),
+        "transport": os.getenv("AVATAR_TRANSPORT", "local-avatar"),
+        "health": probe_url(endpoint, timeout=1.5),
+    }
 
 
 def build_avatar_state(snapshot: dict[str, Any]) -> dict[str, Any]:

@@ -21,6 +21,10 @@ class VoicePlan:
     lip_sync_source: str
     transport: str
     notes: tuple[str, ...] = field(default_factory=tuple)
+    prosody_tag: str = ""
+    emotional_texture_score: int = 0
+    tension_speed_modifier: float = 1.0
+    tension_pitch_modifier: float = 1.0
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)

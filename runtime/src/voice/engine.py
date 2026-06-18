@@ -200,6 +200,86 @@ def _turn_age_seconds(snapshot: dict[str, Any], turn: dict[str, Any]) -> float |
     return max(0.0, float(epoch - sent_at))
 
 
+def _pick_move(snapshot: dict[str, Any]) -> str:
+    last_turn = snapshot.get("last_dialogue_turn") or {}
+    return str(
+        last_turn.get("move")
+        or last_turn.get("move_type")
+        or last_turn.get("metadata", {}).get("move")
+        or snapshot.get("current_move")
+        or ""
+    ).upper()
+
+
+def _voice_agent(snapshot: dict[str, Any], speaker: str) -> dict[str, Any] | None:
+    agents = snapshot.get("agents") or []
+    for agent in agents:
+        if not isinstance(agent, dict):
+            continue
+        current_name = str(agent.get("current_name") or "")
+        soul_id = str(agent.get("soul_id") or "")
+        if current_name.lower() == speaker.lower() or soul_id.lower() == speaker.lower():
+            return agent
+    return None
+
+
+def _prosody_supports_tags(agent: dict[str, Any] | None, snapshot: dict[str, Any]) -> bool:
+    if agent is not None:
+        voice_params = agent.get("voice_params") or {}
+        if isinstance(voice_params, dict):
+            if "supports_prosody_tags" in voice_params:
+                return bool(voice_params.get("supports_prosody_tags"))
+            if "prosody_supported" in voice_params:
+                return bool(voice_params.get("prosody_supported"))
+    status = snapshot.get("voice_status") or {}
+    if isinstance(status, dict):
+        return bool(status.get("supports_prosody_tags") or status.get("prosody_tags"))
+    return False
+
+
+def _current_quality_score(snapshot: dict[str, Any]) -> int:
+    last_turn = snapshot.get("last_dialogue_turn") or {}
+    if isinstance(last_turn.get("quality_score"), int):
+        return int(last_turn.get("quality_score"))
+    if isinstance(snapshot.get("quality_score"), int):
+        return int(snapshot.get("quality_score"))
+    return 0
+
+
+def _voice_modifiers(snapshot: dict[str, Any]) -> tuple[float, float]:
+    pair_state = snapshot.get("pair_state") or {}
+    if not isinstance(pair_state, dict):
+        tension = int(getattr(pair_state, "tension_level", 5) or 5)
+        reconciliation = bool(getattr(pair_state, "reconciliation_arc", False))
+    else:
+        tension = int(pair_state.get("tension_level") or 5)
+        reconciliation = bool(pair_state.get("reconciliation_arc") or False)
+    speed = 1.0
+    pitch = 1.0
+    if tension > 7:
+        speed *= 1.08
+        pitch *= 1.05
+    if reconciliation:
+        speed *= 0.95
+    return speed, pitch
+
+
+def _select_prosody_tag(agent: dict[str, Any] | None, move: str, quality_score: int, supports_tags: bool) -> str:
+    if not supports_tags:
+        return ""
+    voice_params = (agent or {}).get("voice_params") or {}
+    prosody_map = voice_params.get("prosody_map") if isinstance(voice_params, dict) else {}
+    mapped = str((prosody_map or {}).get(move, "")).strip()
+    mapped = mapped.strip("[]")
+    if quality_score > 12 and mapped:
+        return f"[emphasis][{mapped}]"
+    if quality_score > 12:
+        return "[emphasis]"
+    if mapped:
+        return f"[{mapped}]"
+    return ""
+
+
 def build_voice_status() -> dict[str, Any]:
     endpoint = os.getenv("VOICE_HEALTH_URL") or os.getenv("TTS_ENDPOINT")
     provider = os.getenv("VOICE_PROVIDER") or os.getenv("TTS_PROVIDER") or "kokoro"
@@ -283,6 +363,13 @@ class VoiceSurface:
         voice_name = _pick_voice_name()
         utterance_id = _utterance_id(snapshot, speaker, line)
         health = self._cached_health.get(os.getenv("VOICE_HEALTH_URL") or os.getenv("TTS_ENDPOINT"), timeout=1.5)
+        move = _pick_move(snapshot)
+        quality_score = _current_quality_score(snapshot)
+        emotional_texture_score = min(3, max(0, quality_score // 5))
+        selected_agent = _voice_agent(snapshot, speaker)
+        supports_tags = _prosody_supports_tags(selected_agent, snapshot)
+        prosody_tag = _select_prosody_tag(selected_agent, move, quality_score, supports_tags)
+        speed_modifier, pitch_modifier = _voice_modifiers(snapshot)
         speed = _dialogue_speed(snapshot, line)
         last_meta = last_turn.get("metadata") or {}
         if isinstance(last_meta, str):
@@ -299,16 +386,30 @@ class VoiceSurface:
             or last_meta.get("beat_count")
             or ""
         ).strip()
+        tagged_line = line
+        if prosody_tag:
+            if prosody_tag == "[emphasis]":
+                tagged_line = f"[emphasis]{line}[/emphasis]"
+            elif prosody_tag.startswith("[emphasis]"):
+                inner = prosody_tag.removeprefix("[emphasis]")
+                tag_name = inner.strip("[]")
+                if tag_name:
+                    tagged_line = f"[emphasis]{inner}{line}[/{tag_name}][/emphasis]"
+                else:
+                    tagged_line = f"[emphasis]{line}[/emphasis]"
+            else:
+                tag_name = prosody_tag.strip("[]")
+                tagged_line = f"{prosody_tag}{line}[/{tag_name}]"
         plan = VoicePlan(
             speaker=speaker,
-            line=line,
+            line=tagged_line,
             emotion=emotion,
             utterance_id=utterance_id,
             voice_provider=self.provider,
             voice_model=voice_model,
             voice_name=voice_name,
-            pitch=float(os.getenv("VOICE_PITCH", "0.5")),
-            speed=float(os.getenv("VOICE_SPEED", str(speed))),
+            pitch=float(os.getenv("VOICE_PITCH", "0.5")) * pitch_modifier,
+            speed=float(os.getenv("VOICE_SPEED", str(speed))) * speed_modifier,
             sample_rate=int(os.getenv("VOICE_SAMPLE_RATE", "48000")),
             lip_sync_source=os.getenv("LIP_SYNC_SOURCE", "audio"),
             transport=self.transport,
@@ -322,9 +423,16 @@ class VoiceSurface:
                         f"cadence={cadence}" if cadence else "",
                         f"utterance={utterance_id}",
                         f"voice={voice_name}",
+                        f"move={move}" if move else "",
+                        f"prosody={prosody_tag}" if prosody_tag else "",
+                        f"emotional_texture={emotional_texture_score}",
                     ],
                 )
             ),
+            prosody_tag=prosody_tag,
+            emotional_texture_score=emotional_texture_score,
+            tension_speed_modifier=speed_modifier,
+            tension_pitch_modifier=pitch_modifier,
         )
         self._last_plan = plan
         return VoiceState(
