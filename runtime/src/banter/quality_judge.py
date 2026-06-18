@@ -89,6 +89,14 @@ class EnhancedQualityScore:
         )
 
     @property
+    def is_clip_candidate(self) -> bool:
+        """True when this line is flagged as a clip-worthy moment (T7.1).
+
+        Criterion: total > 16 AND sharpness == 3 AND emotional_texture >= 2.
+        """
+        return self.total > 16 and self.sharpness == 3 and self.emotional_texture >= 2
+
+    @property
     def weak_dimensions(self) -> list[tuple[str, int]]:
         """All dimensions scoring 1 or below (for refinement feedback)."""
         return [(name, val) for name, val in self.as_dict().items() if val <= 1]
@@ -108,17 +116,29 @@ class EnhancedQualityScore:
     def refinement_feedback(self) -> str:
         """Build a prompt fragment listing weak dimensions for regeneration.
 
-        Includes voice_authenticity guidance when that dimension is weak.
+        emotional_texture == 0 is treated as a hard block (T7.2): the message
+        demands a rewrite rather than just noting the score. Other weak
+        dimensions are listed as improvement targets.
         """
-        weak = self.weak_dimensions
-        if not weak:
-            return ""
         parts = []
-        for name, val in weak:
+
+        # Hard block: no emotional texture at all (T7.2)
+        if self.emotional_texture == 0:
+            parts.append(
+                "This line has no emotional texture. It must feel like something. Rewrite."
+            )
+
+        # Other weak dimensions (≤1), excluding emotional_texture already handled
+        for name, val in self.weak_dimensions:
+            if name == "emotional_texture":
+                continue
             if name == "voice_authenticity":
                 parts.append("voice_authenticity (use more archetype-specific vocabulary)")
             else:
                 parts.append(f"{name} (currently {val}/3)")
+
+        if not parts:
+            return ""
         return "Improve: " + ", ".join(parts) + "."
 
 
@@ -560,15 +580,12 @@ async def _evaluate_enhanced_impl(
             log.debug("SubtletyDirector scoring failed, defaulting to 0: %s", exc)
             subtext_depth = 0
 
-    # --- shareability bonus from subtext depth (capped at 3) ---
-    boosted_shareability = min(3, base.shareability + subtext_depth)
-
     return EnhancedQualityScore(
         sharpness=base.sharpness,
         emotional_texture=base.emotional_texture,
         rhythm=base.rhythm,
         thematic_relevance=base.thematic_relevance,
-        shareability=boosted_shareability,
+        shareability=base.shareability,
         voice_authenticity=voice_authenticity,
         subtext_depth=subtext_depth,
     )

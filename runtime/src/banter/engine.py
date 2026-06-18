@@ -159,6 +159,7 @@ class BanterEngine:
         self._pending_subtext_instruction: SubtextInstruction | None = None
         self._pending_subtext_was_injected: bool = False
         self._last_soul_metadata: dict = {}
+        self._last_quality_detail = None  # EnhancedQualityScore | None; set per beat
 
         # Session-level soul tracking
         self._session_callback_count: int = 0
@@ -307,6 +308,11 @@ class BanterEngine:
                 )
 
         # --- Step 9: Return BeatResult ---
+        clip_candidate = (
+            self._last_quality_detail.is_clip_candidate
+            if self._last_quality_detail is not None
+            else False
+        )
         return BeatResult(
             line=line,
             move=move,
@@ -319,6 +325,7 @@ class BanterEngine:
                 "pacing_rule": pacing.rule_applied,
                 "session_id": self._session.session_id,
                 "soul": self._last_soul_metadata,
+                "clip_candidate": clip_candidate,
             },
         )
 
@@ -480,7 +487,7 @@ class BanterEngine:
         # Cross-pair eavesdropping injection (T3.2) — 1-in-10 beats
         if opponent and random.random() < 0.1:
             overheard = self._scene_context.get_other_pair_line(elder, opponent)
-            if overheard:
+            if isinstance(overheard, tuple) and len(overheard) == 3:
                 ox, oy, oline = overheard
                 parts.append(f'[OVERHEARD] {ox} to {oy}: "{oline}"')
 
@@ -639,7 +646,13 @@ class BanterEngine:
         if chaos:
             threshold = 6  # Hard floor — raw is the point
         elif move == "CRACK":
-            threshold = 5  # CRACK floor (Section 8.4)
+            threshold = 5  # CRACK: rawness over polish (T4.1, T7.3)
+        elif move == "CONCEDE":
+            threshold = 5  # graceful collapse is fine at lower scores (T7.3)
+        elif move == "CALLBACK":
+            threshold = 10  # must earn the reference (T7.3)
+        elif move == "ESCALATE" and self._last_tension > 8:
+            threshold = 8  # still needs to land at high tension (T7.3)
         else:
             threshold = get_pass_threshold(soul_active) if soul_active else route_decision.quality_threshold
 
@@ -648,7 +661,7 @@ class BanterEngine:
             probed = await self._model_router.probe_remote()
             if probed:
                 route_decision = self._model_router.route("broadcast")
-                if not chaos and move != "CRACK":
+                if not chaos and move not in ("CRACK", "CONCEDE", "CALLBACK") and not (move == "ESCALATE" and self._last_tension > 8):
                     threshold = route_decision.quality_threshold
 
         # Initial generation
@@ -863,6 +876,7 @@ class BanterEngine:
                     config=self._soul_config,
                     timeout_s=self._config.quality_judge_timeout_s,
                 )
+                self._last_quality_detail = quality
             else:
                 quality = await self._quality_judge(
                     line,
@@ -872,6 +886,7 @@ class BanterEngine:
                     scene_context=scene_data,
                     timeout_s=self._config.quality_judge_timeout_s,
                 )
+                self._last_quality_detail = None
             return quality.total, False
         except QualityJudgeError as e:
             log.debug("Quality judge error: %s", e)
