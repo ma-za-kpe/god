@@ -174,6 +174,10 @@ class BanterEngine:
         self._consecutive_escalating: int = 0  # tracks consecutive ESCALATE/TAUNT moves
         self._last_tension: int = 5  # last known tension level
 
+        # World-event reaction state (T5.4)
+        self._world_event_beats_remaining: int = 0
+        self._world_event_text: str = ""
+
     # ------------------------------------------------------------------
     # Public API
     # ------------------------------------------------------------------
@@ -186,6 +190,7 @@ class BanterEngine:
         arc_theme: str,
         conv_thread: list[dict],
         elder_balances: dict[str, float] | None = None,
+        world_event: str | None = None,
     ) -> BeatResult:
         """Full pipeline: generate a single broadcast-quality banter beat.
 
@@ -222,8 +227,35 @@ class BanterEngine:
                 self._reset_session()
         self._last_beat_ts = now
 
+        # Register incoming world event (T5.4) — lasts 3 beats
+        if world_event:
+            self._world_event_text = world_event
+            self._world_event_beats_remaining = 3
+
         # --- Step 2: Move selection ---
         scene_data = self._scene_context.get_context_for_generation(elder)
+
+        # Silence beat check (T3.3) — 15% chance at tension≤3 or after high-score hit
+        landed_score = (
+            scene_data.landed_hit.quality_score
+            if scene_data.landed_hit is not None and scene_data.landed_hit_remaining > 0
+            else 0
+        )
+        # Use last known tension for silence check (pair state not yet fetched)
+        _silence_candidate = (
+            self._last_tension <= 3 or landed_score > 14
+        ) and random.random() < 0.15
+        if _silence_candidate:
+            silence_delay = random.uniform(3.0, 5.0)
+            return BeatResult(
+                line="...",
+                move="SILENCE",
+                quality_score=0,
+                delay_s=silence_delay,
+                pre_pause_s=0.0,
+                source="silence",
+                metadata={"session_id": self._session.session_id, "clip_candidate": False},
+            )
 
         # Apply snap-back override if previous beat was CRACK (T4.1)
         if self._next_move_override is not None:
@@ -482,6 +514,14 @@ class BanterEngine:
             twitch_event_fired=False,
         ):
             parts.append(self._veil_layer.get_injection())
+
+        # World-event reaction (T5.4) — inject for next 3 beats after a world milestone
+        if self._world_event_beats_remaining > 0:
+            parts.append(
+                f"[WORLD EVENT] Something just shifted in the ledger: {self._world_event_text} "
+                f"Everyone felt it. Let it color this line — not as exposition, but as weight."
+            )
+            self._world_event_beats_remaining -= 1
 
         # Patronage-cost grounding (T5.3) — 1-in-5 beats inject economic stakes
         if random.random() < 0.2:
@@ -1080,6 +1120,8 @@ class BanterEngine:
         self._consecutive_counters = 0
         self._consecutive_escalating = 0
         self._last_tension = 5
+        self._world_event_beats_remaining = 0
+        self._world_event_text = ""
 
     def _extract_last_moves(self, elder: str, conv_thread: list[dict]) -> list[str]:
         """Extract the last 3 moves made by this elder from the conversation thread."""

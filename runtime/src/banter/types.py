@@ -27,6 +27,7 @@ MOVE_TYPES = Literal[
     "CONCEDE",
     "CALLBACK",
     "CRACK",
+    "SILENCE",
 ]
 
 
@@ -308,7 +309,7 @@ class BeatResult:
     quality_score: int  # total quality score (0-15) or 0 if scored via fallback
     delay_s: float  # computed inter-beat pacing delay
     pre_pause_s: float  # CONCEDE pause (0.0 or 2.0)
-    source: Literal["remote", "local", "fallback"]  # origin of the line
+    source: Literal["remote", "local", "fallback", "silence"]  # origin of the line
     template_id: str | None = None  # fallback template id if source == "fallback"
     metadata: dict = field(default_factory=dict)  # additional context for logging
 
