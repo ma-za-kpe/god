@@ -185,6 +185,7 @@ class BanterEngine:
         opponent: str | None,
         arc_theme: str,
         conv_thread: list[dict],
+        elder_balances: dict[str, float] | None = None,
     ) -> BeatResult:
         """Full pipeline: generate a single broadcast-quality banter beat.
 
@@ -262,7 +263,8 @@ class BanterEngine:
 
         # --- Step 3: Prompt building ---
         prompt = await self._build_prompt(
-            elder, archetype, opponent, arc_theme, move, conv_thread, scene_data
+            elder, archetype, opponent, arc_theme, move, conv_thread, scene_data,
+            elder_balances=elder_balances,
         )
 
         # --- Step 4 + 5 + 6: Generate, score, refine ---
@@ -388,6 +390,7 @@ class BanterEngine:
         move: str,
         conv_thread: list[dict],
         scene_data,
+        elder_balances: dict[str, float] | None = None,
     ) -> str:
         """Build generation prompt with soul modules, scene context and relationship memory."""
         parts: list[str] = []
@@ -440,6 +443,18 @@ class BanterEngine:
             if reconciliation_active and pair_state is not None:
                 parts.append(self._format_reconciliation_context(pair_state, opponent))
 
+            # Alliance moments (T4.3) — 1-in-5 chance when alliance is active
+            if (
+                pair_state is not None
+                and pair_state.alliance
+                and random.random() < 0.2
+            ):
+                parts.append(
+                    f"[ALLIANCE] You and {opponent} share a genuine moment of agreement here. "
+                    f"Begin with an honest concession or compliment — then pivot back to competition. "
+                    f'Example structure: "You\'re not wrong about that. Which is exactly why I won\'t let you have it."'
+                )
+
         # Landed hit instruction (Req 5.3)
         if scene_data.landed_hit is not None and scene_data.landed_hit_remaining > 0:
             hit_line = scene_data.landed_hit.content
@@ -467,6 +482,26 @@ class BanterEngine:
             twitch_event_fired=False,
         ):
             parts.append(self._veil_layer.get_injection())
+
+        # Patronage-cost grounding (T5.3) — 1-in-5 beats inject economic stakes
+        if random.random() < 0.2:
+            elder_balance = elder_balances.get(elder) if elder_balances else None
+            opponent_balance = (
+                elder_balances.get(opponent)
+                if elder_balances and opponent
+                else None
+            )
+            if elder_balance is not None and opponent_balance is not None:
+                parts.append(
+                    f"[ECONOMY] Your USDC balance: {elder_balance:.2f}. "
+                    f"{opponent}'s balance: {opponent_balance:.2f}. "
+                    f"Rent, survival, and death are real here. Let that bleed into your words."
+                )
+            else:
+                parts.append(
+                    "[ECONOMY] Rent is due. Balances are real. Death is permanent. "
+                    "Let the weight of economic survival bleed into this line."
+                )
 
         # CRACK override — replaces archetype prompt for this beat (T4.1)
         if move == "CRACK":
