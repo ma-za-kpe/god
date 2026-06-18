@@ -475,14 +475,49 @@ class BanterEngine:
         elif self._next_move_override is not None:
             parts.append(self._SNAP_BACK_PROMPT)
 
-        # Core generation instruction (T1.3: grammar enforcement in prompt)
-        parts.append(
-            f"You are {elder} ({archetype}). Move: {move}. "
-            f"{'Opponent: ' + opponent + '. ' if opponent else ''}"
-            f"Generate a single broadcast-quality banter line. "
-            f"Each sentence must end with punctuation (. ! ?). "
-            f"No run-on sentences. Maximum 2 sentences."
+        # Interruption mechanic (T6.2) — em-dash interrupt at tension > 8, 20% chance
+        interrupt_mode = (
+            tension > 8
+            and opponent is not None
+            and random.random() < 0.2
         )
+
+        # Trailing-off mechanic (T6.3) — hesitation at low tension CONCEDE/DEFLECT
+        trailing_mode = (
+            move in ("CONCEDE", "DEFLECT")
+            and tension <= 3
+        )
+
+        # Core generation instruction (T1.3: grammar enforcement in prompt)
+        if interrupt_mode:
+            # Extract opponent's last line from conv_thread for reference
+            opponent_last = ""
+            if conv_thread and opponent:
+                for turn in reversed(conv_thread):
+                    if turn.get("speaker") == opponent:
+                        opponent_last = turn.get("content", "")
+                        break
+            ref = f' Reference what {opponent} just said: "{opponent_last}".' if opponent_last else ""
+            parts.append(
+                f"You are {elder} ({archetype}). Move: {move}. Opponent: {opponent}. "
+                f"Start your line with an em-dash (—) and cut into the middle of their argument.{ref} "
+                f"No run-on sentences."
+            )
+        elif trailing_mode:
+            parts.append(
+                f"You are {elder} ({archetype}). Move: {move}. "
+                f"{'Opponent: ' + opponent + '. ' if opponent else ''}"
+                f"Generate a line that trails off or hesitates — incomplete thoughts, ellipses, "
+                f"or a retraction mid-sentence are appropriate here. Show reluctance or exhaustion."
+            )
+        else:
+            parts.append(
+                f"You are {elder} ({archetype}). Move: {move}. "
+                f"{'Opponent: ' + opponent + '. ' if opponent else ''}"
+                f"Generate a single broadcast-quality banter line. "
+                f"Each sentence must end with punctuation (. ! ?). "
+                f"No run-on sentences. Maximum 2 sentences."
+            )
 
         # Cross-pair eavesdropping injection (T3.2) — 1-in-10 beats
         if opponent and random.random() < 0.1:
