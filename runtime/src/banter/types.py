@@ -152,6 +152,7 @@ class MoveContext:
     fear_keywords: list[str]
     consecutive_counters_in_pair: int
     consecutive_low_scores: int  # for "losing the room" detection
+    scene_phase: str | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -208,6 +209,12 @@ class PairState:
     reconciliation_arc: bool = False
     reconciliation_remaining: int = 0  # interactions left with context injection
     peak_tension_summary: str = ""
+    # --- New fields for CRACK/snap-back (Section 8) ---
+    recent_betrayal: bool = False
+    last_wound_summary: str = ""
+    trust_delta: float = 0.0
+    consecutive_escalations: int = 0
+    consecutive_counters: int = 0
 
 
 # ---------------------------------------------------------------------------

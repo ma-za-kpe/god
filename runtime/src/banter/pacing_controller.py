@@ -46,6 +46,7 @@ class PacingController:
         upcoming_move: str,
         scene_energy: Literal["heated", "cooling", "neutral"],
         landed_hit: bool,
+        scene_phase: str | None = None,
     ) -> PacingDecision:
         """Compute pacing decision using priority-based rule resolution.
 
@@ -99,6 +100,17 @@ class PacingController:
 
         # Final clamping to [1.0, 10.0]
         inter_beat_delay_s = max(self.MIN_DELAY, min(self.MAX_DELAY, winning_delay))
+
+        # Macro rhythm override: scene phase widens or tightens the room.
+        if scene_phase == "release":
+            inter_beat_delay_s = min(self.MAX_DELAY, max(inter_beat_delay_s, 6.0))
+            rule_applied = f"{rule_applied}+release"
+        elif scene_phase == "climax":
+            inter_beat_delay_s = max(self.MIN_DELAY, min(inter_beat_delay_s, 2.2))
+            rule_applied = f"{rule_applied}+climax"
+        elif scene_phase == "reset":
+            inter_beat_delay_s = max(self.MIN_DELAY, min(inter_beat_delay_s, 4.5))
+            rule_applied = f"{rule_applied}+reset"
 
         return PacingDecision(
             inter_beat_delay_s=inter_beat_delay_s,

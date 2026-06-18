@@ -19,6 +19,8 @@ import re
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
+from .contract_types import ContractQualityScore
+from .mode_types import BeatMode, BeatModePolicy
 from .types import QualityJudgeError, QualityScore, SceneContextData
 
 if TYPE_CHECKING:
@@ -315,6 +317,19 @@ def _score_thematic_relevance(candidate: str, arc_theme: str) -> int:
         return 0
 
 
+def _score_pressure_relevance(candidate: str, arc_theme: str) -> int:
+    """Score connection to arc pressure for the contract judge (0-3)."""
+    if not arc_theme or not candidate.strip():
+        return 0
+
+    candidate_lower = candidate.lower()
+    theme_lower = arc_theme.lower().strip()
+    if theme_lower and theme_lower in candidate_lower:
+        return 0
+
+    return _score_thematic_relevance(candidate, arc_theme)
+
+
 def _score_shareability(candidate: str) -> int:
     """Score quotability and clip-worthiness (0-3).
 
@@ -363,9 +378,151 @@ def _score_archetype_voice(candidate: str, archetype: str) -> float:
     return 0.0
 
 
+def _score_voice_authenticity(candidate: str, archetype: str) -> int:
+    """Contract-aligned voice authenticity score (0-3)."""
+    boost = _score_archetype_voice(candidate, archetype)
+    if boost >= 1.0:
+        return 3
+    if boost >= 0.5:
+        return 2
+    if boost > 0:
+        return 1
+    return 0
+
+
+def _score_subtext_depth(candidate: str, move: str) -> int:
+    """Contract-aligned subtext depth score (0-3)."""
+    lower = candidate.lower()
+    score = 0
+
+    implication_markers = {
+        "maybe", "almost", "still", "yet", "though", "however", "despite",
+        "underneath", "between", "instead", "again", "quietly", "apparently",
+    }
+    hidden_cost_words = {
+        "cost", "rent", "debt", "weight", "price", "borrow", "owe", "pay",
+        "burn", "hurt", "trust", "betray", "fear", "loss",
+    }
+
+    if any(word in lower.split() for word in implication_markers):
+        score += 1
+    if any(word in lower.split() for word in hidden_cost_words):
+        score += 1
+    if any(marker in lower for marker in ("...", "—", "?", " but ", " yet ")):
+        score += 1
+
+    if move in {"CRACK", "CONCEDE"} and score < 3:
+        score += 1
+
+    return min(3, score)
+
+
 # ---------------------------------------------------------------------------
 # Main evaluation function
 # ---------------------------------------------------------------------------
+
+
+class QualityJudgeV2:
+    """Contract-aligned 6-dimension judge."""
+
+    async def score(
+        self,
+        candidate: str,
+        *,
+        archetype: str,
+        move: str,
+        arc_theme: str,
+        policy: BeatModePolicy,
+        scene_context: SceneContextData | None = None,
+        timeout_s: float = 2.0,
+    ) -> ContractQualityScore:
+        try:
+            return await asyncio.wait_for(
+                self._score_impl(
+                    candidate,
+                    archetype=archetype,
+                    move=move,
+                    arc_theme=arc_theme,
+                    policy=policy,
+                    scene_context=scene_context,
+                ),
+                timeout=timeout_s,
+            )
+        except asyncio.TimeoutError:
+            raise QualityJudgeError(
+                f"Contract quality evaluation timed out after {timeout_s}s"
+            )
+        except QualityJudgeError:
+            raise
+        except Exception as exc:
+            raise QualityJudgeError(
+                f"Unexpected error during contract scoring: {exc}"
+            ) from exc
+
+    async def _score_impl(
+        self,
+        candidate: str,
+        *,
+        archetype: str,
+        move: str,
+        arc_theme: str,
+        policy: BeatModePolicy,
+        scene_context: SceneContextData | None = None,
+    ) -> ContractQualityScore:
+        sharpness = _score_sharpness(candidate)
+        emotional_texture = _score_emotional_texture(candidate)
+        rhythm = _score_rhythm(candidate)
+        pressure_relevance = _score_pressure_relevance(candidate, arc_theme)
+        voice_authenticity = _score_voice_authenticity(candidate, archetype)
+        subtext_depth = _score_subtext_depth(candidate, move)
+
+        if policy.mode == BeatMode.NORMAL and emotional_texture == 0:
+            log.debug(
+                "NORMAL mode emotional_texture hard block candidate=%r", candidate
+            )
+
+        for name, val in [
+            ("sharpness", sharpness),
+            ("emotional_texture", emotional_texture),
+            ("rhythm", rhythm),
+            ("pressure_relevance", pressure_relevance),
+            ("voice_authenticity", voice_authenticity),
+            ("subtext_depth", subtext_depth),
+        ]:
+            if not (0 <= val <= 3):
+                raise QualityJudgeError(f"Dimension {name} out of bounds: {val}")
+
+        return ContractQualityScore(
+            sharpness=sharpness,
+            emotional_texture=emotional_texture,
+            rhythm=rhythm,
+            pressure_relevance=pressure_relevance,
+            voice_authenticity=voice_authenticity,
+            subtext_depth=subtext_depth,
+        )
+
+
+async def evaluate_contract(
+    candidate: str,
+    *,
+    archetype: str,
+    move: str,
+    arc_theme: str,
+    policy: BeatModePolicy,
+    scene_context: SceneContextData | None = None,
+    timeout_s: float = 2.0,
+) -> ContractQualityScore:
+    """Convenience wrapper around QualityJudgeV2.score."""
+    judge = QualityJudgeV2()
+    return await judge.score(
+        candidate,
+        archetype=archetype,
+        move=move,
+        arc_theme=arc_theme,
+        policy=policy,
+        scene_context=scene_context,
+        timeout_s=timeout_s,
+    )
 
 
 async def evaluate(

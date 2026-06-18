@@ -2,6 +2,12 @@
 
 The arc theme title string MUST NEVER appear in any generated prompt.
 This module is the single conversion point from theme name → pressure text.
+
+Contract: Section 3 — Arc Pressure
+- 3.1: Raw arc theme title MUST NEVER appear in any prompt or delivered line.
+- 3.2: [ARC] block uses the canonical injection format.
+- 3.3: Fallback uses the required format for unknown themes.
+- 3.4: get_pressure() never returns the theme title.
 """
 
 from __future__ import annotations
@@ -46,34 +52,122 @@ _PRESSURE_TABLE: dict[str, ArcPressure] = {
     ),
 }
 
+# Mapping from theme key → safe noun phrase (never the full title).
+# Each noun is a paraphrased concept, not the literal theme title string.
+_THEME_NOUN_TABLE: dict[str, str] = {
+    "scarcity_vs_flow": "scarcity",
+    "market_cruelty": "market pressure",
+    "betrayal_and_return": "broken trust",
+    "power_and_legitimacy": "contested authority",
+    "sacrifice_and_cost": "willing sacrifice",
+    "truth_and_performance": "performed honesty",
+    "survival_and_meaning": "survival instinct",
+}
 
-def _theme_noun(theme: str) -> str:
-    return theme.replace("_", " ").replace("-", " ")
+
+def _normalize_theme(theme: str) -> str:
+    """Normalize a theme string to underscore-separated lowercase key."""
+    return theme.lower().strip().replace(" ", "_").replace("-", "_")
+
+
+def _derive_theme_noun(theme: str) -> str:
+    """Derive a safe noun phrase from a theme string.
+
+    The derived noun MUST NOT be the full theme title, and MUST NOT be
+    a substring that would cause the title to appear verbatim in the
+    fallback pressure template. For single-word themes, a paraphrase
+    is generated instead.
+
+    Strategy:
+    1. Check the explicit noun table first.
+    2. For multi-word unknown themes, extract first meaningful word
+       only if the full title has 3+ words.
+    3. For short themes (1-2 words), use a generic paraphrase to avoid
+       the title appearing in the output.
+    4. Validate: the derived noun must never equal the full readable title.
+    """
+    normalized = _normalize_theme(theme)
+
+    # Known themes have curated nouns
+    if normalized in _THEME_NOUN_TABLE:
+        return _THEME_NOUN_TABLE[normalized]
+
+    # For unknown themes, derive a safe noun that is NOT the full title
+    stop_words = {"and", "or", "the", "of", "vs", "a", "an", "in", "on", "to", "for", "is", "with"}
+    words = normalized.replace("_", " ").split()
+    meaningful = [w for w in words if w.lower() not in stop_words]
+    full_title = normalized.replace("_", " ")
+
+    if len(meaningful) <= 1:
+        # Single meaningful word (or none) — the noun would equal the title.
+        # Use a generic paraphrase: "this tension" avoids leaking the title.
+        noun = "this tension"
+    elif len(meaningful) == 2:
+        # Two meaningful words — taking just one risks being too vague,
+        # but it's safe since one word != two-word title.
+        noun = meaningful[0]
+    else:
+        # 3+ meaningful words — first word is safe (one word != multi-word title)
+        noun = meaningful[0]
+
+    # Final safety check: the noun must not equal the full readable title
+    if noun == full_title:
+        noun = "this tension"
+
+    return noun
 
 
 class ArcContextBuilder:
-    """Converts arc theme names into generative pressure prompts."""
+    """Converts arc theme names into generative pressure prompts.
+
+    Contract guarantees:
+    - get_pressure(theme).pressure never contains the raw theme title.
+    - get_pressure(theme).world_stakes never contains the raw theme title.
+    - format_injection(theme) never contains the raw theme title.
+    """
 
     def get_pressure(self, theme: str) -> ArcPressure:
-        """Return ArcPressure for the given theme name. Never returns the theme name itself."""
-        normalized = theme.lower().strip().replace(" ", "_").replace("-", "_")
+        """Return ArcPressure for the given theme name.
+
+        Never returns the theme title itself in pressure or world_stakes.
+        Uses paraphrased language from the pressure table for known themes,
+        and the Section 3.3 fallback format for unknown themes.
+        """
+        normalized = _normalize_theme(theme)
+
         if normalized in _PRESSURE_TABLE:
-            return _PRESSURE_TABLE[normalized]
-        noun = _theme_noun(theme)
-        return ArcPressure(
-            pressure=f"what does {noun} cost the beings who have nothing left to give?",
-            world_stakes="the Swarm watches who answers this honestly and who performs an answer",
+            result = _PRESSURE_TABLE[normalized]
+        else:
+            # Section 3.3 required fallback format
+            theme_noun = _derive_theme_noun(theme)
+            result = ArcPressure(
+                pressure=f"how does {theme_noun} expose who is truly willing to pay the hidden cost in this ecology?",
+                world_stakes="The Swarm is watching who flinches first. Patrons bet on conviction, not performance.",
+            )
+
+        # Hard contract assertion: result must never contain the raw title
+        readable_title = normalized.replace("_", " ")
+        assert readable_title not in result.pressure.lower(), (
+            f"CONTRACT VIOLATION: theme title '{readable_title}' leaked into pressure"
+        )
+        assert readable_title not in result.world_stakes.lower(), (
+            f"CONTRACT VIOLATION: theme title '{readable_title}' leaked into world_stakes"
         )
 
+        return result
+
     def format_injection(self, theme: str) -> str:
-        """Return the [ARC] prompt block for the given theme. Title never included."""
+        """Return the [ARC] prompt block for the given theme.
+
+        Uses the Section 3.2 injection format. Title never included.
+        """
         p = self.get_pressure(theme)
         return (
-            f"[ARC]\n"
+            "[ARC]\n"
             f"The question burning through the Veil right now: {p.pressure}\n"
             f"The cosmic stakes: {p.world_stakes}\n"
-            f"Take a position on this tension — directly or indirectly — in every line.\n"
-            f"Do not quote or name this question. Embody it."
+            "Take a position on this tension, directly or indirectly, in every line.\n"
+            "Do not quote or name this question. Embody it."
         )
 
 

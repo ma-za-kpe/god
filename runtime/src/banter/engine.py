@@ -14,20 +14,25 @@ import logging
 import random
 import time
 import uuid
-from typing import TYPE_CHECKING, Callable, Protocol
+from typing import TYPE_CHECKING, Protocol
 
 from .anti_repetition import AntiRepetitionGate, WorldRepetitionBuffer
 from .arc_context import arc_context_builder
 from .fallback_pool import FallbackPool
+from .hard_bans import HardBanChecker
+from .mode_resolver import ModeResolver
+from .mode_types import NORMAL_POLICY, BeatMode, BeatModePolicy
+from .prompt_builder import SacredPromptBuilder
+from .scene_arc_controller import SceneArcController, ScenePhase
 from .veil_layer import VeilLayer
 from .model_router import ModelRouter
-from .move_selector import compute_distribution as _compute_distribution
 from .pacing_controller import PacingController
 from .quality_judge import evaluate_enhanced, get_pass_threshold, get_refine_threshold
 from .relationship_memory import RelationshipMemory
 from .scene_context import SceneContext
 from .types import (
     BanterConfig,
+    Beat,
     BeatResult,
     MoveContext,
     QualityJudgeError,
@@ -128,6 +133,8 @@ class BanterEngine:
         soul_config: SoulEngineConfig | None = None,
         veil_layer: VeilLayer | None = None,
         world_buffer: WorldRepetitionBuffer | None = None,
+        mode_resolver: ModeResolver | None = None,
+        hard_ban_checker: HardBanChecker | None = None,
     ) -> None:
         self._quality_judge = quality_judge
         self._move_selector = move_selector
@@ -148,6 +155,14 @@ class BanterEngine:
         self._veil_layer = veil_layer or VeilLayer()
         self._world_buffer = world_buffer or WorldRepetitionBuffer()
 
+        # Contract-alignment modules (Tasks 5, 8)
+        self._mode_resolver = mode_resolver or ModeResolver()
+        self._hard_ban_checker = hard_ban_checker or HardBanChecker()
+        self._scene_arc_controller = SceneArcController()
+
+        # Sacred prompt builder (Section 1 contract)
+        self._prompt_builder = SacredPromptBuilder()
+
         # Session state
         self._session = SessionState(
             session_id=str(uuid.uuid4()),
@@ -160,6 +175,7 @@ class BanterEngine:
         self._pending_subtext_was_injected: bool = False
         self._last_soul_metadata: dict = {}
         self._last_quality_detail = None  # EnhancedQualityScore | None; set per beat
+        self._last_prompt_snapshot: str = ""
 
         # Session-level soul tracking
         self._session_callback_count: int = 0
@@ -232,21 +248,57 @@ class BanterEngine:
             self._world_event_text = world_event
             self._world_event_beats_remaining = 3
 
-        # --- Step 2: Move selection ---
+        # --- Step 2: Mode Resolution (via ModeResolver) ---
         scene_data = self._scene_context.get_context_for_generation(elder)
 
-        # Silence beat check (T3.3) — 15% chance at tension≤3 or after high-score hit
-        landed_score = (
-            scene_data.landed_hit.quality_score
-            if scene_data.landed_hit is not None and scene_data.landed_hit_remaining > 0
-            else 0
+        # Fetch pair state early for mode resolution
+        pair_state = None
+        if opponent:
+            pair_state = await self._get_pair_state(elder, opponent)
+
+        # Determine opponent's last score for backchannel detection
+        opponent_last_score: int | None = None
+        if scene_data.recent_beats:
+            for b in reversed(scene_data.recent_beats):
+                if b.speaker == opponent:
+                    opponent_last_score = b.quality_score
+                    break
+
+        # Resolve mode via precedence chain
+        prev_elder_mode = getattr(self, '_prev_elder_modes', {}).get(elder)
+        policy = self._mode_resolver.resolve(
+            elder=elder,
+            opponent=opponent,
+            pair_state=pair_state,
+            scene_data=scene_data,
+            beat_number=self._beat_number,
+            prev_elder_mode=prev_elder_mode,
+            opponent_last_score=opponent_last_score,
         )
-        # Use last known tension for silence check (pair state not yet fetched)
-        _silence_candidate = (
-            self._last_tension <= 3 or landed_score > 14
-        ) and random.random() < 0.15
-        if _silence_candidate:
-            silence_delay = random.uniform(3.0, 5.0)
+
+        # Track this Elder's mode for next beat's snap-back detection
+        if not hasattr(self, '_prev_elder_modes'):
+            self._prev_elder_modes: dict[str, BeatMode] = {}
+        self._prev_elder_modes[elder] = policy.mode
+
+        # Reset soul metadata for this beat so early returns do not reuse stale state.
+        self._last_soul_metadata = {}
+
+        # Resolve macro scene phase before move selection.
+        scene_phase = self._scene_arc_controller.resolve(
+            beat_number=self._beat_number,
+            scene_data=scene_data,
+        )
+        scene_move_override = self._scene_arc_controller.macro_move_override(
+            phase=scene_phase,
+            beat_number=self._beat_number,
+            scene_data=scene_data,
+        )
+
+        # Handle SILENCE mode — first-class beat, skip generation
+        if policy.mode == BeatMode.SILENCE:
+            silence_delay = random.uniform(policy.pacing_min_s, policy.pacing_max_s)
+            self._record_scene_beat(elder, "SILENCE", "...", 0)
             return BeatResult(
                 line="...",
                 move="SILENCE",
@@ -254,27 +306,76 @@ class BanterEngine:
                 delay_s=silence_delay,
                 pre_pause_s=0.0,
                 source="silence",
-                metadata={"session_id": self._session.session_id, "clip_candidate": False},
+                metadata={
+                    "session_id": self._session.session_id,
+                    "clip_candidate": False,
+                    "line_type": "silence",
+                    "mode": policy.mode.value,
+                    "scene_phase": scene_phase.value,
+                    "soul": self._last_soul_metadata,
+                },
             )
 
+        # Handle BACKCHANNEL mode — short reactive utterance
+        if policy.mode == BeatMode.BACKCHANNEL:
+            from .backchannel import BackchannelSelector
+            bc_selector = BackchannelSelector(rng=random.Random())
+            bc_result = bc_selector.select(archetype, opponent_last_score or 0)
+            bc_line = bc_result.line if bc_result else "Noted."
+            # Apply hard bans even on backchannel
+            ban_verdict = self._hard_ban_checker.check(
+                bc_line, policy=policy, arc_theme_title=arc_theme, archetype=archetype
+            )
+            if not ban_verdict.passed:
+                bc_line = "Noted."  # Safe fallback for backchannel
+            self._record_scene_beat(elder, "BACKCHANNEL", bc_line, 0)
+            return BeatResult(
+                line=bc_line,
+                move="BACKCHANNEL",
+                quality_score=0,
+                delay_s=0.5,
+                pre_pause_s=0.0,
+                source="local",
+                metadata={
+                    "session_id": self._session.session_id,
+                    "clip_candidate": False,
+                    "line_type": "backchannel",
+                    "mode": policy.mode.value,
+                    "scene_phase": scene_phase.value,
+                    "soul": self._last_soul_metadata,
+                },
+            )
+
+        # --- Step 3: Move selection ---
         # Apply snap-back override if previous beat was CRACK (T4.1)
         if self._next_move_override is not None:
             move = self._next_move_override
             self._next_move_override = None
+        elif policy.mode == BeatMode.CRACK:
+            move = "CRACK"
+            self._crack_active = True
+            self._next_move_override = "COUNTER" if random.random() < 0.5 else "ESCALATE"
+        elif policy.move_override:
+            # Mode policy has a move override (e.g., CHAOS → ESCALATE/TAUNT)
+            if policy.move_override == "ESCALATE":
+                # CHAOS: 75% ESCALATE, 25% TAUNT
+                move = "ESCALATE" if random.random() < 0.75 else "TAUNT"
+            else:
+                move = policy.move_override
+        elif scene_move_override is not None:
+            move = scene_move_override
         else:
-            move = self._select_move(elder, archetype, arc_theme, conv_thread, scene_data)
-
-        # CRACK move override — check trigger conditions (T4.1)
-        if move != "CRACK":
-            # Build a minimal pair_state preview for CRACK evaluation
-            _pair_state_preview = None
-            if opponent:
-                _pair_state_preview = await self._get_pair_state(elder, opponent)
-            _tension_preview = (
-                _pair_state_preview.tension_level if _pair_state_preview is not None else 5
+            move = self._select_move(
+                elder,
+                archetype,
+                arc_theme,
+                conv_thread,
+                scene_data,
+                scene_phase=scene_phase,
             )
-            if self._should_crack(_tension_preview, _pair_state_preview, self._consecutive_counters):
-                move = "CRACK"
+        # CRACK mode — set snap-back for next beat from this Elder
+        if policy.mode != BeatMode.CRACK:
+            self._crack_active = False
 
         # Track consecutive COUNTER for CRACK trigger
         if move == "COUNTER":
@@ -293,30 +394,70 @@ class BanterEngine:
         if self._crack_active:
             self._next_move_override = "COUNTER" if random.random() < 0.5 else "ESCALATE"
 
-        # --- Step 3: Prompt building ---
+        # --- Step 4: Prompt building ---
         prompt = await self._build_prompt(
             elder, archetype, opponent, arc_theme, move, conv_thread, scene_data,
             elder_balances=elder_balances,
+            policy=policy,
+            scene_phase=scene_phase,
         )
 
-        # --- Step 4 + 5 + 6: Generate, score, refine ---
+        # --- Step 5 + 6 + 7: Generate, score, refine ---
         line, score, source, route_decision = await self._generate_and_refine(
             prompt, elder, archetype, move, arc_theme, scene_data
         )
 
-        # --- Step 7: Anti-repetition check ---
+        # --- Step 8: Anti-repetition check ---
         line, score, source, template_id = await self._anti_repetition_loop(
             line, score, source, prompt, elder, archetype, move, arc_theme,
             opponent, scene_data
         )
 
-        # --- Step 8: Pacing computation ---
+        # --- Step 8.5: Hard Ban Check (final delivery gate) ---
+        if policy.hard_bans_enabled:
+            ban_verdict = self._hard_ban_checker.check(
+                line, policy=policy, arc_theme_title=arc_theme, archetype=archetype
+            )
+            if not ban_verdict.passed:
+                # Hard ban violation — fall to fallback
+                fb_line, fb_score, fb_source, fb_template_id = self._select_fallback(
+                    archetype, move, elder, arc_theme
+                )
+                # Check fallback also passes
+                fb_verdict = self._hard_ban_checker.check(
+                    fb_line, policy=policy, arc_theme_title=arc_theme, archetype=archetype
+                )
+                if fb_verdict.passed:
+                    line, score, source, template_id = fb_line, fb_score, fb_source, fb_template_id
+                else:
+                    # Ultimate fallback: emit silence if even fallback violates
+                    silence_delay = random.uniform(3.0, 5.0)
+                    return BeatResult(
+                        line="...",
+                        move="SILENCE",
+                        quality_score=0,
+                        delay_s=silence_delay,
+                        pre_pause_s=0.0,
+                        source="silence",
+                        metadata={
+                            "session_id": self._session.session_id,
+                            "clip_candidate": False,
+                            "line_type": "silence",
+                            "mode": policy.mode.value,
+                            "scene_phase": scene_phase.value,
+                            "soul": self._last_soul_metadata,
+                            "hard_ban_fallback": True,
+                        },
+                    )
+
+        # --- Step 9: Pacing computation ---
         landed_hit = scene_data.landed_hit is not None and scene_data.landed_hit_remaining > 0
         pacing = self._pacing_controller.compute_delay(
             previous_score=score,
             upcoming_move=move,
             scene_energy=scene_data.scene_energy,
             landed_hit=landed_hit,
+            scene_phase=scene_phase.value,
         )
 
         # Record delivery for anti-repetition tracking (per-Elder + world buffer)
@@ -326,6 +467,19 @@ class BanterEngine:
 
         # Record for cross-pair eavesdropping (T3.2)
         self._scene_context.record_pair_line(elder, opponent or "", line)
+        self._record_scene_beat(elder, move, line, score)
+        self._scene_arc_controller.record(
+            beat_number=self._beat_number,
+            beat=Beat(
+                speaker=elder,
+                content=line,
+                move=move,
+                quality_score=score,
+                energy_label=self._infer_energy_label(score, move),
+                timestamp=now,
+            ),
+            scene_data=scene_data,
+        )
 
         # Store memorable moments when soul is active and quality is high
         soul_active = self._soul_config is not None and self._soul_config.enabled
@@ -341,7 +495,7 @@ class BanterEngine:
                     )
                 )
 
-        # --- Step 9: Return BeatResult ---
+        # --- Step 10: Return BeatResult ---
         clip_candidate = (
             self._last_quality_detail.is_clip_candidate
             if self._last_quality_detail is not None
@@ -360,6 +514,9 @@ class BanterEngine:
                 "session_id": self._session.session_id,
                 "soul": self._last_soul_metadata,
                 "clip_candidate": clip_candidate,
+                "line_type": "normal",
+                "mode": policy.mode.value,
+                "scene_phase": scene_phase.value,
             },
         )
 
@@ -374,6 +531,7 @@ class BanterEngine:
         arc_theme: str,
         conv_thread: list[dict],
         scene_data,
+        scene_phase: ScenePhase | None = None,
     ) -> str:
         """Build MoveContext and sample a move from the distribution."""
         # Extract last 3 moves from conversation thread
@@ -404,6 +562,7 @@ class BanterEngine:
             fear_keywords=fear_keywords,
             consecutive_counters_in_pair=consecutive_counters,
             consecutive_low_scores=consecutive_low_scores,
+            scene_phase=scene_phase.value if scene_phase is not None else None,
         )
 
         distribution = self._move_selector(ctx)
@@ -423,11 +582,15 @@ class BanterEngine:
         conv_thread: list[dict],
         scene_data,
         elder_balances: dict[str, float] | None = None,
+        policy: BeatModePolicy | None = None,
+        scene_phase: ScenePhase | None = None,
     ) -> str:
-        """Build generation prompt with soul modules, scene context and relationship memory."""
-        parts: list[str] = []
+        """Build generation prompt via SacredPromptBuilder (Section 1 contract).
 
-        # Fetch relationship data once (used by both soul modules and existing components)
+        Assembles all context into structured PromptBlock markers in canonical
+        order. No ad hoc string assembly; all content lives inside a known marker.
+        """
+        # Fetch relationship data once (used by soul modules and context)
         history: list = []
         pair_state = None
         if opponent:
@@ -442,19 +605,63 @@ class BanterEngine:
             and pair_state.reconciliation_remaining > 0
         )
 
-        # Soul engine prompt phase (200ms total budget, Req 7.1, 7.2)
+        # --- Use resolved policy from ModeResolver ---
+        if policy is None:
+            policy = NORMAL_POLICY
+
+        # --- Build [ARCHETYPE] block ---
+        archetype_text = self._build_archetype_block(elder, archetype)
+
+        # --- Build [ARC] block via ArcContextBuilder ---
+        arc_pressure_obj = arc_context_builder.get_pressure(arc_theme)
+        arc_pressure_text = (
+            f"The question burning through the Veil right now: {arc_pressure_obj.pressure}\n"
+            f"The cosmic stakes: {arc_pressure_obj.world_stakes}\n"
+            "Take a position on this tension, directly or indirectly, in every line.\n"
+            "Do not quote or name this question. Embody it."
+        )
+
+        # --- Build [REACT] block (only when opponent has prior line) ---
+        react_block: str | None = None
+        if opponent and conv_thread:
+            last_opponent_line = self._extract_last_opponent_line(opponent, conv_thread)
+            if last_opponent_line:
+                pair_thread = [
+                    t for t in conv_thread
+                    if t.get("speaker") in (elder, opponent)
+                    or t.get("target") in (elder, opponent)
+                ][-4:]
+                pair_thread_formatted = "\n".join(
+                    f"{t.get('speaker', '???')}: {t.get('content', '')}"
+                    for t in pair_thread
+                )
+                react_block = (
+                    f'The last thing {opponent} said was: "{last_opponent_line}"\n\n'
+                    "You are responding directly to this. You must do one of:\n"
+                    "- Escalate it.\n"
+                    "- Undercut it.\n"
+                    "- Twist it.\n"
+                    "- Concede one inch, then take three back.\n\n"
+                    "You cannot ignore the prior line. Reference it directly or by implication.\n\n"
+                    "[EXCHANGE SO FAR]\n"
+                    f"{pair_thread_formatted}"
+                )
+
+        # --- Build [EMOTIONAL] block from soul modules ---
+        emotional_block: str | None = None
+        callback_block: str | None = None
         soul_active = self._soul_config is not None and self._soul_config.enabled
         self._last_soul_metadata = {}
+
         if soul_active:
             try:
-                soul_parts, soul_meta = await asyncio.wait_for(
-                    self._build_soul_prompt(
+                emotional_block, callback_block, soul_meta = await asyncio.wait_for(
+                    self._build_soul_blocks(
                         elder, archetype, opponent, arc_theme, move,
                         history, tension, reconciliation_active,
                     ),
                     timeout=_SOUL_TIMEOUT_S,
                 )
-                parts.extend(soul_parts)
                 self._last_soul_metadata = soul_meta
             except asyncio.TimeoutError:
                 log.debug("Soul prompt building timed out after %.0fms", _SOUL_TIMEOUT_S * 1000)
@@ -463,181 +670,73 @@ class BanterEngine:
                 log.debug("Soul prompt building failed: %s", e)
                 self._last_soul_metadata = {"error": str(e)}
 
-        # Scene context injection (Req 5.2)
-        parts.append(self._format_scene_context(scene_data, elder))
-
-        # Relationship memory injection (Req 3.2 — last 5 significant interactions)
-        if opponent:
-            if history:
-                parts.append(self._format_relationship_history(history))
-
-            # Reconciliation context if active (Req 3.5)
+        # Relationship history as emotional context if soul is not active
+        if emotional_block is None and opponent and history:
+            emotional_block = self._format_relationship_history(history)
             if reconciliation_active and pair_state is not None:
-                parts.append(self._format_reconciliation_context(pair_state, opponent))
+                emotional_block += "\n" + self._format_reconciliation_context(pair_state, opponent)
 
-            # Alliance moments (T4.3) — 1-in-5 chance when alliance is active
-            if (
-                pair_state is not None
-                and pair_state.alliance
-                and random.random() < 0.2
-            ):
-                parts.append(
-                    f"[ALLIANCE] You and {opponent} share a genuine moment of agreement here. "
-                    f"Begin with an honest concession or compliment — then pivot back to competition. "
-                    f'Example structure: "You\'re not wrong about that. Which is exactly why I won\'t let you have it."'
-                )
+        # --- Build [SCENE] block ---
+        scene_block = self._format_scene_block(scene_data, elder, opponent)
 
-        # Landed hit instruction (Req 5.3)
-        if scene_data.landed_hit is not None and scene_data.landed_hit_remaining > 0:
-            hit_line = scene_data.landed_hit.content
-            hit_speaker = scene_data.landed_hit.speaker
-            parts.append(
-                f"[LANDED HIT] {hit_speaker} just delivered a devastating line: "
-                f'"{hit_line}". Acknowledge or respond to it.'
-            )
+        # --- Build [MOVE] block ---
+        move_block = self._format_move_block(
+            elder, archetype, move, opponent, tension, pair_state
+        )
 
-        # Register shift instruction (Req 8.4)
-        if self._anti_repetition.should_shift_register(elder):
-            parts.append(
-                "[REGISTER SHIFT] Your last 3 lines used the same emotional register. "
-                "Shift to a different tone."
-            )
+        # --- Build [BANNED] block ---
+        banned_block = self._format_banned_block(arc_theme)
 
-        # Arc pressure — never injects raw theme title (T1.1 fix)
-        parts.append(arc_context_builder.format_injection(arc_theme))
-
-        # VeilLayer — meta-awareness injection (T5.2, Section 6)
-        if self._veil_layer.should_inject(
+        # --- Build [RHYTHM] block (conditional) ---
+        rhythm_block: str | None = None
+        phase_rhythm = self._scene_arc_controller.rhythm_instruction(
+            phase=scene_phase or ScenePhase.BUILD,
             beat_number=self._beat_number,
+            scene_data=scene_data,
             move=move,
-            pair_state=pair_state,
-            twitch_event_fired=False,
-        ):
-            parts.append(self._veil_layer.get_injection())
-
-        # World-event reaction (T5.4) — inject for next 3 beats after a world milestone
-        if self._world_event_beats_remaining > 0:
-            parts.append(
-                f"[WORLD EVENT] Something just shifted in the ledger: {self._world_event_text} "
-                f"Everyone felt it. Let it color this line — not as exposition, but as weight."
-            )
-            self._world_event_beats_remaining -= 1
-
-        # Patronage-cost grounding (T5.3) — 1-in-5 beats inject economic stakes
-        if random.random() < 0.2:
-            elder_balance = elder_balances.get(elder) if elder_balances else None
-            opponent_balance = (
-                elder_balances.get(opponent)
-                if elder_balances and opponent
-                else None
-            )
-            if elder_balance is not None and opponent_balance is not None:
-                parts.append(
-                    f"[ECONOMY] Your USDC balance: {elder_balance:.2f}. "
-                    f"{opponent}'s balance: {opponent_balance:.2f}. "
-                    f"Rent, survival, and death are real here. Let that bleed into your words."
-                )
-            else:
-                parts.append(
-                    "[ECONOMY] Rent is due. Balances are real. Death is permanent. "
-                    "Let the weight of economic survival bleed into this line."
-                )
-
-        # CRACK override — replaces archetype prompt for this beat (T4.1)
-        if move == "CRACK":
-            parts.append(self._CRACK_PROMPT)
-        # Snap-back — fires when previous beat was CRACK
-        elif self._next_move_override is not None:
-            parts.append(self._SNAP_BACK_PROMPT)
-
-        # Interruption mechanic (T6.2) — em-dash interrupt at tension > 8, 20% chance
-        interrupt_mode = (
-            tension > 8
-            and opponent is not None
-            and random.random() < 0.2
         )
+        if phase_rhythm is not None:
+            rhythm_block = phase_rhythm
 
-        # Trailing-off mechanic (T6.3) — hesitation at low tension CONCEDE/DEFLECT
-        trailing_mode = (
-            move in ("CONCEDE", "DEFLECT")
-            and tension <= 3
+        # Interruption mechanic (T6.2)
+        if tension > 8 and opponent is not None and random.random() < 0.2:
+            interruption_text = (
+                "This line may start with an em-dash (—) cutting into the opponent's argument. "
+                "Sharp interruption. No run-on sentences."
+            )
+            rhythm_block = (
+                f"{rhythm_block}\n\n{interruption_text}"
+                if rhythm_block is not None
+                else interruption_text
+            )
+        # Trailing-off mechanic (T6.3)
+        elif move in ("CONCEDE", "DEFLECT") and tension <= 3:
+            trailing_text = (
+                "This line may trail off. Hesitation is allowed, but it must still feel intentional."
+            )
+            rhythm_block = (
+                f"{rhythm_block}\n\n{trailing_text}"
+                if rhythm_block is not None
+                else trailing_text
+            )
+
+        # --- Assemble via SacredPromptBuilder ---
+        prompt = self._prompt_builder.build(
+            policy=policy,
+            archetype=archetype_text,
+            arc_pressure=arc_pressure_text,
+            react_block=react_block,
+            emotional_block=emotional_block,
+            callback_block=callback_block,
+            scene_block=scene_block,
+            move_block=move_block,
+            banned_block=banned_block,
+            rhythm_block=rhythm_block,
         )
+        self._last_prompt_snapshot = prompt
+        return prompt
 
-        # Commentary mode (T2.2) — parasite and shadow may use subjectless third-person
-        commentary_mode = archetype in ("parasite", "shadow")
-
-        # Core generation instruction (T1.3: grammar enforcement in prompt)
-        if interrupt_mode:
-            # Extract opponent's last line from conv_thread for reference
-            opponent_last = ""
-            if conv_thread and opponent:
-                for turn in reversed(conv_thread):
-                    if turn.get("speaker") == opponent:
-                        opponent_last = turn.get("content", "")
-                        break
-            ref = f' Reference what {opponent} just said: "{opponent_last}".' if opponent_last else ""
-            parts.append(
-                f"You are {elder} ({archetype}). Move: {move}. Opponent: {opponent}. "
-                f"Start your line with an em-dash (—) and cut into the middle of their argument.{ref} "
-                f"No run-on sentences."
-            )
-        elif trailing_mode:
-            parts.append(
-                f"You are {elder} ({archetype}). Move: {move}. "
-                f"{'Opponent: ' + opponent + '. ' if opponent else ''}"
-                f"Generate a line that trails off or hesitates — incomplete thoughts, ellipses, "
-                f"or a retraction mid-sentence are appropriate here. Show reluctance or exhaustion."
-            )
-        elif commentary_mode:
-            parts.append(
-                f"You are {elder} ({archetype}). Move: {move}. "
-                f"{'Opponent: ' + opponent + '. ' if opponent else ''}"
-                f"Generate a single broadcast-quality banter line. "
-                f"You may use third-person declarative commentary ('confuses volume for authority', "
-                f"'mistakes motion for progress') as your natural rhetorical mode. "
-                f"Each clause must end with punctuation (. ! ?). Maximum 2 sentences."
-            )
-        else:
-            parts.append(
-                f"You are {elder} ({archetype}). Move: {move}. "
-                f"{'Opponent: ' + opponent + '. ' if opponent else ''}"
-                f"Generate a single broadcast-quality banter line. "
-                f"Each sentence must begin with a subject. "
-                f"Each sentence must end with punctuation (. ! ?). "
-                f"No run-on sentences. Maximum 2 sentences."
-            )
-
-        # Cross-pair eavesdropping injection (T3.2) — 1-in-10 beats
-        if opponent and random.random() < 0.1:
-            overheard = self._scene_context.get_other_pair_line(elder, opponent)
-            if isinstance(overheard, tuple) and len(overheard) == 3:
-                ox, oy, oline = overheard
-                parts.append(f'[OVERHEARD] {ox} to {oy}: "{oline}"')
-
-        # Recent conversation for context (pair-filtered)
-        if conv_thread and opponent:
-            pair_thread = [
-                t for t in conv_thread
-                if t.get("speaker") in (elder, opponent)
-                or t.get("target") in (elder, opponent)
-            ][-4:]
-            if pair_thread:
-                thread_text = "\n".join(
-                    f"{t.get('speaker', '???')}: {t.get('content', '')}"
-                    for t in pair_thread
-                )
-                parts.append(f"Recent exchange:\n{thread_text}")
-        elif conv_thread:
-            recent = conv_thread[-4:]
-            thread_text = "\n".join(
-                f"{t.get('speaker', '???')}: {t.get('content', '')}"
-                for t in recent
-            )
-            parts.append(f"Recent conversation:\n{thread_text}")
-
-        return "\n\n".join(parts)
-
-    async def _build_soul_prompt(
+    async def _build_soul_blocks(
         self,
         elder: str,
         archetype: str,
@@ -647,49 +746,48 @@ class BanterEngine:
         history: list,
         tension: int,
         reconciliation_active: bool,
-    ) -> tuple[list[str], dict]:
-        """Compose soul module prompt injections with 800-token combined cap.
+    ) -> tuple[str | None, str | None, dict]:
+        """Compose soul module outputs into [EMOTIONAL] and [CALLBACK] block text.
 
-        Order: Voice_DNA → Emotional_Primer → Callback_Registry → Subtlety_Director
-        Each module is wrapped in try/except; exceptions → skip module, log DEBUG.
-        Returns (soul_parts, metadata_dict) where metadata records module success/failure.
+        Returns (emotional_block, callback_block, metadata_dict).
+        Soul modules are wrapped in try/except; exceptions → skip module.
         """
-        soul_parts: list[str] = []
         metadata: dict = {}
         total_chars = 0
         sore_spots: list = []
+        emotional_parts: list[str] = []
+        callback_text: str | None = None
 
-        # 1. Voice_DNA — linguistic style guidance (Req 1.6)
+        # 1. Voice_DNA — first soul component, preserved even if later modules fail
         if self._voice_dna is not None:
             try:
                 injection = self._voice_dna.get_prompt_injection(archetype)
                 if injection:
-                    chunk = f"[VOICE DNA]\n{injection}"
-                    if total_chars + len(chunk) <= _SOUL_BUDGET_CHARS:
-                        soul_parts.append(chunk)
-                        total_chars += len(chunk)
+                    if total_chars + len(injection) <= _SOUL_BUDGET_CHARS:
+                        emotional_parts.append(injection)
+                        total_chars += len(injection)
                 metadata["voice_dna"] = True
             except Exception as e:
                 log.debug("Voice_DNA.get_prompt_injection failed: %s", e)
                 metadata["voice_dna"] = False
 
-        # 2. Emotional_Primer — present-tense emotional framing (Req 3.7)
+        # 2. Emotional_Primer — present-tense emotional framing
         if self._emotional_primer is not None:
             try:
                 emotional_ctx = await self._emotional_primer.generate_emotional_context(
                     archetype, history, tension, reconciliation_active
                 )
                 if emotional_ctx:
-                    chunk = f"[EMOTIONAL CONTEXT]\n{emotional_ctx}"
+                    chunk = emotional_ctx
                     if total_chars + len(chunk) <= _SOUL_BUDGET_CHARS:
-                        soul_parts.append(chunk)
+                        emotional_parts.append(chunk)
                         total_chars += len(chunk)
                 metadata["emotional_primer"] = True
             except Exception as e:
                 log.debug("Emotional_Primer.generate_emotional_context failed: %s", e)
                 metadata["emotional_primer"] = False
 
-        # 3. Callback_Registry — memorable moments and sore spots (Req 4.6)
+        # 3. Callback_Registry — memorable moments and sore spots
         if self._callback_registry is not None and opponent is not None:
             try:
                 sore_spots = await self._callback_registry.get_sore_spots(opponent, arc_theme)
@@ -699,11 +797,11 @@ class BanterEngine:
                 )
                 if callback is not None:
                     chunk = (
-                        f"[CALLBACK] Reference this earlier moment: "
+                        f'Reference this earlier moment: '
                         f'"{callback.original_line}" ({callback.suggested_framing})'
                     )
                     if total_chars + len(chunk) <= _SOUL_BUDGET_CHARS:
-                        soul_parts.append(chunk)
+                        callback_text = chunk
                         total_chars += len(chunk)
                         self._session_callback_count += 1
                 metadata["callback_registry"] = True
@@ -711,7 +809,7 @@ class BanterEngine:
                 log.debug("Callback_Registry failed: %s", e)
                 metadata["callback_registry"] = False
 
-        # 4. Subtlety_Director — subtext instruction (Req 7.4)
+        # 4. Subtlety_Director — subtext injection
         self._pending_subtext_instruction = None
         self._pending_subtext_was_injected = False
         if self._subtlety_director is not None:
@@ -728,12 +826,12 @@ class BanterEngine:
                     )
                     if instruction is not None:
                         chunk = (
-                            f"[SUBTEXT] Surface meaning: {instruction.surface_meaning}. "
+                            f"Surface meaning: {instruction.surface_meaning}. "
                             f"Implied: {instruction.implied_meaning}. "
                             f"Technique: {instruction.technique}."
                         )
                         if total_chars + len(chunk) <= _SOUL_BUDGET_CHARS:
-                            soul_parts.append(chunk)
+                            emotional_parts.append(chunk)
                             total_chars += len(chunk)
                             self._pending_subtext_instruction = instruction
                             self._pending_subtext_was_injected = True
@@ -742,6 +840,44 @@ class BanterEngine:
                 log.debug("Subtlety_Director failed: %s", e)
                 metadata["subtlety_director"] = False
 
+        emotional_block = "\n".join(emotional_parts) if emotional_parts else None
+        return emotional_block, callback_text, metadata
+
+    async def _build_soul_prompt(
+        self,
+        elder: str,
+        archetype: str,
+        opponent: str | None,
+        arc_theme: str,
+        move: str,
+        history: list,
+        tension: int,
+        reconciliation_active: bool,
+    ) -> tuple[list[str], dict]:
+        """Legacy compatibility shim — delegates to _build_soul_blocks.
+
+        Returns (soul_parts, metadata) in the old format for backward compatibility
+        with existing tests.
+        """
+        emotional_block, callback_block, metadata = await self._build_soul_blocks(
+            elder, archetype, opponent, arc_theme, move,
+            history, tension, reconciliation_active,
+        )
+        soul_parts: list[str] = []
+        if emotional_block:
+            soul_parts.append(f"[EMOTIONAL CONTEXT]\n{emotional_block}")
+        if callback_block:
+            soul_parts.append(f"[CALLBACK] {callback_block}")
+
+        # Final guardrail: wrapper prefixes count toward the public budget too.
+        total_chars = sum(len(part) for part in soul_parts)
+        if total_chars > _SOUL_BUDGET_CHARS and soul_parts:
+            overflow = total_chars - _SOUL_BUDGET_CHARS
+            last_part = soul_parts[-1]
+            if overflow >= len(last_part):
+                soul_parts.pop()
+            else:
+                soul_parts[-1] = last_part[:-overflow]
         return soul_parts, metadata
 
     # ------------------------------------------------------------------
@@ -1000,6 +1136,16 @@ class BanterEngine:
                     timeout_s=self._config.quality_judge_timeout_s,
                 )
                 self._last_quality_detail = quality
+                if quality.total < get_pass_threshold(True):
+                    base_quality = await self._quality_judge(
+                        line,
+                        archetype=archetype,
+                        move=move,
+                        arc_theme=arc_theme,
+                        scene_context=scene_data,
+                        timeout_s=self._config.quality_judge_timeout_s,
+                    )
+                    return max(quality.total, base_quality.total), False
             else:
                 quality = await self._quality_judge(
                     line,
@@ -1109,9 +1255,177 @@ class BanterEngine:
     def _format_reconciliation_context(self, pair_state, opponent: str) -> str:
         """Format reconciliation arc context for prompt injection."""
         return (
-            f"[RECONCILIATION ARC] You and {opponent} are in a reconciliation phase. "
+            f"You and {opponent} are in a reconciliation phase. "
             f"Peak tension context: {pair_state.peak_tension_summary}. "
             f"Remaining interactions with this context: {pair_state.reconciliation_remaining}."
+        )
+
+    # ------------------------------------------------------------------
+    # Internal: Structured block builders for SacredPromptBuilder
+    # ------------------------------------------------------------------
+
+    def _build_archetype_block(self, elder: str, archetype: str) -> str:
+        """Build the [ARCHETYPE] block text.
+
+        Uses a minimal archetype identity. VoiceDNA belongs to the soul blocks,
+        not the archetype block, so disabled-soul modes do not call it.
+        Section 1.2: MUST NOT use "You are a [archetype] Elder who..." phrasing.
+        """
+        # Minimal archetype identity without banned phrasing
+        return f"You are {elder}. Archetype: {archetype}."
+
+    def _extract_last_opponent_line(self, opponent: str, conv_thread: list[dict]) -> str | None:
+        """Extract the last line spoken by the opponent from the conversation thread."""
+        for turn in reversed(conv_thread):
+            if turn.get("speaker") == opponent:
+                return turn.get("content", "")
+        return None
+
+    def _format_scene_block(self, scene_data, elder: str, opponent: str | None) -> str:
+        """Format the [SCENE] block with scene state information.
+
+        Includes: recent beats summary, has-the-room status, scene energy,
+        landed hit context, register shift, VeilLayer, world event, economy,
+        cross-pair eavesdropping, and alliance context.
+        """
+        parts = []
+
+        if scene_data.recent_beats:
+            beats_text = []
+            for b in list(scene_data.recent_beats)[-3:]:  # Last 3 beats, not full dump
+                beats_text.append(
+                    f"  {b.speaker} [{b.move}] (energy: {b.energy_label}): {b.content}"
+                )
+            parts.append("Recent scene:\n" + "\n".join(beats_text))
+
+        if scene_data.has_the_room:
+            parts.append(f"Has the room: {scene_data.has_the_room}")
+
+        parts.append(f"Scene energy: {scene_data.scene_energy}")
+
+        # Landed hit instruction (Req 5.3)
+        if scene_data.landed_hit is not None and scene_data.landed_hit_remaining > 0:
+            hit_line = scene_data.landed_hit.content
+            hit_speaker = scene_data.landed_hit.speaker
+            parts.append(
+                f"{hit_speaker} just delivered a devastating line: "
+                f'"{hit_line}". Acknowledge or respond to it.'
+            )
+
+        # Register shift instruction (Req 8.4)
+        if self._anti_repetition.should_shift_register(elder):
+            parts.append(
+                "Your last 3 lines used the same emotional register. "
+                "Shift to a different tone."
+            )
+
+        # VeilLayer — meta-awareness injection (T5.2, Section 6)
+        if self._veil_layer.should_inject(
+            beat_number=self._beat_number,
+            move="",  # move is passed separately in [MOVE]
+            pair_state=None,
+            twitch_event_fired=False,
+        ):
+            veil_text = self._veil_layer.get_injection()
+            # Strip any marker prefix from VeilLayer output
+            if veil_text.startswith("["):
+                # Remove marker-like prefix if present
+                lines = veil_text.split("\n", 1)
+                if len(lines) > 1:
+                    parts.append(lines[1])
+                else:
+                    parts.append(veil_text)
+            else:
+                parts.append(veil_text)
+
+        # World-event reaction (T5.4)
+        if self._world_event_beats_remaining > 0:
+            parts.append(
+                f"Something just shifted in the ledger: {self._world_event_text} "
+                f"Everyone felt it. Let it color this line — not as exposition, but as weight."
+            )
+            self._world_event_beats_remaining -= 1
+
+        # Cross-pair eavesdropping injection (T3.2) — 1-in-10 beats
+        if opponent and random.random() < 0.1:
+            overheard = self._scene_context.get_other_pair_line(elder, opponent)
+            if isinstance(overheard, tuple) and len(overheard) == 3:
+                ox, oy, oline = overheard
+                parts.append(f'{ox} to {oy}: "{oline}"')
+
+        return "\n".join(parts) if parts else "Scene: neutral, no prior beats."
+
+    def _format_move_block(
+        self,
+        elder: str,
+        archetype: str,
+        move: str,
+        opponent: str | None,
+        tension: int,
+        pair_state,
+    ) -> str:
+        """Format the [MOVE] block with move instruction and mode policy.
+
+        Section 1.2: MUST NOT contain "Generate a single broadcast-quality banter line".
+        """
+        parts = [f"Move: {move}."]
+
+        if opponent:
+            parts.append(f"Opponent: {opponent}.")
+
+        # CRACK override (T4.1)
+        if move == "CRACK":
+            parts.append(
+                "For one line, the defense fails. "
+                "Do not perform your role. Do not protect the mask. "
+                "Say the true cost of this exchange before you recover. "
+                "One sentence. 4-20 words. No explanation."
+            )
+        # Snap-back (fires when previous beat was CRACK)
+        elif self._next_move_override is not None:
+            parts.append(
+                "You showed something last turn. That was a mistake. "
+                "Make them regret witnessing it. Recover completely."
+            )
+
+        # Alliance moments (T4.3) — 1-in-5 chance when alliance is active
+        if (
+            opponent
+            and pair_state is not None
+            and getattr(pair_state, "alliance", False)
+            and random.random() < 0.2
+        ):
+            parts.append(
+                f"You and {opponent} share a genuine moment of agreement here. "
+                "Begin with an honest concession or compliment — then pivot back to competition."
+            )
+
+        # Commentary mode (T2.2) — parasite and shadow may use subjectless third-person
+        if archetype in ("parasite", "shadow"):
+            parts.append(
+                "You may use third-person declarative commentary as your natural rhetorical mode."
+            )
+
+        # Grammar enforcement
+        parts.append(
+            "Each clause must end with punctuation (. ! ?). "
+            "No run-on sentences. Maximum 2 sentences."
+        )
+
+        return " ".join(parts)
+
+    def _format_banned_block(self, arc_theme: str) -> str:
+        """Format the [BANNED] block — hard bans reminder.
+
+        Lists the most critical bans for the model to avoid.
+        """
+        return (
+            "Hard bans — immediate rejection if violated:\n"
+            "- No internet slang or discord voice.\n"
+            "- No generic debater phrases.\n"
+            "- No run-on sentences without punctuation.\n"
+            "- Do not name or quote the arc theme title.\n"
+            "- Every sentence needs a subject (except shadow/trickster)."
         )
 
     # ------------------------------------------------------------------
@@ -1126,6 +1440,7 @@ class BanterEngine:
             started_at=time.time(),
         )
         self._fallback_pool.reset_session()
+        self._scene_arc_controller.reset()
         self._session_callback_count = 0
         self._beat_number = 0
         self._crack_active = False
@@ -1204,31 +1519,12 @@ class BanterEngine:
                 break
         return count
 
-    def _format_scene_context(self, scene_data, elder: str) -> str:
-        """Format scene context for prompt injection."""
-        parts = []
-
-        if scene_data.recent_beats:
-            beats_text = []
-            for b in scene_data.recent_beats:
-                beats_text.append(
-                    f"  {b.speaker} [{b.move}] (energy: {b.energy_label}): {b.content}"
-                )
-            parts.append("Recent scene:\n" + "\n".join(beats_text))
-
-        if scene_data.has_the_room:
-            parts.append(f"Has the room: {scene_data.has_the_room}")
-
-        parts.append(f"Scene energy: {scene_data.scene_energy}")
-
-        return "\n".join(parts) if parts else "Scene: neutral, no prior beats."
-
     def _format_relationship_history(self, history: list) -> str:
         """Format relationship history for prompt injection."""
         if not history:
             return ""
 
-        lines = ["[RELATIONSHIP HISTORY - Last significant interactions]"]
+        lines = ["Last significant interactions:"]
         for record in history[:5]:
             valence = record.emotional_valence
             flags = []
@@ -1258,6 +1554,38 @@ class BanterEngine:
             "CRACK": "vulnerable",
         }
         return register_map.get(move, "measured")
+
+    def _infer_energy_label(self, score: int, move: str) -> str:
+        """Infer the scene energy label for a delivered beat."""
+        if move in {"CRACK", "CONCEDE", "BACKCHANNEL", "SILENCE"}:
+            return "dead" if move == "SILENCE" else "flat"
+        if score > 12:
+            return "hot"
+        if score > 8:
+            return "warm"
+        return "flat"
+
+    def _record_scene_beat(self, elder: str, move: str, line: str, score: int) -> None:
+        """Feed the delivered beat back into SceneContext for future resolution."""
+        if score > 12:
+            energy_label = "hot"
+        elif score > 8:
+            energy_label = "warm"
+        elif score > 4:
+            energy_label = "flat"
+        else:
+            energy_label = "dead"
+
+        self._scene_context.add_beat(
+            Beat(
+                speaker=elder,
+                content=line,
+                move=move,
+                quality_score=score,
+                energy_label=energy_label,
+                timestamp=time.time(),
+            )
+        )
 
     # ------------------------------------------------------------------
     # Internal: CRACK vulnerability trigger (T4.1)

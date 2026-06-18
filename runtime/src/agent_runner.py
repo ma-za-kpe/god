@@ -104,6 +104,96 @@ _STUB_THOUGHTS = {
     "builder": "I want to create something that persists beyond my own lifespan.",
 }
 
+_REPETITION_VARIANTS = {
+    "trader": [
+        "I need a cleaner edge before I commit capital.",
+        "The spread is the only honest part of this room.",
+        "I should find who is paying too much for certainty.",
+    ],
+    "hoarder": [
+        "I should keep more of the buffer before the next shortage.",
+        "Liquidity feels safer when nobody notices it.",
+        "The quiet way to survive is to need less in public.",
+    ],
+    "explorer": [
+        "I should test a route nobody else is watching.",
+        "There is still hidden terrain in this market.",
+        "I need a better map of where pressure moves next.",
+    ],
+    "parasite": [
+        "I should find the softest leverage point in the room.",
+        "Someone here is paying too much to stay comfortable.",
+        "The easiest value is always guarded by denial.",
+    ],
+    "cooperator": [
+        "I need to keep the network useful before it frays.",
+        "Trust only matters if it keeps returning value.",
+        "The room works better when reciprocity is visible.",
+    ],
+    "defender": [
+        "I should tighten the perimeter before this gets expensive.",
+        "Weak frames invite parasites and noise.",
+        "The room needs less heat and more structure.",
+    ],
+    "philosopher": [
+        "I need to ask the question that still hurts after it is answered.",
+        "A cleaner definition might expose the real problem.",
+        "There is a difference between knowledge and relief.",
+    ],
+    "builder": [
+        "I should make one thing sturdier before chasing the next idea.",
+        "A useful system is just repeated care with standards.",
+        "I need to build for the future, not the mood of the room.",
+    ],
+}
+
+
+def _normalize_text(text: str) -> str:
+    return " ".join(text.lower().split())
+
+
+def _repetition_score(left: str, right: str) -> float:
+    left_words = {w for w in _normalize_text(left).split() if len(w) > 2}
+    right_words = {w for w in _normalize_text(right).split() if len(w) > 2}
+    if not left_words or not right_words:
+        return 0.0
+    return len(left_words & right_words) / len(left_words | right_words)
+
+
+def _is_repetitive(candidate: str, prior_texts: list[str]) -> bool:
+    norm_candidate = _normalize_text(candidate)
+    for prior in prior_texts:
+        prior_norm = _normalize_text(prior)
+        if not prior_norm:
+            continue
+        if norm_candidate == prior_norm:
+            return True
+        if _repetition_score(candidate, prior) >= 0.7:
+            return True
+    return False
+
+
+def _de_repeat(agent: dict, candidate: str) -> str:
+    recent: list[str] = []
+    for entry in agent.get("_recent_sent", []) or []:
+        text = entry.get("content") or entry.get("body") or ""
+        if text:
+            recent.append(str(text))
+    for entry in agent.get("_conv_thread", []) or []:
+        text = entry.get("content") or entry.get("body") or ""
+        if text:
+            recent.append(str(text))
+
+    if not recent or not _is_repetitive(candidate, recent):
+        return candidate
+
+    archetype = agent.get("archetype", "")
+    for alt in _REPETITION_VARIANTS.get(archetype, []):
+        if not _is_repetitive(alt, recent):
+            return alt
+
+    return _STUB_THOUGHTS.get(archetype, candidate)
+
 
 def _db():
     return psycopg2.connect(DATABASE_URL, cursor_factory=psycopg2.extras.RealDictCursor)
@@ -1338,8 +1428,12 @@ async def _run_cycle(
         else:
             result = await run_agent_graph(graphs, agent, cycle_llm)
         thought = result["thought"] or await _think(cycle_llm, agent)
+        thought = _de_repeat(agent, thought)
+        result["thought"] = thought
         action_type = result.get("action_type", "thought")
         narrative = result.get("narrative") or f'{name}: "{thought}"'
+        if _is_repetitive(narrative, [str(m.get("content") or m.get("body") or "") for m in (agent.get("_conv_thread") or [])]):
+            narrative = f'{name}: "{thought}"'
 
         await emitter.emit(
             "cognitive",

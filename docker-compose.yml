@@ -245,6 +245,16 @@ services:
       - SOUL_NFT_ADDRESS=${SOUL_NFT_ADDRESS:-}
       - USDC_ADDRESS=${USDC_ADDRESS:-}
       - CREATOR_PRIVATE_KEY=${CREATOR_PRIVATE_KEY:-}
+      # Avatar Genesis Pipeline
+      - COMFYUI_ENDPOINT=${COMFYUI_ENDPOINT:-http://comfyui:8188}
+      - TTS_ENDPOINT=${TTS_ENDPOINT:-http://fish-speech:8080}
+      - PIPELINE_TIMEOUT_SECONDS=${PIPELINE_TIMEOUT_SECONDS:-300}
+      - COMFYUI_CONCURRENCY=${COMFYUI_CONCURRENCY:-2}
+      - TTS_CONCURRENCY=${TTS_CONCURRENCY:-4}
+      - CRACK_EXPRESSION_DURATION_SECONDS=${CRACK_EXPRESSION_DURATION_SECONDS:-25}
+      - FLINCH_EXPRESSION_DURATION_SECONDS=${FLINCH_EXPRESSION_DURATION_SECONDS:-8}
+      - AVATAR_EVOLUTION_ENABLED=${AVATAR_EVOLUTION_ENABLED:-true}
+      - AVATAR_GENESIS_ENABLED=${AVATAR_GENESIS_ENABLED:-true}
       # Optional cloud LLM fallbacks
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
@@ -268,6 +278,64 @@ services:
       nats:
         condition: service_healthy
     restart: unless-stopped
+
+  # ─── Avatar Genesis: ComfyUI (Flux image generation) ──────────────────
+
+  comfyui:
+    image: ghcr.io/ai-dock/comfyui:latest
+    container_name: god-comfyui
+    environment:
+      - CLI_ARGS=--listen 0.0.0.0 --port 8188
+    volumes:
+      - comfyui_models:/workspace/ComfyUI/models
+      - comfyui_output:/workspace/ComfyUI/output
+      - comfyui_input:/workspace/ComfyUI/input
+    ports:
+      - "8188:8188"
+    networks:
+      - god-net
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8188/system_stats || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+
+  # ─── Avatar Genesis: Fish Speech (TTS voice cloning) ─────────────────
+
+  fish-speech:
+    image: fishaudio/fish-speech:latest
+    container_name: god-fish-speech
+    command: ["--listen", "0.0.0.0:8080"]
+    volumes:
+      - fish_speech_models:/app/models
+      - ./runtime/seed_utterances:/app/utterances:ro
+    ports:
+      - "8090:8080"
+    networks:
+      - god-net
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8080/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
 
   # ─── Observer Website ────────────────────────────────────────────────
   # Stub: serves index.html with a live event feed polling the runtime.
@@ -316,3 +384,7 @@ volumes:
   nats_data:
   redis_data:
   postgres_data:
+  comfyui_models:
+  comfyui_output:
+  comfyui_input:
+  fish_speech_models:

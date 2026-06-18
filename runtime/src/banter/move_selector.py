@@ -7,7 +7,6 @@ distribution system that accounts for context, history, and scene dynamics.
 from __future__ import annotations
 
 import logging
-from typing import Literal
 
 from .types import MoveContext, MoveDistribution
 
@@ -254,6 +253,23 @@ def compute_distribution(ctx: MoveContext) -> MoveDistribution:
                 reduction_each = boost_total / len(others)
                 for m in others:
                     dist[m] = max(0.0, dist[m] - reduction_each)
+
+    # --- Rule: Scene phase curve ---
+    # The macro-arc layer nudges the move distribution without replacing it.
+    if ctx.scene_phase == "climax":
+        dist["ESCALATE"] += 0.10
+        dist["TAUNT"] += 0.08
+        dist["COUNTER"] += 0.05
+    elif ctx.scene_phase == "release":
+        dist["CONCEDE"] += 0.12
+        dist["PIVOT"] += 0.10
+        dist["CALLBACK"] += 0.06
+        dist["QUESTION"] += 0.04
+    elif ctx.scene_phase == "reset":
+        dist["PIVOT"] += 0.12
+        dist["QUESTION"] += 0.08
+        dist["DEFLECT"] += 0.05
+        dist["CALLBACK"] += 0.04
 
     # --- Final enforcement ---
     dist = _enforce_minimums(dist, signature)
