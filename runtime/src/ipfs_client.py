@@ -28,6 +28,7 @@ class PinResult:
     ok: bool
     cid: str = ""
     pinned_nodes: int = 0
+    verified_nodes: int = 0
     required_nodes: int = MIN_PINS
     errors: tuple[str, ...] = field(default_factory=tuple)
 
@@ -53,6 +54,48 @@ async def _pin_once(
     if not cid:
         raise ValueError(f"no CID in response from {endpoint}")
     return cid
+
+
+async def _verify_once(
+    client: httpx.AsyncClient,
+    endpoint: str,
+    cid: str,
+) -> bool:
+    resp = await client.post(
+        f"{endpoint.rstrip('/')}/api/v0/pin/ls",
+        params={"arg": cid},
+    )
+    resp.raise_for_status()
+    body = resp.json()
+    keys = body.get("Keys") or body.get("keys") or {}
+    if isinstance(keys, dict) and cid in keys:
+        return True
+    pins = body.get("Pins") or body.get("pins") or []
+    if isinstance(pins, list) and cid in pins:
+        return True
+    if str(body.get("Type") or body.get("type") or "").lower() == "recursive":
+        return True
+    return False
+
+
+async def _verify_replication(
+    cid: str,
+    endpoints: list[str],
+) -> tuple[int, list[str]]:
+    verified = 0
+    errors: list[str] = []
+    async with httpx.AsyncClient(timeout=PIN_TIMEOUT_S) as client:
+        tasks = [_verify_once(client, ep, cid) for ep in endpoints]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+    for ep, result in zip(endpoints, results):
+        if isinstance(result, Exception):
+            msg = f"{ep}: {result}"
+            errors.append(msg)
+            log.debug(msg)
+            continue
+        if result:
+            verified += 1
+    return verified, errors
 
 
 async def pin_bytes(
@@ -92,8 +135,18 @@ async def pin_bytes(
         if cid_votes:
             cid, count = max(cid_votes.items(), key=lambda item: item[1])
             if count >= required:
-                log.info(f"IPFS pin ok: {cid} ({count}/{len(endpoints)} nodes)")
-                return PinResult(ok=True, cid=cid, pinned_nodes=count, required_nodes=required)
+                verified, verify_errors = await _verify_replication(cid, endpoints)
+                errors.extend(verify_errors)
+                if verified >= required:
+                    log.info(f"IPFS pin ok: {cid} ({verified}/{len(endpoints)} nodes verified)")
+                    return PinResult(
+                        ok=True,
+                        cid=cid,
+                        pinned_nodes=count,
+                        verified_nodes=verified,
+                        required_nodes=required,
+                    )
+                errors.append(f"verification failed: {verified}/{required} nodes confirmed")
 
         last_errors = errors or [f"attempt {attempt}: insufficient pins ({cid_votes})"]
         if attempt < attempts:
@@ -103,6 +156,7 @@ async def pin_bytes(
     return PinResult(
         ok=False,
         pinned_nodes=0,
+        verified_nodes=0,
         required_nodes=required,
         errors=tuple(last_errors),
     )

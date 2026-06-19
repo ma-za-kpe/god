@@ -21,10 +21,12 @@ async def test_pin_requires_minimum_nodes():
         return_value=["http://node-1", "http://node-2", "http://node-3"],
     ):
         with patch("ipfs_client._pin_once", side_effect=fake_pin):
-            result = await pin_bytes(data, min_pins=2, retries=1)
+            with patch("ipfs_client._verify_replication", return_value=(2, [])):
+                result = await pin_bytes(data, min_pins=2, retries=1)
     assert result.ok
     assert result.cid == "QmTestCID123"
     assert result.pinned_nodes == 2
+    assert result.verified_nodes == 2
 
 
 @pytest.mark.asyncio
@@ -36,9 +38,30 @@ async def test_pin_fails_when_insufficient_nodes():
 
     with patch("ipfs_client.ipfs_endpoints", return_value=["http://n1", "http://n2"]):
         with patch("ipfs_client._pin_once", side_effect=always_fail):
-            result = await pin_bytes(data, min_pins=2, retries=1)
+            with patch("ipfs_client._verify_replication", return_value=(0, [])):
+                result = await pin_bytes(data, min_pins=2, retries=1)
     assert not result.ok
     assert result.cid == ""
+
+
+@pytest.mark.asyncio
+async def test_pin_fails_when_replication_not_verified():
+    data = json.dumps({"soul_id": "test"}).encode()
+
+    async def fake_pin(client, endpoint, payload, filename):
+        return "QmTestCID123"
+
+    with patch(
+        "ipfs_client.ipfs_endpoints",
+        return_value=["http://node-1", "http://node-2", "http://node-3"],
+    ):
+        with patch("ipfs_client._pin_once", side_effect=fake_pin):
+            with patch("ipfs_client._verify_replication", return_value=(1, [])):
+                result = await pin_bytes(data, min_pins=2, retries=1)
+
+    assert not result.ok
+    assert result.cid == ""
+    assert result.verified_nodes == 0
 
 
 def test_endpoints_parses_comma_list():
