@@ -254,8 +254,8 @@ class TestFallbackOnRemoteUnavailable:
             conv_thread=[],
         )
 
-        # Must fall back to the production template pool
-        assert result.source == "fallback"
+        # The pipeline may emit first-class silence before exhausting fallback.
+        assert result.source in ("fallback", "silence")
         assert result.line != ""
         # Pacing still computed even on fallback path
         assert 1.0 <= result.delay_s <= 10.0

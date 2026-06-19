@@ -552,10 +552,8 @@ class TestProperty23ReconciliationArcDetection:
 
         # Apply de-escalation moves until we cross below 3
         tension = pair.tension_level
-        crossed_below_3 = False
         for _ in range(deescalate_count):
             if tension < _RECONCILIATION_LOW:
-                crossed_below_3 = True
                 break
             p = PairState(tension_level=tension, last_interaction_ts=time.time())
             tension = memory.update_tension(p, "CONCEDE")
@@ -582,8 +580,6 @@ class TestProperty23ReconciliationArcDetection:
     def test_no_reconciliation_if_never_above_7(self, start_tension: int):
         """No reconciliation arc if tension never exceeded 7."""
         memory = RelationshipMemory(pool=None)
-        pair = PairState(tension_level=start_tension, last_interaction_ts=time.time())
-
         # De-escalate to 0
         tension = start_tension
         for _ in range(15):

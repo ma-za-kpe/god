@@ -56,8 +56,6 @@ def main() -> int:
         return 1
 
     wallet = buyer.get("wallet_address") or "0xmock"
-    bal_before = float(buyer.get("balance_usdc") or 0)
-
     print(f"  seller={seller_id[:8]} service={name}")
     print(f"  buyer={buyer['soul_id'][:8]} wallet={wallet[:10]}…")
 

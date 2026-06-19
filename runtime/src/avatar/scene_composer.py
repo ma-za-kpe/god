@@ -6,9 +6,9 @@ from dataclasses import asdict, dataclass, field
 from typing import Any
 
 try:  # pragma: no cover - runtime package import path
-    from ..banter.types import Beat, PairState, SceneContextData
+    from ..banter.types import Beat, SceneContextData
 except ImportError:  # pragma: no cover - flat test path
-    from banter.types import Beat, PairState, SceneContextData
+    from banter.types import Beat, SceneContextData
 
 
 @dataclass(frozen=True)

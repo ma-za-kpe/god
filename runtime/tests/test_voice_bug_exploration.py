@@ -160,7 +160,7 @@ class TestSwallowedException:
         with caplog.at_level(logging.DEBUG):
             with patch("voice.engine.probe_url", side_effect=raise_key_error):
                 try:
-                    result = build_voice_state(snapshot)
+                    build_voice_state(snapshot)
                 except Exception:
                     pass  # Exception may propagate on unfixed code
 

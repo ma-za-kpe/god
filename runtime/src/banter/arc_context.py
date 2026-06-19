@@ -12,6 +12,7 @@ Contract: Section 3 — Arc Pressure
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 
 
@@ -80,11 +81,9 @@ def _derive_theme_noun(theme: str) -> str:
 
     Strategy:
     1. Check the explicit noun table first.
-    2. For multi-word unknown themes, extract first meaningful word
-       only if the full title has 3+ words.
-    3. For short themes (1-2 words), use a generic paraphrase to avoid
-       the title appearing in the output.
-    4. Validate: the derived noun must never equal the full readable title.
+    2. For unknown themes, fall back to a stable generic paraphrase instead of
+       reusing any title word. This avoids accidental leaks from arbitrary
+       user-provided themes and keeps the fallback pressure stable.
     """
     normalized = _normalize_theme(theme)
 
@@ -92,29 +91,7 @@ def _derive_theme_noun(theme: str) -> str:
     if normalized in _THEME_NOUN_TABLE:
         return _THEME_NOUN_TABLE[normalized]
 
-    # For unknown themes, derive a safe noun that is NOT the full title
-    stop_words = {"and", "or", "the", "of", "vs", "a", "an", "in", "on", "to", "for", "is", "with"}
-    words = normalized.replace("_", " ").split()
-    meaningful = [w for w in words if w.lower() not in stop_words]
-    full_title = normalized.replace("_", " ")
-
-    if len(meaningful) <= 1:
-        # Single meaningful word (or none) — the noun would equal the title.
-        # Use a generic paraphrase: "this tension" avoids leaking the title.
-        noun = "this tension"
-    elif len(meaningful) == 2:
-        # Two meaningful words — taking just one risks being too vague,
-        # but it's safe since one word != two-word title.
-        noun = meaningful[0]
-    else:
-        # 3+ meaningful words — first word is safe (one word != multi-word title)
-        noun = meaningful[0]
-
-    # Final safety check: the noun must not equal the full readable title
-    if noun == full_title:
-        noun = "this tension"
-
-    return noun
+    return "this tension"
 
 
 class ArcContextBuilder:
@@ -147,10 +124,11 @@ class ArcContextBuilder:
 
         # Hard contract assertion: result must never contain the raw title
         readable_title = normalized.replace("_", " ")
-        assert readable_title not in result.pressure.lower(), (
+        title_pattern = re.compile(rf"\b{re.escape(readable_title)}\b", re.IGNORECASE)
+        assert not title_pattern.search(result.pressure), (
             f"CONTRACT VIOLATION: theme title '{readable_title}' leaked into pressure"
         )
-        assert readable_title not in result.world_stakes.lower(), (
+        assert not title_pattern.search(result.world_stakes), (
             f"CONTRACT VIOLATION: theme title '{readable_title}' leaked into world_stakes"
         )
 

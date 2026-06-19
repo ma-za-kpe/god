@@ -142,6 +142,9 @@ class SubtletyDirector:
         self._technique_history: dict[str, deque[str]] = {}
         # Random instance for deterministic testing.
         self._rng = random.Random(seed)
+        # Deterministic throttle for high-tension injection so the long-run
+        # activation rate stays inside the contract across all seeds.
+        self._high_tension_calls = 0
 
     def should_inject_subtext(
         self,
@@ -193,9 +196,8 @@ class SubtletyDirector:
 
         # --- High tension rate reduction ---
         if tension > 8:
-            # Slightly under the nominal 20% target to keep the 100-trial
-            # property test inside its 30% upper bound across seeds.
-            return self._rng.random() < 0.18
+            self._high_tension_calls += 1
+            return self._high_tension_calls % 5 == 0
 
         return True
 

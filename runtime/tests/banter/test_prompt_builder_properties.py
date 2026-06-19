@@ -288,11 +288,34 @@ class TestProperty4ArcPressure:
         builder = ArcContextBuilder()
         pressure = builder.get_pressure(theme.strip())
         readable = theme.strip().lower().replace(" ", "_").replace("-", "_").replace("_", " ")
+        stop_words = {
+            "this",
+            "that",
+            "the",
+            "and",
+            "or",
+            "for",
+            "with",
+            "into",
+            "from",
+            "when",
+            "what",
+            "who",
+            "why",
+            "how",
+            "you",
+            "your",
+            "our",
+            "their",
+        }
+        terms = [term for term in readable.split() if len(term) >= 4 and term not in stop_words]
+        if not terms:
+            return
 
-        # The full theme title should not appear in pressure
-        assert readable not in pressure.pressure.lower(), (
-            f"Theme '{readable}' leaked into pressure: {pressure.pressure}"
-        )
+        pressure_text = pressure.pressure.lower()
+        assert not any(
+            re.search(rf"\b{re.escape(term)}\b", pressure_text) for term in terms
+        ), f"Theme '{readable}' leaked into pressure: {pressure.pressure}"
 
 
 # ---------------------------------------------------------------------------

@@ -11,7 +11,6 @@ import uuid
 from dataclasses import asdict, dataclass, field
 from typing import Any
 
-import httpx
 
 try:  # pragma: no cover - runtime package import path
     from ..owned_graph import OwnedGraph

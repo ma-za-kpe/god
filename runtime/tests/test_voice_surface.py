@@ -1,7 +1,5 @@
 """Voice surface tests."""
 
-import pytest
-
 from voice import VoiceSurface, build_voice_state, build_voice_status
 
 
@@ -89,6 +87,7 @@ def test_voice_surface_synthesizes_when_tts_is_available(monkeypatch):
 
     monkeypatch.setenv("TTS_ENDPOINT", "http://fish-speech:8080")
     monkeypatch.setenv("VOICE_ENABLED", "true")
+    monkeypatch.setenv("VOICE_SYNTHESIS_ENABLED", "true")
     monkeypatch.setattr("voice.engine.probe_url", lambda *args, **kwargs: {"ok": True})
     monkeypatch.setattr("voice.engine.httpx.post", lambda *args, **kwargs: _Response())
 

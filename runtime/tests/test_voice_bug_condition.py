@@ -84,7 +84,7 @@ class TestSynchronousBlocking:
 
     def test_compose_does_not_block_on_slow_probe(self):
         """Assert compose() completes within 200ms even when probe_url takes 1200ms.
-        
+
         On unfixed code, compose() calls probe_url() synchronously inline,
         so it will block for ~1200ms, failing the 200ms assertion.
         """
@@ -112,7 +112,7 @@ class TestSynchronousBlocking:
     @settings(max_examples=5, suppress_health_check=[HealthCheck.function_scoped_fixture])
     def test_compose_bounded_latency_property(self, latency):
         """Property: For any probe latency > 500ms, compose() still finishes within 200ms.
-        
+
         **Validates: Requirements 1.1**
         """
         def slow_probe(url, timeout=1.5):
@@ -143,7 +143,7 @@ class TestSwallowedException:
 
     def test_build_voice_state_logs_warning_on_exception(self, caplog):
         """Assert WARNING-level log is emitted when build_voice_state() encounters an error.
-        
+
         On unfixed code, exceptions are swallowed at DEBUG level with no warning,
         making failures invisible.
         """
@@ -156,7 +156,7 @@ class TestSwallowedException:
         with caplog.at_level(logging.DEBUG):
             with patch("voice.engine.probe_url", side_effect=raise_key_error):
                 try:
-                    result = build_voice_state(snapshot)
+                    build_voice_state(snapshot)
                 except Exception:
                     pass  # Exception may propagate on unfixed code
 
@@ -174,7 +174,7 @@ class TestSwallowedException:
     @settings(max_examples=5, suppress_health_check=[HealthCheck.function_scoped_fixture])
     def test_any_exception_produces_warning_log(self, caplog, exc_type):
         """Property: For any exception type in build_voice_state, WARNING log is emitted.
-        
+
         **Validates: Requirements 1.2**
         """
         snapshot = _base_snapshot()
@@ -185,7 +185,7 @@ class TestSwallowedException:
         with caplog.at_level(logging.DEBUG):
             with patch("voice.engine.probe_url", side_effect=raise_exc):
                 try:
-                    result = build_voice_state(snapshot)
+                    build_voice_state(snapshot)
                 except Exception:
                     pass
 
@@ -208,7 +208,7 @@ class TestAbruptFallback:
 
     def test_stale_dialogue_no_static_fallback(self):
         """Assert output is NOT the static string when dialogue is stale and no headline exists.
-        
+
         On unfixed code, the pipeline falls back to "The world keeps moving."
         when dialogue is stale (>20s) and no showrunner headline is available.
         """
@@ -233,7 +233,7 @@ class TestAbruptFallback:
     @settings(max_examples=5, suppress_health_check=[HealthCheck.function_scoped_fixture])
     def test_stale_dialogue_graceful_fallback_property(self, dialogue_age):
         """Property: For any stale dialogue with no headline, output is NOT the static fallback.
-        
+
         **Validates: Requirements 1.3**
         """
         def mock_probe(url, timeout=1.5):
@@ -277,7 +277,7 @@ class TestNoRetry:
 
     def test_health_probe_retries_after_failure(self):
         """Assert health.ok=True after probe fails once then succeeds on retry.
-        
+
         On unfixed code, a single probe failure sets health.ok=False with no retry,
         leaving voice marked unhealthy for the entire snapshot cycle.
         """
@@ -305,7 +305,7 @@ class TestNoRetry:
     @settings(max_examples=3, suppress_health_check=[HealthCheck.function_scoped_fixture])
     def test_probe_retry_recovers_property(self, failures_before_success):
         """Property: After N transient failures (N<=max_retries), health recovers.
-        
+
         **Validates: Requirements 1.4**
         """
         call_count = {"n": 0}

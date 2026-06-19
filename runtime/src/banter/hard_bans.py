@@ -8,6 +8,7 @@ Implements all 7 mandatory bans from Section 10 of the contract.
 Requirements: 10.1, 10.2, 10.3
 """
 
+# ruff: noqa: I001
 from __future__ import annotations
 
 import re
@@ -110,18 +111,18 @@ class HardBanChecker:
         if not verdict.passed:
             return verdict
 
-        # Ban 2: discord_register
+        # Ban 2: arc_theme_title_leak
+        verdict = self._check_arc_title_leak(candidate, arc_theme_title)
+        if not verdict.passed:
+            return verdict
+
+        # Ban 3: discord_register
         verdict = self._check_discord_register(candidate)
         if not verdict.passed:
             return verdict
 
-        # Ban 3: generic_debater
+        # Ban 4: generic_debater
         verdict = self._check_generic_debater(candidate)
-        if not verdict.passed:
-            return verdict
-
-        # Ban 4: arc_theme_title_leak
-        verdict = self._check_arc_title_leak(candidate, arc_theme_title)
         if not verdict.passed:
             return verdict
 

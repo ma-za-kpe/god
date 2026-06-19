@@ -11,7 +11,8 @@ src = ["runtime"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "W"]
-ignore = ["E501", "E702", "E701"]
+ignore = ["E501", "E701", "E702", "E402", "I001"]
 
 [tool.ruff.lint.per-file-ignores]
 "runtime/src/seed_agents.py" = ["F401"]
+"runtime/tests/**/*.py" = ["E402"]

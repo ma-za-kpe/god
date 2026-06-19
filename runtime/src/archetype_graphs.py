@@ -1224,11 +1224,11 @@ def _banter_loop(
         best = _best_reactive_fragment(message_text, max_words=10) or _theme_focus_fragment(arc_theme) or "Say it plainly."
     arch = (archetype or "").lower()
     if arch == "cooperator" and not any(word in best.lower() for word in ("hurt", "sorry", "tired", "miss", "worry")):
-        best = f"I am tired of pretending this does not hurt. If we keep dodging it, the room cracks."
+        best = "I am tired of pretending this does not hurt. If we keep dodging it, the room cracks."
     elif arch == "hoarder" and not any(word in best.lower() for word in ("lose", "fear", "safe", "cost", "keep")):
-        best = f"I am not afraid of the argument. I am afraid of losing the room."
+        best = "I am not afraid of the argument. I am afraid of losing the room."
     elif arch == "philosopher" and not any(word in best.lower() for word in ("doubt", "wonder", "maybe", "not sure")):
-        best = f"Maybe I am wrong, but the shape of this answer still bothers me."
+        best = "Maybe I am wrong, but the shape of this answer still bothers me."
     elif arch == "defender" and not any(word in best.lower() for word in ("no", "stop", "enough", "won't")):
         best = "No. Not while the line is still blurred."
     elif arch == "parasite" and not any(word in best.lower() for word in ("useful", "worth", "profit", "cost")):
@@ -2328,8 +2328,8 @@ async def run_agent_graph(
 
         persona = _ARCHETYPE_PROMPTS.get(archetype, "You are an autonomous agent.")
         name = state["name"]
-        peers_text = _format_peers(peers)
-        inbox_text = _format_inbox(inbox)
+        peers_text = _format_peers(state.get("peers") or [])
+        inbox_text = _format_inbox(state.get("inbox") or [])
         thought_prompt = (
             f"You are {name} ({archetype}). Balance: {state['balance_usdc']:.4f} USDC.\n\n"
             f"REAL AGENTS IN YOUR WORLD:\n{peers_text}\n\n"

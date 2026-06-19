@@ -9,6 +9,9 @@ from typing import Any
 import psycopg2
 import psycopg2.extras
 
+DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://god:localdev@localhost:5432/god_world")
+WORLD_ID = os.getenv("WORLD_ID", "local-dev-world-1")
+
 
 def _env_flag(name: str, default: str = "0") -> bool:
     return os.getenv(name, default).strip().lower() in {"1", "true", "yes", "on"}

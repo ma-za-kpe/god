@@ -20,7 +20,6 @@ from .soul_types import (
     RhythmPattern,
     SoulEngineConfig,
     VoiceDNAProfile,
-    VOICE_DNA_SCHEMA,
     validate_voice_dna_profile,
 )
 
@@ -52,8 +51,6 @@ def _estimate_token_count(text: str) -> int:
     word_count = len(text.split())
     return int(word_count * _TOKENS_PER_WORD)
 
-
-import re
 
 _CLAUSE_DELIMITERS = re.compile(r"[,;:\-—]+|\band\b|\bbut\b|\bor\b")
 
@@ -209,7 +206,7 @@ class VoiceDNA:
         filepath = self._profiles_dir / f"{archetype}.json"
 
         if not filepath.exists():
-            log.warning(
+            log.debug(
                 "VoiceDNA profile file not found: %s",
                 filepath,
             )

@@ -15,7 +15,7 @@ from decimal import Decimal
 import psycopg2
 from eth_account import Account
 
-from .owned_graph import ARCHETYPES, OwnedGraph, create_agent_zero
+from .owned_graph import create_agent_zero
 
 log = logging.getLogger("god.seed")
 

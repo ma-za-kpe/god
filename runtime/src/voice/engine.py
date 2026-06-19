@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import hashlib
-import json
 import logging
 import os
 import re
@@ -30,8 +29,7 @@ try:  # pragma: no cover - runtime package import path
     from ..health_checks import probe_url
 except ImportError:  # pragma: no cover - flat test path
     from health_checks import probe_url
-
-from .state import VoicePlan, VoiceState
+from .state import VoicePlan, VoiceState  # noqa: E402
 
 
 class _CachedHealthProbe:
@@ -289,6 +287,7 @@ def build_voice_status() -> dict[str, Any]:
     return {
         "enabled": _env_bool("VOICE_ENABLED") or bool(os.getenv("TTS_MODEL")) or bool(endpoint),
         "dry_run": _env_bool("VOICE_DRY_RUN", "false"),
+        "synthesis_enabled": _env_bool("VOICE_SYNTHESIS_ENABLED", "false"),
         "provider": provider,
         "voice_model": _pick_voice_model(),
         "voice_name": _pick_voice_name(),
@@ -316,10 +315,12 @@ class VoiceSurface:
             self.dry_run = dry_run
         self.provider = os.getenv("VOICE_PROVIDER") or os.getenv("TTS_PROVIDER") or "kokoro"
         self.transport = os.getenv("VOICE_TRANSPORT", "local-tts")
+        self.synthesis_enabled = _env_bool("VOICE_SYNTHESIS_ENABLED", "false")
         self._cached_health = _CachedHealthProbe(ttl=5.0)
         self._last_plan: VoicePlan | None = None
 
     def compose(self, snapshot: dict[str, Any]) -> VoiceState:
+        self.synthesis_enabled = _env_bool("VOICE_SYNTHESIS_ENABLED", "false")
         showrunner = snapshot.get("showrunner") or {}
         broadcast = snapshot.get("broadcast") or {}
         # Prefer most recent live dialogue turn over showrunner headline
@@ -460,6 +461,8 @@ class VoiceSurface:
             return {"ok": False, "reason": "disabled"}
         if self.dry_run:
             return {"ok": False, "reason": "dry_run"}
+        if not self.synthesis_enabled:
+            return {"ok": False, "reason": "synthesis_disabled"}
         if not endpoint:
             return {"ok": False, "reason": "missing_tts_endpoint"}
         if not health.get("ok"):

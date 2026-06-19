@@ -13,7 +13,7 @@ from .pacing_controller import PacingController
 from .prompt_builder import PromptContractError, SacredPromptBuilder
 from .quality_judge import QualityJudgeV2, evaluate_contract
 from .silence_controller import SilenceController
-from .theater_harness import TheaterHarness, ArchetypeRoster, SessionMetrics, HarnessResult
+from .theater_harness import ArchetypeRoster, HarnessResult, SessionMetrics, TheaterHarness
 from .types import (
     MOVE_TYPES,
     BanterConfig,
@@ -38,21 +38,21 @@ from .types import (
 )
 
 __all__ = [
-    # Type literal
     "MOVE_TYPES",
-    # Components
     "BanterEngine",
+    "HardBanChecker",
+    "ModeResolver",
     "PacingController",
-    # Prompt Builder (Section 1, 12)
     "SacredPromptBuilder",
     "PromptContractError",
     "QualityJudgeV2",
     "evaluate_contract",
-    # Data models — contract-aligned (Section 7, 10)
+    "BeatMode",
+    "BeatModePolicy",
+    "POLICY_TABLE",
     "ContractQualityScore",
     "HardBan",
     "HardBanVerdict",
-    # Data models — legacy/shared
     "BanterConfig",
     "Beat",
     "BeatResult",
@@ -69,7 +69,11 @@ __all__ = [
     "RouteDecision",
     "SceneContextData",
     "SessionState",
-    # Exceptions
+    "SilenceController",
+    "TheaterHarness",
+    "ArchetypeRoster",
+    "SessionMetrics",
+    "HarnessResult",
     "ModelRouterError",
     "QualityJudgeError",
     "RelationshipMemoryError",

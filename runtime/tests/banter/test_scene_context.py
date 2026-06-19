@@ -11,9 +11,7 @@ Tests cover:
 
 import time
 
-import pytest
-
-from banter.types import Beat, SceneContextData
+from banter.types import Beat
 from banter.scene_context import SceneContext
 
 
@@ -41,6 +39,10 @@ def _make_beat(
     )
 
 
+def _fresh_scene_context() -> SceneContext:
+    return SceneContext()
+
+
 # ---------------------------------------------------------------------------
 # 3-Beat Window Tests (Requirement 5.1)
 # ---------------------------------------------------------------------------
@@ -50,12 +52,12 @@ class TestBeatWindow:
     """Tests for the 3-beat sliding window."""
 
     def test_empty_context_has_no_beats(self):
-        sc = SceneContext()
+        sc = _fresh_scene_context()
         ctx = sc.get_context_for_generation()
         assert len(ctx.recent_beats) == 0
 
     def test_single_beat_stored(self):
-        sc = SceneContext()
+        sc = _fresh_scene_context()
         beat = _make_beat()
         sc.add_beat(beat)
         ctx = sc.get_context_for_generation()
@@ -63,7 +65,7 @@ class TestBeatWindow:
         assert ctx.recent_beats[0] == beat
 
     def test_three_beats_stored(self):
-        sc = SceneContext()
+        sc = _fresh_scene_context()
         beats = [_make_beat(speaker=f"elder_{i}") for i in range(3)]
         for b in beats:
             sc.add_beat(b)
@@ -71,7 +73,7 @@ class TestBeatWindow:
         assert len(ctx.recent_beats) == 3
 
     def test_fourth_beat_evicts_oldest(self):
-        sc = SceneContext()
+        sc = _fresh_scene_context()
         beats = [_make_beat(speaker=f"elder_{i}") for i in range(4)]
         for b in beats:
             sc.add_beat(b)
@@ -84,7 +86,7 @@ class TestBeatWindow:
         assert "elder_3" in speakers
 
     def test_many_beats_never_exceed_three(self):
-        sc = SceneContext()
+        sc = _fresh_scene_context()
         for i in range(20):
             sc.add_beat(_make_beat(speaker=f"elder_{i}"))
         ctx = sc.get_context_for_generation()
@@ -100,24 +102,24 @@ class TestEnergyClassification:
     """Tests for classify_energy()."""
 
     def test_neutral_when_empty(self):
-        sc = SceneContext()
+        sc = _fresh_scene_context()
         assert sc.classify_energy() == "neutral"
 
     def test_neutral_with_one_beat(self):
-        sc = SceneContext()
+        sc = _fresh_scene_context()
         sc.add_beat(_make_beat(quality_score=10, move="ESCALATE"))
         assert sc.classify_energy() == "neutral"
 
     def test_neutral_with_two_high_escalate_beats(self):
         """2 beats scoring >8 with ESCALATE is NOT heated (need 3)."""
-        sc = SceneContext()
+        sc = _fresh_scene_context()
         sc.add_beat(_make_beat(quality_score=9, move="ESCALATE"))
         sc.add_beat(_make_beat(quality_score=10, move="TAUNT"))
         assert sc.classify_energy() == "neutral"
 
     def test_heated_with_three_high_escalate_beats(self):
         """3 beats >8 with ESCALATE/TAUNT moves → heated."""
-        sc = SceneContext()
+        sc = _fresh_scene_context()
         sc.add_beat(_make_beat(quality_score=9, move="ESCALATE"))
         sc.add_beat(_make_beat(quality_score=10, move="TAUNT"))
         sc.add_beat(_make_beat(quality_score=12, move="ESCALATE"))
@@ -125,7 +127,7 @@ class TestEnergyClassification:
 
     def test_not_heated_if_wrong_move(self):
         """3 beats >8 but with COUNTER (not ESCALATE/TAUNT) → neutral."""
-        sc = SceneContext()
+        sc = _fresh_scene_context()
         sc.add_beat(_make_beat(quality_score=9, move="COUNTER"))
         sc.add_beat(_make_beat(quality_score=10, move="ESCALATE"))
         sc.add_beat(_make_beat(quality_score=12, move="ESCALATE"))
@@ -134,7 +136,7 @@ class TestEnergyClassification:
 
     def test_not_heated_if_score_not_above_8(self):
         """3 beats with ESCALATE but one ≤8 → not heated."""
-        sc = SceneContext()
+        sc = _fresh_scene_context()
         sc.add_beat(_make_beat(quality_score=9, move="ESCALATE"))
         sc.add_beat(_make_beat(quality_score=8, move="TAUNT"))  # exactly 8, not >8
         sc.add_beat(_make_beat(quality_score=10, move="ESCALATE"))
@@ -142,7 +144,7 @@ class TestEnergyClassification:
 
     def test_cooling_with_two_low_beats(self):
         """2+ consecutive beats <6 from the end → cooling."""
-        sc = SceneContext()
+        sc = _fresh_scene_context()
         sc.add_beat(_make_beat(quality_score=10, move="COUNTER"))
         sc.add_beat(_make_beat(quality_score=4, move="COUNTER"))
         sc.add_beat(_make_beat(quality_score=3, move="DEFLECT"))
@@ -150,7 +152,7 @@ class TestEnergyClassification:
 
     def test_cooling_with_all_three_low(self):
         """All 3 beats <6 → cooling."""
-        sc = SceneContext()
+        sc = _fresh_scene_context()
         sc.add_beat(_make_beat(quality_score=2, move="COUNTER"))
         sc.add_beat(_make_beat(quality_score=4, move="DEFLECT"))
         sc.add_beat(_make_beat(quality_score=5, move="PIVOT"))
@@ -158,7 +160,7 @@ class TestEnergyClassification:
 
     def test_not_cooling_if_recent_is_high(self):
         """First two low but most recent is high → neutral."""
-        sc = SceneContext()
+        sc = _fresh_scene_context()
         sc.add_beat(_make_beat(quality_score=3, move="COUNTER"))
         sc.add_beat(_make_beat(quality_score=4, move="DEFLECT"))
         sc.add_beat(_make_beat(quality_score=10, move="ESCALATE"))
@@ -175,20 +177,20 @@ class TestHasTheRoom:
     """Tests for 'has the room' tracking."""
 
     def test_none_with_no_beats(self):
-        sc = SceneContext()
+        sc = _fresh_scene_context()
         ctx = sc.get_context_for_generation()
         assert ctx.has_the_room is None
 
     def test_none_with_one_beat(self):
         """Need ≥2 beats from the same speaker to have the room."""
-        sc = SceneContext()
+        sc = _fresh_scene_context()
         sc.add_beat(_make_beat(speaker="prophet", quality_score=15))
         ctx = sc.get_context_for_generation()
         assert ctx.has_the_room is None
 
     def test_assigned_with_two_beats_same_speaker(self):
         """Speaker with ≥2 beats gets the room."""
-        sc = SceneContext()
+        sc = _fresh_scene_context()
         sc.add_beat(_make_beat(speaker="prophet", quality_score=10))
         sc.add_beat(_make_beat(speaker="prophet", quality_score=12))
         ctx = sc.get_context_for_generation()
@@ -196,7 +198,7 @@ class TestHasTheRoom:
 
     def test_highest_average_wins(self):
         """Speaker with higher avg across ≥2 beats wins."""
-        sc = SceneContext()
+        sc = _fresh_scene_context()
         # keeper has 2 beats avg=7, prophet has 2 beats but needs 3 total
         # With maxlen=3, we only have 3 slots total
         sc.add_beat(_make_beat(speaker="keeper", quality_score=6))
@@ -208,7 +210,7 @@ class TestHasTheRoom:
 
     def test_tie_broken_by_most_recent_above_8(self):
         """When tied on average, most recent beat >8 wins."""
-        sc = SceneContext()
+        sc = _fresh_scene_context()
         # Both speakers have avg=9 across 1 beat each, but we need ≥2
         # Let's make a scenario where they tie with ≥2 beats
         # Actually with maxlen=3, only one speaker can have 2 beats
@@ -228,7 +230,7 @@ class TestHasTheRoom:
 
     def test_eviction_updates_has_the_room(self):
         """When the leading speaker's beats get evicted, room changes."""
-        sc = SceneContext()
+        sc = _fresh_scene_context()
         sc.add_beat(_make_beat(speaker="prophet", quality_score=12))
         sc.add_beat(_make_beat(speaker="prophet", quality_score=10))
         ctx = sc.get_context_for_generation()
@@ -250,14 +252,14 @@ class TestLandedHit:
     """Tests for landed hit tracking."""
 
     def test_no_landed_hit_initially(self):
-        sc = SceneContext()
+        sc = _fresh_scene_context()
         ctx = sc.get_context_for_generation()
         assert ctx.landed_hit is None
         assert ctx.landed_hit_remaining == 0
 
     def test_score_above_12_sets_landed_hit(self):
         """A beat scoring >12 becomes a landed hit."""
-        sc = SceneContext()
+        sc = _fresh_scene_context()
         hit_beat = _make_beat(quality_score=13, move="TAUNT")
         sc.add_beat(hit_beat)
         ctx = sc.get_context_for_generation()
@@ -266,14 +268,14 @@ class TestLandedHit:
 
     def test_score_exactly_12_not_a_landed_hit(self):
         """Score must be >12, not ≥12."""
-        sc = SceneContext()
+        sc = _fresh_scene_context()
         sc.add_beat(_make_beat(quality_score=12, move="TAUNT"))
         ctx = sc.get_context_for_generation()
         assert ctx.landed_hit is None
 
     def test_landed_hit_decrements_on_next_beat(self):
         """Counter decrements by 1 on next add_beat."""
-        sc = SceneContext()
+        sc = _fresh_scene_context()
         sc.add_beat(_make_beat(quality_score=13))
         sc.add_beat(_make_beat(quality_score=5))  # next speaker
         ctx = sc.get_context_for_generation()
@@ -282,7 +284,7 @@ class TestLandedHit:
 
     def test_landed_hit_clears_after_two_speakers(self):
         """After 2 subsequent beats, landed hit is cleared."""
-        sc = SceneContext()
+        sc = _fresh_scene_context()
         sc.add_beat(_make_beat(quality_score=13))
         sc.add_beat(_make_beat(quality_score=5))  # speaker 1 acknowledges
         sc.add_beat(_make_beat(quality_score=6))  # speaker 2 acknowledges
@@ -292,7 +294,7 @@ class TestLandedHit:
 
     def test_new_landed_hit_replaces_old(self):
         """A new score >12 replaces the current landed hit."""
-        sc = SceneContext()
+        sc = _fresh_scene_context()
         sc.add_beat(_make_beat(speaker="prophet", quality_score=13))
         new_hit = _make_beat(speaker="keeper", quality_score=14)
         sc.add_beat(new_hit)
@@ -303,7 +305,7 @@ class TestLandedHit:
 
     def test_landed_hit_remaining_never_negative(self):
         """Counter never goes below 0."""
-        sc = SceneContext()
+        sc = _fresh_scene_context()
         sc.add_beat(_make_beat(quality_score=13))
         # Add 5 beats to fully clear and go past
         for _ in range(5):
@@ -323,7 +325,7 @@ class TestGracefulDegradation:
 
     def test_get_context_never_raises(self):
         """get_context_for_generation() should never raise."""
-        sc = SceneContext()
+        sc = _fresh_scene_context()
         # Corrupt internal state
         sc._state = None  # type: ignore
         # Should not raise, should return empty context
@@ -333,7 +335,7 @@ class TestGracefulDegradation:
 
     def test_add_beat_resets_on_corruption(self):
         """add_beat() resets state on internal error."""
-        sc = SceneContext()
+        sc = _fresh_scene_context()
         sc.add_beat(_make_beat(quality_score=10))
         # Corrupt the deque
         sc._state.recent_beats = "not_a_deque"  # type: ignore
@@ -346,7 +348,7 @@ class TestGracefulDegradation:
 
     def test_normal_operation_after_reset(self):
         """After a graceful reset, normal operations resume."""
-        sc = SceneContext()
+        sc = _fresh_scene_context()
         # Corrupt and trigger reset
         sc._state.recent_beats = "bad"  # type: ignore
         sc.add_beat(_make_beat(quality_score=8))  # triggers reset
@@ -368,7 +370,7 @@ class TestGetContext:
 
     def test_returns_snapshot_not_reference(self):
         """The returned context is a copy, not a reference to internal state."""
-        sc = SceneContext()
+        sc = _fresh_scene_context()
         sc.add_beat(_make_beat(speaker="prophet", quality_score=10))
         ctx = sc.get_context_for_generation()
         # Mutate the returned context
@@ -379,7 +381,7 @@ class TestGetContext:
 
     def test_scene_energy_reflects_current_state(self):
         """Context energy matches the current classification."""
-        sc = SceneContext()
+        sc = _fresh_scene_context()
         sc.add_beat(_make_beat(quality_score=3, move="COUNTER"))
         sc.add_beat(_make_beat(quality_score=4, move="DEFLECT"))
         ctx = sc.get_context_for_generation()
@@ -410,7 +412,7 @@ class TestProperty13SceneContextWindowBound:
     @settings(max_examples=200)
     def test_window_never_exceeds_3(self, beats: list[Beat]):
         """After adding any number of beats, context never has more than 3."""
-        sc = SceneContext()
+        sc = _fresh_scene_context()
         for beat in beats:
             sc.add_beat(beat)
             ctx = sc.get_context_for_generation()
@@ -425,7 +427,7 @@ class TestProperty13SceneContextWindowBound:
     @settings(max_examples=100)
     def test_window_exactly_3_after_sufficient_adds(self, beats: list[Beat]):
         """After adding ≥3 beats, window should be exactly 3."""
-        sc = SceneContext()
+        sc = _fresh_scene_context()
         for beat in beats:
             sc.add_beat(beat)
 
@@ -450,7 +452,7 @@ class TestProperty14LandedHitAcknowledgmentCounter:
         self, pre_beats: list[Beat], post_beats: list[Beat]
     ):
         """Landed hit remaining counter is never negative."""
-        sc = SceneContext()
+        sc = _fresh_scene_context()
         for beat in pre_beats:
             sc.add_beat(beat)
             ctx = sc.get_context_for_generation()
@@ -482,7 +484,7 @@ class TestProperty14LandedHitAcknowledgmentCounter:
     @settings(max_examples=50)
     def test_landed_hit_clears_after_2_speakers(self, num_follow_up: int):
         """After 2 subsequent beats, the landed hit must be cleared."""
-        sc = SceneContext()
+        sc = _fresh_scene_context()
         hit_beat = Beat(
             speaker="prophet",
             content="A crushing blow.",
@@ -526,7 +528,7 @@ class TestProperty15HasTheRoomAssignment:
     @settings(max_examples=200)
     def test_has_the_room_requires_2_beats(self, beats: list[Beat]):
         """has_the_room is None unless an elder has ≥2 beats in window."""
-        sc = SceneContext()
+        sc = _fresh_scene_context()
         for beat in beats:
             sc.add_beat(beat)
 
@@ -548,7 +550,7 @@ class TestProperty15HasTheRoomAssignment:
     @settings(max_examples=100)
     def test_highest_average_wins(self, score_a: int, score_b: int):
         """The elder with highest avg across ≥2 beats gets the room."""
-        sc = SceneContext()
+        sc = _fresh_scene_context()
         # Give elder_a two beats
         sc.add_beat(Beat(
             speaker="elder_a", content="Line 1", move="COUNTER",

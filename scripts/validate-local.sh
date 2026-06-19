@@ -15,11 +15,12 @@ POWERSHELL_BIN="${POWERSHELL_BIN:-powershell.exe}"
 Write-Host '[validate] compose config'
 docker compose --project-directory \$root config --quiet
 Write-Host '[validate] runtime tests'
-docker exec god-runtime sh -lc 'rm -rf /tmp/god-runtime-tests && mkdir -p /tmp/god-runtime-tests'
-docker cp \"\$root/runtime/tests/.\" god-runtime:/tmp/god-runtime-tests
+docker exec god-runtime sh -lc 'rm -rf /tmp/god-validation && mkdir -p /tmp/god-validation/suite/runtime-tests'
+docker cp \"\$root/runtime/tests/.\" god-runtime:/tmp/god-validation/suite/runtime-tests
+docker exec god-runtime rm -f /tmp/god-validation/suite/runtime-tests/banter/__init__.py
 try {
-  docker exec -e PYTHONPATH=/app/src god-runtime python -m pytest /tmp/god-runtime-tests
+  docker exec -e PYTHONPATH=/app/src -e VOICE_SYNTHESIS_ENABLED=false god-runtime python -m pytest /tmp/god-validation/suite/runtime-tests
 } finally {
-  docker exec god-runtime rm -rf /tmp/god-runtime-tests | Out-Null
+  docker exec god-runtime rm -rf /tmp/god-validation | Out-Null
 }
 "

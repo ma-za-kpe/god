@@ -115,8 +115,6 @@ def test_showrunner_is_deterministic_for_same_snapshot():
 
 
 def test_showrunner_public_bank_prompt_tracks_economy():
-    plan = build_showrunner_plan(_snapshot())
-
     economy_plan = build_showrunner_plan(_economy_snapshot())
     assert "economic move" in economy_plan["audience_prompt"]
     assert economy_plan["cues"][0]["cue_type"] == "economy.service.purchased"

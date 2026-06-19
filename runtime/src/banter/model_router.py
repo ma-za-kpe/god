@@ -14,9 +14,9 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
-from typing import Callable, Literal, Protocol
+from typing import Literal, Protocol
 
-from .types import CircuitBreakerState, ModelRouterError, RouteDecision
+from .types import CircuitBreakerState, RouteDecision
 
 log = logging.getLogger("god.banter.router")
 

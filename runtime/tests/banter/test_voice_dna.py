@@ -296,7 +296,6 @@ async def test_check_for_reload_detects_change(profiles_dir, config):
     vdna = VoiceDNA(profiles_dir, config)
     await vdna.load_profiles()
 
-    original_profile = vdna.profiles["parasite"]
 
     # Modify the parasite profile
     updated = _make_valid_profile("parasite")

@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import hashlib
 import os
-from collections import Counter
 from typing import Any
 
 try:  # pragma: no cover - runtime package import path
@@ -69,8 +68,6 @@ def _theme(snapshot: dict[str, Any]) -> str:
 
 
 def _build_arcs(snapshot: dict[str, Any], horizon_days: int) -> list[dict[str, Any]]:
-    stats = snapshot.get("stats") or {}
-    audience = snapshot.get("audience") or {}
     top = _top_agents(snapshot, limit=3)
     top_names = [a.get("current_name") or a.get("soul_id", "")[:8] for a in top]
     theme = _theme(snapshot)
@@ -181,7 +178,6 @@ class ContentBankSurface:
         self.transport = os.getenv("CONTENT_BANK_TRANSPORT", "local-pre-gen")
 
     def compose(self, snapshot: dict[str, Any]) -> ContentBankState:
-        stats = snapshot.get("stats") or {}
         audience = snapshot.get("audience") or {}
         world_id = str(snapshot.get("world_id") or "")
         source_epoch = int(snapshot.get("epoch") or 0)

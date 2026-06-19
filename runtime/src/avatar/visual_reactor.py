@@ -217,12 +217,21 @@ class VisualReactor:
             return None
         for agent in self._iter_agents(agents):
             if isinstance(agent, dict):
-                if str(agent.get("soul_id") or agent.get("identity", {}).get("soul_id") or "") == soul_id:
+                candidate = str(
+                    agent.get("soul_id")
+                    or agent.get("current_name")
+                    or agent.get("identity", {}).get("soul_id")
+                    or agent.get("identity", {}).get("current_name")
+                    or ""
+                )
+                if candidate.lower() == soul_id.lower():
                     return agent
                 continue
             identity = getattr(agent, "identity", None)
-            if identity is not None and str(getattr(identity, "soul_id", "") or "") == soul_id:
+            if identity is not None and str(
+                getattr(identity, "soul_id", "") or getattr(identity, "current_name", "") or ""
+            ).lower() == soul_id.lower():
                 return agent
-            if str(getattr(agent, "soul_id", "") or "") == soul_id:
+            if str(getattr(agent, "soul_id", "") or getattr(agent, "current_name", "") or "").lower() == soul_id.lower():
                 return agent
         return None
