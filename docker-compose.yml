@@ -196,7 +196,7 @@ services:
       - MIN_IPFS_PINS=3
       - IPFS_GATEWAY=http://ipfs-node-1:8080
       - RUNTIME_BASE_URL=http://localhost:8888
-      - MOCK_X402_PAYMENTS=${MOCK_X402_PAYMENTS:-true}
+      - MOCK_X402_PAYMENTS=${MOCK_X402_PAYMENTS:-false}
       - USE_X402_FOR_BUY_SERVICE=${USE_X402_FOR_BUY_SERVICE:-true}
       - ANVIL_RPC=http://anvil:8545
       - CHAIN_ID=84532

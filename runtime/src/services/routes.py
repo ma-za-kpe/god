@@ -7,7 +7,7 @@ The flow:
   2. Client retries with X-Payment-Authorization header
   3. Middleware verifies payment → handler executes → 200
 
-Local dev: MOCK_X402_PAYMENTS=true skips real payment verification.
+Local dev: set MOCK_X402_PAYMENTS=true to skip real payment verification.
 """
 
 import logging
