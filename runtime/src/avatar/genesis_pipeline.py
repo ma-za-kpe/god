@@ -20,10 +20,12 @@ except ImportError:  # pragma: no cover - flat test path
 
 try:  # pragma: no cover - runtime package import path
     from .archetype_config import ARCHETYPE_CONFIGS, validate_archetype_configs
+    from ..ipfs_client import pin_bytes, pin_json
     from .portrait_generator import PortraitGenerator
     from .voice_cloner import VoiceCloner
 except ImportError:  # pragma: no cover - flat test path
     from avatar.archetype_config import ARCHETYPE_CONFIGS, validate_archetype_configs
+    from ipfs_client import pin_bytes, pin_json
     from avatar.portrait_generator import PortraitGenerator
     from avatar.voice_cloner import VoiceCloner
 
@@ -144,23 +146,60 @@ class GenesisPipeline:
         if await portrait_generator.health_check():
             portrait_bytes = await portrait_generator.generate_portrait(archetype, style_config)
             if portrait_bytes:
-                identity.avatar_cid = f"memory:{soul_id}:portrait"
-                if not identity.avatar_base_cid:
+                portrait_pin = await pin_bytes(portrait_bytes, filename=f"{soul_id}-portrait.png")
+                if not portrait_pin.ok:
+                    self._record_failure(result, "portrait", "ipfs_pin_failed")
+                    self._log_step(correlation_id, soul_id, "portrait", False, {"pin_errors": portrait_pin.errors})
+                    portrait_pin = None
+                if portrait_pin:
+                    identity.avatar_cid = portrait_pin.cid
+                    result.portrait_cid = portrait_pin.cid
+                    result.assets_produced += 1
+                    self._log_step(correlation_id, soul_id, "portrait", True, {"bytes": len(portrait_bytes), "cid": portrait_pin.cid})
+                if result.portrait_cid and not identity.avatar_base_cid:
                     identity.avatar_base_cid = identity.avatar_cid
                 identity.avatar_style_prompt = style_config.style_prompt_template
-                result.portrait_cid = identity.avatar_cid
-                result.assets_produced += 1
-                self._log_step(correlation_id, soul_id, "portrait", True, {"bytes": len(portrait_bytes)})
                 expression_bytes = await portrait_generator.generate_expressions(
                     portrait_bytes,
                     ["neutral", "angry", "playful", "calm", "intense", "vulnerable", "flinch"],
                     archetype_prompt=style_config.style_prompt_template,
                 )
                 if expression_bytes:
-                    identity.mood_mapping = {name: f"memory:{soul_id}:expr:{name}" for name in expression_bytes}
-                    result.expression_sheet_cid = f"memory:{soul_id}:expressions"
-                    result.assets_produced += 1
-                self._log_step(correlation_id, soul_id, "expression_sheet", bool(expression_bytes), {"count": len(expression_bytes)})
+                    pinned_expressions: dict[str, str] = {}
+                    for expression_name, expression_data in expression_bytes.items():
+                        pin_result = await pin_bytes(
+                            expression_data,
+                            filename=f"{soul_id}-{expression_name}.png",
+                        )
+                        if pin_result.ok:
+                            pinned_expressions[expression_name] = pin_result.cid
+                    if pinned_expressions:
+                        identity.mood_mapping = pinned_expressions
+                        manifest_pin = await pin_json(
+                            json.dumps(
+                                {
+                                    "soul_id": soul_id,
+                                    "archetype": archetype,
+                                    "expressions": pinned_expressions,
+                                },
+                                sort_keys=True,
+                            ).encode("utf-8"),
+                            filename=f"{soul_id}-expressions.json",
+                        )
+                        if manifest_pin.ok:
+                            result.expression_sheet_cid = manifest_pin.cid
+                            result.assets_produced += 1
+                        else:
+                            self._record_failure(result, "expression_sheet", "ipfs_manifest_pin_failed")
+                    else:
+                        self._record_failure(result, "expression_sheet", "ipfs_pin_failed")
+                    self._log_step(
+                        correlation_id,
+                        soul_id,
+                        "expression_sheet",
+                        bool(result.expression_sheet_cid),
+                        {"count": len(pinned_expressions), "cid": result.expression_sheet_cid},
+                    )
             else:
                 self._record_failure(result, "portrait", "generation_failed")
                 self._log_step(correlation_id, soul_id, "portrait", False, {})
@@ -171,11 +210,21 @@ class GenesisPipeline:
         if await voice_cloner.health_check():
             voice_result = await voice_cloner.clone_voice(style_config.seed_utterance_path, archetype)
             if voice_result:
-                identity.voice_model_cid = f"memory:{soul_id}:voice"
-                identity.voice_params = voice_result.voice_params
-                result.voice_embedding_cid = identity.voice_model_cid
-                result.assets_produced += 1
-                self._log_step(correlation_id, soul_id, "voice_embedding", True, {"bytes": len(voice_result.embedding_bytes)})
+                voice_pin = await pin_bytes(voice_result.embedding_bytes, filename=f"{soul_id}-voice.bin")
+                if voice_pin.ok:
+                    identity.voice_model_cid = voice_pin.cid
+                    identity.voice_params = voice_result.voice_params
+                    result.voice_embedding_cid = voice_pin.cid
+                    result.assets_produced += 1
+                else:
+                    self._record_failure(result, "voice_embedding", "ipfs_pin_failed")
+                self._log_step(
+                    correlation_id,
+                    soul_id,
+                    "voice_embedding",
+                    bool(result.voice_embedding_cid),
+                    {"bytes": len(voice_result.embedding_bytes), "cid": result.voice_embedding_cid},
+                )
             else:
                 self._record_failure(result, "voice_embedding", "generation_failed")
                 self._log_step(correlation_id, soul_id, "voice_embedding", False, {})
