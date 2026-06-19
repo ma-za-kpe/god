@@ -3,12 +3,15 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import logging
 import os
 import re
 import threading
 import time
 from typing import Any
+
+import httpx
 
 _log = logging.getLogger(__name__)
 
@@ -285,7 +288,7 @@ def build_voice_status() -> dict[str, Any]:
     provider = os.getenv("VOICE_PROVIDER") or os.getenv("TTS_PROVIDER") or "kokoro"
     return {
         "enabled": _env_bool("VOICE_ENABLED") or bool(os.getenv("TTS_MODEL")) or bool(endpoint),
-        "dry_run": _env_bool("VOICE_DRY_RUN", "true"),
+        "dry_run": _env_bool("VOICE_DRY_RUN", "false"),
         "provider": provider,
         "voice_model": _pick_voice_model(),
         "voice_name": _pick_voice_name(),
@@ -305,12 +308,9 @@ class VoiceSurface:
     def __init__(self, enabled: bool | None = None, dry_run: bool | None = None):
         self.enabled = _env_bool("VOICE_ENABLED") if enabled is None else enabled
         if dry_run is None:
-            self.dry_run = _env_bool("VOICE_DRY_RUN", "true")
-            # Dry-run visibility: warn operators when env var is unset (accidental dry-run)
+            self.dry_run = _env_bool("VOICE_DRY_RUN", "false")
             _voice_dry_run_raw = os.getenv("VOICE_DRY_RUN")
-            if _voice_dry_run_raw is None and self.dry_run:
-                _log.warning("VOICE_DRY_RUN is not set; defaulting to dry-run mode (no TTS output)")
-            elif _voice_dry_run_raw is not None and self.dry_run:
+            if _voice_dry_run_raw is not None and self.dry_run:
                 _log.debug("VOICE_DRY_RUN explicitly set to '%s'; dry-run mode active", _voice_dry_run_raw)
         else:
             self.dry_run = dry_run
@@ -435,6 +435,7 @@ class VoiceSurface:
             tension_pitch_modifier=pitch_modifier,
         )
         self._last_plan = plan
+        synthesis = self._maybe_synthesize(plan, health)
         return VoiceState(
             enabled=self.enabled,
             dry_run=self.dry_run,
@@ -447,10 +448,67 @@ class VoiceSurface:
             transport=self.transport,
             health=health,
             plan=plan,
+            synthesis=synthesis,
         )
 
     def status(self) -> dict[str, Any]:
         return build_voice_status()
+
+    def _maybe_synthesize(self, plan: VoicePlan, health: dict[str, Any]) -> dict[str, Any]:
+        endpoint = os.getenv("VOICE_HEALTH_URL") or os.getenv("TTS_ENDPOINT")
+        if not self.enabled:
+            return {"ok": False, "reason": "disabled"}
+        if self.dry_run:
+            return {"ok": False, "reason": "dry_run"}
+        if not endpoint:
+            return {"ok": False, "reason": "missing_tts_endpoint"}
+        if not health.get("ok"):
+            return {"ok": False, "reason": "unhealthy_endpoint", "endpoint": endpoint}
+
+        synth_url = f"{endpoint.rstrip('/')}/speak"
+        payload = {
+            "text": plan.line,
+            "speaker": plan.speaker,
+            "voice_provider": plan.voice_provider,
+            "voice_model": plan.voice_model,
+            "voice_name": plan.voice_name,
+            "emotion": plan.emotion,
+            "prosody_tag": plan.prosody_tag,
+            "pitch": plan.pitch,
+            "speed": plan.speed,
+            "sample_rate": plan.sample_rate,
+            "lip_sync_source": plan.lip_sync_source,
+            "transport": plan.transport,
+            "utterance_id": plan.utterance_id,
+        }
+
+        try:
+            response = httpx.post(synth_url, json=payload, timeout=20.0)
+            response.raise_for_status()
+            content_type = response.headers.get("content-type", "")
+            synthesis: dict[str, Any] = {
+                "ok": True,
+                "endpoint": synth_url,
+                "content_type": content_type,
+                "byte_count": len(response.content or b""),
+            }
+            if content_type.startswith("application/json"):
+                try:
+                    body = response.json()
+                except Exception:
+                    body = {}
+                if isinstance(body, dict):
+                    synthesis["response_keys"] = sorted(body.keys())
+                    if body.get("audio_url"):
+                        synthesis["audio_url"] = str(body["audio_url"])
+                    if body.get("audio") is not None:
+                        synthesis["audio_present"] = True
+                    if body.get("duration_seconds") is not None:
+                        synthesis["duration_seconds"] = body["duration_seconds"]
+            return synthesis
+        except Exception as exc:
+            _log.warning("voice synthesis failed: %s", exc)
+            return {"ok": False, "endpoint": synth_url, "error": str(exc)}
 
 
 def build_voice_state(snapshot: dict[str, Any]) -> dict[str, Any]:
@@ -485,6 +543,7 @@ def build_voice_state(snapshot: dict[str, Any]) -> dict[str, Any]:
             "transport": os.getenv("VOICE_TRANSPORT", "local-tts"),
             "health": {"ok": False, "reason": "compose_failed"},
             "plan": None,
+            "synthesis": {"ok": False, "reason": "compose_failed"},
         }
 
 

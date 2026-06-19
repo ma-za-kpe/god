@@ -43,6 +43,7 @@ class VoiceState:
     transport: str
     health: dict[str, Any]
     plan: VoicePlan
+    synthesis: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         payload = asdict(self)

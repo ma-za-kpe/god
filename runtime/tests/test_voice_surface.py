@@ -1,5 +1,7 @@
 """Voice surface tests."""
 
+import pytest
+
 from voice import VoiceSurface, build_voice_state, build_voice_status
 
 
@@ -68,3 +70,30 @@ def test_voice_surface_falls_back_when_dialogue_is_stale():
     state = surface.compose(_stale_snapshot())
 
     assert state.plan.line == "Watch the exchange."
+
+
+def test_voice_surface_synthesizes_when_tts_is_available(monkeypatch):
+    surface = VoiceSurface(enabled=True, dry_run=False)
+    snapshot = _snapshot()
+
+    class _Response:
+        status_code = 200
+        headers = {"content-type": "application/json"}
+        content = b'{"audio_url":"http://tts/audio.wav","duration_seconds":1.2}'
+
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return {"audio_url": "http://tts/audio.wav", "duration_seconds": 1.2}
+
+    monkeypatch.setenv("TTS_ENDPOINT", "http://fish-speech:8080")
+    monkeypatch.setenv("VOICE_ENABLED", "true")
+    monkeypatch.setattr("voice.engine.probe_url", lambda *args, **kwargs: {"ok": True})
+    monkeypatch.setattr("voice.engine.httpx.post", lambda *args, **kwargs: _Response())
+
+    state = surface.compose(snapshot)
+
+    assert state.synthesis["ok"] is True
+    assert state.synthesis["endpoint"].endswith("/speak")
+    assert state.synthesis["audio_url"] == "http://tts/audio.wav"

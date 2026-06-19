@@ -323,14 +323,10 @@ class TestNoRetry:
 # ---------------------------------------------------------------------------
 
 class TestSilentDryRun:
-    """Bug condition 1.5: VOICE_DRY_RUN defaults to true with no warning."""
+    """Bug condition 1.5: VOICE_DRY_RUN should default to live mode."""
 
-    def test_dry_run_warning_when_unset(self, caplog):
-        """Assert WARNING log about dry-run mode when VOICE_DRY_RUN is not set.
-
-        On unfixed code, when VOICE_DRY_RUN env var is unset, the system
-        defaults to dry-run=true without any warning, silently disabling TTS.
-        """
+    def test_live_mode_when_unset(self, caplog):
+        """Assert VOICE_DRY_RUN defaults to live mode when unset."""
         env = os.environ.copy()
         env.pop("VOICE_DRY_RUN", None)
 
@@ -338,24 +334,14 @@ class TestSilentDryRun:
             with patch.dict(os.environ, env, clear=True):
                 surface = VoiceSurface()
 
-        # Expected behavior: WARNING log should be emitted about dry-run default
-        warning_logs = [
-            record for record in caplog.records
-            if record.levelno >= logging.WARNING
-            and ("dry" in record.message.lower() or "DRY_RUN" in record.message)
-        ]
-        assert len(warning_logs) > 0, (
-            "No WARNING log about dry-run mode when VOICE_DRY_RUN is unset. "
-            "Bug condition 1.5: silent dry-run default disables TTS without operator notice."
-        )
+        assert surface.dry_run is False
+        warning_logs = [record for record in caplog.records if record.levelno >= logging.WARNING]
+        assert len(warning_logs) == 0
 
     @given(st.just(None))
     @settings(max_examples=3, suppress_health_check=[HealthCheck.function_scoped_fixture])
-    def test_unset_env_var_always_warns_property(self, _):
-        """Property: Whenever VOICE_DRY_RUN is unset, a WARNING log is emitted.
-
-        **Validates: Requirements 1.5**
-        """
+    def test_unset_env_var_defaults_live_property(self, _):
+        """Property: Whenever VOICE_DRY_RUN is unset, live mode is selected."""
         import logging as _logging
 
         log_records: list = []
@@ -376,13 +362,8 @@ class TestSilentDryRun:
             with patch.dict(os.environ, env, clear=True):
                 surface = VoiceSurface()
 
-            warning_logs = [
-                r for r in log_records
-                if r.levelno >= _logging.WARNING
-                and ("dry" in r.message.lower() or "DRY_RUN" in r.message)
-            ]
-            assert len(warning_logs) > 0, (
-                "VOICE_DRY_RUN unset but no WARNING emitted about dry-run mode."
-            )
+            assert surface.dry_run is False
+            warning_logs = [r for r in log_records if r.levelno >= _logging.WARNING]
+            assert len(warning_logs) == 0
         finally:
             logger.removeHandler(handler)
