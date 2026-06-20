@@ -23,6 +23,10 @@ services:
       - TTS_ENDPOINT=http://localhost:7860
       - VOICE_HEALTH_URL=http://localhost:7860
       - AVATAR_HEALTH_URL=http://localhost:8188
+      - NATS_URL=nats://localhost:4222
+      - REDIS_URL=redis://localhost:6379
+      - DATABASE_URL=postgresql://god:${POSTGRES_PASSWORD}@localhost:5432/god
+      - IPFS_API=http://localhost:5001
 
   db:
     network_mode: host

@@ -19,9 +19,6 @@ REPO_URL="https://github.com/ma-za-kpe/god.git"
 REPO_DIR="/workspace/god"
 # Branch to deploy. Override with: REPO_BRANCH=main bash vast-setup.sh
 REPO_BRANCH="${REPO_BRANCH:-feat/twitch-ne-mo-showrunner}"
-# Optional GitHub token for private repos. Set via: GITHUB_TOKEN=ghp_... bash vast-setup.sh
-# If unset, clones via HTTPS (works for public repos; fails for private).
-GITHUB_TOKEN="${GITHUB_TOKEN:-}"
 OLLAMA_MODEL="${OLLAMA_MODEL:-llama3.1:8b}"
 SKIP_MODELS="${SKIP_MODELS:-0}"
 SKIP_FISH_MODELS="${SKIP_FISH_MODELS:-0}"
@@ -52,10 +49,18 @@ if ! docker compose version &>/dev/null 2>&1; then
 fi
 
 if ! docker info &>/dev/null 2>&1; then
-  log "Starting dockerd (bridge=none, no iptables — Vast.ai container environment)..."
+  log "Starting dockerd (Vast.ai: no bridge, no iptables, vfs storage driver)..."
   rm -f /var/run/docker.sock
   mkdir -p /var/log
-  nohup dockerd --bridge=none --iptables=false --ip-masq=false \
+  # --bridge=none      : no cap_net_admin to create docker0 bridge
+  # --iptables=false   : no nf_tables capability
+  # --storage-driver=vfs : overlayfs bind-mounts are also blocked; vfs works without them
+  #                       (slower — copies layers instead of CoW — but correct in this env)
+  nohup dockerd \
+    --bridge=none \
+    --iptables=false \
+    --ip-masq=false \
+    --storage-driver=vfs \
     > /var/log/dockerd.log 2>&1 &
   for i in $(seq 1 20); do
     docker info &>/dev/null 2>&1 && break
@@ -72,23 +77,16 @@ log "Compose: $(docker compose version)"
 
 # On Vast.ai the NVIDIA Container Toolkit is pre-installed by the host.
 # Verify GPU is visible to Docker:
-if ! docker run --rm --gpus all nvidia/cuda:12.4.1-base-ubuntu22.04 nvidia-smi -L 2>/dev/null; then
+if ! docker run --rm --network host --gpus all nvidia/cuda:12.4.1-base-ubuntu22.04 nvidia-smi -L 2>/dev/null; then
   log "WARNING: GPU not visible to Docker. Check NVIDIA Container Toolkit."
 fi
 
-log "Docker: $(docker --version)"
-log "Compose: $(docker compose version)"
-
 # ── 3. Clone / update repo ────────────────────────────────────────────────────
-# Build the clone URL. Inject a GitHub token if provided (required for private repos).
-if [ -n "$GITHUB_TOKEN" ]; then
-  AUTH_REPO_URL="https://x-access-token:${GITHUB_TOKEN}@github.com/ma-za-kpe/god.git"
-else
-  AUTH_REPO_URL="$REPO_URL"
-fi
-
+# Repo is public — plain HTTPS clone works without credentials.
 if [ -d "$REPO_DIR/.git" ]; then
-  log "Repo exists — pulling latest on branch ${REPO_BRANCH}..."
+  log "Repo exists — syncing branch ${REPO_BRANCH}..."
+  GIT_TERMINAL_PROMPT=0 git -C "$REPO_DIR" fetch origin || true
+  git -C "$REPO_DIR" checkout "$REPO_BRANCH" 2>/dev/null || true
   GIT_TERMINAL_PROMPT=0 git -C "$REPO_DIR" pull || log "WARNING: git pull failed — continuing with existing code"
 else
   log "Cloning ${REPO_URL} (branch: ${REPO_BRANCH})..."
@@ -96,7 +94,7 @@ else
   GIT_TERMINAL_PROMPT=0 git clone \
     --branch "$REPO_BRANCH" \
     --single-branch \
-    "$AUTH_REPO_URL" "$REPO_DIR"
+    "$REPO_URL" "$REPO_DIR"
 fi
 cd "$REPO_DIR"
 
