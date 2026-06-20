@@ -476,6 +476,16 @@
         0 0 24px rgba(84,200,255,0.24),
         0 0 58px rgba(244,201,93,0.08);
       animation: pulse 4s ease-in-out infinite;
+      overflow: hidden;
+      position: relative;
+      flex-shrink: 0;
+    }
+    .avatar-orb img.avatar-portrait {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      border-radius: 50%;
+      display: block;
     }
 
     .active .avatar-orb {
@@ -1581,7 +1591,7 @@
             <div class="agent-name">${fmt(agent.current_name || agent.soul_id)}</div>
             <div class="agent-state">${state}</div>
           </div>
-          <div class="agent-body"><div class="avatar-orb" style="background:${agent.soul_id?.startsWith('empty-') ? 'radial-gradient(circle at center, rgba(255,255,255,0.08), rgba(255,255,255,0.02))' : `radial-gradient(circle at 35% 30%, rgba(255,255,255,0.72), rgba(255,255,255,0.18) 15%, transparent 17%), radial-gradient(circle at center, ${AGENT_COLORS[index % AGENT_COLORS.length]}, rgba(84,200,255,0.52) 36%, rgba(5,8,16,0.15) 74%)`}; opacity:${agent.soul_id?.startsWith('empty-') ? 0.35 : 1}"></div></div>
+          <div class="agent-body"><div class="avatar-orb" style="background:${agent.soul_id?.startsWith('empty-') ? 'radial-gradient(circle at center, rgba(255,255,255,0.08), rgba(255,255,255,0.02))' : `radial-gradient(circle at 35% 30%, rgba(255,255,255,0.72), rgba(255,255,255,0.18) 15%, transparent 17%), radial-gradient(circle at center, ${AGENT_COLORS[index % AGENT_COLORS.length]}, rgba(84,200,255,0.52) 36%, rgba(5,8,16,0.15) 74%)`}; opacity:${agent.soul_id?.startsWith('empty-') ? 0.35 : 1}">${agent.avatar_cid ? `<img class="avatar-portrait" src="${RUNTIME}/ipfs/${agent.avatar_cid}" loading="lazy" onerror="this.style.display='none'">` : ''}</div></div>
           <div class="agent-meta">${tags.map(tag => `<span class="chip"><i></i>${tag}</span>`).join('')}</div>
           ${(isActive || isSecondary) ? `
             <div class="agent-dialogue">

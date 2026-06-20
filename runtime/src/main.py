@@ -9,9 +9,12 @@ import os
 import pathlib
 from contextlib import asynccontextmanager
 
+import httpx
 import uvicorn
-from fastapi import FastAPI, Header, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, Header, Response, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 
 from .agent_runner import agent_runner
 from .creator.routes import router as creator_router
@@ -128,6 +131,34 @@ app.add_middleware(
 
 app.include_router(services_router)
 app.include_router(creator_router)
+
+_OBSERVER_DIR = pathlib.Path(__file__).parent.parent.parent / "observer"
+if _OBSERVER_DIR.is_dir():
+    app.mount("/observer", StaticFiles(directory=str(_OBSERVER_DIR), html=True), name="observer")
+
+
+@app.get("/stage")
+async def stage_page():
+    """Serve the stage UI directly at /stage."""
+    f = _OBSERVER_DIR / "stage.html"
+    if f.exists():
+        return FileResponse(str(f), media_type="text/html")
+    return Response("stage not found", status_code=404)
+
+
+@app.get("/ipfs/{cid}")
+async def proxy_ipfs(cid: str):
+    """Proxy IPFS content through the local node so the browser tunnel can load images."""
+    ipfs_api = os.getenv("IPFS_API", "http://localhost:5001")
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            r = await client.post(f"{ipfs_api}/api/v0/cat?arg={cid}")
+            if r.status_code != 200:
+                return Response(status_code=502)
+            content_type = "image/png" if r.content[:4] == b"\x89PNG" else "application/octet-stream"
+            return Response(content=r.content, media_type=content_type)
+    except Exception:
+        return Response(status_code=502)
 
 
 @app.get("/health")
