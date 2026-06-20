@@ -99,14 +99,21 @@ fi
 
 # ── GOD runtime ───────────────────────────────────────────────────────────────
 log "Starting GOD runtime..."
-if ! pgrep -f "uvicorn src.main" &>/dev/null; then
-  cd "$REPO_DIR/runtime"
-  source /opt/god-venv/bin/activate
-  set -a; source "$REPO_DIR/.env.local"; set +a
-  nohup python3 -m uvicorn src.main:app --host 0.0.0.0 --port 8888 \
-    > "$LOG_DIR/runtime.log" 2>&1 &
+# Force-kill any stale uvicorn process (prevents stuck-18:04-style ghost)
+UVICORN_PIDS=$(pgrep -f "uvicorn src.main" 2>/dev/null || true)
+if [ -n "$UVICORN_PIDS" ]; then
+  log "Killing existing uvicorn PIDs: $UVICORN_PIDS"
+  kill -9 $UVICORN_PIDS 2>/dev/null || true
+  sleep 2
 fi
-sleep 5
+fuser -k 8888/tcp 2>/dev/null || true
+sleep 1
+cd "$REPO_DIR/runtime"
+source /opt/god-venv/bin/activate
+set -a; source "$REPO_DIR/.env.local"; set +a
+nohup python3 -m uvicorn src.main:app --host 0.0.0.0 --port 8888 \
+  > "$LOG_DIR/runtime.log" 2>&1 &
+sleep 8
 curl -sf http://localhost:8888/health &>/dev/null && log "Runtime OK" || log "WARNING: runtime not responding"
 
 # ── Summary ───────────────────────────────────────────────────────────────────
