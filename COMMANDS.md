@@ -302,15 +302,156 @@ ssh -p SSH_PORT -i ~/.ssh/id_ed25519 root@SSH_HOST \
 # Use a smaller model to save VRAM:
 ssh -p SSH_PORT -i ~/.ssh/id_ed25519 root@SSH_HOST \
   'OLLAMA_MODEL=llama3.2:3b nohup bash /root/vast-setup-native.sh > /root/setup-native.log 2>&1 &'
+```
 
-# Check service health after setup:
-ssh -p SSH_PORT -i ~/.ssh/id_ed25519 root@SSH_HOST 'bash -s' << 'EOF'
-curl -sf http://localhost:8888/health && echo "runtime OK"
-curl -sf http://localhost:11434/api/tags && echo "ollama OK"
-curl -sf http://localhost:8188/ && echo "comfyui OK"
-curl -sf http://localhost:7860/ && echo "fish-speech OK"
+#### After a Vast.ai instance reboot (services are stopped, data is preserved)
+
+```bash
+# All downloaded models and the repo survive a reboot — just restart services.
+# 1. Copy the restart script to the instance (once):
+scp -P SSH_PORT -i ~/.ssh/id_ed25519 \
+  scripts/vast-restart-services.sh root@SSH_HOST:/root/
+
+# 2. Run it — brings up Postgres, Redis, NATS, Ollama, ComfyUI, fish-speech, runtime:
+ssh -p SSH_PORT -i ~/.ssh/id_ed25519 root@SSH_HOST \
+  'bash /workspace/god/scripts/vast-restart-services.sh 2>&1 | tee /root/restart.log'
+```
+
+#### Manual steps after setup (run if setup script fails mid-way)
+
+```bash
+# ── Fix missing portaudio header (needed by fish-speech/pyaudio) ─────────────
+# vast-setup-native.sh includes portaudio19-dev now; run manually on older instances.
+apt-get install -y portaudio19-dev
+
+# ── Re-run fish-speech uv sync after installing portaudio ────────────────────
+# uv lives in /opt/god-venv/bin, not on system PATH — find it explicitly:
+UV=$(find /opt/god-venv/bin /root/.local/bin -name uv -type f 2>/dev/null | head -1)
+cd /opt/fish-speech && "$UV" sync --no-dev --quiet
+
+# ── Initialize DB schema from the base SQL file ───────────────────────────────
+# Needed on first deploy — init-db.sql creates the full 33-table schema.
+# ensure_schema() / alembic only add/migrate columns on an existing schema.
+source /opt/god-venv/bin/activate
+set -a; source /workspace/god/.env.local; set +a
+PGPASS=$(echo $DATABASE_URL | sed 's|.*://[^:]*:\([^@]*\)@.*|\1|')
+PGPASSWORD="$PGPASS" psql -U god -d god -h localhost \
+  -f /workspace/god/scripts/init-db.sql
+
+# ── Restart the runtime after schema init ────────────────────────────────────
+pkill -f "uvicorn src.main" 2>/dev/null || true
+sleep 2
+source /opt/god-venv/bin/activate
+set -a; source /workspace/god/.env.local; set +a
+cd /workspace/god/runtime
+nohup python3 -m uvicorn src.main:app --host 0.0.0.0 --port 8888 \
+  > /var/log/god/runtime.log 2>&1 &
+echo "runtime PID=$!"
+
+# ── Start Ollama with VRAM release between requests ──────────────────────────
+# OLLAMA_KEEP_ALIVE=0 unloads the model immediately after each request,
+# freeing GPU VRAM for ComfyUI portrait generation and fish-speech voice.
+# Without this, Ollama holds the GPU and both GPU services will OOM.
+pkill -x ollama 2>/dev/null; sleep 2
+OLLAMA_KEEP_ALIVE=0 nohup ollama serve > /var/log/god/ollama.log 2>&1 &
+echo "Ollama PID=$!"
+
+# ── Start ComfyUI (portrait generation) ─────────────────────────────────────
+# CUDA_VISIBLE_DEVICES must NOT be empty string — unset it if so.
+# Empty string hides GPUs from CUDA even though nvidia-smi still sees them.
+[ -z "${CUDA_VISIBLE_DEVICES:-}" ] && unset CUDA_VISIBLE_DEVICES
+source /opt/god-venv/bin/activate
+cd /opt/ComfyUI
+nohup python3 main.py --listen 0.0.0.0 --port 8188 --disable-auto-launch \
+  > /var/log/god/comfyui.log 2>&1 &
+echo "ComfyUI PID=$!"
+
+# ── Start fish-speech API server (after models are downloaded) ────────────────
+UV=$(find /opt/god-venv/bin /root/.local/bin -name uv -type f 2>/dev/null | head -1)
+cd /opt/fish-speech
+# Unset empty CUDA_VISIBLE_DEVICES before launching fish-speech (same issue as ComfyUI)
+[ -z "${CUDA_VISIBLE_DEVICES:-}" ] && unset CUDA_VISIBLE_DEVICES
+nohup "$UV" run tools/api_server.py \
+  --llama-checkpoint-path checkpoints \
+  --decoder-checkpoint-path checkpoints/codec.pth \
+  --decoder-config-name modded_dac_vq \
+  --device cuda \
+  --listen 0.0.0.0:7860 \
+  > /var/log/god/fish-speech.log 2>&1 &
+echo "fish-speech PID=$!"
+```
+
+#### GPU troubleshooting (CUDA errors on Vast.ai)
+
+```bash
+# ── Symptom: "CUDA-capable device(s) is/are busy or unavailable" ─────────────
+# torch.cuda.is_available() returns True but tensor creation fails.
+# Cause: CUDA_VISIBLE_DEVICES="" (empty string) hides GPUs from CUDA,
+#        or a zombie CUDA context left by a crashed process.
+
+# Check GPU state — look for processes with nvidia memory mappings:
+nvidia-smi
+nvidia-smi --query-gpu=utilization.gpu,memory.used,memory.free --format=csv,noheader
+
+# Fix 1: Unset empty CUDA_VISIBLE_DEVICES (Vast.ai sometimes sets it to ""):
+echo "CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES"   # is it empty?
+unset CUDA_VISIBLE_DEVICES
+CUDA_VISIBLE_DEVICES=0 python3 -c "import torch; print(torch.zeros(1).cuda())"
+
+# Fix 2: Kill any zombie process holding a CUDA context:
+for pid in $(ls /proc/ | grep -E "^[0-9]+$"); do
+  grep -l nvidia /proc/$pid/maps 2>/dev/null && \
+    echo "PID $pid: $(cat /proc/$pid/cmdline 2>/dev/null | tr \\0 ' ' | head -c 60)"
+done
+# kill -9 <PID> for any stuck GPU process
+
+# Fix 3: Restart Ollama with KEEP_ALIVE=0 so it frees VRAM between requests:
+pkill -x ollama; sleep 3
+OLLAMA_KEEP_ALIVE=0 nohup ollama serve > /var/log/god/ollama.log 2>&1 &
+# Force Ollama to unload any currently loaded model:
+curl -sf http://localhost:11434/api/generate \
+  -d '{"model":"llama3.1:8b","keep_alive":0}' > /dev/null
+
+# Fix 4: If GPU context is truly stuck and modprobe is unavailable in container,
+#        reboot the instance (data on disk is preserved, only processes are lost):
+#   From your local machine:
+#   scripts\vastai.cmd reboot instance INSTANCE_ID
+#   Then run: bash /workspace/god/scripts/vast-restart-services.sh
+```
+
+#### Service health checks (on the instance)
+
+```bash
+# Check all core services in one shot
+curl -sf http://localhost:8888/health && echo "runtime OK" || echo "runtime DOWN"
+curl -sf http://localhost:11434/api/tags && echo "ollama OK" || echo "ollama DOWN"
+curl -sf http://localhost:8188/ && echo "comfyui OK" || echo "comfyui DOWN"
+curl -sf http://localhost:7860/ && echo "fish-speech OK" || echo "fish-speech DOWN"
 redis-cli ping
-EOF
+pgrep -x nats-server && echo "nats OK" || echo "nats DOWN"
+
+# Check service logs
+tail -50 /var/log/god/runtime.log
+tail -50 /var/log/god/fish-speech.log
+tail -50 /var/log/god/comfyui.log
+tail -50 /var/log/god/ollama.log
+```
+
+#### Genesis (after all services are healthy)
+
+```bash
+# Run genesis to spawn the full 8-archetype cast.
+# The DB schema (scripts/init-db.sql) must be applied first.
+curl -s -X POST http://localhost:8888/creator/genesis \
+  -H 'Content-Type: application/json' \
+  -d '{"confirm": true}' | python3 -m json.tool
+
+# Verify agents were created
+curl -s http://localhost:8888/agents | python3 -c \
+  "import json,sys; agents=json.load(sys.stdin); print(f'{len(agents)} agents')"
+
+# Check world snapshot (shows scene, speaker, agent stats)
+curl -s http://localhost:8888/world/snapshot | python3 -m json.tool
 ```
 
 ### Automated provisioning scripts

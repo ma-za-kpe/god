@@ -38,6 +38,7 @@ apt-get install -y -qq \
   python3-pip python3-venv python3-dev \
   build-essential libssl-dev libffi-dev \
   ffmpeg libsndfile1 \
+  portaudio19-dev \
   nodejs npm
 
 # ── 2. NATS server ────────────────────────────────────────────────────────────
@@ -145,7 +146,9 @@ log ".env.local written"
 # ── 10. Ollama daemon + model ─────────────────────────────────────────────────
 log "Starting Ollama daemon..."
 if ! pgrep -x ollama &>/dev/null; then
-  nohup ollama serve > "$LOG_DIR/ollama.log" 2>&1 &
+  # OLLAMA_KEEP_ALIVE=0 unloads the model from VRAM after each request,
+  # freeing GPU memory for ComfyUI and fish-speech between LLM calls.
+  OLLAMA_KEEP_ALIVE=0 nohup ollama serve > "$LOG_DIR/ollama.log" 2>&1 &
 fi
 log "Waiting for Ollama..."
 for i in $(seq 1 30); do
@@ -181,6 +184,8 @@ print('SDXL ready')
 
   # Start ComfyUI in background
   log "Starting ComfyUI on :8188..."
+  # Unset empty CUDA_VISIBLE_DEVICES — empty string hides GPUs from CUDA
+  [ -z "${CUDA_VISIBLE_DEVICES:-}" ] && unset CUDA_VISIBLE_DEVICES
   nohup python3 main.py --listen 0.0.0.0 --port 8188 --disable-auto-launch \
     > "$LOG_DIR/comfyui.log" 2>&1 &
   cd "$REPO_DIR"
@@ -189,6 +194,7 @@ fi
 # ── 12. fish-speech (optional) ────────────────────────────────────────────────
 if [ "$SKIP_FISH" = "0" ]; then
   log "Installing fish-speech..."
+  # portaudio19-dev must already be installed (step 1) or pyaudio build fails
   if ! command -v uv &>/dev/null; then
     pip install --quiet uv
   fi
@@ -196,7 +202,10 @@ if [ "$SKIP_FISH" = "0" ]; then
     git clone --depth 1 https://github.com/fishaudio/fish-speech /opt/fish-speech
   fi
   cd /opt/fish-speech
-  uv sync --no-dev --quiet
+  # uv lands in the venv bin dir, not system PATH — discover it explicitly
+  UV=$(find /opt/god-venv/bin /root/.local/bin -name uv -type f 2>/dev/null | head -1)
+  UV="${UV:-$(command -v uv)}"
+  "$UV" sync --no-dev --quiet
 
   # Download fish-speech 1.5 models
   log "Downloading fish-speech 1.5 models (~10.4 GB)..."
@@ -213,7 +222,9 @@ print('fish-speech models ready')
 
   # Start fish-speech API server
   log "Starting fish-speech on :7860..."
-  nohup uv run tools/api_server.py \
+  # Unset CUDA_VISIBLE_DEVICES if empty — empty string hides GPUs from CUDA
+  [ -z "${CUDA_VISIBLE_DEVICES:-}" ] && unset CUDA_VISIBLE_DEVICES
+  nohup "$UV" run tools/api_server.py \
     --llama-checkpoint-path checkpoints \
     --decoder-checkpoint-path checkpoints/codec.pth \
     --decoder-config-name modded_dac_vq \
@@ -223,13 +234,18 @@ print('fish-speech models ready')
   cd "$REPO_DIR"
 fi
 
-# ── 13. Run DB migrations ──────────────────────────────────────────────────────
-log "Running database migrations..."
+# ── 13. Database schema init + migrations ─────────────────────────────────────
+log "Initialising database schema..."
+PGPASSWORD="${POSTGRES_PASSWORD}" psql -U god -d god -h localhost \
+  -f "$REPO_DIR/scripts/init-db.sql" 2>/dev/null || \
+  log "WARNING: init-db.sql failed (schema may already exist — continuing)"
+
+log "Running alembic migrations..."
 cd "$REPO_DIR/runtime"
 source /opt/god-venv/bin/activate
 DATABASE_URL="postgresql://god:${POSTGRES_PASSWORD}@localhost:5432/god" \
   python3 -m alembic upgrade head 2>/dev/null || \
-  log "WARNING: migrations failed (DB may not be ready yet)"
+  log "WARNING: alembic migrations failed (DB may not be ready yet)"
 
 # ── 14. Start the runtime ─────────────────────────────────────────────────────
 log "Starting GOD runtime on :8888..."
