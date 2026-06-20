@@ -63,14 +63,15 @@ class RelationshipMemory:
         if self._pool is not None:
             return self._pool
         try:
-            from db_pool import get_pool
+            try:
+                from ..db_pool import get_pool
+            except ImportError:
+                from db_pool import get_pool  # flat test path
 
             self._pool = await get_pool()
             return self._pool
         except Exception as exc:
-            raise RelationshipMemoryError(
-                f"Failed to acquire database pool: {exc}"
-            ) from exc
+            raise RelationshipMemoryError(f"Failed to acquire database pool: {exc}") from exc
 
     async def record_interaction(self, record: InteractionRecord) -> None:
         """Persist an interaction and update the pair's tension state.
@@ -85,9 +86,7 @@ class RelationshipMemory:
         except RelationshipMemoryError:
             raise
         except Exception as exc:
-            raise RelationshipMemoryError(
-                f"Failed to acquire database pool: {exc}"
-            ) from exc
+            raise RelationshipMemoryError(f"Failed to acquire database pool: {exc}") from exc
 
         pair_id = _compute_pair_id(record.elder_a, record.elder_b)
         sorted_a, sorted_b = _normalize_pair(record.elder_a, record.elder_b)
@@ -112,15 +111,10 @@ class RelationshipMemory:
                 else:
                     pair_state = PairState(
                         tension_level=existing["tension_level"],
-                        last_interaction_ts=float(
-                            existing["last_interaction_ts"]
-                        ),
+                        last_interaction_ts=float(existing["last_interaction_ts"]),
                         reconciliation_arc=existing["reconciliation_arc"],
-                        reconciliation_remaining=existing[
-                            "reconciliation_remaining"
-                        ],
-                        peak_tension_summary=existing["peak_tension_summary"]
-                        or "",
+                        reconciliation_remaining=existing["reconciliation_remaining"],
+                        peak_tension_summary=existing["peak_tension_summary"] or "",
                     )
 
                 # Track whether tension was previously above the high threshold
@@ -135,9 +129,7 @@ class RelationshipMemory:
                 # tension drops below 3 after having exceeded 7
                 if was_above_high and new_tension < _RECONCILIATION_LOW:
                     pair_state.reconciliation_arc = True
-                    pair_state.reconciliation_remaining = (
-                        _RECONCILIATION_INTERACTIONS
-                    )
+                    pair_state.reconciliation_remaining = _RECONCILIATION_INTERACTIONS
                     # Store a summary of the peak tension context
                     pair_state.peak_tension_summary = (
                         f"Tension peaked above {_RECONCILIATION_HIGH} "
@@ -204,9 +196,7 @@ class RelationshipMemory:
         except RelationshipMemoryError:
             raise
         except Exception as exc:
-            raise RelationshipMemoryError(
-                f"Failed to record interaction: {exc}"
-            ) from exc
+            raise RelationshipMemoryError(f"Failed to record interaction: {exc}") from exc
 
     async def get_significant_history(
         self, elder_a: str, elder_b: str, limit: int = 5
@@ -317,9 +307,7 @@ class RelationshipMemory:
             return decayed_tension
 
         except Exception as exc:
-            log.warning(
-                "Failed to get tension for %s/%s: %s", elder_a, elder_b, exc
-            )
+            log.warning("Failed to get tension for %s/%s: %s", elder_a, elder_b, exc)
             return 0
 
     def update_tension(self, pair: PairState, move: str) -> int:
