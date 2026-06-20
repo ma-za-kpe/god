@@ -25,7 +25,12 @@ except ImportError:  # pragma: no cover - flat test path
 class PortraitGenerator:
     """Submit Flux/IP-Adapter workflows to ComfyUI."""
 
-    def __init__(self, comfyui_endpoint: str | None, semaphore: asyncio.Semaphore | None = None, timeout_s: int = 60) -> None:
+    def __init__(
+        self,
+        comfyui_endpoint: str | None,
+        semaphore: asyncio.Semaphore | None = None,
+        timeout_s: int = 60,
+    ) -> None:
         self.comfyui_endpoint = (comfyui_endpoint or "").rstrip("/")
         self.semaphore = semaphore or asyncio.Semaphore(int(os.getenv("COMFYUI_CONCURRENCY", "2")))
         self.timeout_s = timeout_s
@@ -36,12 +41,9 @@ class PortraitGenerator:
         if not self.comfyui_endpoint:
             return False
         try:
-            async with httpx.AsyncClient(timeout=10.0) as client:
+            async with httpx.AsyncClient(timeout=10.0, follow_redirects=False) as client:
                 response = await client.get(f"{self.comfyui_endpoint}/system_stats")
-                if 200 <= response.status_code < 400:
-                    return True
-                response = await client.get(self.comfyui_endpoint)
-                return 200 <= response.status_code < 400
+                return 200 <= response.status_code < 300
         except Exception:
             return False
 
@@ -91,7 +93,8 @@ class PortraitGenerator:
                 replacements={
                     "{{EXPRESSION_PROMPT}}": f"{archetype_prompt}, {expression} expression",
                     "{{NEGATIVE_PROMPT}}": "blurry, low-resolution, malformed, text, watermark",
-                    "{{SEED}}": (seed if seed is not None else self._stable_seed(expression)) + index,
+                    "{{SEED}}": (seed if seed is not None else self._stable_seed(expression))
+                    + index,
                     "{{WIDTH}}": max(512, int(width)),
                     "{{HEIGHT}}": max(512, int(height)),
                     "{{REFERENCE_IMAGE_PATH}}": self._inline_image_reference(portrait_ref),
@@ -141,7 +144,9 @@ class PortraitGenerator:
                     return await self._fetch_comfyui_image(client, entry)
         return None
 
-    async def _fetch_comfyui_image(self, client: httpx.AsyncClient, history_entry: dict[str, Any]) -> bytes | None:
+    async def _fetch_comfyui_image(
+        self, client: httpx.AsyncClient, history_entry: dict[str, Any]
+    ) -> bytes | None:
         for output in history_entry.get("outputs", {}).values():
             for img in output.get("images", []):
                 filename = img.get("filename")
@@ -159,7 +164,9 @@ class PortraitGenerator:
                     return resp.content
         return None
 
-    def _build_workflow_payload(self, *, template_name: str, replacements: dict[str, Any]) -> dict[str, Any]:
+    def _build_workflow_payload(
+        self, *, template_name: str, replacements: dict[str, Any]
+    ) -> dict[str, Any]:
         template = self._load_workflow_template(template_name)
         return self._replace_tokens(template, replacements)
 
@@ -205,6 +212,8 @@ class PortraitGenerator:
         try:
             with Image.open(__import__("io").BytesIO(payload)) as image:
                 image.load()
-                return image.format in {"PNG", "JPEG"} and image.width >= 512 and image.height >= 512
+                return (
+                    image.format in {"PNG", "JPEG"} and image.width >= 512 and image.height >= 512
+                )
         except Exception:
             return False
