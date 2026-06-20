@@ -48,7 +48,7 @@ redis-cli ping &>/dev/null && log "Redis OK" || log "WARNING: Redis not respondi
 # ── NATS ──────────────────────────────────────────────────────────────────────
 log "Starting NATS..."
 if ! pgrep -x nats-server &>/dev/null; then
-  nohup nats-server -p 4222 > "$LOG_DIR/nats.log" 2>&1 &
+  nohup nats-server -p 4222 --jetstream > "$LOG_DIR/nats.log" 2>&1 &
 fi
 sleep 2
 

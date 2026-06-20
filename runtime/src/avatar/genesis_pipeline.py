@@ -60,9 +60,13 @@ class GenesisPipeline:
         tts_concurrency: int | None = None,
     ) -> None:
         validate_archetype_configs()
-        self.comfyui_endpoint = comfyui_endpoint if comfyui_endpoint is not None else os.getenv("COMFYUI_ENDPOINT")
+        self.comfyui_endpoint = (
+            comfyui_endpoint if comfyui_endpoint is not None else os.getenv("COMFYUI_ENDPOINT")
+        )
         self.tts_endpoint = tts_endpoint if tts_endpoint is not None else os.getenv("TTS_ENDPOINT")
-        self.pipeline_timeout_seconds = pipeline_timeout_seconds or int(os.getenv("PIPELINE_TIMEOUT_SECONDS", "300"))
+        self.pipeline_timeout_seconds = pipeline_timeout_seconds or int(
+            os.getenv("PIPELINE_TIMEOUT_SECONDS", "300")
+        )
         self.comfyui_concurrency = comfyui_concurrency or int(os.getenv("COMFYUI_CONCURRENCY", "2"))
         self.tts_concurrency = tts_concurrency or int(os.getenv("TTS_CONCURRENCY", "4"))
         self._comfyui_semaphore = asyncio.Semaphore(self.comfyui_concurrency)
@@ -79,11 +83,19 @@ class GenesisPipeline:
         self._status_registry[soul_id] = result
         self._started_at[soul_id] = time.time()
         start = time.perf_counter()
-        self._log_event("pipeline_start", soul_id=soul_id, archetype=archetype, correlation_id=correlation_id)
+        self._log_event(
+            "pipeline_start", soul_id=soul_id, archetype=archetype, correlation_id=correlation_id
+        )
 
         try:
             completed = await asyncio.wait_for(
-                self._execute_inner(soul_id=soul_id, archetype=archetype, graph=graph, result=result, correlation_id=correlation_id),
+                self._execute_inner(
+                    soul_id=soul_id,
+                    archetype=archetype,
+                    graph=graph,
+                    result=result,
+                    correlation_id=correlation_id,
+                ),
                 timeout=self.pipeline_timeout_seconds,
             )
             return completed
@@ -148,13 +160,25 @@ class GenesisPipeline:
                 portrait_pin = await pin_bytes(portrait_bytes, filename=f"{soul_id}-portrait.png")
                 if not portrait_pin.ok:
                     self._record_failure(result, "portrait", "ipfs_pin_failed")
-                    self._log_step(correlation_id, soul_id, "portrait", False, {"pin_errors": portrait_pin.errors})
+                    self._log_step(
+                        correlation_id,
+                        soul_id,
+                        "portrait",
+                        False,
+                        {"pin_errors": portrait_pin.errors},
+                    )
                     portrait_pin = None
                 if portrait_pin:
                     identity.avatar_cid = portrait_pin.cid
                     result.portrait_cid = portrait_pin.cid
                     result.assets_produced += 1
-                    self._log_step(correlation_id, soul_id, "portrait", True, {"bytes": len(portrait_bytes), "cid": portrait_pin.cid})
+                    self._log_step(
+                        correlation_id,
+                        soul_id,
+                        "portrait",
+                        True,
+                        {"bytes": len(portrait_bytes), "cid": portrait_pin.cid},
+                    )
                 if result.portrait_cid and not identity.avatar_base_cid:
                     identity.avatar_base_cid = identity.avatar_cid
                 identity.avatar_style_prompt = style_config.style_prompt_template
@@ -189,7 +213,9 @@ class GenesisPipeline:
                             result.expression_sheet_cid = manifest_pin.cid
                             result.assets_produced += 1
                         else:
-                            self._record_failure(result, "expression_sheet", "ipfs_manifest_pin_failed")
+                            self._record_failure(
+                                result, "expression_sheet", "ipfs_manifest_pin_failed"
+                            )
                     else:
                         self._record_failure(result, "expression_sheet", "ipfs_pin_failed")
                     self._log_step(
@@ -207,9 +233,13 @@ class GenesisPipeline:
             self._log_step(correlation_id, soul_id, "portrait", False, {"skipped": True})
 
         if await voice_cloner.health_check():
-            voice_result = await voice_cloner.clone_voice(style_config.seed_utterance_path, archetype)
+            voice_result = await voice_cloner.clone_voice(
+                style_config.seed_utterance_path, archetype
+            )
             if voice_result:
-                voice_pin = await pin_bytes(voice_result.embedding_bytes, filename=f"{soul_id}-voice.bin")
+                voice_pin = await pin_bytes(
+                    voice_result.embedding_bytes, filename=f"{soul_id}-voice.bin"
+                )
                 if voice_pin.ok:
                     identity.voice_model_cid = voice_pin.cid
                     identity.voice_params = voice_result.voice_params
@@ -234,7 +264,13 @@ class GenesisPipeline:
         if result.assets_produced > 0:
             await self._persist_identity(graph, soul_id, result, correlation_id)
 
-        result.status = "complete" if result.errors == [] else "partial" if result.assets_produced > 0 else "failed"
+        result.status = (
+            "complete"
+            if result.errors == []
+            else "partial"
+            if result.assets_produced > 0
+            else "failed"
+        )
         return result
 
     async def _persist_identity(
@@ -251,13 +287,26 @@ class GenesisPipeline:
             try:
                 graph_cid = await asyncio.to_thread(graph.pin_to_ipfs)
                 self._update_postgres_graph_cid(soul_id, graph_cid)
-                self._log_step(correlation_id, soul_id, "identity_registration", True, {"graph_cid": graph_cid})
+                self._log_step(
+                    correlation_id, soul_id, "identity_registration", True, {"graph_cid": graph_cid}
+                )
                 return
             except Exception as exc:
                 last_error = exc
-                await asyncio.sleep(min(8, 2 ** attempts))
-        result.errors.append({"step": "identity_registration", "message": str(last_error) if last_error else "pin_failed"})
-        self._log_step(correlation_id, soul_id, "identity_registration", False, {"error": str(last_error) if last_error else "pin_failed"})
+                await asyncio.sleep(min(8, 2**attempts))
+        result.errors.append(
+            {
+                "step": "identity_registration",
+                "message": str(last_error) if last_error else "pin_failed",
+            }
+        )
+        self._log_step(
+            correlation_id,
+            soul_id,
+            "identity_registration",
+            False,
+            {"error": str(last_error) if last_error else "pin_failed"},
+        )
 
     def _update_postgres_graph_cid(self, soul_id: str, graph_cid: str) -> None:
         database_url = os.getenv("DATABASE_URL")
@@ -268,7 +317,9 @@ class GenesisPipeline:
 
             with psycopg2.connect(database_url) as conn:
                 with conn.cursor() as cur:
-                    cur.execute("UPDATE agents SET graph_cid = %s WHERE soul_id = %s", (graph_cid, soul_id))
+                    cur.execute(
+                        "UPDATE agents SET graph_cid = %s WHERE soul_id = %s", (graph_cid, soul_id)
+                    )
                 conn.commit()
         except Exception as exc:
             log.warning("postgres_update_failed soul_id=%s error=%s", soul_id, exc)
@@ -279,7 +330,9 @@ class GenesisPipeline:
     def _log_event(self, event: str, **payload: Any) -> None:
         log.info(json.dumps({"event": event, **payload}, sort_keys=True))
 
-    def _log_step(self, correlation_id: str, soul_id: str, step: str, success: bool, payload: dict[str, Any]) -> None:
+    def _log_step(
+        self, correlation_id: str, soul_id: str, step: str, success: bool, payload: dict[str, Any]
+    ) -> None:
         log.info(
             json.dumps(
                 {

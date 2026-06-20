@@ -92,6 +92,16 @@ async def lifespan(app: FastAPI):
     ensure_schema()
     await init_pool()
 
+    # Bootstrap NATS JetStream before agents start emitting.
+    # Without this the first N emits race to create the stream and most lose.
+    from .event_emitter import get_emitter
+
+    try:
+        await get_emitter()
+        log.info("NATS JetStream ready")
+    except Exception as _js_err:
+        log.warning(f"NATS JetStream bootstrap failed (agents will retry): {_js_err}")
+
     _background_tasks.append(asyncio.create_task(rent_daemon(), name="rent_daemon"))
     _background_tasks.append(asyncio.create_task(agent_runner(), name="agent_runner"))
     _background_tasks.append(asyncio.create_task(status_review_daemon(), name="status_review"))

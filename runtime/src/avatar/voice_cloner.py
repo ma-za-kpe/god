@@ -1,8 +1,9 @@
-"""Fish Speech / CosyVoice voice cloning helpers."""
+"""Fish Speech voice cloning helpers (fish-speech 2.0 / s2-pro)."""
 
 from __future__ import annotations
 
 import asyncio
+import base64
 import os
 from dataclasses import dataclass
 from pathlib import Path
@@ -26,7 +27,12 @@ class VoiceCloneResult:
 class VoiceCloner:
     """Submit zero-shot cloning requests to the TTS service."""
 
-    def __init__(self, tts_endpoint: str | None, semaphore: asyncio.Semaphore | None = None, timeout_s: int = 60) -> None:
+    def __init__(
+        self,
+        tts_endpoint: str | None,
+        semaphore: asyncio.Semaphore | None = None,
+        timeout_s: int = 60,
+    ) -> None:
         self.tts_endpoint = (tts_endpoint or "").rstrip("/")
         self.semaphore = semaphore or asyncio.Semaphore(int(os.getenv("TTS_CONCURRENCY", "4")))
         self.timeout_s = timeout_s
@@ -36,8 +42,13 @@ class VoiceCloner:
             return False
         try:
             async with httpx.AsyncClient(timeout=10.0) as client:
-                response = await client.get(self.tts_endpoint)
-                return 200 <= response.status_code < 300
+                response = await client.get(f"{self.tts_endpoint}/v1/health")
+                if not 200 <= response.status_code < 300:
+                    return False
+                try:
+                    return response.json().get("status") == "ok"
+                except Exception:
+                    return True
         except Exception:
             return False
 
@@ -98,44 +109,43 @@ class VoiceCloner:
         }
 
     async def _submit_clone(self, seed_utterance: bytes, archetype: str) -> bytes | None:
+        # fish-speech 2.0 has no persistent embedding step; reference audio is
+        # passed inline with each /v1/tts call. We do a test synthesis to confirm
+        # the service accepts the voice, then return the seed WAV itself as the
+        # "embedding" so _submit_verification_sample can use it as reference.
         async with self.semaphore:
             async with httpx.AsyncClient(timeout=self.timeout_s) as client:
-                response = await client.post(
-                    f"{self.tts_endpoint}/clone",
-                    files={"seed_utterance": ("seed.wav", seed_utterance, "audio/wav")},
-                    data={"archetype": archetype},
-                )
+                payload = {
+                    "text": f"I am the {archetype}. I emerge from the void.",
+                    "references": [
+                        {"audio": base64.b64encode(seed_utterance).decode(), "text": ""},
+                    ],
+                    "format": "wav",
+                    "streaming": False,
+                }
+                response = await client.post(f"{self.tts_endpoint}/v1/tts", json=payload)
                 if not 200 <= response.status_code < 300:
                     return None
-                if response.headers.get("content-type", "").startswith("application/json"):
-                    payload = response.json()
-                    blob = payload.get("embedding_bytes") or payload.get("embedding")
-                    if isinstance(blob, str):
-                        try:
-                            import base64
-
-                            return base64.b64decode(blob)
-                        except Exception:
-                            return None
-                    if isinstance(blob, bytes):
-                        return blob
-                return response.content or None
+                # The seed WAV itself is the voice identity for future /v1/tts calls.
+                return seed_utterance
 
     async def _submit_verification_sample(
         self,
         embedding: bytes,
         voice_params: dict[str, Any],
     ) -> bytes | None:
+        # embedding here is the seed WAV returned by _submit_clone.
         async with self.semaphore:
             async with httpx.AsyncClient(timeout=self.timeout_s) as client:
-                response = await client.post(
-                    f"{self.tts_endpoint}/speak",
-                    json={
-                        "embedding": embedding.hex(),
-                        "voice_params": voice_params,
-                        "duration_seconds": 4,
-                    },
-                )
+                payload = {
+                    "text": "The world tests those who dare to persist. I endure.",
+                    "references": [
+                        {"audio": base64.b64encode(embedding).decode(), "text": ""},
+                    ],
+                    "format": "wav",
+                    "streaming": False,
+                }
+                response = await client.post(f"{self.tts_endpoint}/v1/tts", json=payload)
                 if not 200 <= response.status_code < 300:
                     return None
                 return response.content or None
@@ -143,8 +153,12 @@ class VoiceCloner:
     def _read_seed_utterance(self, path: str) -> bytes | None:
         if not path:
             return None
+        # archetype_config paths are like "runtime/seed_utterances/trader.wav".
+        # parents[2] = runtime/, parents[3] = project root.
+        # "project_root / path" resolves correctly regardless of CWD.
         candidates = [
             Path(path),
+            Path(__file__).resolve().parents[3] / path,
             Path(__file__).resolve().parents[2] / path,
             Path(__file__).resolve().parents[3] / "runtime" / path,
             Path.cwd() / path,

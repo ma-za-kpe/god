@@ -23,7 +23,16 @@ SEED_BALANCE_USDC = Decimal(os.getenv("SEED_BALANCE_USDC", "0.10"))
 WORLD_ID = os.getenv("WORLD_ID", "local-dev-world-1")
 IPFS_API = os.getenv("IPFS_API", "http://localhost:5001")
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://god:localdev@localhost:5432/god_world")
-AVATAR_GENESIS_ENABLED = os.getenv("AVATAR_GENESIS_ENABLED", "true").lower() in ("1", "true", "yes", "on")
+AVATAR_GENESIS_ENABLED = os.getenv("AVATAR_GENESIS_ENABLED", "true").lower() in (
+    "1",
+    "true",
+    "yes",
+    "on",
+)
+
+# Shared semaphores so concurrent genesis calls don't swamp ComfyUI / fish-speech.
+_comfyui_semaphore = asyncio.Semaphore(int(os.getenv("COMFYUI_CONCURRENCY", "2")))
+_tts_semaphore = asyncio.Semaphore(int(os.getenv("TTS_CONCURRENCY", "2")))
 
 
 def _persist_agent(agent: dict):
@@ -116,7 +125,12 @@ async def seed_one_agent(
         try:
             from .avatar import GenesisPipeline
 
-            pipeline = GenesisPipeline()
+            pipeline = GenesisPipeline(
+                comfyui_concurrency=int(os.getenv("COMFYUI_CONCURRENCY", "2")),
+                tts_concurrency=int(os.getenv("TTS_CONCURRENCY", "2")),
+            )
+            pipeline._comfyui_semaphore = _comfyui_semaphore
+            pipeline._tts_semaphore = _tts_semaphore
             asyncio.create_task(pipeline.execute(soul_id, archetype, graph))
         except Exception as exc:
             log.warning("  Avatar genesis schedule failed for %s: %s", soul_id[:8], exc)
