@@ -164,6 +164,8 @@ async def list_agents(limit: int = 10000):
                 COALESCE(rp.paid_count,  0)          AS rent_paid_count,
                 COALESCE(rp.miss_count,  0)          AS rent_miss_count,
                 COALESCE(ss.is_sleeping, false)      AS is_sleeping,
+                COALESCE(a.avatar_cid, '')           AS avatar_cid,
+                COALESCE(a.voice_model_cid, '')      AS voice_model_cid,
                 e.last_thought
             FROM agents a
             LEFT JOIN (

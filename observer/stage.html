@@ -1102,7 +1102,10 @@
   </div>
 
   <script>
-    const RUNTIME = new URLSearchParams(location.search).get('runtime') || 'http://localhost:8888';
+    const RUNTIME =
+      new URLSearchParams(location.search).get('runtime') ||
+      window.RUNTIME_URL ||
+      'http://localhost:18888';
     const POLL_MS = 3000;
     const STATE = {
       ws: null,

@@ -155,6 +155,10 @@ _MIGRATIONS: list[str] = [
         ON interaction_records(pair_id, timestamp DESC)
         WHERE emotional_valence != 'neutral' OR betrayal OR alliance OR concession
     """,
+    # Avatar genesis: direct CID columns so the /agents API can return them
+    "ALTER TABLE agents ADD COLUMN IF NOT EXISTS avatar_cid TEXT NOT NULL DEFAULT ''",
+    "ALTER TABLE agents ADD COLUMN IF NOT EXISTS voice_model_cid TEXT NOT NULL DEFAULT ''",
+    "ALTER TABLE agents ADD COLUMN IF NOT EXISTS avatar_style_prompt TEXT NOT NULL DEFAULT ''",
 ]
 
 

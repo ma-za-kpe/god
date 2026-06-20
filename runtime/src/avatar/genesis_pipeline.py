@@ -286,7 +286,12 @@ class GenesisPipeline:
             attempts += 1
             try:
                 graph_cid = await asyncio.to_thread(graph.pin_to_ipfs)
-                self._update_postgres_graph_cid(soul_id, graph_cid)
+                self._update_postgres_graph_cid(
+                    soul_id,
+                    graph_cid,
+                    avatar_cid=result.portrait_cid or "",
+                    voice_model_cid=result.voice_embedding_cid or "",
+                )
                 self._log_step(
                     correlation_id, soul_id, "identity_registration", True, {"graph_cid": graph_cid}
                 )
@@ -308,7 +313,13 @@ class GenesisPipeline:
             {"error": str(last_error) if last_error else "pin_failed"},
         )
 
-    def _update_postgres_graph_cid(self, soul_id: str, graph_cid: str) -> None:
+    def _update_postgres_graph_cid(
+        self,
+        soul_id: str,
+        graph_cid: str,
+        avatar_cid: str = "",
+        voice_model_cid: str = "",
+    ) -> None:
         database_url = os.getenv("DATABASE_URL")
         if not database_url:
             return
@@ -318,7 +329,12 @@ class GenesisPipeline:
             with psycopg2.connect(database_url) as conn:
                 with conn.cursor() as cur:
                     cur.execute(
-                        "UPDATE agents SET graph_cid = %s WHERE soul_id = %s", (graph_cid, soul_id)
+                        """UPDATE agents
+                           SET graph_cid = %s,
+                               avatar_cid = CASE WHEN %s != '' THEN %s ELSE avatar_cid END,
+                               voice_model_cid = CASE WHEN %s != '' THEN %s ELSE voice_model_cid END
+                           WHERE soul_id = %s""",
+                        (graph_cid, avatar_cid, avatar_cid, voice_model_cid, voice_model_cid, soul_id),
                     )
                 conn.commit()
         except Exception as exc:
