@@ -34,11 +34,12 @@ services:
       retries: 10
       start_period: 30s
 
-  # ─── fish-speech: use the pre-built patch image (no warm-up, CUDA mode) ────
-  # vast-setup.sh builds `fish-patch` before compose runs; referencing it here
-  # prevents compose from ignoring that build and re-building from the Dockerfile.
+  # ─── fish-speech: upstream image + CUDA mode ────────────────────────────────
+  # On Vast.ai (64 GB RAM) the warm-up inference won't OOM, so no patched image
+  # is needed. The warm-up runs once on first boot (~30 s); subsequent requests
+  # are fast. Override entrypoint to force CUDA instead of CPU.
   fish-speech:
-    image: fish-patch
+    image: fishaudio/fish-speech:latest
     entrypoint:
       - "sh"
       - "-c"

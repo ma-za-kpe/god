@@ -17,6 +17,11 @@ set -euo pipefail
 
 REPO_URL="https://github.com/ma-za-kpe/god.git"
 REPO_DIR="/workspace/god"
+# Branch to deploy. Override with: REPO_BRANCH=main bash vast-setup.sh
+REPO_BRANCH="${REPO_BRANCH:-feat/twitch-ne-mo-showrunner}"
+# Optional GitHub token for private repos. Set via: GITHUB_TOKEN=ghp_... bash vast-setup.sh
+# If unset, clones via HTTPS (works for public repos; fails for private).
+GITHUB_TOKEN="${GITHUB_TOKEN:-}"
 OLLAMA_MODEL="${OLLAMA_MODEL:-llama3.1:8b}"
 SKIP_MODELS="${SKIP_MODELS:-0}"
 SKIP_FISH_MODELS="${SKIP_FISH_MODELS:-0}"
@@ -75,13 +80,23 @@ log "Docker: $(docker --version)"
 log "Compose: $(docker compose version)"
 
 # ── 3. Clone / update repo ────────────────────────────────────────────────────
-if [ -d "$REPO_DIR/.git" ]; then
-  log "Repo exists — pulling latest..."
-  git -C "$REPO_DIR" pull
+# Build the clone URL. Inject a GitHub token if provided (required for private repos).
+if [ -n "$GITHUB_TOKEN" ]; then
+  AUTH_REPO_URL="https://x-access-token:${GITHUB_TOKEN}@github.com/ma-za-kpe/god.git"
 else
-  log "Cloning ${REPO_URL}..."
+  AUTH_REPO_URL="$REPO_URL"
+fi
+
+if [ -d "$REPO_DIR/.git" ]; then
+  log "Repo exists — pulling latest on branch ${REPO_BRANCH}..."
+  GIT_TERMINAL_PROMPT=0 git -C "$REPO_DIR" pull || log "WARNING: git pull failed — continuing with existing code"
+else
+  log "Cloning ${REPO_URL} (branch: ${REPO_BRANCH})..."
   mkdir -p /workspace
-  git clone "$REPO_URL" "$REPO_DIR"
+  GIT_TERMINAL_PROMPT=0 git clone \
+    --branch "$REPO_BRANCH" \
+    --single-branch \
+    "$AUTH_REPO_URL" "$REPO_DIR"
 fi
 cd "$REPO_DIR"
 
@@ -116,9 +131,11 @@ EOF
 
 log ".env.local written"
 
-# ── 5. Build fish-speech image (no-warmup patch) ─────────────────────────────
-log "Building patched fish-speech image..."
-docker build -t fish-patch ./fish-speech
+# ── 5. Pre-pull fish-speech base image ───────────────────────────────────────
+# No custom build needed on Vast.ai (64 GB RAM — warm-up won't OOM).
+# Pull in advance so compose startup doesn't time out on a 10 GB download.
+log "Pulling fishaudio/fish-speech:latest..."
+docker pull --quiet fishaudio/fish-speech:latest || log "WARNING: pull failed — compose will retry"
 
 # ── 6. Download fish-speech 1.5 models (~10.4 GB) ───────────────────────────
 if [ "$SKIP_MODELS" = "0" ] && [ "$SKIP_FISH_MODELS" = "0" ]; then
