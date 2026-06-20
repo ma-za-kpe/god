@@ -32,7 +32,10 @@ export DEBIAN_FRONTEND=noninteractive
 apt-get update -qq
 apt-get install -y -qq curl git openssl ca-certificates python3-pip
 
-# ── 2. Docker CE ─────────────────────────────────────────────────────────────
+# ── 2. Docker ────────────────────────────────────────────────────────────────
+# Vast.ai instances run as unprivileged containers — no systemd, no cap_net_admin.
+# Docker CE installs fine but the daemon can't create bridge networks.
+# Fix: start dockerd with --bridge=none --iptables=false and use host networking.
 if ! command -v docker &>/dev/null; then
   log "Installing Docker CE..."
   curl -fsSL https://get.docker.com | sh
@@ -43,26 +46,24 @@ if ! docker compose version &>/dev/null 2>&1; then
   apt-get install -y -qq docker-compose-plugin
 fi
 
-# Vast.ai runs as a container (no systemd). Start dockerd directly.
-# --iptables=false: the host kernel doesn't grant nf_tables caps to nested containers.
-# Containers communicate via host-network mode; that is handled in the compose files.
 if ! docker info &>/dev/null 2>&1; then
-  log "Starting Docker daemon (no systemd — using dockerd directly)..."
+  log "Starting dockerd (bridge=none, no iptables — Vast.ai container environment)..."
+  rm -f /var/run/docker.sock
   mkdir -p /var/log
-  nohup dockerd --iptables=false > /var/log/dockerd.log 2>&1 &
-  DOCKERD_PID=$!
-  log "dockerd started (PID=${DOCKERD_PID}), waiting for socket..."
-  for i in $(seq 1 30); do
+  nohup dockerd --bridge=none --iptables=false --ip-masq=false \
+    > /var/log/dockerd.log 2>&1 &
+  for i in $(seq 1 20); do
     docker info &>/dev/null 2>&1 && break
     sleep 2
   done
   if ! docker info &>/dev/null 2>&1; then
-    log "ERROR: Docker daemon failed to start. See /var/log/dockerd.log"
+    log "ERROR: Docker daemon failed to start:"
     cat /var/log/dockerd.log
     exit 1
   fi
 fi
-log "Docker daemon ready"
+log "Docker: $(docker --version)"
+log "Compose: $(docker compose version)"
 
 # On Vast.ai the NVIDIA Container Toolkit is pre-installed by the host.
 # Verify GPU is visible to Docker:
@@ -103,11 +104,14 @@ AVATAR_GENESIS_ENABLED=true
 AVATAR_ENABLED=true
 
 # Voice — fish-speech on CUDA
+# With host networking, all services are reachable on localhost
 VOICE_ENABLED=true
-VOICE_HEALTH_URL=http://fish-speech:7860
+VOICE_HEALTH_URL=http://localhost:7860
 
 # ComfyUI
-AVATAR_HEALTH_URL=http://comfyui:8188
+AVATAR_HEALTH_URL=http://localhost:8188
+COMFYUI_ENDPOINT=http://localhost:8188
+TTS_ENDPOINT=http://localhost:7860
 EOF
 
 log ".env.local written"
@@ -119,7 +123,9 @@ docker build -t fish-patch ./fish-speech
 # ── 6. Download fish-speech 1.5 models (~10.4 GB) ───────────────────────────
 if [ "$SKIP_MODELS" = "0" ] && [ "$SKIP_FISH_MODELS" = "0" ]; then
   log "Downloading fish-speech 1.5 models into Docker volume (~10.4 GB, takes ~5 min)..."
+  # --network host: with bridge disabled, containers need host networking to reach HuggingFace
   docker run --rm \
+    --network host \
     -v god_fish_speech_checkpoints:/checkpoints \
     python:3.11-slim \
     bash -c "
@@ -143,6 +149,7 @@ fi
 if [ "$SKIP_MODELS" = "0" ] && [ "$SKIP_SDXL" = "0" ]; then
   log "Downloading SDXL base 1.0 checkpoint (~6.5 GB, takes ~3 min)..."
   docker run --rm \
+    --network host \
     -v god_comfyui_models:/models \
     python:3.11-slim \
     bash -c "
@@ -165,9 +172,12 @@ fi
 
 # ── 8. Start the full stack ───────────────────────────────────────────────────
 log "Starting GOD stack..."
+# docker-compose.vast-hostnet.yml switches all services to network_mode: host
+# because Vast.ai containers lack cap_net_admin (bridge networks not allowed).
 docker compose \
   -f docker-compose.yml \
   -f docker-compose.vast.yml \
+  -f docker-compose.vast-hostnet.yml \
   --profile fish-speech \
   up -d
 

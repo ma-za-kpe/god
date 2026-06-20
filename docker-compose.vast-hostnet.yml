@@ -1,0 +1,59 @@
+# Host-network override for Vast.ai instances.
+# Vast.ai containers lack cap_net_admin, so bridge networks can't be created.
+# This file switches every service to network_mode: host so Docker uses the host
+# network namespace directly. Services find each other via localhost instead of
+# container-name DNS.
+#
+# Usage (via vast-setup.sh):
+#   docker compose \
+#     -f docker-compose.yml \
+#     -f docker-compose.vast.yml \
+#     -f docker-compose.vast-hostnet.yml \
+#     --profile fish-speech up -d
+
+services:
+
+  runtime:
+    network_mode: host
+    networks: !reset []
+    environment:
+      # With host networking, services are on localhost — not container-name DNS.
+      - OLLAMA_BASE_URL=http://localhost:11434
+      - COMFYUI_ENDPOINT=http://localhost:8188
+      - TTS_ENDPOINT=http://localhost:7860
+      - VOICE_HEALTH_URL=http://localhost:7860
+      - AVATAR_HEALTH_URL=http://localhost:8188
+
+  db:
+    network_mode: host
+    networks: !reset []
+
+  redis:
+    network_mode: host
+    networks: !reset []
+
+  nats:
+    network_mode: host
+    networks: !reset []
+
+  anvil:
+    network_mode: host
+    networks: !reset []
+
+  ipfs:
+    network_mode: host
+    networks: !reset []
+
+  comfyui:
+    network_mode: host
+    networks: !reset []
+
+  ollama:
+    network_mode: host
+    networks: !reset []
+
+  fish-speech:
+    network_mode: host
+    networks: !reset []
+
+networks: !reset {}

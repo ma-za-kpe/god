@@ -1,0 +1,64 @@
+# Vast.ai override — GPU mode, fully self-contained (no external API keys)
+# Usage: docker compose -f docker-compose.yml -f docker-compose.vast.yml --profile fish-speech up -d
+#
+# What changes vs local:
+#   - ollama: added as a container (GPU-accelerated, replaces host.docker.internal:11434)
+#   - fish-speech: --device cuda (RTX 4090 handles 6.5 GB easily)
+#   - runtime: OLLAMA_BASE_URL → the ollama container; SDXL portrait templates
+#   - comfyui: WEB_ENABLE_AUTH=false (already in main compose, kept here for explicitness)
+
+services:
+
+  # ─── Local LLM: Ollama (GPU) ─────────────────────────────────────────────
+  ollama:
+    image: ollama/ollama:latest
+    container_name: god-ollama
+    volumes:
+      - ollama_models:/root/.ollama
+    ports:
+      - "11434:11434"
+    networks:
+      - god-net
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:11434/api/tags || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  # ─── fish-speech: use the pre-built patch image (no warm-up, CUDA mode) ────
+  # vast-setup.sh builds `fish-patch` before compose runs; referencing it here
+  # prevents compose from ignoring that build and re-building from the Dockerfile.
+  fish-speech:
+    image: fish-patch
+    entrypoint:
+      - "sh"
+      - "-c"
+      - "cd /app && uv run tools/api_server.py --llama-checkpoint-path checkpoints --decoder-checkpoint-path checkpoints/codec.pth --decoder-config-name modded_dac_vq --device cuda --listen 0.0.0.0:7860"
+
+  # ─── runtime: point LLM at the ollama container ──────────────────────────
+  runtime:
+    environment:
+      - LLM_PROVIDER=ollama
+      - LLM_MODEL=llama3.1:8b
+      - OLLAMA_BASE_URL=http://ollama:11434
+      - COMFYUI_PORTRAIT_TEMPLATE=sdxl_portrait.json
+      - COMFYUI_EXPRESSION_TEMPLATE=sdxl_expression.json
+      - VOICE_HEALTH_URL=http://fish-speech:7860
+      - AVATAR_HEALTH_URL=http://comfyui:8188
+      - AVATAR_GENESIS_ENABLED=true
+      - AVATAR_ENABLED=true
+    depends_on:
+      ollama:
+        condition: service_healthy
+
+volumes:
+  ollama_models:
