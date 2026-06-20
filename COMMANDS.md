@@ -253,8 +253,14 @@ scripts\vastai.cmd show instance INSTANCE_ID
 scripts\vastai.cmd ssh-url INSTANCE_ID
 
 # Attach your SSH key to a running instance if it was registered after launch.
-# The wrapper mounts the local SSH directory, so pass the container path.
-scripts\vastai.cmd attach ssh INSTANCE_ID /root/.ssh/id_ed25519.pub
+# IMPORTANT: pass the key *content* as a string — the vastai CLI interprets
+# the argument as a literal string, NOT a file path to read.
+PUB=$(cat ~/.ssh/id_ed25519.pub)
+docker run --rm \
+  -v "$(pwd)/vastai:/vastai" \
+  -v "$HOME/.config/vastai:/root/.config/vastai" \
+  god-vastai-cli:latest \
+  python /vastai attach ssh INSTANCE_ID "$PUB"
 
 # Destroy an instance when done — billing stops immediately.
 scripts\vastai.cmd destroy instance INSTANCE_ID
@@ -262,24 +268,49 @@ scripts\vastai.cmd destroy instance INSTANCE_ID
 
 ### Deploy the GOD stack
 
-```bash
-# 1. Copy the setup script to the instance.
-#    SSH_HOST and SSH_PORT come from `show instances` (e.g. ssh2.vast.ai 30044).
-scp -P SSH_PORT -i ~/.ssh/id_ed25519 scripts/vast-setup.sh root@SSH_HOST:/root/
+> **Note**: Standard Vast.ai container instances lack `CAP_SYS_ADMIN`, making
+> Docker-in-Docker impossible (overlayfs mounts blocked, user-namespace creation blocked).
+> Use `vast-setup-native.sh` which runs all services directly on the host — no Docker needed.
 
-# 2. Launch setup in the background so it survives disconnects (~20 min total).
-#    Installs Docker CE, clones repo, downloads SDXL + fish-speech models, starts stack.
+```bash
+# 1. Copy the native setup script to the instance.
+#    SSH_HOST and SSH_PORT come from `show instances` (e.g. ssh8.vast.ai 35402).
+scp -P SSH_PORT -i ~/.ssh/id_ed25519 scripts/vast-setup-native.sh root@SSH_HOST:/root/
+
+# 2. Launch in the background — survives disconnects.
+#    Installs Postgres/Redis/NATS/Ollama/ComfyUI/fish-speech natively (~30 min total).
 ssh -p SSH_PORT -i ~/.ssh/id_ed25519 root@SSH_HOST \
-  'nohup bash /root/vast-setup.sh > /root/setup.log 2>&1 & echo "PID=$!"'
+  'nohup bash /root/vast-setup-native.sh > /root/setup-native.log 2>&1 & echo "PID=$!"'
 
 # 3. Follow the setup log in real time (Ctrl-C to detach without killing setup).
-ssh -p SSH_PORT -i ~/.ssh/id_ed25519 root@SSH_HOST 'tail -f /root/setup.log'
+ssh -p SSH_PORT -i ~/.ssh/id_ed25519 root@SSH_HOST 'tail -f /root/setup-native.log'
 
-# 4. Run genesis once ComfyUI is healthy (~2 min after setup finishes).
-#    INSTANCE_IP is the public IP printed at the end of setup.log.
+# 4. Run genesis once runtime is healthy.
+#    INSTANCE_IP is the public IP printed at the end of setup-native.log.
 curl -s -X POST http://INSTANCE_IP:8888/creator/genesis \
   -H 'Content-Type: application/json' \
   -d '{"confirm": true}' | python3 -m json.tool
+```
+
+#### Setup overrides (env vars)
+
+```bash
+# Skip ComfyUI + fish-speech for a fast LLM-only deploy (~5 min):
+ssh -p SSH_PORT -i ~/.ssh/id_ed25519 root@SSH_HOST \
+  'SKIP_FISH=1 SKIP_COMFYUI=1 nohup bash /root/vast-setup-native.sh > /root/setup-native.log 2>&1 &'
+
+# Use a smaller model to save VRAM:
+ssh -p SSH_PORT -i ~/.ssh/id_ed25519 root@SSH_HOST \
+  'OLLAMA_MODEL=llama3.2:3b nohup bash /root/vast-setup-native.sh > /root/setup-native.log 2>&1 &'
+
+# Check service health after setup:
+ssh -p SSH_PORT -i ~/.ssh/id_ed25519 root@SSH_HOST 'bash -s' << 'EOF'
+curl -sf http://localhost:8888/health && echo "runtime OK"
+curl -sf http://localhost:11434/api/tags && echo "ollama OK"
+curl -sf http://localhost:8188/ && echo "comfyui OK"
+curl -sf http://localhost:7860/ && echo "fish-speech OK"
+redis-cli ping
+EOF
 ```
 
 ### Automated provisioning scripts
