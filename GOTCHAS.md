@@ -52,6 +52,25 @@ or environment issues.
   use and reuses it afterward. The first call is slower; later calls skip the
   `pip install` step entirely.
 
+## Vast.ai — Docker-in-Docker
+
+Vast.ai instances are unprivileged containers. Two capabilities are blocked:
+
+| Blocked | Effect |
+|---------|--------|
+| `cap_net_admin` | Can't create `docker0` bridge network |
+| overlayfs bind-mounts | `docker pull` / `docker build` fail with "operation not permitted" |
+
+`vast-setup.sh` works around both:
+- `--bridge=none --iptables=false` — no bridge network needed (host networking instead)
+- `--storage-driver=vfs` — vfs copies layers rather than using overlayfs; slower but works
+- `docker-compose.vast-hostnet.yml` — forces `network_mode: host` on every service so
+  container-name DNS (e.g. `redis:6379`) is replaced with `localhost`
+
+GPU visibility: `nvidia-smi` works on the host but `docker run --gpus all` may not work
+until the NVIDIA Container Toolkit is configured for the dockerd-vfs combo. The GOD stack
+still runs; Ollama uses the GPU via its own CUDA calls without needing Docker GPU passthrough.
+
 ## What to check first
 
 1. `docker compose ps`
