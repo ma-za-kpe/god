@@ -174,20 +174,24 @@ start_fish() {
   fi
 
   log "Starting fish-speech..."
-  if ! pgrep -f "tools/api_server.py" >/dev/null 2>&1; then
-    check_port 7860 "fish-speech"
-    UV=$(find /opt/god-venv/bin /root/.local/bin -name uv -type f 2>/dev/null | head -1)
-    UV="${UV:-$(command -v uv)}"
-    cd /opt/fish-speech
-    nohup "$UV" run python tools/api_server.py \
-      --llama-checkpoint-path /opt/fish-speech/checkpoints/s2-pro \
-      --decoder-checkpoint-path /opt/fish-speech/checkpoints/s2-pro/codec.pth \
-      --decoder-config-name modded_dac_vq \
-      --device cuda \
-      --listen 0.0.0.0:7860 \
-      >"$LOG_DIR/fish-speech.log" 2>&1 &
-    cd "$REPO_DIR"
+  FISH_PIDS=$(pgrep -f "tools/api_server.py" 2>/dev/null || true)
+  if [ -n "$FISH_PIDS" ]; then
+    log "Killing existing fish-speech PIDs: $FISH_PIDS"
+    kill -9 $FISH_PIDS 2>/dev/null || true
+    sleep 2
   fi
+  check_port 7860 "fish-speech"
+  UV=$(find /opt/god-venv/bin /root/.local/bin -name uv -type f 2>/dev/null | head -1)
+  UV="${UV:-$(command -v uv)}"
+  cd /opt/fish-speech
+  nohup "$UV" run python tools/api_server.py \
+    --llama-checkpoint-path /opt/fish-speech/checkpoints/s2-pro \
+    --decoder-checkpoint-path /opt/fish-speech/checkpoints/s2-pro/codec.pth \
+    --decoder-config-name modded_dac_vq \
+    --device cuda \
+    --listen 0.0.0.0:7860 \
+    >"$LOG_DIR/fish-speech.log" 2>&1 &
+  cd "$REPO_DIR"
   wait_http "http://localhost:7860/" "fish-speech" 150 5 || die "fish-speech not responding"
 }
 
@@ -197,15 +201,25 @@ start_observer() {
   fi
 
   log "Starting observer on :3000..."
-  if ! pgrep -f "observer/serve.py" >/dev/null 2>&1 && ! pgrep -f "vite" >/dev/null 2>&1; then
-    check_port 3000 "observer"
-    cd "$REPO_DIR/observer"
-    if [ ! -d node_modules ]; then
-      npm ci
-    fi
-    nohup npm run dev -- --host 0.0.0.0 --port 3000 >"$LOG_DIR/observer.log" 2>&1 &
-    cd "$REPO_DIR"
+  OBSERVER_PIDS="$(pgrep -f 'observer/serve.py' 2>/dev/null || true)"
+  if [ -n "$OBSERVER_PIDS" ]; then
+    log "Killing existing observer PIDs: $OBSERVER_PIDS"
+    kill -9 $OBSERVER_PIDS 2>/dev/null || true
+    sleep 2
   fi
+  VITE_PIDS="$(pgrep -f 'vite' 2>/dev/null || true)"
+  if [ -n "$VITE_PIDS" ]; then
+    log "Killing existing Vite PIDs: $VITE_PIDS"
+    kill -9 $VITE_PIDS 2>/dev/null || true
+    sleep 2
+  fi
+  check_port 3000 "observer"
+  cd "$REPO_DIR/observer"
+  if [ ! -d node_modules ]; then
+    npm ci
+  fi
+  nohup npm run dev -- --host 0.0.0.0 --port 3000 >"$LOG_DIR/observer.log" 2>&1 &
+  cd "$REPO_DIR"
   wait_http "http://localhost:3000/one" "observer /one" 120 3 || die "Observer not responding on /one"
 }
 
