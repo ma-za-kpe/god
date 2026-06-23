@@ -220,13 +220,24 @@ start_fish() {
   UV=$(find /opt/god-venv/bin /root/.local/bin -name uv -type f 2>/dev/null | head -1)
   UV="${UV:-$(command -v uv)}"
   cd /opt/fish-speech
-  nohup "$UV" run python tools/api_server.py \
-    --llama-checkpoint-path /opt/fish-speech/checkpoints/s2-pro \
-    --decoder-checkpoint-path /opt/fish-speech/checkpoints/s2-pro/codec.pth \
-    --decoder-config-name modded_dac_vq \
-    --device cuda \
-    --listen 0.0.0.0:7860 \
-    >"$LOG_DIR/fish-speech.log" 2>&1 &
+  if [ -n "${UV:-}" ]; then
+    nohup "$UV" run python tools/api_server.py \
+      --llama-checkpoint-path /opt/fish-speech/checkpoints/s2-pro \
+      --decoder-checkpoint-path /opt/fish-speech/checkpoints/s2-pro/codec.pth \
+      --decoder-config-name modded_dac_vq \
+      --device cuda \
+      --listen 0.0.0.0:7860 \
+      >"$LOG_DIR/fish-speech.log" 2>&1 &
+  else
+    source /opt/god-venv/bin/activate
+    nohup python3 tools/api_server.py \
+      --llama-checkpoint-path /opt/fish-speech/checkpoints/s2-pro \
+      --decoder-checkpoint-path /opt/fish-speech/checkpoints/s2-pro/codec.pth \
+      --decoder-config-name modded_dac_vq \
+      --device cuda \
+      --listen 0.0.0.0:7860 \
+      >"$LOG_DIR/fish-speech.log" 2>&1 &
+  fi
   cd "$REPO_DIR"
   wait_http "http://localhost:7860/" "fish-speech" 150 5 || die "fish-speech not responding"
 }
