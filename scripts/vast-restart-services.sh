@@ -217,7 +217,15 @@ start_fish() {
     sleep 3
   fi
   check_port 7860 "fish-speech"
-  UV=$(find /opt/god-venv/bin /root/.local/bin -name uv -type f 2>/dev/null | head -1)
+  UV=""
+  for uv_dir in /opt/god-venv/bin /root/.local/bin; do
+    if [ -d "$uv_dir" ]; then
+      UV=$(find "$uv_dir" -name uv -type f 2>/dev/null | head -1 || true)
+      if [ -n "$UV" ]; then
+        break
+      fi
+    fi
+  done
   UV="${UV:-$(command -v uv)}"
   cd /opt/fish-speech
   if [ -n "${UV:-}" ]; then
