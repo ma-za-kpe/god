@@ -10,6 +10,7 @@
 #   SKIP_FISH=1                — skip fish-speech install
 #   SKIP_COMFYUI=1             — skip ComfyUI install
 #   SKIP_IPFS=1                — skip IPFS daemon (avatar CID pinning disabled)
+#   SKIP_OBS=1                 — skip OBS Studio install/start
 #   POSTGRES_PASSWORD=xxx      — custom DB password (default: random)
 #   REPO_BRANCH=main           — branch to deploy (default: feat/twitch-ne-mo-showrunner)
 
@@ -22,6 +23,7 @@ OLLAMA_MODEL="${OLLAMA_MODEL:-llama3.1:8b}"
 SKIP_FISH="${SKIP_FISH:-0}"
 SKIP_COMFYUI="${SKIP_COMFYUI:-0}"
 SKIP_IPFS="${SKIP_IPFS:-0}"
+SKIP_OBS="${SKIP_OBS:-0}"
 POSTGRES_PASSWORD="${POSTGRES_PASSWORD:-$(openssl rand -hex 16)}"
 LOG_DIR="/var/log/god"
 
@@ -59,7 +61,8 @@ apt-get install -y -qq \
   build-essential libssl-dev libffi-dev \
   ffmpeg libsndfile1 \
   portaudio19-dev \
-  nodejs npm
+  nodejs npm \
+  obs-studio xvfb xauth dbus-x11
 
 # ── 2. NATS server ────────────────────────────────────────────────────────────
 if ! command -v nats-server &>/dev/null; then

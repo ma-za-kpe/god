@@ -254,6 +254,37 @@ start_nginx() {
   fi
 }
 
+start_obs() {
+  if [ "${SKIP_OBS:-0}" = "1" ]; then
+    log "OBS install/start skipped (SKIP_OBS=1)"
+    return 0
+  fi
+
+  if ! command -v obs >/dev/null 2>&1; then
+    log "OBS Studio not installed; skipping OBS start"
+    return 0
+  fi
+
+  log "Starting OBS Studio..."
+  if ! pgrep -x Xvfb >/dev/null 2>&1; then
+    nohup Xvfb :99 -screen 0 1920x1080x24 -ac >"$LOG_DIR/xvfb.log" 2>&1 &
+    sleep 2
+  fi
+
+  mkdir -p /tmp/xdg-runtime-root
+  chmod 700 /tmp/xdg-runtime-root 2>/dev/null || true
+
+  if pgrep -x obs >/dev/null 2>&1; then
+    log "OBS already running"
+    return 0
+  fi
+
+  # OBS runs headless under Xvfb. A profile/scene collection still needs to be
+  # configured once, but the app itself is now part of the startup stack.
+  nohup env DISPLAY=:99 XDG_RUNTIME_DIR=/tmp/xdg-runtime-root obs \
+    >"$LOG_DIR/obs.log" 2>&1 &
+}
+
 start_runtime() {
   log "Starting runtime..."
   UVICORN_PIDS=$(pgrep -f "uvicorn src.main" 2>/dev/null || true)
@@ -292,6 +323,7 @@ main() {
   start_fish
   start_observer
   start_nginx
+  start_obs
   start_runtime
 
   PUBLIC_IP=$(curl -sf --max-time 5 ifconfig.me 2>/dev/null || echo "<instance-ip>")
