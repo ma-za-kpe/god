@@ -212,6 +212,9 @@ OBS_BROWSER_SOURCE=god-browser
 OBS_BROWSER_URL=http://localhost:10517/one
 OBS_BROWSER_WIDTH=1920
 OBS_BROWSER_HEIGHT=1080
+OBS_AUTO_START_STREAM=false
+OBS_STREAM_SERVER=rtmp://a.rtmp.youtube.com/live2
+OBS_STREAM_KEY=
 EOF
 log ".env.local written"
 

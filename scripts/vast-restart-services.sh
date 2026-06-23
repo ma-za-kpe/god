@@ -122,6 +122,9 @@ configure_streaming_mode() {
   if [ -z "${OBS_BROWSER_URL:-}" ]; then
     export OBS_BROWSER_URL=http://localhost:10517/one
   fi
+  if [ -z "${OBS_STREAM_SERVER:-}" ]; then
+    export OBS_STREAM_SERVER=rtmp://a.rtmp.youtube.com/live2
+  fi
 }
 
 start_postgres() {

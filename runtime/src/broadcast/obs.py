@@ -54,6 +54,9 @@ class BroadcastSurface:
         self.obs_browser_url = os.getenv("OBS_BROWSER_URL", "http://localhost:10517/one")
         self.obs_browser_width = int(os.getenv("OBS_BROWSER_WIDTH", "1920"))
         self.obs_browser_height = int(os.getenv("OBS_BROWSER_HEIGHT", "1080"))
+        self.obs_stream_server = os.getenv("OBS_STREAM_SERVER", "")
+        self.obs_stream_key = os.getenv("OBS_STREAM_KEY", "")
+        self.obs_auto_start_stream = _env_bool("OBS_AUTO_START_STREAM", "false")
 
     def compose(self, snapshot: dict[str, Any]) -> BroadcastState:
         scene_profile = select_scene(snapshot)
@@ -185,6 +188,9 @@ class BroadcastSurface:
                     )
                     log.debug("OBS browser source update %s: %s", self.obs_browser_source, exc)
 
+            if self.obs_auto_start_stream:
+                self._ensure_streaming(cl, results)
+
             cl.base_client.ws.close()
         except Exception as exc:
             log.warning("OBS WebSocket error: %s", exc)
@@ -201,6 +207,8 @@ class BroadcastSurface:
             "obs_scene_prefix": self.obs_scene_prefix,
             "obs_browser_source": self.obs_browser_source,
             "obs_browser_url": self.obs_browser_url,
+            "obs_stream_server": self.obs_stream_server,
+            "obs_auto_start_stream": self.obs_auto_start_stream,
             "health": health,
         }
 
@@ -321,6 +329,33 @@ class BroadcastSurface:
                     }
                 )
                 log.debug("OBS browser source provisioning failed for %s: %s", scene_name, exc)
+
+    def _ensure_streaming(self, cl, results: list[dict[str, Any]]) -> None:
+        """Best-effort configure and start YouTube streaming."""
+        if not self.obs_stream_server or not self.obs_stream_key:
+            return
+
+        try:
+            cl.set_stream_service_settings(
+                stream_service_type="rtmp_custom",
+                stream_service_settings={
+                    "server": self.obs_stream_server,
+                    "key": self.obs_stream_key,
+                },
+            )
+            results.append({"action": "set_stream_service", "ok": True})
+        except Exception as exc:
+            results.append({"action": "set_stream_service", "ok": False, "error": str(exc)})
+            log.debug("OBS stream service setup failed: %s", exc)
+            return
+
+        try:
+            cl.start_stream()
+            results.append({"action": "start_stream", "ok": True})
+            log.info("OBS live stream started")
+        except Exception as exc:
+            results.append({"action": "start_stream", "ok": False, "error": str(exc)})
+            log.debug("OBS start_stream failed: %s", exc)
 
 
 def _parse_obs_url(url: str) -> tuple[str, str]:
