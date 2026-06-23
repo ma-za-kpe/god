@@ -174,11 +174,10 @@ start_fish() {
   fi
 
   log "Starting fish-speech..."
-  FISH_PIDS=$(pgrep -f "tools/api_server.py" 2>/dev/null || true)
-  if [ -n "$FISH_PIDS" ]; then
-    log "Killing existing fish-speech PIDs: $FISH_PIDS"
-    kill -9 $FISH_PIDS 2>/dev/null || true
-    sleep 2
+  if pgrep -f "tools/api_server.py" >/dev/null 2>&1; then
+    log "Killing existing fish-speech processes"
+    pkill -9 -f "tools/api_server.py" 2>/dev/null || true
+    sleep 3
   fi
   check_port 7860 "fish-speech"
   UV=$(find /opt/god-venv/bin /root/.local/bin -name uv -type f 2>/dev/null | head -1)
@@ -201,16 +200,14 @@ start_observer() {
   fi
 
   log "Starting observer on :3000..."
-  OBSERVER_PIDS="$(pgrep -f 'observer/serve.py' 2>/dev/null || true)"
-  if [ -n "$OBSERVER_PIDS" ]; then
-    log "Killing existing observer PIDs: $OBSERVER_PIDS"
-    kill -9 $OBSERVER_PIDS 2>/dev/null || true
+  if pgrep -f 'observer/serve.py' >/dev/null 2>&1; then
+    log "Killing existing observer serve.py process"
+    pkill -9 -f 'observer/serve.py' 2>/dev/null || true
     sleep 2
   fi
-  VITE_PIDS="$(pgrep -f 'vite' 2>/dev/null || true)"
-  if [ -n "$VITE_PIDS" ]; then
-    log "Killing existing Vite PIDs: $VITE_PIDS"
-    kill -9 $VITE_PIDS 2>/dev/null || true
+  if pgrep -f 'vite' >/dev/null 2>&1; then
+    log "Killing existing Vite process"
+    pkill -9 -f 'vite' 2>/dev/null || true
     sleep 2
   fi
   check_port 3000 "observer"
