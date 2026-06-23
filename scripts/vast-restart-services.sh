@@ -90,6 +90,33 @@ ensure_repo() {
   GIT_TERMINAL_PROMPT=0 git -C "$REPO_DIR" pull || die "git pull failed"
 }
 
+configure_streaming_mode() {
+  local streaming_mode="${STREAMING_MODE:-auto}"
+
+  # If the operator has already enabled streaming, preserve it.
+  # Otherwise, auto-enable only when the required credentials are present.
+  if [ "${streaming_mode}" = "true" ] || [ "${streaming_mode}" = "1" ]; then
+    export YOUTUBE_ENABLED=true
+    export YOUTUBE_DRY_RUN=false
+    export BROADCAST_ENABLED=true
+    export BROADCAST_DRY_RUN=false
+    log "STREAMING_MODE forced on: runtime will connect YouTube + OBS live"
+    return 0
+  fi
+
+  if [ -n "${YOUTUBE_CHANNEL_ID:-}" ] && [ -n "${YOUTUBE_ACCESS_TOKEN:-}" ] && [ -n "${YOUTUBE_CLIENT_ID:-}" ] && [ -n "${YOUTUBE_CLIENT_SECRET:-}" ]; then
+    export YOUTUBE_ENABLED=true
+    export YOUTUBE_DRY_RUN=false
+    log "YouTube credentials detected: enabling live chat poller"
+  fi
+
+  if [ -n "${OBS_WEBSOCKET_URL:-}" ] && [ -n "${OBS_WEBSOCKET_PASSWORD:-}" ]; then
+    export BROADCAST_ENABLED=true
+    export BROADCAST_DRY_RUN=false
+    log "OBS websocket detected: enabling live broadcast control"
+  fi
+}
+
 start_postgres() {
   log "Starting PostgreSQL..."
   service postgresql start 2>/dev/null || pg_ctlcluster 14 main start 2>/dev/null || die "Cannot start PostgreSQL"
@@ -254,6 +281,7 @@ main() {
   log "GPU(s): $(nvidia-smi --list-gpus 2>/dev/null | head -2 || echo 'none - CPU mode')"
 
   ensure_repo
+  configure_streaming_mode
   cleanup_stale_ports
   start_postgres
   start_redis
