@@ -110,7 +110,7 @@ configure_streaming_mode() {
     log "YouTube credentials detected: enabling live chat poller"
   fi
 
-  if [ -n "${OBS_WEBSOCKET_URL:-}" ] && [ -n "${OBS_WEBSOCKET_PASSWORD:-}" ]; then
+  if [ -n "${OBS_WEBSOCKET_URL:-}" ]; then
     export BROADCAST_ENABLED=true
     export BROADCAST_DRY_RUN=false
     log "OBS websocket detected: enabling live broadcast control"
