@@ -282,12 +282,26 @@
       min-height: 0;
     }
 
+    .ensemble.solo {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .ensemble.solo .focus {
+      display: none;
+    }
+
     .ensemble-grid {
       min-height: 0;
       display: grid;
       grid-template-columns: repeat(4, minmax(0, 1fr));
       grid-template-rows: repeat(2, minmax(0, 1fr));
       gap: 12px;
+    }
+
+    .ensemble.solo .ensemble-grid {
+      grid-template-columns: minmax(0, 1fr);
+      grid-template-rows: minmax(0, 1fr);
+      align-items: stretch;
     }
 
     .agent-tile {
@@ -307,6 +321,11 @@
       gap: 10px;
       transition: border-color 0.35s ease, box-shadow 0.35s ease, opacity 0.35s ease;
       will-change: transform;
+    }
+
+    .ensemble.solo .agent-tile {
+      width: min(100%, 760px);
+      margin: 0 auto;
     }
 
     .agent-tile::before {
@@ -361,9 +380,35 @@
       animation: secondaryPulse 2.4s ease-in-out infinite;
     }
 
+    .agent-tile.speaking {
+      border-color: rgba(78,255,181,0.4);
+      box-shadow:
+        0 0 34px rgba(78,255,181,0.18),
+        0 0 58px rgba(84,200,255,0.10),
+        inset 0 0 0 1px rgba(78,255,181,0.15);
+    }
+
+    .agent-tile.speaking .avatar-orb {
+      animation: pulse 1.3s ease-in-out infinite, speakingBob 0.74s ease-in-out infinite;
+      filter: saturate(1.08) brightness(1.08);
+    }
+
+    .agent-tile.listening {
+      border-color: rgba(204,134,255,0.28);
+    }
+
+    .agent-tile.listening .avatar-orb {
+      animation: pulse 3.2s ease-in-out infinite;
+    }
+
     @keyframes secondaryPulse {
       0%,100% { box-shadow: 0 0 20px rgba(84,200,255,0.15), inset 0 0 0 1px rgba(84,200,255,0.10); }
       50% { box-shadow: 0 0 38px rgba(84,200,255,0.28), inset 0 0 0 1px rgba(84,200,255,0.22); }
+    }
+
+    @keyframes speakingBob {
+      0%, 100% { transform: translateY(0) scale(1.01); }
+      50% { transform: translateY(-2px) scale(1.06); }
     }
 
     .agent-tile.lead-prior {
@@ -480,12 +525,89 @@
       position: relative;
       flex-shrink: 0;
     }
+
+    .avatar-orb::before {
+      content: "";
+      position: absolute;
+      inset: 8%;
+      border-radius: 50%;
+      border: 1px solid rgba(255,255,255,0.08);
+      opacity: 0;
+      transform: scale(0.9);
+      pointer-events: none;
+    }
+
+    .agent-tile.speaking .avatar-orb::before {
+      opacity: 1;
+      animation: haloPulse 0.95s ease-in-out infinite;
+    }
+
+    @keyframes haloPulse {
+      0%, 100% { transform: scale(0.94); opacity: 0.35; }
+      50% { transform: scale(1.04); opacity: 0.85; }
+    }
+
     .avatar-orb img.avatar-portrait {
       width: 100%;
       height: 100%;
       object-fit: cover;
       border-radius: 50%;
       display: block;
+    }
+
+    .avatar-orb .rigged-avatar-canvas {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      display: block;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.25s ease;
+    }
+
+    .agent-tile.active .avatar-orb .rigged-avatar-canvas,
+    .agent-tile.speaking .avatar-orb .rigged-avatar-canvas {
+      opacity: 1;
+    }
+
+    .agent-tile.active .avatar-orb img.avatar-portrait {
+      opacity: 0.18;
+      filter: saturate(0.85) brightness(0.85);
+    }
+
+    .voice-rings {
+      position: absolute;
+      inset: auto 8px 6px 8px;
+      display: flex;
+      align-items: end;
+      justify-content: center;
+      gap: 3px;
+      height: 14px;
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .voice-rings span {
+      width: 3px;
+      border-radius: 999px;
+      background: linear-gradient(180deg, rgba(78,255,181,0.95), rgba(84,200,255,0.55));
+      transform-origin: bottom center;
+      height: 25%;
+    }
+
+    .agent-tile.speaking .voice-rings {
+      opacity: 1;
+    }
+
+    .agent-tile.speaking .voice-rings span:nth-child(1) { animation: voiceBar 0.76s ease-in-out infinite; }
+    .agent-tile.speaking .voice-rings span:nth-child(2) { animation: voiceBar 0.62s ease-in-out infinite 0.08s; }
+    .agent-tile.speaking .voice-rings span:nth-child(3) { animation: voiceBar 0.84s ease-in-out infinite 0.14s; }
+
+    @keyframes voiceBar {
+      0%, 100% { height: 28%; opacity: 0.45; }
+      45% { height: 100%; opacity: 1; }
+      70% { height: 48%; opacity: 0.82; }
     }
 
     .active .avatar-orb {
@@ -588,6 +710,14 @@
       grid-template-columns: 1fr 1fr;
       gap: 12px;
       place-items: center;
+    }
+
+    .focus-avatar.speaking .focus-orb {
+      animation: pulse 1.15s ease-in-out infinite, speakingBob 0.74s ease-in-out infinite;
+      box-shadow:
+        0 0 0 1px rgba(255,255,255,0.12),
+        0 0 26px rgba(78,255,181,0.28),
+        0 0 68px rgba(244,201,93,0.12);
     }
 
     .focus-orb-b {
@@ -1112,10 +1242,25 @@
   </div>
 
   <script>
+    const PAGE_MODE = (() => {
+      const params = new URLSearchParams(location.search);
+      if ((location.pathname || '').replace(/\/+$/, '') === '/one') return 'one';
+      if (params.get('solo') === '1') return 'one';
+      return 'ensemble';
+    })();
+
+    function defaultRuntimeUrl() {
+      const { hostname, origin } = window.location;
+      if (hostname === 'localhost' || hostname === '127.0.0.1') {
+        return 'http://localhost:8888';
+      }
+      return origin;
+    }
+
     const RUNTIME =
       new URLSearchParams(location.search).get('runtime') ||
       window.RUNTIME_URL ||
-      'http://localhost:18888';
+      defaultRuntimeUrl();
     const POLL_MS = 3000;
     const STATE = {
       ws: null,
@@ -1132,7 +1277,9 @@
       dialogueSeen: new Set(), // dedup by payload.message_id
       dialogueSpeaking: false,
       speechStartedAt: 0,
-      voiceVoices: []
+      voiceVoices: [],
+      currentSpeakerId: null,
+      currentRecipientId: null
     };
     const AGENT_COLORS = ['#4effb5', '#54c8ff', '#f4c95d', '#cc86ff', '#ff6b88', '#87a7ff', '#7df2e3', '#ffc66b'];
 
@@ -1142,6 +1289,19 @@
 
     function fmt(value, fallback = '—') {
       return value === undefined || value === null || value === '' ? fallback : String(value);
+    }
+
+    function escapeHtml(value) {
+      return String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    function fmt(value, fallback = '-') {
+      return value === undefined || value === null || value === '' ? fallback : escapeHtml(value);
     }
 
     function kindFor(eventType = '') {
@@ -1440,6 +1600,8 @@
       const item = STATE.dialogueQueue.shift();
       STATE.dialogueSpeaking = true;
       STATE.speechStartedAt = Date.now();
+      STATE.currentSpeakerId = item.sender?.soul_id || null;
+      STATE.currentRecipientId = item.recipient?.soul_id || null;
       const meta = item.meta || {};
 
       _highlightDialogueTurn(item.sender, item.recipient);
@@ -1459,6 +1621,8 @@
       const _done = () => {
         STATE.dialogueSpeaking = false;
         STATE.speechStartedAt = 0;
+        STATE.currentSpeakerId = null;
+        STATE.currentRecipientId = null;
         // Natural breath between turns: cadence-aware jitter.
         const pause = cadencePauseMs(meta) + Math.random() * 140;
         setTimeout(drainDialogue, pause);
@@ -1543,12 +1707,19 @@
     function renderEnsemble(snap) {
       const grid = document.getElementById('ensemble-grid');
       const agents = (snap.agents || []).filter(a => a && a.is_alive !== false).slice(0, 8);
+      const avatarState = snap.avatar || {};
       STATE.agents = agents;
+      const shell = document.querySelector('.shell');
+      const soloMode = PAGE_MODE === 'one' || agents.length === 1;
+      if (shell) shell.classList.toggle('solo', soloMode);
+      if (grid) grid.classList.toggle('solo', soloMode);
       const active = pickActiveAgent(snap) || agents[0] || null;
       const previousActiveId = STATE.activeId;
       const activeChanged = previousActiveId !== (active?.soul_id || null);
       STATE.previousActiveId = previousActiveId;
       STATE.activeId = active?.soul_id || null;
+      const speakingId = STATE.dialogueSpeaking ? STATE.currentSpeakerId : null;
+      const listeningId = STATE.dialogueSpeaking ? STATE.currentRecipientId : null;
 
       const previousRects = new Map(
         Array.from(grid.children).map((child) => [
@@ -1565,23 +1736,34 @@
         return (a.current_name || a.soul_id).localeCompare(b.current_name || b.soul_id);
       });
 
-      while (ordered.length < 8) {
-        ordered.push({
-          soul_id: `empty-${ordered.length}`,
-          current_name: 'Awaiting cast',
-          archetype: 'vacant',
-          is_alive: true
-        });
+      if (!soloMode) {
+        while (ordered.length < 8) {
+          ordered.push({
+            soul_id: `empty-${ordered.length}`,
+            current_name: 'Awaiting cast',
+            archetype: 'vacant',
+            is_alive: true
+          });
+        }
       }
 
       const pair = pickConversationPair(snap);
       const secondaryId = (pair.secondary && pair.secondary.soul_id !== STATE.activeId) ? pair.secondary.soul_id : null;
 
-      ordered.slice(0, 8).forEach((agent, index) => {
+      ordered.slice(0, soloMode ? 1 : 8).forEach((agent, index) => {
         const isActive = agent.soul_id === STATE.activeId;
         const isSecondary = !isActive && agent.soul_id === secondaryId;
+        const isSpeaking = agent.soul_id === speakingId;
+        const isListening = agent.soul_id === listeningId;
+        const avatarSrc = agent.avatar_cid ? `${RUNTIME}/ipfs/${agent.avatar_cid}` : '';
+        const riggedSrc = agent.rigged_avatar_cid || avatarState.rigged_avatar_cid || agent.avatar_cid || '';
+        const riggedUrl = riggedSrc ? `${RUNTIME}/ipfs/${riggedSrc}` : '';
+        const avatarExpression = String(avatarState.expression || 'neutral');
+        const avatarPose = String(avatarState.pose || 'lead');
+        const avatarMotion = String(avatarState.motion || 'live-reactive');
+        const lipSyncSource = String(avatarState.lip_sync_source || 'audio');
         const tile = document.createElement('article');
-        tile.className = `agent-tile${isActive ? ' active' : ''}${isSecondary ? ' secondary-speaker' : ''}`;
+        tile.className = `agent-tile${isActive ? ' active' : ''}${isSecondary ? ' secondary-speaker' : ''}${isSpeaking ? ' speaking' : ''}${isListening ? ' listening' : ''}`;
         tile.dataset.agentId = agent.soul_id;
         tile.style.setProperty('--accent', accentFor(agent, index));
         const state = isActive ? 'LEAD' : (isSecondary ? 'RESPONDING' : (agent.is_sleeping ? 'SLEEPING' : 'SUPPORT'));
@@ -1591,12 +1773,29 @@
             <div class="agent-name">${fmt(agent.current_name || agent.soul_id)}</div>
             <div class="agent-state">${state}</div>
           </div>
-          <div class="agent-body"><div class="avatar-orb" style="background:${agent.soul_id?.startsWith('empty-') ? 'radial-gradient(circle at center, rgba(255,255,255,0.08), rgba(255,255,255,0.02))' : `radial-gradient(circle at 35% 30%, rgba(255,255,255,0.72), rgba(255,255,255,0.18) 15%, transparent 17%), radial-gradient(circle at center, ${AGENT_COLORS[index % AGENT_COLORS.length]}, rgba(84,200,255,0.52) 36%, rgba(5,8,16,0.15) 74%)`}; opacity:${agent.soul_id?.startsWith('empty-') ? 0.35 : 1}">${agent.avatar_cid ? `<img class="avatar-portrait" src="${RUNTIME}/ipfs/${agent.avatar_cid}" loading="lazy" onerror="this.style.display='none'">` : ''}</div></div>
-          <div class="agent-meta">${tags.map(tag => `<span class="chip"><i></i>${tag}</span>`).join('')}</div>
+          <div class="agent-body">
+            <div
+              class="avatar-orb${isActive ? ' rigged-host' : ''}"
+              data-rigged-avatar-host="${isActive ? '1' : '0'}"
+              data-avatar-src="${avatarSrc}"
+              data-rigged-avatar-src="${riggedUrl}"
+              data-avatar-expression="${avatarExpression}"
+              data-avatar-pose="${avatarPose}"
+              data-avatar-motion="${avatarMotion}"
+              data-avatar-speaking="${isSpeaking ? '1' : '0'}"
+              data-avatar-lip-sync="${lipSyncSource}"
+              style="background:${agent.soul_id?.startsWith('empty-') ? 'radial-gradient(circle at center, rgba(255,255,255,0.08), rgba(255,255,255,0.02))' : `radial-gradient(circle at 35% 30%, rgba(255,255,255,0.72), rgba(255,255,255,0.18) 15%, transparent 17%), radial-gradient(circle at center, ${AGENT_COLORS[index % AGENT_COLORS.length]}, rgba(84,200,255,0.52) 36%, rgba(5,8,16,0.15) 74%)`}; opacity:${agent.soul_id?.startsWith('empty-') ? 0.35 : 1}"
+            >
+              ${agent.avatar_cid ? `<img class="avatar-portrait" src="${RUNTIME}/ipfs/${agent.avatar_cid}" loading="lazy" onerror="this.style.display='none'">` : ''}
+              ${isActive ? '<canvas class="rigged-avatar-canvas" data-rigged-avatar-canvas></canvas>' : ''}
+              <div class="voice-rings" aria-hidden="true"><span></span><span></span><span></span></div>
+            </div>
+          </div>
+          <div class="agent-meta">${tags.map(tag => `<span class="chip"><i></i>${fmt(tag)}</span>`).join('')}</div>
           ${(isActive || isSecondary) ? `
             <div class="agent-dialogue">
               <span class="caption">${isActive ? 'ACTIVE LEAD' : 'RESPONDING'}</span>
-              <div class="text">${agentDialogue(agent, snap, isActive)}</div>
+              <div class="text">${fmt(agentDialogue(agent, snap, isActive))}</div>
             </div>
           ` : ''}
         `;
@@ -1607,13 +1806,22 @@
           tile.querySelector('.avatar-orb').style.height = '132px';
           tile.classList.add('lead-shift');
           if (activeChanged) tile.classList.add('lead-entrance');
-          tile.querySelector('.agent-meta').innerHTML = tags.slice(0, 2).map(tag => `<span class="chip"><i></i>${tag}</span>`).join('');
+          tile.querySelector('.agent-meta').innerHTML = tags.slice(0, 2).map(tag => `<span class="chip"><i></i>${fmt(tag)}</span>`).join('');
         } else if (isSecondary) {
           tile.style.gridColumn = 'span 2';
           tile.querySelector('.avatar-orb').style.width = '88px';
           tile.querySelector('.avatar-orb').style.height = '88px';
         } else if (agent.soul_id === previousActiveId) {
           tile.classList.add('lead-prior');
+        }
+        if (soloMode && isActive) {
+          tile.style.gridColumn = '1 / -1';
+          tile.style.gridRow = '1 / -1';
+          tile.style.width = 'min(100%, 760px)';
+          tile.style.margin = '0 auto';
+          tile.querySelector('.avatar-orb').style.width = '180px';
+          tile.querySelector('.avatar-orb').style.height = '180px';
+          tile.querySelector('.agent-meta').innerHTML = tags.slice(0, 4).map(tag => `<span class="chip"><i></i>${fmt(tag)}</span>`).join('');
         }
         grid.appendChild(tile);
       });
@@ -1632,6 +1840,9 @@
           }, 980);
         }
       });
+      if (window.GodRig && typeof window.GodRig.scan === 'function') {
+        window.GodRig.scan();
+      }
     }
 
     function renderFocus(snap) {
@@ -1667,6 +1878,9 @@
         if (focusNameB) focusNameB.style.display = 'none';
         if (focusOrbB) focusOrbB.style.display = 'none';
         if (focusAvatar) focusAvatar.classList.remove('dual');
+      }
+      if (focusAvatar) {
+        focusAvatar.classList.toggle('speaking', STATE.dialogueSpeaking && STATE.currentSpeakerId === active?.soul_id);
       }
 
       const focusOrb = document.getElementById('focus-orb');
@@ -1750,7 +1964,7 @@
         if (!body) continue;
         const bubble = document.createElement('div');
         bubble.className = 'chat-bubble outgoing';
-        bubble.innerHTML = `<div class="bubble-name">${senderName} → ${recipName}</div><div class="bubble-text">${body}</div>`;
+        bubble.innerHTML = `<div class="bubble-name">${fmt(senderName)} → ${fmt(recipName)}</div><div class="bubble-text">${fmt(body)}</div>`;
         thread.prepend(bubble);
         // Keep max 5 bubbles
         while (thread.children.length > 5) thread.removeChild(thread.lastChild);
@@ -1885,5 +2099,6 @@
     tickClock();
     setInterval(() => { if (!STATE.live) fetchSnapshot(); }, POLL_MS);
   </script>
+  <script type="module" src="/rigged-avatar.js"></script>
 </body>
 </html>
