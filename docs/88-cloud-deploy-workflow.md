@@ -9,7 +9,7 @@ How code changes move from local edits to the live cloud runtime.
 | SSH | `ssh -p 10784 root@ssh7.vast.ai` |
 | Runtime port (internal) | `8888` |
 | nginx proxy (external) | `10515 → 8888` |
-| Observer static proxy | `10517 → 3000` (observer not yet wired) |
+| Observer static proxy | `10517 → 3000` |
 | Cloudflare tunnel | `https://folks-forming-bizrate-begins.trycloudflare.com` → port `8888` |
 | SSH tunnel (local) | `ssh -L 18888:localhost:8888 -N -f -p 10784 root@ssh7.vast.ai` → `http://localhost:18888` |
 | Git branch | `feat/twitch-ne-mo-showrunner` |
@@ -61,8 +61,8 @@ ssh -p 10784 root@ssh7.vast.ai \
 ssh -p 10784 root@ssh7.vast.ai \
   "psql \$DATABASE_URL -c \"SELECT current_name, avatar_cid FROM agents WHERE world_id='god-world-1';\""
 
-# Open public stage URL (cloudflare tunnel must be running)
-https://folks-forming-bizrate-begins.trycloudflare.com/stage
+# Open the public /one URL on the Vast host
+http://ssh7.vast.ai:10517/one
 
 # Open via SSH tunnel (tunnel must be active)
 http://localhost:18888/stage
@@ -77,12 +77,14 @@ http://localhost:18888/stage
 | NATS + JetStream | 4222 | `nats-server -p 4222 --jetstream` |
 | Ollama | 11434 | `ollama serve` |
 | ComfyUI (SDXL) | 8188 | `cd /opt/ComfyUI && python3 main.py --listen 0.0.0.0 --port 8188` |
-| fish-speech 2.0 | 7860 | `cd /opt/fish-speech && uv run tools/api_server.py --listen 0.0.0.0:7860` |
+| fish-speech 2.0 | 7860 | `uv run python /opt/fish-speech/tools/api_server.py --llama-checkpoint-path /opt/fish-speech/checkpoints/s2-pro --decoder-checkpoint-path /opt/fish-speech/checkpoints/s2-pro/codec.pth --listen 0.0.0.0:7860` |
 | GOD Runtime | 8888 | see restart cmd above |
 | IPFS | 5001 (api) / 8080 (gateway) | `ipfs daemon` |
 | nginx | 10515–10517 | `service nginx start` |
 
 Restart all: `bash /workspace/god/scripts/vast-restart-services.sh`
+This now blocks until PostgreSQL, Redis, NATS, IPFS, Ollama, ComfyUI,
+fish-speech, the observer on `:3000`, nginx, and the runtime are all up.
 
 ## Current Progress (as of 2026-06-20)
 
@@ -105,7 +107,7 @@ Restart all: `bash /workspace/god/scripts/vast-restart-services.sh`
 - [ ] Public cloudflare tunnel: URL `folks-forming-bizrate-begins.trycloudflare.com` expires when process dies — needs permanent solution (ngrok auth token or Cloudflare named tunnel)
 - [ ] Add cloudflared auto-start to `vast-restart-services.sh`
 - [ ] Expression sheet CIDs: confirm expression sheet assets pinned for all 8 agents
-- [ ] Observer port 3000: currently nothing serves it on the cloud instance; stage now accessible at `/stage` via runtime instead
+- [ ] Observer `/one`: verify the Vite app is live on `:3000` and reachable through nginx at `http://ssh7.vast.ai:10517/one`
 
 ## Troubleshooting
 
