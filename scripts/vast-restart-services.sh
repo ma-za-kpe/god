@@ -226,7 +226,7 @@ start_fish() {
       fi
     fi
   done
-  UV="${UV:-$(command -v uv)}"
+  UV="${UV:-$(command -v uv 2>/dev/null || true)}"
   cd /opt/fish-speech
   if [ -n "${UV:-}" ]; then
     nohup "$UV" run python tools/api_server.py \
