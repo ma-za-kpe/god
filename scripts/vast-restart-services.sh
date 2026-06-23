@@ -34,8 +34,6 @@ cleanup_stale_ports() {
 5432 PostgreSQL
 6379 Redis
 4222 NATS
-5001 IPFS API
-8080 IPFS Gateway
 11434 Ollama
 8188 ComfyUI
 7860 fish-speech
@@ -133,6 +131,10 @@ start_ipfs() {
   fi
 
   log "Starting IPFS..."
+  if curl -sf -X POST http://localhost:5001/api/v0/version >/dev/null 2>&1; then
+    log "IPFS OK"
+    return 0
+  fi
   if ! pgrep -x ipfs >/dev/null 2>&1; then
     check_port 5001 "IPFS API"
     check_port 8080 "IPFS Gateway"
