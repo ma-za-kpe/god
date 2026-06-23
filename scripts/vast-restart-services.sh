@@ -25,6 +25,28 @@ check_port() {
   fi
 }
 
+cleanup_stale_ports() {
+  local port name
+  while read -r port name; do
+    [ -z "${port:-}" ] && continue
+    check_port "$port" "$name"
+  done <<'EOF'
+5432 PostgreSQL
+6379 Redis
+4222 NATS
+5001 IPFS API
+8080 IPFS Gateway
+11434 Ollama
+8188 ComfyUI
+7860 fish-speech
+3000 Observer
+8888 Runtime
+10515 nginx-proxy
+10516 nginx-proxy
+10517 nginx-proxy
+EOF
+}
+
 wait_http() {
   local url=$1 name=$2 timeout=${3:-90} delay=${4:-3}
   local elapsed=0
@@ -205,6 +227,7 @@ main() {
   log "GPU(s): $(nvidia-smi --list-gpus 2>/dev/null | head -2 || echo 'none - CPU mode')"
 
   ensure_repo
+  cleanup_stale_ports
   start_postgres
   start_redis
   start_nats
