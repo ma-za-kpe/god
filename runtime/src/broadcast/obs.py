@@ -1,10 +1,13 @@
-"""OBS surface adapter with dry-run support."""
+"""OBS surface adapter with dry-run support and WebSocket v5 wiring."""
 
 from __future__ import annotations
 
+import logging
 import os
 from dataclasses import asdict, dataclass, field
 from typing import Any
+
+log = logging.getLogger("god.broadcast.obs")
 
 try:  # pragma: no cover - runtime package import path
     from ..health_checks import probe_url
@@ -47,6 +50,10 @@ class BroadcastSurface:
         self.dry_run = _env_bool("BROADCAST_DRY_RUN", "true") if dry_run is None else dry_run
         self.transport = os.getenv("BROADCAST_TRANSPORT", "dry-run")
         self.obs_scene_prefix = os.getenv("OBS_SCENE_PREFIX", "obs/")
+        self.obs_browser_source = os.getenv("OBS_BROWSER_SOURCE", "god-browser")
+        self.obs_browser_url = os.getenv("OBS_BROWSER_URL", "http://localhost:10517/one")
+        self.obs_browser_width = int(os.getenv("OBS_BROWSER_WIDTH", "1920"))
+        self.obs_browser_height = int(os.getenv("OBS_BROWSER_HEIGHT", "1080"))
 
     def compose(self, snapshot: dict[str, Any]) -> BroadcastState:
         scene_profile = select_scene(snapshot)
@@ -82,6 +89,107 @@ class BroadcastSurface:
             source_epoch=int(snapshot.get("epoch") or 0),
         )
 
+    async def apply(self, snapshot: dict[str, Any]) -> dict[str, Any]:
+        """Compose broadcast state and push commands to OBS via WebSocket v5.
+
+        Dry-run: logs commands but makes no WS connection.
+        Live:    connects to OBS_WEBSOCKET_URL, sends SetCurrentProgramScene +
+                 text-source updates for caption/ticker, then disconnects.
+        """
+        state = self.compose(snapshot)
+        if self.dry_run or not self.enabled:
+            log.debug(
+                "BroadcastSurface dry-run: scene=%s caption=%s",
+                state.scene.scene_id,
+                state.caption.headline[:60],
+            )
+            return {"dry_run": True, "summary": state.summary, "commands": list(state.commands)}
+
+        obs_url = os.getenv("OBS_WEBSOCKET_URL", "")
+        obs_password = os.getenv("OBS_WEBSOCKET_PASSWORD", "")
+        if not obs_url:
+            log.warning("OBS_WEBSOCKET_URL not set — broadcast commands skipped")
+            return {"dry_run": False, "ok": False, "reason": "obs_url_not_set"}
+
+        try:
+            import obsws_python as obs  # type: ignore[import]
+        except ImportError:
+            log.warning("obsws-python not installed — OBS commands skipped")
+            return {"dry_run": False, "ok": False, "reason": "obsws_python_missing"}
+
+        results: list[dict[str, Any]] = []
+        try:
+            host, port_str = _parse_obs_url(obs_url)
+            cl = obs.ReqClient(host=host, port=int(port_str), password=obs_password, timeout=5)
+
+            # Scene change
+            scene_id = state.scene.scene_id
+            if scene_id:
+                try:
+                    cl.set_current_program_scene(scene_id)
+                    results.append({"action": "set_scene", "scene": scene_id, "ok": True})
+                    log.info("OBS scene → %s", scene_id)
+                except Exception as exc:
+                    results.append({"action": "set_scene", "scene": scene_id, "ok": False, "error": str(exc)})
+                    log.warning("OBS set_scene failed: %s", exc)
+
+            # Caption / ticker text source update
+            caption_source = os.getenv("OBS_CAPTION_SOURCE", "god-caption")
+            ticker_source = os.getenv("OBS_TICKER_SOURCE", "god-ticker")
+            for source_name, text in [
+                (caption_source, state.caption.headline),
+                (ticker_source, " • ".join(state.caption.ticker_lines[:3])),
+            ]:
+                if source_name and text:
+                    try:
+                        cl.set_input_settings(
+                            name=source_name,
+                            settings={"text": text},
+                            overlay=True,
+                        )
+                        results.append({"action": "set_text", "source": source_name, "ok": True})
+                    except Exception as exc:
+                        results.append({"action": "set_text", "source": source_name, "ok": False, "error": str(exc)})
+                        log.debug("OBS set_input_settings %s: %s", source_name, exc)
+
+            # Browser source points at the public observer /one page.
+            if self.obs_browser_source and self.obs_browser_url:
+                try:
+                    cl.set_input_settings(
+                        name=self.obs_browser_source,
+                        settings={
+                            "url": self.obs_browser_url,
+                            "width": self.obs_browser_width,
+                            "height": self.obs_browser_height,
+                        },
+                        overlay=True,
+                    )
+                    results.append(
+                        {
+                            "action": "set_browser",
+                            "source": self.obs_browser_source,
+                            "url": self.obs_browser_url,
+                            "ok": True,
+                        }
+                    )
+                except Exception as exc:
+                    results.append(
+                        {
+                            "action": "set_browser",
+                            "source": self.obs_browser_source,
+                            "ok": False,
+                            "error": str(exc),
+                        }
+                    )
+                    log.debug("OBS browser source update %s: %s", self.obs_browser_source, exc)
+
+            cl.base_client.ws.close()
+        except Exception as exc:
+            log.warning("OBS WebSocket error: %s", exc)
+            return {"dry_run": False, "ok": False, "reason": str(exc), "results": results}
+
+        return {"dry_run": False, "ok": True, "summary": state.summary, "results": results}
+
     def status(self) -> dict[str, Any]:
         health = probe_url(os.getenv("OBS_WEBSOCKET_URL"), timeout=1.5)
         return {
@@ -89,6 +197,8 @@ class BroadcastSurface:
             "dry_run": self.dry_run,
             "transport": self.transport,
             "obs_scene_prefix": self.obs_scene_prefix,
+            "obs_browser_source": self.obs_browser_source,
+            "obs_browser_url": self.obs_browser_url,
             "health": health,
         }
 
@@ -129,6 +239,15 @@ class BroadcastSurface:
                 command["dry_run"] = True
                 command["transport"] = self.transport
         return commands
+
+
+def _parse_obs_url(url: str) -> tuple[str, str]:
+    """Extract host and port from ws://host:port or wss://host:port."""
+    url = url.removeprefix("wss://").removeprefix("ws://")
+    if ":" in url:
+        host, port = url.rsplit(":", 1)
+        return host, port.split("/")[0]
+    return url, "4455"
 
 
 def build_broadcast_status() -> dict[str, Any]:

@@ -68,6 +68,26 @@ http://ssh7.vast.ai:10517/one
 http://localhost:18888/stage
 ```
 
+## Streaming Mode
+
+The restart script now auto-enables live YouTube and OBS control when the
+required credentials are present in `/workspace/god/.env.local`.
+
+Required envs for live mode:
+
+- `STREAMING_MODE=true` to force live mode, or leave `auto` and supply credentials
+- `YOUTUBE_CHANNEL_ID`
+- `YOUTUBE_ACCESS_TOKEN`
+- `YOUTUBE_CLIENT_ID`
+- `YOUTUBE_CLIENT_SECRET`
+- `OBS_WEBSOCKET_URL`
+- `OBS_WEBSOCKET_PASSWORD`
+- `OBS_BROWSER_SOURCE` defaults to `god-browser`
+- `OBS_BROWSER_URL` defaults to `http://localhost:10517/one`
+
+If those values are missing, the runtime stays up and the stream controls
+remain in dry-run / observer-only mode.
+
 ## Service Map (Vast.ai native)
 
 | Service | Port | Start cmd |

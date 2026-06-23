@@ -115,6 +115,13 @@ configure_streaming_mode() {
     export BROADCAST_DRY_RUN=false
     log "OBS websocket detected: enabling live broadcast control"
   fi
+
+  if [ -z "${OBS_BROWSER_SOURCE:-}" ]; then
+    export OBS_BROWSER_SOURCE=god-browser
+  fi
+  if [ -z "${OBS_BROWSER_URL:-}" ]; then
+    export OBS_BROWSER_URL=http://localhost:10517/one
+  fi
 }
 
 start_postgres() {
