@@ -61,6 +61,20 @@ wait_http() {
   return 1
 }
 
+wait_http_post() {
+  local url=$1 name=$2 timeout=${3:-90} delay=${4:-3}
+  local elapsed=0
+  while [ "$elapsed" -lt "$timeout" ]; do
+    if curl -sf -X POST "$url" >/dev/null 2>&1; then
+      log "${name} OK"
+      return 0
+    fi
+    sleep "$delay"
+    elapsed=$((elapsed + delay))
+  done
+  return 1
+}
+
 ensure_repo() {
   if [ -f "$REPO_DIR/.env.local" ]; then
     set -a
@@ -124,7 +138,7 @@ start_ipfs() {
     check_port 8080 "IPFS Gateway"
     nohup ipfs daemon --enable-gc >"$LOG_DIR/ipfs.log" 2>&1 &
   fi
-  wait_http "http://localhost:5001/api/v0/version" "IPFS" 90 2 || die "IPFS not responding"
+  wait_http_post "http://localhost:5001/api/v0/version" "IPFS" 180 3 || die "IPFS not responding"
 }
 
 start_ollama() {
