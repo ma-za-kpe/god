@@ -17,12 +17,12 @@ except ImportError:  # pragma: no cover - flat test path
 try:  # pragma: no cover - runtime package import path
     from .captions import build_caption
     from .overlays import build_overlay
-    from .scenes import select_scene
+    from .scenes import SCENE_MAP, select_scene
     from .state import BroadcastCaption, BroadcastOverlay, BroadcastScene, BroadcastState
 except ImportError:  # pragma: no cover - flat test path
     from captions import build_caption
     from overlays import build_overlay
-    from scenes import select_scene
+    from scenes import SCENE_MAP, select_scene
     from state import BroadcastCaption, BroadcastOverlay, BroadcastScene, BroadcastState
 
 
@@ -121,6 +121,8 @@ class BroadcastSurface:
         try:
             host, port_str = _parse_obs_url(obs_url)
             cl = obs.ReqClient(host=host, port=int(port_str), password=obs_password, timeout=5)
+
+            self._ensure_browser_source(cl, results)
 
             # Scene change
             scene_id = state.scene.scene_id
@@ -239,6 +241,86 @@ class BroadcastSurface:
                 command["dry_run"] = True
                 command["transport"] = self.transport
         return commands
+
+    def _ensure_browser_source(self, cl, results: list[dict[str, Any]]) -> None:
+        """Best-effort create/update the browser source in all runtime scenes."""
+        if not self.obs_browser_source or not self.obs_browser_url:
+            return
+
+        scene_names = [
+            profile["scene_id"]
+            for profile in SCENE_MAP.values()
+            if profile.get("scene_id")
+        ]
+        if not scene_names:
+            return
+
+        input_settings = {
+            "url": self.obs_browser_url,
+            "width": self.obs_browser_width,
+            "height": self.obs_browser_height,
+        }
+
+        existing_inputs: set[str] = set()
+        try:
+            input_list = cl.get_input_list()
+            inputs = input_list.inputs if hasattr(input_list, "inputs") else input_list.get("inputs", [])
+            for item in inputs:
+                if isinstance(item, dict):
+                    name = item.get("inputName") or item.get("input_name") or item.get("name")
+                else:
+                    name = getattr(item, "inputName", None) or getattr(item, "name", None)
+                if name:
+                    existing_inputs.add(str(name))
+        except Exception as exc:
+            log.debug("OBS get_input_list unavailable while provisioning browser source: %s", exc)
+
+        for scene_name in scene_names:
+            try:
+                if self.obs_browser_source not in existing_inputs:
+                    cl.create_input(
+                        sceneName=scene_name,
+                        inputName=self.obs_browser_source,
+                        inputKind="browser_source",
+                        inputSettings=input_settings,
+                        sceneItemEnabled=True,
+                    )
+                    existing_inputs.add(self.obs_browser_source)
+                    results.append(
+                        {
+                            "action": "create_browser",
+                            "scene": scene_name,
+                            "source": self.obs_browser_source,
+                            "url": self.obs_browser_url,
+                            "ok": True,
+                        }
+                    )
+                    log.info("OBS browser source created in %s", scene_name)
+                else:
+                    cl.set_input_settings(
+                        name=self.obs_browser_source,
+                        settings=input_settings,
+                        overlay=True,
+                    )
+                    results.append(
+                        {
+                            "action": "update_browser",
+                            "scene": scene_name,
+                            "source": self.obs_browser_source,
+                            "ok": True,
+                        }
+                    )
+            except Exception as exc:
+                results.append(
+                    {
+                        "action": "browser_source",
+                        "scene": scene_name,
+                        "source": self.obs_browser_source,
+                        "ok": False,
+                        "error": str(exc),
+                    }
+                )
+                log.debug("OBS browser source provisioning failed for %s: %s", scene_name, exc)
 
 
 def _parse_obs_url(url: str) -> tuple[str, str]:
