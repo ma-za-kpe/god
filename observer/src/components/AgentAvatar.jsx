@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Text } from '@react-three/drei';
 import { useFrame, useLoader } from '@react-three/fiber';
 import { TextureLoader } from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { VRMLoaderPlugin, VRMUtils } from '@pixiv/three-vrm';
+import { Suspense } from 'react';
 
 const DEFAULT_VRM = import.meta.env.VITE_DEFAULT_VRM_URL || '';
 const TRANSPARENT_PIXEL =
@@ -80,11 +81,11 @@ export function AgentAvatar({ agent, avatarState, selected, speaking, vrmUrl, ru
   const groupRef = useRef();
   const modelUrl = vrmUrl || agent.vrm_avatar_url || DEFAULT_VRM || '';
   const vrmStateRef = useRef(null);
+  const [portraitTexture, setPortraitTexture] = useState(null);
   const portraitCid = resolveAvatarCid(agent, avatarState);
   const portraitUrl = portraitCid
     ? `${String(runtimeBaseUrl || '').replace(/\/+$/, '')}/ipfs/${portraitCid}`
     : TRANSPARENT_PIXEL;
-  const portraitTexture = useLoader(TextureLoader, portraitUrl || TRANSPARENT_PIXEL);
   const isActiveSpeaker = Boolean(
     speaking || (avatarState?.speaker_soul_id && agent?.soul_id === avatarState.speaker_soul_id && avatarState?.speaking)
   );
@@ -94,6 +95,28 @@ export function AgentAvatar({ agent, avatarState, selected, speaking, vrmUrl, ru
   const speakerState = isActiveSpeaker
     ? avatarState
     : { ...(avatarState || {}), speaking: false, mouth_open: 0.03, presentation_mode: 'listening' };
+
+  useEffect(() => {
+    let disposed = false;
+    const loader = new TextureLoader();
+    loader.load(
+      portraitUrl || TRANSPARENT_PIXEL,
+      (texture) => {
+        if (disposed) return;
+        texture.colorSpace = 'srgb';
+        texture.needsUpdate = true;
+        setPortraitTexture(texture);
+      },
+      undefined,
+      () => {
+        if (disposed) return;
+        setPortraitTexture(null);
+      }
+    );
+    return () => {
+      disposed = true;
+    };
+  }, [portraitUrl]);
 
   useFrame((_, delta) => {
     if (vrmStateRef.current) applyVRMState(vrmStateRef.current, speakerState, delta);
@@ -109,55 +132,57 @@ export function AgentAvatar({ agent, avatarState, selected, speaking, vrmUrl, ru
 
   return (
     <group ref={groupRef} position={position}>
+      <group ref={fallbackRef}>
+        <mesh castShadow position={[0, 1.0, 0]}>
+          <sphereGeometry args={[0.58, 32, 32]} />
+          <meshStandardMaterial color={color} emissive={selected ? '#ffffff' : color} emissiveIntensity={selected ? 0.45 : 0.1} />
+        </mesh>
+        <mesh position={[0, 0.76, 0]}>
+          <capsuleGeometry args={[0.20, 0.56, 8, 16]} />
+          <meshStandardMaterial color="#d8b19a" roughness={0.95} />
+        </mesh>
+        <mesh position={[-0.42, 0.66, 0]} rotation={[0, 0, 0.42]}>
+          <capsuleGeometry args={[0.08, 0.48, 6, 12]} />
+          <meshStandardMaterial color="#d8b19a" roughness={0.95} />
+        </mesh>
+        <mesh position={[0.42, 0.66, 0]} rotation={[0, 0, -0.42]}>
+          <capsuleGeometry args={[0.08, 0.48, 6, 12]} />
+          <meshStandardMaterial color="#d8b19a" roughness={0.95} />
+        </mesh>
+        <mesh position={[-0.18, -0.12, 0]} rotation={[0, 0, 0.04]}>
+          <capsuleGeometry args={[0.09, 0.62, 6, 12]} />
+          <meshStandardMaterial color="#5b667a" roughness={0.8} />
+        </mesh>
+        <mesh position={[0.18, -0.12, 0]} rotation={[0, 0, -0.04]}>
+          <capsuleGeometry args={[0.09, 0.62, 6, 12]} />
+          <meshStandardMaterial color="#5b667a" roughness={0.8} />
+        </mesh>
+        <mesh position={[0.12, 1.15, 0.46]}>
+          <sphereGeometry args={[0.095, 16, 16]} />
+          <meshStandardMaterial color="#faf7ff" />
+        </mesh>
+        <mesh position={[-0.12, 1.15, 0.46]}>
+          <sphereGeometry args={[0.095, 16, 16]} />
+          <meshStandardMaterial color="#faf7ff" />
+        </mesh>
+        <mesh position={[0, 0.97, 0.49]}>
+          <boxGeometry args={[0.28, Math.max(0.06, mouthOpen * 0.14), 0.05]} />
+          <meshStandardMaterial color="#3e1018" />
+        </mesh>
+        <mesh position={[0, 1.02, 0.59]}>
+          <planeGeometry args={[0.9, 1.2]} />
+          <meshBasicMaterial map={portraitTexture || undefined} transparent toneMapped={false} />
+        </mesh>
+      </group>
+
       {modelUrl ? (
-        <VRMAvatarModel
-          modelUrl={modelUrl}
-          vrmStateRef={vrmStateRef}
-        />
-      ) : (
-        <group ref={fallbackRef}>
-          <mesh castShadow position={[0, 1.0, 0]}>
-            <sphereGeometry args={[0.58, 32, 32]} />
-            <meshStandardMaterial color={color} emissive={selected ? '#ffffff' : color} emissiveIntensity={selected ? 0.45 : 0.1} />
-          </mesh>
-          <mesh position={[0, 0.76, 0]}>
-            <capsuleGeometry args={[0.20, 0.56, 8, 16]} />
-            <meshStandardMaterial color="#d8b19a" roughness={0.95} />
-          </mesh>
-          <mesh position={[-0.42, 0.66, 0]} rotation={[0, 0, 0.42]}>
-            <capsuleGeometry args={[0.08, 0.48, 6, 12]} />
-            <meshStandardMaterial color="#d8b19a" roughness={0.95} />
-          </mesh>
-          <mesh position={[0.42, 0.66, 0]} rotation={[0, 0, -0.42]}>
-            <capsuleGeometry args={[0.08, 0.48, 6, 12]} />
-            <meshStandardMaterial color="#d8b19a" roughness={0.95} />
-          </mesh>
-          <mesh position={[-0.18, -0.12, 0]} rotation={[0, 0, 0.04]}>
-            <capsuleGeometry args={[0.09, 0.62, 6, 12]} />
-            <meshStandardMaterial color="#5b667a" roughness={0.8} />
-          </mesh>
-          <mesh position={[0.18, -0.12, 0]} rotation={[0, 0, -0.04]}>
-            <capsuleGeometry args={[0.09, 0.62, 6, 12]} />
-            <meshStandardMaterial color="#5b667a" roughness={0.8} />
-          </mesh>
-          <mesh position={[0.12, 1.15, 0.46]}>
-            <sphereGeometry args={[0.095, 16, 16]} />
-            <meshStandardMaterial color="#faf7ff" />
-          </mesh>
-          <mesh position={[-0.12, 1.15, 0.46]}>
-            <sphereGeometry args={[0.095, 16, 16]} />
-            <meshStandardMaterial color="#faf7ff" />
-          </mesh>
-          <mesh position={[0, 0.97, 0.49]}>
-            <boxGeometry args={[0.28, Math.max(0.06, mouthOpen * 0.14), 0.05]} />
-            <meshStandardMaterial color="#3e1018" />
-          </mesh>
-          <mesh position={[0, 1.02, 0.59]}>
-            <planeGeometry args={[0.9, 1.2]} />
-            <meshBasicMaterial map={portraitTexture} transparent toneMapped={false} />
-          </mesh>
-        </group>
-      )}
+        <Suspense fallback={null}>
+          <VRMAvatarModel
+            modelUrl={modelUrl}
+            vrmStateRef={vrmStateRef}
+          />
+        </Suspense>
+      ) : null}
 
       {minimal ? null : (
         <Text

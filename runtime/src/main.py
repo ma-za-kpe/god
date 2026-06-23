@@ -18,6 +18,7 @@ from fastapi.staticfiles import StaticFiles
 
 from .agent_runner import agent_runner
 from .creator.routes import router as creator_router
+from .health_checks import probe_url
 from .rent_daemon import rent_daemon
 from .services.routes import router as services_router
 from .status_engine import TIERS, status_review_daemon
@@ -58,6 +59,76 @@ async def _agent_jobs_daemon():
             break
         except Exception as e:
             log.debug(f"agent jobs daemon: {e}")
+
+
+async def _twitch_chat_relay_daemon():
+    """Tail social.agent.message_sent events and forward agent lines to Twitch chat.
+
+    Runs every 3 seconds. Deduplicates by event_id so each line is sent once.
+    Only active when TWITCH_ENABLED=true and TWITCH_DRY_RUN=false.
+    Rate-limited by helix._RateLimiter (20 msg / 30s).
+    """
+    if os.getenv("TWITCH_ENABLED", "false").lower() not in ("1", "true", "yes"):
+        return
+    channel_name = os.getenv("TWITCH_CHANNEL_NAME", "")
+    if not channel_name:
+        log.warning("TWITCH_CHANNEL_NAME not set — chat relay disabled")
+        return
+
+    from .twitch.adapter import TwitchAdapter
+    from .twitch.models import TwitchChatMessage
+
+    adapter = TwitchAdapter()
+    seen_ids: set[str] = set()
+    RELAY_INTERVAL = 3
+
+    while True:
+        try:
+            await asyncio.sleep(RELAY_INTERVAL)
+            if adapter.dry_run or not adapter.enabled:
+                continue
+
+            from .world_snapshot import build_world_snapshot_async
+
+            snap = await build_world_snapshot_async(events_limit=20)
+            events = snap.get("events") or []
+            msg_events = [
+                ev for ev in events
+                if str(ev.get("event_type", "")).endswith("message_sent")
+                and ev.get("event_id") not in seen_ids
+            ]
+            # Newest first, cap at 2 per cycle so we don't burst the rate limit
+            for ev in sorted(msg_events, key=lambda e: e.get("timestamp", 0))[-2:]:
+                event_id = ev.get("event_id", "")
+                seen_ids.add(event_id)
+                payload = ev.get("payload") or {}
+                if isinstance(payload, str):
+                    import json as _json
+                    try:
+                        payload = _json.loads(payload)
+                    except Exception:
+                        payload = {}
+                body = str(payload.get("content") or payload.get("body") or "").strip()
+                sender = str(payload.get("sender_name") or ev.get("agent_id") or "").strip()
+                if not body or len(body) < 4:
+                    continue
+                # Format: "AgentName: line" — truncate to 490 chars (Twitch limit is 500)
+                line = f"{sender}: {body}"[:490] if sender else body[:490]
+                chat_msg = TwitchChatMessage(message=line, channel_name=channel_name)
+                result = await adapter.send_chat(chat_msg)
+                if not result.ok:
+                    log.debug("Twitch chat relay send failed: %s", result.reason)
+                else:
+                    log.debug("Twitch chat → %s: %s", channel_name, line[:80])
+
+            # Trim seen_ids to avoid unbounded growth (keep last 500)
+            if len(seen_ids) > 500:
+                seen_ids = set(list(seen_ids)[-500:])
+
+        except asyncio.CancelledError:
+            break
+        except Exception as exc:
+            log.debug("Twitch chat relay daemon: %s", exc)
 
 
 async def _ws_snapshot_daemon():
@@ -110,10 +181,45 @@ async def lifespan(app: FastAPI):
     _background_tasks.append(asyncio.create_task(status_review_daemon(), name="status_review"))
     _background_tasks.append(asyncio.create_task(_ws_snapshot_daemon(), name="ws_snapshot"))
     _background_tasks.append(asyncio.create_task(_agent_jobs_daemon(), name="agent_jobs"))
+    _background_tasks.append(asyncio.create_task(_twitch_chat_relay_daemon(), name="twitch_relay"))
+
+    # ── Twitch EventSub WebSocket (only when TWITCH_ENABLED=true) ────────────
+    _twitch_client = None
+    if os.getenv("TWITCH_ENABLED", "false").lower() in ("1", "true", "yes"):
+        try:
+            from .twitch.eventsub import EventSubClient
+
+            _emitter = await get_emitter()
+            _twitch_client = EventSubClient(emit_fn=_emitter.emit)
+            _background_tasks.append(_twitch_client.start())
+            log.info("Twitch EventSub client started")
+        except Exception as _tw_err:
+            log.warning("Twitch EventSub start failed (runtime continues): %s", _tw_err)
+    else:
+        log.info("Twitch disabled (TWITCH_ENABLED=false) — set to true to connect live")
+
+    # ── YouTube Live Chat poller (only when YOUTUBE_ENABLED=true) ────────────
+    _youtube_client = None
+    if os.getenv("YOUTUBE_ENABLED", "false").lower() in ("1", "true", "yes"):
+        try:
+            from .youtube.chat_poller import ChatPoller
+
+            _emitter = await get_emitter()
+            _youtube_client = ChatPoller(emit_fn=_emitter.emit)
+            _background_tasks.append(_youtube_client.start())
+            log.info("YouTube Live Chat poller started")
+        except Exception as _yt_err:
+            log.warning("YouTube poller start failed (runtime continues): %s", _yt_err)
+    else:
+        log.info("YouTube disabled (YOUTUBE_ENABLED=false) — set to true to connect live")
 
     yield
 
     log.info("Shutting down daemons...")
+    if _twitch_client is not None:
+        _twitch_client.stop()
+    if _youtube_client is not None:
+        _youtube_client.stop()
     for task in _background_tasks:
         task.cancel()
     await asyncio.gather(*_background_tasks, return_exceptions=True)
@@ -196,6 +302,8 @@ async def list_agents(limit: int = 10000):
                 COALESCE(rp.miss_count,  0)          AS rent_miss_count,
                 COALESCE(ss.is_sleeping, false)      AS is_sleeping,
                 COALESCE(a.avatar_cid, '')           AS avatar_cid,
+                COALESCE(NULLIF(a.rigged_avatar_cid, ''), a.avatar_cid, '') AS rigged_avatar_cid,
+                COALESCE(a.vrm_avatar_url, '')       AS vrm_avatar_url,
                 COALESCE(a.voice_model_cid, '')      AS voice_model_cid,
                 e.last_thought
             FROM agents a
@@ -234,10 +342,48 @@ async def world_snapshot(events_limit: int = 50, messages_limit: int = 80):
     try:
         from .world_snapshot import build_world_snapshot_async
 
-        return await build_world_snapshot_async(
+        snapshot = await build_world_snapshot_async(
             events_limit=min(events_limit, 200),
             messages_limit=min(messages_limit, 500),
         )
+        if snapshot.get("agents"):
+            try:
+                import psycopg2
+                import psycopg2.extras
+
+                world_id = snapshot.get("world_id", os.getenv("WORLD_ID", "local-dev-world-1"))
+                conn = psycopg2.connect(
+                    os.getenv("DATABASE_URL", "postgresql://god:localdev@localhost:5432/god_world"),
+                    cursor_factory=psycopg2.extras.RealDictCursor,
+                )
+                cur = conn.cursor()
+                cur.execute(
+                    """
+                           SELECT soul_id,
+                           COALESCE(avatar_cid, '') AS avatar_cid,
+                           COALESCE(NULLIF(rigged_avatar_cid, ''), avatar_cid, '') AS rigged_avatar_cid,
+                           COALESCE(vrm_avatar_url, '') AS vrm_avatar_url,
+                           COALESCE(voice_model_cid, '') AS voice_model_cid
+                    FROM agents
+                    WHERE world_id = %s
+                    """,
+                    (world_id,),
+                )
+                cid_map = {row["soul_id"]: dict(row) for row in cur.fetchall()}
+                cur.close()
+                conn.close()
+                for agent in snapshot["agents"]:
+                    if not isinstance(agent, dict):
+                        continue
+                    cid_row = cid_map.get(agent.get("soul_id"))
+                    if cid_row:
+                        agent["avatar_cid"] = cid_row.get("avatar_cid", "")
+                        agent["rigged_avatar_cid"] = cid_row.get("rigged_avatar_cid", "")
+                        agent["vrm_avatar_url"] = cid_row.get("vrm_avatar_url", "")
+                        agent["voice_model_cid"] = cid_row.get("voice_model_cid", "")
+            except Exception as merge_error:
+                log.debug(f"/world/snapshot CID merge skipped: {merge_error}")
+        return snapshot
     except Exception as e:
         log.warning(f"/world/snapshot error: {e}")
         try:
@@ -1175,6 +1321,30 @@ async def creator_genesis(
         f"@ {genesis_balance} USDC each"
     )
 
+    comfyui_probe = probe_url("http://localhost:8188/system_stats")
+    if not comfyui_probe.get("ok"):
+        from fastapi.responses import JSONResponse
+
+        return JSONResponse(
+            status_code=503,
+            content={
+                "error": "ComfyUI is not healthy",
+                "probe": comfyui_probe,
+            },
+        )
+
+    fish_probe = probe_url("http://localhost:7860/v1/health")
+    if not fish_probe.get("ok"):
+        from fastapi.responses import JSONResponse
+
+        return JSONResponse(
+            status_code=503,
+            content={
+                "error": "fish-speech is not healthy",
+                "probe": fish_probe,
+            },
+        )
+
     # Clear existing agents (hard delete for clean genesis)
     try:
         import psycopg2
@@ -1222,11 +1392,31 @@ async def creator_genesis(
                 archetype=archetype,
                 seed_balance=Decimal(str(genesis_balance)),
                 is_elder=True,
+                block_on_avatar_genesis=True,
+                require_avatar_assets=True,
             )
+            if not agent.get("avatar_cid") or not agent.get("voice_model_cid"):
+                raise RuntimeError(
+                    f"genesis agent missing required assets: avatar_cid={agent.get('avatar_cid')!r} "
+                    f"voice_model_cid={agent.get('voice_model_cid')!r}"
+                )
             genesis_agents.append(agent)
             log.info(f"  GENESIS: {agent['name']} ({archetype}) soul={agent['soul_id'][:8]}")
         except Exception as e:
             log.error(f"  Failed to create genesis {archetype}: {e}")
+            try:
+                _clear_world_state(world_id)
+            except Exception as cleanup_error:
+                log.error(f"  Cleanup after genesis failure failed: {cleanup_error}")
+            from fastapi.responses import JSONResponse
+
+            return JSONResponse(
+                status_code=500,
+                content={
+                    "error": f"Failed to create genesis {archetype}: {e}",
+                    "agents_created": len(genesis_agents),
+                },
+            )
 
     # Seed starter marketplace so USDC circulates via buy_service / x402 locally
     try:
@@ -1266,12 +1456,180 @@ async def creator_genesis(
         "genesis_complete": True,
         "agents_created": len(genesis_agents),
         "agents": [
-            {"name": a["name"], "archetype": a["archetype"], "soul_id": a["soul_id"][:12]}
+            {
+                "name": a["name"],
+                "archetype": a["archetype"],
+                "soul_id": a["soul_id"],
+                "wallet_address": a["wallet_address"],
+                "graph_cid": a.get("graph_cid", ""),
+                "avatar_cid": a.get("avatar_cid", ""),
+                "rigged_avatar_cid": a.get("rigged_avatar_cid", ""),
+                "voice_model_cid": a.get("voice_model_cid", ""),
+                "avatar_genesis_status": a.get("avatar_genesis_status", ""),
+            }
             for a in genesis_agents
         ],
         "balance_each": genesis_balance,
         "message": "The world has begun. Agents will reproduce naturally from here.",
     }
+
+
+@app.post("/creator/one")
+@app.post("/one")
+async def creator_one(
+    body: dict = {},
+    x_creator_token: str | None = Header(None, alias="X-Creator-Token"),
+):
+    """
+    Creator-only: clear the world and create exactly one talk-first agent.
+
+    This is the smoke-test path. It blocks until both avatar and voice assets
+    are generated and pinned, and fails if either asset is missing.
+    """
+    from decimal import Decimal
+
+    from .security import deny_creator_action
+
+    denied = deny_creator_action(x_creator_token)
+    if denied:
+        return denied
+
+    if not body.get("confirm"):
+        return {
+            "warning": "This will DELETE all existing agents and create one agent. Pass {confirm: true} to proceed.",
+            "current_agent_count": _count_agents(),
+        }
+
+    world_id = os.getenv("WORLD_ID", "local-dev-world-1")
+    archetype = str(body.get("archetype") or "philosopher").strip().lower()
+    seed_balance = float(body.get("seed_balance_usdc", 2.0))
+
+    try:
+        from .avatar.archetype_config import ARCHETYPE_CONFIGS
+
+        if archetype not in ARCHETYPE_CONFIGS:
+            return {
+                "error": f"unknown archetype: {archetype}",
+                "valid_archetypes": sorted(ARCHETYPE_CONFIGS),
+            }
+    except Exception as exc:
+        return {"error": f"failed to validate archetype: {exc}"}
+
+    log.info("CREATOR ONE: clearing world, spawning one %s agent", archetype)
+
+    try:
+        _clear_world_state(world_id)
+    except Exception as e:
+        log.error(f"  Failed to clear world: {e}")
+        from fastapi.responses import JSONResponse
+
+        return JSONResponse(status_code=500, content={"error": f"Failed to clear world: {e}"})
+
+    from .seed_agents import seed_one_agent
+
+    try:
+        agent = await seed_one_agent(
+            archetype=archetype,
+            seed_balance=Decimal(str(seed_balance)),
+            is_elder=True,
+            block_on_avatar_genesis=True,
+            require_avatar_assets=True,
+        )
+    except Exception as exc:
+        log.error("  Failed to create one-agent world: %s", exc)
+        return {"error": str(exc)}
+
+    try:
+        import psycopg2
+        import psycopg2.extras
+
+        conn = psycopg2.connect(
+            os.getenv("DATABASE_URL", "postgresql://god:localdev@localhost:5432/god_world"),
+            cursor_factory=psycopg2.extras.RealDictCursor,
+        )
+        cur = conn.cursor()
+        cur.execute(
+            """
+            SELECT soul_id, current_name, archetype,
+                   COALESCE(avatar_cid, '') AS avatar_cid,
+                   COALESCE(NULLIF(rigged_avatar_cid, ''), avatar_cid, '') AS rigged_avatar_cid,
+                   COALESCE(vrm_avatar_url, '') AS vrm_avatar_url,
+                   COALESCE(voice_model_cid, '') AS voice_model_cid
+            FROM agents
+            WHERE world_id = %s
+            ORDER BY birth_timestamp DESC
+            LIMIT 1
+            """,
+            (world_id,),
+        )
+        row = cur.fetchone()
+        cur.close()
+        conn.close()
+    except Exception as exc:
+        return {"error": f"failed to verify one-agent world: {exc}", "agent": agent}
+
+    if not row:
+        return {"error": "one-agent world did not persist", "agent": agent}
+    if not row.get("avatar_cid") or not row.get("voice_model_cid"):
+        return {
+            "error": "one-agent world missing required assets",
+            "agent": dict(row),
+            "seed_agent": agent,
+        }
+
+    try:
+        from .messaging import send_message
+
+        bootstrap_line = (
+            body.get("bootstrap_line")
+            or body.get("speech")
+            or f"I am {row.get('current_name')}. This world has one voice now."
+        )
+        await send_message(
+            sender_soul_id=str(row["soul_id"]),
+            recipient_soul_id=str(row["soul_id"]),
+            body=str(bootstrap_line),
+            subject="solo bootstrap",
+            message_type="direct",
+            metadata={"source": "creator_one", "solo": True},
+        )
+    except Exception as exc:
+        log.warning("  Solo bootstrap speech failed: %s", exc)
+
+    return {
+        "one_complete": True,
+        "agent": dict(row),
+        "seed_agent": agent,
+        "message": "One agent is live with both avatar and voice assets.",
+    }
+
+
+def _clear_world_state(world_id: str) -> None:
+    import psycopg2
+
+    db = os.getenv("DATABASE_URL", "postgresql://god:localdev@localhost:5432/god_world")
+    conn = psycopg2.connect(db)
+    cur = conn.cursor()
+    cur.execute(
+        "DELETE FROM service_listings WHERE agent_soul_id IN "
+        "(SELECT soul_id FROM agents WHERE world_id = %s)",
+        (world_id,),
+    )
+    cur.execute("DELETE FROM agents WHERE world_id = %s", (world_id,))
+    cur.execute("DELETE FROM sleep_states WHERE world_id = %s", (world_id,))
+    cur.execute("DELETE FROM rent_payments WHERE soul_id NOT IN (SELECT soul_id FROM agents)")
+    cur.execute("DELETE FROM events WHERE world_id = %s", (world_id,))
+    cur.execute("DELETE FROM agent_messages WHERE world_id = %s", (world_id,))
+    cur.execute("DELETE FROM dreams WHERE world_id = %s", (world_id,))
+    cur.execute("DELETE FROM episodes WHERE world_id = %s", (world_id,))
+    cur.execute("DELETE FROM external_payments WHERE world_id = %s", (world_id,))
+    cur.execute("DELETE FROM agent_status WHERE world_id = %s", (world_id,))
+    cur.execute("DELETE FROM world_firsts WHERE world_id = %s", (world_id,))
+    cur.execute("DELETE FROM world_milestones WHERE world_id = %s", (world_id,))
+    conn.commit()
+    cur.close()
+    conn.close()
+    log.info("  Existing world state cleared")
 
 
 def _count_agents() -> int:
@@ -1337,6 +1695,6 @@ if __name__ == "__main__":
         "src.main:app",
         host="0.0.0.0",
         port=8888,
-        reload=True,
+        reload=os.getenv("UVICORN_RELOAD", "false").lower() in ("1", "true", "yes"),
         log_level=os.getenv("LOG_LEVEL", "info").lower(),
     )

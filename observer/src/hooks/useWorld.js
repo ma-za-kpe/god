@@ -26,12 +26,7 @@ export function useWorld() {
       let ok = true;
       let lastError = '';
       try {
-        const [agentsRes, eventsRes, statsRes, snapshotRes] = await Promise.all([
-          fetch(`${API_BASE}/agents?limit=10000`),
-          fetch(`${API_BASE}/events?limit=80`),
-          fetch(`${API_BASE}/stats`),
-          fetch(`${API_BASE}/world/snapshot?events_limit=60&messages_limit=40`),
-        ]);
+        const agentsRes = await fetch(`${API_BASE}/agents?limit=10000`);
         if (agentsRes.ok) {
           const json = await agentsRes.json();
           setAgents(json.agents || []);
@@ -39,24 +34,33 @@ export function useWorld() {
           ok = false;
           lastError = `agents:${agentsRes.status}`;
         }
-        if (eventsRes.ok) {
-          const json = await eventsRes.json();
+
+        const [eventsRes, statsRes, snapshotRes] = await Promise.allSettled([
+          fetch(`${API_BASE}/events?limit=80`),
+          fetch(`${API_BASE}/stats`),
+          fetch(`${API_BASE}/world/snapshot?events_limit=60&messages_limit=40`),
+        ]);
+
+        if (eventsRes.status === 'fulfilled' && eventsRes.value.ok) {
+          const json = await eventsRes.value.json();
           setEvents(json.events || []);
         } else {
           ok = false;
-          lastError = lastError || `events:${eventsRes.status}`;
+          lastError = lastError || `events:${eventsRes.status === 'fulfilled' ? eventsRes.value.status : 'fetch'}`;
         }
-        if (statsRes.ok) {
-          setStats(await statsRes.json());
+
+        if (statsRes.status === 'fulfilled' && statsRes.value.ok) {
+          setStats(await statsRes.value.json());
         } else {
           ok = false;
-          lastError = lastError || `stats:${statsRes.status}`;
+          lastError = lastError || `stats:${statsRes.status === 'fulfilled' ? statsRes.value.status : 'fetch'}`;
         }
-        if (snapshotRes.ok) {
-          setSnapshot(await snapshotRes.json());
+
+        if (snapshotRes.status === 'fulfilled' && snapshotRes.value.ok) {
+          setSnapshot(await snapshotRes.value.json());
         } else {
           ok = false;
-          lastError = lastError || `snapshot:${snapshotRes.status}`;
+          lastError = lastError || `snapshot:${snapshotRes.status === 'fulfilled' ? snapshotRes.value.status : 'fetch'}`;
         }
       } catch (err) {
         ok = false;

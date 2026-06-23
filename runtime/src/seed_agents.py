@@ -67,6 +67,8 @@ async def seed_one_agent(
     archetype: str,
     seed_balance: Decimal = SEED_BALANCE_USDC,
     is_elder: bool = False,
+    block_on_avatar_genesis: bool = False,
+    require_avatar_assets: bool = False,
 ) -> dict:
     """Create, pin, and register one seed agent. Returns registration info."""
 
@@ -131,7 +133,30 @@ async def seed_one_agent(
             )
             pipeline._comfyui_semaphore = _comfyui_semaphore
             pipeline._tts_semaphore = _tts_semaphore
-            asyncio.create_task(pipeline.execute(soul_id, archetype, graph))
+            if block_on_avatar_genesis:
+                pipeline_result = await pipeline.execute(soul_id, archetype, graph)
+                result["avatar_genesis"] = pipeline_result.to_dict()
+                result["avatar_cid"] = pipeline_result.portrait_cid or ""
+                result["rigged_avatar_cid"] = (
+                    getattr(pipeline_result, "rigged_avatar_cid", "")
+                    or pipeline_result.portrait_cid
+                    or ""
+                )
+                result["voice_model_cid"] = pipeline_result.voice_embedding_cid or ""
+                result["expression_sheet_cid"] = pipeline_result.expression_sheet_cid or ""
+                result["avatar_genesis_status"] = pipeline_result.status
+                if require_avatar_assets:
+                    missing = []
+                    if not pipeline_result.portrait_cid:
+                        missing.append("avatar_cid")
+                    if not pipeline_result.voice_embedding_cid:
+                        missing.append("voice_model_cid")
+                    if missing:
+                        raise RuntimeError(
+                            f"avatar genesis incomplete for {soul_id[:8]}: missing {missing}"
+                        )
+            else:
+                asyncio.create_task(pipeline.execute(soul_id, archetype, graph))
         except Exception as exc:
             log.warning("  Avatar genesis schedule failed for %s: %s", soul_id[:8], exc)
 

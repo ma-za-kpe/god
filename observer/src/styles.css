@@ -28,6 +28,43 @@ body {
   height: 100%;
 }
 
+.debug-red-screen {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(135deg, #ff0015 0%, #b00000 100%);
+  color: #fff;
+  font-family: Inter, system-ui, sans-serif;
+}
+
+.debug-red-card {
+  display: grid;
+  gap: 10px;
+  padding: 24px 28px;
+  border: 2px solid rgba(255, 255, 255, 0.75);
+  border-radius: 20px;
+  background: rgba(0, 0, 0, 0.18);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
+  text-align: center;
+}
+
+.debug-red-title {
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  font-weight: 800;
+  font-size: 0.9rem;
+}
+
+.debug-red-copy {
+  font-size: 1rem;
+  line-height: 1.4;
+}
+
+.observer-app.one {
+  grid-template-rows: 1fr;
+}
+
 .stream-badge {
   position: fixed;
   z-index: 20;
@@ -117,7 +154,17 @@ body {
 }
 
 .observer-app.one .observer-main {
+  grid-column: 1;
+  grid-row: 1;
+  min-height: 100vh;
+}
+
+.observer-app.one .observer-main {
   grid-template-columns: 1fr;
+}
+
+.observer-app.one .world-shell {
+  min-height: 100vh;
 }
 
 .world-shell { min-width: 0; min-height: 0; }

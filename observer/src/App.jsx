@@ -10,6 +10,7 @@ import { useObserverStore } from './store';
 function currentMode() {
   const pathname = window.location.pathname.replace(/\/+$/, '');
   const params = new URLSearchParams(window.location.search);
+  if (pathname === '/one-red' || params.get('debug') === 'red') return 'red';
   if (pathname === '/one' || params.get('solo') === '1') return 'one';
   return 'stage';
 }
@@ -23,6 +24,18 @@ export default function App() {
   const ageMs = observerHealth.lastPollAt ? Date.now() - observerHealth.lastPollAt : Infinity;
   const live = observerHealth.ok && ageMs < 7000;
   const label = live ? 'observer live' : 'observer stale';
+
+  if (mode === 'red') {
+    return (
+      <div className="debug-red-screen">
+        <div className="debug-red-card">
+          <div className="debug-red-title">observer debug</div>
+          <div className="debug-red-copy">If you can see this, the browser source is rendering correctly.</div>
+          <div className="debug-red-copy muted">Use /one to return to the live world.</div>
+        </div>
+      </div>
+    );
+  }
 
   if (mode === 'one') {
     return (

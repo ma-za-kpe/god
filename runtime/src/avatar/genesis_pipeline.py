@@ -31,12 +31,22 @@ except ImportError:  # pragma: no cover - flat test path
 log = logging.getLogger(__name__)
 
 
+def _resolve_endpoint(*candidates: str | None) -> str:
+    for candidate in candidates:
+        value = str(candidate or "").strip().rstrip("/")
+        if value:
+            return value
+    return ""
+
+
 @dataclass
 class PipelineResult:
     soul_id: str
     correlation_id: str
     status: str
     portrait_cid: str | None = None
+    rigged_avatar_cid: str | None = None
+    vrm_avatar_url: str | None = None
     expression_sheet_cid: str | None = None
     voice_embedding_cid: str | None = None
     assets_produced: int = 0
@@ -60,10 +70,22 @@ class GenesisPipeline:
         tts_concurrency: int | None = None,
     ) -> None:
         validate_archetype_configs()
-        self.comfyui_endpoint = (
-            comfyui_endpoint if comfyui_endpoint is not None else os.getenv("COMFYUI_ENDPOINT")
+        self.comfyui_endpoint = _resolve_endpoint(
+            comfyui_endpoint,
+            os.getenv("COMFYUI_ENDPOINT"),
+            os.getenv("COMFYUI_HEALTH_URL"),
+            os.getenv("COMFYUI_URL"),
+            "http://localhost:8188",
+            "http://comfyui:8188",
         )
-        self.tts_endpoint = tts_endpoint if tts_endpoint is not None else os.getenv("TTS_ENDPOINT")
+        self.tts_endpoint = _resolve_endpoint(
+            tts_endpoint,
+            os.getenv("TTS_ENDPOINT"),
+            os.getenv("VOICE_HEALTH_URL"),
+            os.getenv("TTS_HEALTH_URL"),
+            "http://localhost:7860",
+            "http://fish-speech:7860",
+        )
         self.pipeline_timeout_seconds = pipeline_timeout_seconds or int(
             os.getenv("PIPELINE_TIMEOUT_SECONDS", "300")
         )
@@ -170,7 +192,9 @@ class GenesisPipeline:
                     portrait_pin = None
                 if portrait_pin:
                     identity.avatar_cid = portrait_pin.cid
+                    identity.rigged_avatar_cid = portrait_pin.cid
                     result.portrait_cid = portrait_pin.cid
+                    result.rigged_avatar_cid = portrait_pin.cid
                     result.assets_produced += 1
                     self._log_step(
                         correlation_id,
@@ -290,6 +314,8 @@ class GenesisPipeline:
                     soul_id,
                     graph_cid,
                     avatar_cid=result.portrait_cid or "",
+                    rigged_avatar_cid=result.rigged_avatar_cid or result.portrait_cid or "",
+                    vrm_avatar_url=result.vrm_avatar_url or "",
                     voice_model_cid=result.voice_embedding_cid or "",
                 )
                 self._log_step(
@@ -318,11 +344,11 @@ class GenesisPipeline:
         soul_id: str,
         graph_cid: str,
         avatar_cid: str = "",
+        rigged_avatar_cid: str = "",
+        vrm_avatar_url: str = "",
         voice_model_cid: str = "",
     ) -> None:
-        database_url = os.getenv("DATABASE_URL")
-        if not database_url:
-            return
+        database_url = os.getenv("DATABASE_URL", "postgresql://god:localdev@localhost:5432/god_world")
         try:
             import psycopg2
 
@@ -332,11 +358,30 @@ class GenesisPipeline:
                         """UPDATE agents
                            SET graph_cid = %s,
                                avatar_cid = CASE WHEN %s != '' THEN %s ELSE avatar_cid END,
+                               rigged_avatar_cid = CASE WHEN %s != '' THEN %s ELSE rigged_avatar_cid END,
+                               vrm_avatar_url = CASE WHEN %s != '' THEN %s ELSE vrm_avatar_url END,
                                voice_model_cid = CASE WHEN %s != '' THEN %s ELSE voice_model_cid END
                            WHERE soul_id = %s""",
-                        (graph_cid, avatar_cid, avatar_cid, voice_model_cid, voice_model_cid, soul_id),
+                        (
+                            graph_cid,
+                            avatar_cid,
+                            avatar_cid,
+                            rigged_avatar_cid,
+                            rigged_avatar_cid,
+                            vrm_avatar_url,
+                            vrm_avatar_url,
+                            voice_model_cid,
+                            voice_model_cid,
+                            soul_id,
+                        ),
                     )
                 conn.commit()
+                if cur.rowcount != 1:
+                    log.warning(
+                        "postgres_update_rowcount soul_id=%s rowcount=%s",
+                        soul_id,
+                        cur.rowcount,
+                    )
         except Exception as exc:
             log.warning("postgres_update_failed soul_id=%s error=%s", soul_id, exc)
 
@@ -367,6 +412,8 @@ class GenesisPipeline:
         assets = []
         if result.portrait_cid:
             assets.append("portrait")
+        if result.rigged_avatar_cid:
+            assets.append("rigged_avatar")
         if result.expression_sheet_cid:
             assets.append("expression_sheet")
         if result.voice_embedding_cid:
@@ -377,6 +424,8 @@ class GenesisPipeline:
         skipped = []
         if not result.portrait_cid:
             skipped.append("portrait")
+        if not result.rigged_avatar_cid:
+            skipped.append("rigged_avatar")
         if not result.expression_sheet_cid:
             skipped.append("expression_sheet")
         if not result.voice_embedding_cid:

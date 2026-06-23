@@ -1,6 +1,6 @@
 import { Canvas } from '@react-three/fiber';
 import { Billboard, OrbitControls, Text } from '@react-three/drei';
-import { Suspense, useMemo } from 'react';
+import { useMemo } from 'react';
 import { AgentAvatar } from './AgentAvatar';
 import { useObserverStore } from '../store';
 import { API_BASE } from '../hooks/useWorld';
@@ -65,37 +65,35 @@ export function WorldMap({ mode, minimal = false }) {
         <directionalLight position={[8, 12, 8]} intensity={2.2} castShadow />
         <directionalLight position={[-8, 4, -6]} intensity={0.8} color="#66ccff" />
 
-        <Suspense fallback={null}>
-          <group position={[0, -0.15, 0]}>
-            {layout.map(({ agent, pos }, index) => {
-              if (!agent) return null;
-              const isSelected = agent.soul_id === (selectedSoulId || activeAgent?.soul_id);
-              const isSpeaking = agent.soul_id === speakingId;
-              const modelUrl = agent.vrm_avatar_url || snapshot.avatar?.vrm_avatar_url || import.meta.env.VITE_DEFAULT_VRM_URL || '';
-              const color = COLORS[index % COLORS.length];
-              return (
-                <AgentAvatar
-                  key={agent.soul_id}
-                  agent={agent}
-                  avatarState={avatarState}
-                  selected={isSelected}
-                  speaking={isSpeaking}
-                  vrmUrl={modelUrl}
-                  position={pos}
-                  color={color}
-                  runtimeBaseUrl={API_BASE}
-                  minimal={minimal}
-                />
-              );
-            })}
-            {mode === 'one' || agents.length <= 1 || minimal ? null : (
-              <mesh rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
-                <planeGeometry args={[60, 60]} />
-                <meshStandardMaterial color="#0d1020" />
-              </mesh>
-            )}
-          </group>
-        </Suspense>
+        <group position={[0, -0.15, 0]}>
+          {layout.map(({ agent, pos }, index) => {
+            if (!agent) return null;
+            const isSelected = agent.soul_id === (selectedSoulId || activeAgent?.soul_id);
+            const isSpeaking = agent.soul_id === speakingId;
+            const modelUrl = agent.vrm_avatar_url || snapshot.avatar?.vrm_avatar_url || import.meta.env.VITE_DEFAULT_VRM_URL || '';
+            const color = COLORS[index % COLORS.length];
+            return (
+              <AgentAvatar
+                key={agent.soul_id}
+                agent={agent}
+                avatarState={avatarState}
+                selected={isSelected}
+                speaking={isSpeaking}
+                vrmUrl={modelUrl}
+                position={pos}
+                color={color}
+                runtimeBaseUrl={API_BASE}
+                minimal={minimal}
+              />
+            );
+          })}
+          {mode === 'one' || agents.length <= 1 || minimal ? null : (
+            <mesh rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
+              <planeGeometry args={[60, 60]} />
+              <meshStandardMaterial color="#0d1020" />
+            </mesh>
+          )}
+        </group>
 
         {minimal ? null : (
           <Billboard position={[0, 5.5, 0]}>
