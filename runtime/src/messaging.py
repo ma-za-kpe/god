@@ -744,8 +744,8 @@ async def _publish_to_nats(msg: AgentMessage):
     subject = f"world.{WORLD_ID}.agent.{msg.recipient_id}.inbox"
     payload = json.dumps(msg.to_dict()).encode()
     log.debug(f"  NATS publish direct: subject={subject}")
-    if hasattr(emitter, "_nc") and emitter._nc:
-        await emitter._nc.publish(subject, payload)
+    if getattr(emitter, "nc", None):
+        await emitter.nc.publish(subject, payload)
     else:
         log.debug("  NATS: no connection object, skipping direct publish")
 
@@ -758,7 +758,7 @@ async def _publish_broadcast(msg: AgentMessage):
     subject = f"world.{WORLD_ID}.broadcast"
     payload = json.dumps(msg.to_dict()).encode()
     log.debug(f"  NATS publish broadcast: subject={subject}")
-    if hasattr(emitter, "_nc") and emitter._nc:
-        await emitter._nc.publish(subject, payload)
+    if getattr(emitter, "nc", None):
+        await emitter.nc.publish(subject, payload)
     else:
         log.debug("  NATS: no connection object, skipping broadcast publish")

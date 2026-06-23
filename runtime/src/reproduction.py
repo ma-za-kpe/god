@@ -92,7 +92,7 @@ async def fork_self(agent: dict) -> dict:
         if "insufficient balance" in reason:
             from .event_emitter import get_emitter
 
-            emitter = get_emitter()
+            emitter = await get_emitter()
             await emitter.emit(
                 "lifecycle",
                 "reproduction.blocked",
