@@ -255,6 +255,16 @@ start_observer() {
     die "$REPO_DIR/observer missing"
   fi
 
+  ensure_node() {
+    if ! command -v node >/dev/null 2>&1 || ! node -e 'process.exit(Number(process.versions.node.split(".")[0]) >= 18 ? 0 : 1)' >/dev/null 2>&1; then
+      log "Installing Node.js 20.x for observer..."
+      curl -fsSL https://deb.nodesource.com/setup_20.x | bash - >/dev/null 2>&1
+      apt-get install -y -qq nodejs
+    fi
+  }
+
+  ensure_node
+
   log "Starting observer on :3000..."
   if pgrep -f 'observer/serve.py' >/dev/null 2>&1; then
     log "Killing existing observer serve.py process"
