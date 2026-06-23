@@ -250,7 +250,11 @@ start_observer() {
   check_port 3000 "observer"
   cd "$REPO_DIR/observer"
   if [ ! -d node_modules ]; then
-    npm ci
+    if [ -f package-lock.json ]; then
+      npm ci
+    else
+      npm install
+    fi
   fi
   nohup npm run dev -- --host 0.0.0.0 --port 3000 >"$LOG_DIR/observer.log" 2>&1 &
   cd "$REPO_DIR"
