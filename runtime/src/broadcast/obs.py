@@ -51,9 +51,14 @@ class BroadcastSurface:
         self.transport = os.getenv("BROADCAST_TRANSPORT", "dry-run")
         self.obs_scene_prefix = os.getenv("OBS_SCENE_PREFIX", "obs/")
         self.obs_browser_source = os.getenv("OBS_BROWSER_SOURCE", "god-browser")
-        self.obs_browser_url = os.getenv("OBS_BROWSER_URL", "http://localhost:10517/one")
+        self.obs_browser_url = os.getenv("OBS_BROWSER_URL", "http://localhost:10517/stage")
         self.obs_browser_width = int(os.getenv("OBS_BROWSER_WIDTH", "1920"))
         self.obs_browser_height = int(os.getenv("OBS_BROWSER_HEIGHT", "1080"))
+        self.obs_capture_mode = os.getenv("OBS_CAPTURE_MODE", "browser")
+        self.obs_capture_source_kind = os.getenv("OBS_CAPTURE_SOURCE_KIND", "browser_source")
+        self.obs_capture_window_id = os.getenv("OBS_CAPTURE_WINDOW_ID", "")
+        self.obs_capture_window_class = os.getenv("OBS_CAPTURE_WINDOW_CLASS", "")
+        self.obs_capture_window_name = os.getenv("OBS_CAPTURE_WINDOW_NAME", "")
         self.obs_stream_server = os.getenv("OBS_STREAM_SERVER", "")
         self.obs_stream_key = os.getenv("OBS_STREAM_KEY", "")
         self.obs_auto_start_stream = _env_bool("OBS_AUTO_START_STREAM", "false")
@@ -157,8 +162,9 @@ class BroadcastSurface:
                         results.append({"action": "set_text", "source": source_name, "ok": False, "error": str(exc)})
                         log.debug("OBS set_input_settings %s: %s", source_name, exc)
 
-            # Browser source points at the public observer /one page.
-            if self.obs_browser_source and self.obs_browser_url:
+            # Browser mode updates a browser source URL. Window-capture mode
+            # leaves the X11 source alone because the startup script owns it.
+            if self.obs_capture_mode == "browser" and self.obs_browser_source and self.obs_browser_url:
                 try:
                     cl.set_input_settings(
                         name=self.obs_browser_source,
@@ -187,6 +193,15 @@ class BroadcastSurface:
                         }
                     )
                     log.debug("OBS browser source update %s: %s", self.obs_browser_source, exc)
+            elif self.obs_capture_mode != "browser":
+                results.append(
+                    {
+                        "action": "capture_source",
+                        "mode": self.obs_capture_mode,
+                        "source": self.obs_browser_source,
+                        "ok": True,
+                    }
+                )
 
             if self.obs_auto_start_stream:
                 self._ensure_streaming(cl, results)
@@ -208,6 +223,9 @@ class BroadcastSurface:
             "obs_browser_source": self.obs_browser_source,
             "obs_browser_url": self.obs_browser_url,
             "obs_stream_server": self.obs_stream_server,
+            "obs_capture_mode": self.obs_capture_mode,
+            "obs_capture_source_kind": self.obs_capture_source_kind,
+            "obs_capture_window_id": self.obs_capture_window_id,
             "obs_auto_start_stream": self.obs_auto_start_stream,
             "health": health,
         }

@@ -83,7 +83,7 @@ Required envs for live mode:
 - `OBS_WEBSOCKET_URL`
 - `OBS_WEBSOCKET_PASSWORD`
 - `OBS_BROWSER_SOURCE` defaults to `god-browser`
-- `OBS_BROWSER_URL` defaults to `http://localhost:10517/one`
+- `OBS_BROWSER_URL` defaults to `http://localhost:10517/stage`
 
 If those values are missing, the runtime stays up and the stream controls
 remain in dry-run / observer-only mode.
@@ -127,7 +127,7 @@ fish-speech, the observer on `:3000`, nginx, and the runtime are all up.
 - [ ] Public cloudflare tunnel: URL `folks-forming-bizrate-begins.trycloudflare.com` expires when process dies — needs permanent solution (ngrok auth token or Cloudflare named tunnel)
 - [ ] Add cloudflared auto-start to `vast-restart-services.sh`
 - [ ] Expression sheet CIDs: confirm expression sheet assets pinned for all 8 agents
-- [ ] Observer `/one`: verify the Vite app is live on `:3000` and reachable through nginx at `http://ssh7.vast.ai:10517/one`
+- [ ] Observer `/stage`: verify the Vite app is live on `:3000` and reachable through nginx at `http://ssh7.vast.ai:10517/stage`
 
 ## Troubleshooting
 
