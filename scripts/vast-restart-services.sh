@@ -317,6 +317,80 @@ start_obs() {
   mkdir -p /tmp/xdg-runtime-root
   chmod 700 /tmp/xdg-runtime-root 2>/dev/null || true
 
+  force_obs_keyframes() {
+    local profile_dir profile_file
+    while IFS= read -r profile_file; do
+      [ -f "$profile_file" ] || continue
+      python3 - "$profile_file" <<'PY'
+from pathlib import Path
+import sys
+
+path = Path(sys.argv[1])
+text = path.read_text(encoding="utf-8", errors="ignore")
+
+def ensure_section(data: str, section: str, key_values: dict[str, str]) -> str:
+    marker = f"[{section}]"
+    if marker not in data:
+        block = "\n".join([marker, *[f"{k}={v}" for k, v in key_values.items()], ""])
+        return data.rstrip() + "\n\n" + block
+
+    lines = data.splitlines()
+    out = []
+    in_section = False
+    seen = set()
+    inserted = False
+    current_section = None
+
+    for line in lines:
+      if line.startswith("[") and line.endswith("]"):
+        if in_section and not inserted:
+          for k, v in key_values.items():
+            if k not in seen:
+              out.append(f"{k}={v}")
+          inserted = True
+        current_section = line[1:-1]
+        in_section = current_section == section
+        seen = set()
+        out.append(line)
+        continue
+
+      if in_section:
+        if "=" in line and not line.lstrip().startswith(";"):
+          key = line.split("=", 1)[0].strip()
+          if key in key_values:
+            out.append(f"{key}={key_values[key]}")
+            seen.add(key)
+            continue
+      out.append(line)
+
+    if in_section and not inserted:
+      for k, v in key_values.items():
+        if k not in seen:
+          out.append(f"{k}={v}")
+
+    result = "\n".join(out)
+    if not result.endswith("\n"):
+      result += "\n"
+    return result
+
+simple_keys = {
+    "KeyframeInterval": "2",
+    "keyint_sec": "2",
+}
+adv_keys = {
+    "KeyframeInterval": "2",
+    "keyint_sec": "2",
+}
+updated = ensure_section(text, "SimpleOutput", simple_keys)
+updated = ensure_section(updated, "AdvOut", adv_keys)
+if updated != text:
+    path.write_text(updated, encoding="utf-8")
+PY
+    done < <(find /root/.config/obs-studio/basic/profiles -name basic.ini -type f 2>/dev/null)
+  }
+
+  force_obs_keyframes
+
   if pgrep -x obs >/dev/null 2>&1; then
     log "OBS already running"
     return 0

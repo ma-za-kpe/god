@@ -200,6 +200,7 @@ ws.call(requests.StartStreaming())
 - The stream did not fail because `/one` was unreachable. The browser source was added successfully.
 - The stream failed because OBS defaulted to NVENC and the host could not open the NVENC encoder.
 - The correct recovery path was to force OBS simple output to `x264_lowcpu`.
+- Once the stream was stable, YouTube Studio could still hang on `Preparing stream` if the keyframe interval stayed too long; the safe target is `2s` or `4s` max.
 - OBS profile data lived in the profile INI and service JSON files, so the fix had to land there, not only in runtime env vars.
 - `GetStreamingStatus()` can lag behind or report `streaming: false` momentarily even when the log has already shown `Streaming Start`. The log is the source of truth for the ingest transition.
 - Once the x264 encoder was forced, the RTMP connection succeeded and the stream went live.
