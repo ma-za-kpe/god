@@ -120,10 +120,22 @@ configure_streaming_mode() {
     export OBS_BROWSER_SOURCE=god-browser
   fi
   if [ -z "${OBS_BROWSER_URL:-}" ]; then
-    export OBS_BROWSER_URL=http://localhost:10517/one
+    export OBS_BROWSER_URL=http://localhost:10517/stage
   fi
   if [ -z "${OBS_STREAM_SERVER:-}" ]; then
     export OBS_STREAM_SERVER=rtmp://a.rtmp.youtube.com/live2
+  fi
+  if [ -z "${OBS_CAPTURE_MODE:-}" ]; then
+    export OBS_CAPTURE_MODE=window
+  fi
+  if [ -z "${OBS_CAPTURE_SOURCE_KIND:-}" ]; then
+    export OBS_CAPTURE_SOURCE_KIND=xcomposite_input
+  fi
+  if [ -z "${OBS_CAPTURE_WINDOW_CLASS:-}" ]; then
+    export OBS_CAPTURE_WINDOW_CLASS=Firefox
+  fi
+  if [ -z "${OBS_CAPTURE_WINDOW_NAME:-}" ]; then
+    export OBS_CAPTURE_WINDOW_NAME=Firefox
   fi
 }
 
@@ -287,7 +299,83 @@ start_observer() {
   fi
   nohup npm run dev -- --host 0.0.0.0 --port 3000 >"$LOG_DIR/observer.log" 2>&1 &
   cd "$REPO_DIR"
-  wait_http "http://localhost:3000/one" "observer /one" 120 3 || die "Observer not responding on /one"
+  wait_http "http://localhost:3000/stage" "observer /stage" 120 3 || die "Observer not responding on /stage"
+}
+
+ensure_browser_user() {
+  if ! id stream >/dev/null 2>&1; then
+    log "Creating browser user 'stream'..."
+    useradd -m -s /bin/bash stream
+  fi
+  install -d -o stream -g stream /tmp/firefox-profile
+  install -d -o stream -g stream /tmp/runtime-stream
+}
+
+start_firefox() {
+  if [ ! -x /opt/firefox/firefox ]; then
+    log "Firefox tarball not present; installing..."
+    curl -fsSL -L -o /tmp/firefox-latest.tar.xz "https://download.mozilla.org/?product=firefox-latest-ssl&os=linux64&lang=en-US"
+    rm -rf /opt/firefox
+    tar -xJf /tmp/firefox-latest.tar.xz -C /opt
+  fi
+
+  ensure_browser_user
+
+  log "Starting Firefox on Xvfb..."
+  if pgrep -u stream -f '/opt/firefox/firefox --new-instance --profile /tmp/firefox-profile --kiosk' >/dev/null 2>&1; then
+    log "Firefox already running"
+  else
+    nohup runuser -u stream -- env \
+      DISPLAY=:99 \
+      XDG_RUNTIME_DIR=/tmp/runtime-stream \
+      MOZ_DISABLE_CONTENT_SANDBOX=1 \
+      /opt/firefox/firefox --new-instance --profile /tmp/firefox-profile --kiosk "${OBS_BROWSER_URL:-http://localhost:10517/stage}" \
+      >"$LOG_DIR/firefox.log" 2>&1 &
+  fi
+
+  local window_id=""
+  for _ in $(seq 1 30); do
+    window_id="$(DISPLAY=:99 xdotool search --all --class Firefox 2>/dev/null | head -1 || true)"
+    if [ -n "${window_id:-}" ]; then
+      break
+    fi
+    sleep 2
+  done
+  [ -n "${window_id:-}" ] || die "Firefox window not found on DISPLAY=:99"
+
+  export OBS_CAPTURE_WINDOW_ID="$window_id"
+  log "Firefox window id: ${OBS_CAPTURE_WINDOW_ID}"
+
+  python3 - <<'PY'
+from pathlib import Path
+import json
+import os
+
+scene_path = Path("/root/.config/obs-studio/basic/scenes/Untitled.json")
+data = json.loads(scene_path.read_text(encoding="utf-8"))
+window_id = os.environ["OBS_CAPTURE_WINDOW_ID"]
+for source in data.get("sources", []):
+    if source.get("name") == os.getenv("OBS_CAPTURE_SOURCE_NAME", "god-browser"):
+        source["id"] = os.getenv("OBS_CAPTURE_SOURCE_KIND", "xcomposite_input")
+        source["versioned_id"] = os.getenv("OBS_CAPTURE_SOURCE_KIND", "xcomposite_input")
+        source["settings"] = {
+            "capture_window": window_id,
+            "CaptureCursor": 0,
+            "include_border": 0,
+            "exclude_alpha": 0,
+            "lock_x": 0,
+            "swap_redblue": 0,
+            "AdvancedSettings": 0,
+            "CropTop": 0,
+            "CropLeft": 0,
+            "CropRight": 0,
+            "CropBottom": 0,
+        }
+        break
+else:
+    raise SystemExit("god-browser source not found")
+scene_path.write_text(json.dumps(data, separators=(",", ":"), ensure_ascii=False), encoding="utf-8")
+PY
 }
 
 start_nginx() {
@@ -374,11 +462,9 @@ def ensure_section(data: str, section: str, key_values: dict[str, str]) -> str:
     return result
 
 simple_keys = {
-    "KeyframeInterval": "2",
     "keyint_sec": "2",
 }
 adv_keys = {
-    "KeyframeInterval": "2",
     "keyint_sec": "2",
 }
 updated = ensure_section(text, "SimpleOutput", simple_keys)
@@ -400,6 +486,101 @@ PY
   # configured once, but the app itself is now part of the startup stack.
   nohup env DISPLAY=:99 XDG_RUNTIME_DIR=/tmp/xdg-runtime-root obs \
     >"$LOG_DIR/obs.log" 2>&1 &
+}
+
+start_obs_stream() {
+  if [ "${SKIP_OBS:-0}" = "1" ]; then
+    return 0
+  fi
+
+  if ! pgrep -x obs >/dev/null 2>&1; then
+    log "OBS is not running; skipping stream start"
+    return 0
+  fi
+
+  if ! python3 - <<'PY' >/dev/null 2>&1
+from pathlib import Path
+import base64
+import hashlib
+import json
+import os
+import time
+
+from websocket import create_connection
+
+profile = Path("/root/.config/obs-studio/basic/profiles/Untitled/basic.ini")
+text = profile.read_text(encoding="utf-8", errors="ignore")
+auth_secret = ""
+for line in text.splitlines():
+    if line.startswith("AuthSecret="):
+        auth_secret = line.split("=", 1)[1].strip()
+        break
+
+if not auth_secret:
+    raise SystemExit("missing OBS websocket AuthSecret")
+
+ws = create_connection("ws://127.0.0.1:4444", timeout=10)
+
+def call(payload: dict[str, object]) -> dict[str, object]:
+    ws.send(json.dumps(payload))
+    return json.loads(ws.recv())
+
+auth = call({"request-type": "GetAuthRequired", "message-id": "1"})
+if auth.get("authRequired"):
+    challenge = str(auth["challenge"])
+    ws_auth = base64.b64encode(
+        hashlib.sha256((auth_secret + challenge).encode("utf-8")).digest()
+    ).decode("utf-8")
+    result = call({
+        "request-type": "Authenticate",
+        "message-id": "2",
+        "auth": ws_auth,
+    })
+    if result.get("status") != "ok":
+        raise SystemExit("OBS websocket auth failed")
+
+status = call({"request-type": "GetStreamingStatus", "message-id": "3"})
+if status.get("streaming"):
+    print("OBS already streaming")
+    ws.close()
+    raise SystemExit(0)
+
+stream_server = os.getenv("OBS_STREAM_SERVER", "")
+stream_key = os.getenv("OBS_STREAM_KEY", "")
+if stream_server and stream_key:
+    result = call({
+        "request-type": "SetStreamSettings",
+        "message-id": "4",
+        "streamType": "rtmp_custom",
+        "settings": {
+            "server": stream_server,
+            "key": stream_key,
+        },
+        "save": True,
+    })
+    if result.get("status") != "ok":
+        raise SystemExit("OBS stream settings update failed")
+
+result = call({"request-type": "StartStreaming", "message-id": "5"})
+if result.get("status") != "ok":
+    raise SystemExit("OBS start streaming failed")
+
+for _ in range(10):
+    time.sleep(1)
+    status = call({"request-type": "GetStreamingStatus", "message-id": "6"})
+    if status.get("streaming"):
+        print("OBS streaming started")
+        break
+else:
+    raise SystemExit("OBS streaming did not report true")
+
+ws.close()
+PY
+  then
+    log "OBS stream start completed"
+  else
+    log "OBS stream start failed"
+  fi
 }
 
 start_runtime() {
@@ -440,7 +621,9 @@ main() {
   start_fish
   start_observer
   start_nginx
+  start_firefox
   start_obs
+  start_obs_stream
   start_runtime
 
   PUBLIC_IP=$(curl -sf --max-time 5 ifconfig.me 2>/dev/null || echo "<instance-ip>")
@@ -450,7 +633,7 @@ main() {
   log "  ComfyUI   http://${PUBLIC_IP}:8188"
   log "  Ollama    http://${PUBLIC_IP}:11434"
   log "  fish TTS  http://${PUBLIC_IP}:7860"
-  log "  Observer  http://${PUBLIC_IP}:10517/one"
+  log "  Observer  http://${PUBLIC_IP}:10517/stage"
   log ""
   log "Genesis can run only after the stack is healthy:"
   log "  curl -s -X POST http://localhost:8888/creator/genesis -H 'Content-Type: application/json' -d '{\"confirm\": true}'"
