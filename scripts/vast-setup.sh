@@ -120,6 +120,8 @@ AVATAR_ENABLED=true
 # With host networking, all services are reachable on localhost
 VOICE_ENABLED=true
 VOICE_HEALTH_URL=http://localhost:7860
+FISH_DEVICE=cuda
+FISH_HALF_MODE=--half
 
 # ComfyUI
 AVATAR_HEALTH_URL=http://localhost:8188

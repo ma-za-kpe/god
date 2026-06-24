@@ -25,6 +25,11 @@ SKIP_COMFYUI="${SKIP_COMFYUI:-0}"
 SKIP_IPFS="${SKIP_IPFS:-0}"
 SKIP_OBS="${SKIP_OBS:-0}"
 POSTGRES_PASSWORD="${POSTGRES_PASSWORD:-$(openssl rand -hex 16)}"
+CREATOR_GENESIS_TOKEN="${CREATOR_GENESIS_TOKEN:-$(openssl rand -hex 32)}"
+BROADCAST_ENABLED_VALUE="false"
+if [ "$SKIP_OBS" = "1" ]; then
+  BROADCAST_ENABLED_VALUE="false"
+fi
 LOG_DIR="/var/log/god"
 
 log() { echo "[vast-native] $*"; }
@@ -178,6 +183,7 @@ cat > .env.local <<EOF
 
 POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
 DATABASE_URL=postgresql://god:${POSTGRES_PASSWORD}@localhost:5432/god
+LOCAL_DEV_MODE=false
 
 # LLM — Ollama on localhost
 LLM_PROVIDER=ollama
@@ -201,12 +207,18 @@ AVATAR_HEALTH_URL=http://localhost:8188
 VOICE_ENABLED=true
 TTS_ENDPOINT=http://localhost:7860
 VOICE_HEALTH_URL=http://localhost:7860
+FISH_DEVICE=cuda
+FISH_HALF_MODE=--half
 STREAMING_MODE=auto
 YOUTUBE_ENABLED=false
 YOUTUBE_DRY_RUN=true
 OBS_WEBSOCKET_URL=
 OBS_WEBSOCKET_PASSWORD=
-BROADCAST_ENABLED=true
+CREATOR_GENESIS_TOKEN=${CREATOR_GENESIS_TOKEN}
+CREATOR_TOKEN=${CREATOR_GENESIS_TOKEN}
+ALLOW_TOKENLESS_CREATOR=false
+ALLOW_INSECURE_LOCAL_ENDPOINTS=false
+BROADCAST_ENABLED=${BROADCAST_ENABLED_VALUE}
 BROADCAST_DRY_RUN=true
 OBS_BROWSER_SOURCE=god-browser
 OBS_BROWSER_URL=http://localhost:10517/stage
@@ -354,14 +366,14 @@ log "=================================================="
 log "Waiting for runtime to become healthy (up to 90s)..."
 RUNTIME_UP=0
 for i in $(seq 1 30); do
-  if curl -sf http://localhost:8888/health &>/dev/null; then
+  if curl -sf http://localhost:8888/ready &>/dev/null; then
     RUNTIME_UP=1; break
   fi
   sleep 3
 done
 
 if [ "$RUNTIME_UP" = "1" ]; then
-  log "Runtime health: OK"
+  log "Runtime readiness: OK"
 else
   log "WARNING: Runtime not responding after 90s — check $LOG_DIR/runtime.log"
 fi
@@ -371,4 +383,5 @@ log ""
 log "Genesis (run after all services are green):"
 log "  curl -s -X POST http://localhost:8888/creator/genesis \\"
 log "    -H 'Content-Type: application/json' \\"
+log "    -H \"X-Creator-Token: ${CREATOR_GENESIS_TOKEN}\" \\"
 log "    -d '{\"confirm\": true}' | python3 -m json.tool"
