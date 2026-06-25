@@ -22,7 +22,10 @@ log = logging.getLogger("god.creator")
 router = APIRouter(prefix="/creator", tags=["creator"])
 
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://god:localdev@localhost:5432/god_world")
-WORLD_ID = os.getenv("WORLD_ID", "local-dev-world-1")
+
+
+def _world_id() -> str:
+    return os.getenv("WORLD_ID", "local-dev-world-1")
 
 VALID_PETITION_TYPES = {
     "domain",
@@ -159,7 +162,7 @@ async def submit_petition(
             body.get("governing_body"),
             proposed_fee,
             now,
-            WORLD_ID,
+            _world_id(),
         ),
     )
     conn.commit()

@@ -20,8 +20,11 @@ from .owned_graph import create_agent_zero
 log = logging.getLogger("god.seed")
 
 SEED_BALANCE_USDC = Decimal(os.getenv("SEED_BALANCE_USDC", "0.10"))
-WORLD_ID = os.getenv("WORLD_ID", "local-dev-world-1")
 IPFS_API = os.getenv("IPFS_API", "http://localhost:5001")
+
+
+def _world_id() -> str:
+    return os.getenv("WORLD_ID", "local-dev-world-1")
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://god:localdev@localhost:5432/god_world")
 AVATAR_GENESIS_ENABLED = os.getenv("AVATAR_GENESIS_ENABLED", "true").lower() in (
     "1",
@@ -53,7 +56,7 @@ def _persist_agent(agent: dict):
             agent["wallet_address"],
             agent["name"],
             int(time.time()),
-            WORLD_ID,
+            _world_id(),
             agent["archetype"],
             float(agent.get("seed_balance", SEED_BALANCE_USDC)),
         ),
@@ -83,7 +86,7 @@ async def seed_one_agent(
         soul_id=soul_id,
         owner_key=acct._key_obj.public_key.to_hex(),
         wallet_address=wallet_address,
-        world_id=WORLD_ID,
+        world_id=_world_id(),
         archetype=archetype,
         seed_balance=seed_balance,
     )

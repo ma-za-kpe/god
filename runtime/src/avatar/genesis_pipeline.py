@@ -6,6 +6,7 @@ import asyncio
 import json
 import logging
 import os
+import random
 import time
 import uuid
 from dataclasses import asdict, dataclass, field
@@ -177,7 +178,9 @@ class GenesisPipeline:
         voice_result = None
 
         if await portrait_generator.health_check():
-            portrait_bytes = await portrait_generator.generate_portrait(archetype, style_config)
+            portrait_bytes = await portrait_generator.generate_portrait(
+                archetype, style_config, seed=random.randint(0, 2_147_483_647)
+            )
             if portrait_bytes:
                 portrait_pin = await pin_bytes(portrait_bytes, filename=f"{soul_id}-portrait.png")
                 if not portrait_pin.ok:

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import glob
 import json
 import os
 from pathlib import Path
@@ -162,6 +163,17 @@ class PortraitGenerator:
                 )
                 if resp.status_code == 200:
                     return resp.content
+        # ComfyUI returned execution_cached with empty outputs — read latest output from disk
+        for pattern in (
+            "/opt/ComfyUI/output/genesis_portrait_*.png",
+            "/opt/ComfyUI/output/*.png",
+        ):
+            files = sorted(glob.glob(pattern), key=os.path.getmtime, reverse=True)
+            if files:
+                try:
+                    return Path(files[0]).read_bytes()
+                except OSError:
+                    continue
         return None
 
     def _build_workflow_payload(

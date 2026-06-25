@@ -413,6 +413,17 @@ start_fish() {
       log "GPU headroom for fish-speech is low (${free_vram_mb} MiB free); starting on CUDA with ${fish_half_flag:-no} half-precision"
     fi
   fi
+  # Unload Ollama models before fish-speech to free VRAM
+  if curl -sf http://localhost:11434/api/tags >/dev/null 2>&1; then
+    log "Unloading Ollama models to free VRAM for fish-speech..."
+    for model in $(curl -sf http://localhost:11434/api/tags | python3 -c "import sys,json; [print(m['name']) for m in json.load(sys.stdin).get('models',[])]" 2>/dev/null || true); do
+      curl -sf -X POST http://localhost:11434/api/generate \
+        -H 'Content-Type: application/json' \
+        -d "{\"model\":\"$model\",\"keep_alive\":0}" >/dev/null 2>&1 || true
+    done
+    sleep 2
+  fi
+
   if fish_process_is_cuda && fish_tts_ready; then
     log "fish-speech already healthy on CUDA"
     return 0
