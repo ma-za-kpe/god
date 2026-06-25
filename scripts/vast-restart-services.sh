@@ -104,50 +104,27 @@ cleanup_stale_ports() {
 
 obs_websocket_ready() {
   python3 - <<'PY' >/dev/null 2>&1
-from pathlib import Path
-import base64
-import hashlib
 import json
 from websocket import create_connection
 
-profile_candidates = [
-    Path("/home/stream/.config/obs-studio/basic/profiles/Untitled/basic.ini"),
-    Path("/root/.config/obs-studio/basic/profiles/Untitled/basic.ini"),
-]
-profile = next((p for p in profile_candidates if p.is_file()), None)
-if profile is None:
-    raise SystemExit("missing OBS profile basic.ini")
-text = profile.read_text(encoding="utf-8", errors="ignore")
-auth_secret = ""
-for line in text.splitlines():
-    if line.startswith("AuthSecret="):
-        auth_secret = line.split("=", 1)[1].strip()
-        break
-
-if not auth_secret:
-    raise SystemExit("missing OBS websocket AuthSecret")
-
 ws = create_connection("ws://127.0.0.1:4444", timeout=6)
 
-def call(payload: dict[str, object]) -> dict[str, object]:
-    ws.send(json.dumps(payload))
-    return json.loads(ws.recv())
+def call(t, mid):
+    ws.send(json.dumps({"request-type": t, "message-id": str(mid)}))
+    for _ in range(20):
+        try:
+            r = json.loads(ws.recv())
+            if r.get("message-id") == str(mid):
+                return r
+        except Exception:
+            break
+    return {}
 
-auth = call({"request-type": "GetAuthRequired", "message-id": "1"})
+auth = call("GetAuthRequired", 1)
 if auth.get("authRequired"):
-    challenge = str(auth["challenge"])
-    ws_auth = base64.b64encode(
-        hashlib.sha256((auth_secret + challenge).encode("utf-8")).digest()
-    ).decode("utf-8")
-    result = call({
-        "request-type": "Authenticate",
-        "message-id": "2",
-        "auth": ws_auth,
-    })
-    if result.get("status") != "ok":
-        raise SystemExit("OBS websocket auth failed")
+    raise SystemExit("OBS websocket auth required but no secret configured")
 
-status = call({"request-type": "GetStreamingStatus", "message-id": "3"})
+status = call("GetStreamingStatus", 2)
 if status.get("status") != "ok":
     raise SystemExit("OBS websocket status failed")
 
@@ -610,7 +587,7 @@ capture_settings = {
     "CropBottom": 0,
 }
 
-scene_path = Path("/root/.config/obs-studio/basic/scenes/Untitled.json")
+scene_path = Path("/home/stream/.config/obs-studio/basic/scenes/Untitled.json")
 scene_path.parent.mkdir(parents=True, exist_ok=True)
 
 if scene_path.exists():
@@ -800,7 +777,7 @@ updated = ensure_section(updated, "AdvOut", adv_keys)
 if updated != text:
     path.write_text(updated, encoding="utf-8")
 PY
-    done < <(find /root/.config/obs-studio/basic/profiles -name basic.ini -type f 2>/dev/null)
+    done < <(find /home/stream/.config/obs-studio/basic/profiles -name basic.ini -type f 2>/dev/null)
   }
 
   force_obs_keyframes
@@ -857,86 +834,63 @@ start_obs_stream() {
   fi
 
   if ! python3 - <<'PY' >/dev/null 2>&1
-from pathlib import Path
-import base64
-import hashlib
 import json
 import os
 import time
-
 from websocket import create_connection
 
-profile_candidates = [
-    Path("/home/stream/.config/obs-studio/basic/profiles/Untitled/basic.ini"),
-    Path("/root/.config/obs-studio/basic/profiles/Untitled/basic.ini"),
-]
-profile = next((p for p in profile_candidates if p.is_file()), None)
-if profile is None:
-    raise SystemExit("missing OBS profile basic.ini")
-text = profile.read_text(encoding="utf-8", errors="ignore")
-auth_secret = ""
-for line in text.splitlines():
-    if line.startswith("AuthSecret="):
-        auth_secret = line.split("=", 1)[1].strip()
-        break
-
-if not auth_secret:
-    raise SystemExit("missing OBS websocket AuthSecret")
-
 ws = create_connection("ws://127.0.0.1:4444", timeout=10)
+_mid = 0
 
-def call(payload: dict[str, object]) -> dict[str, object]:
+def call(t, **kw):
+    global _mid
+    _mid += 1
+    payload = {"request-type": t, "message-id": str(_mid)}
+    payload.update(kw)
     ws.send(json.dumps(payload))
-    return json.loads(ws.recv())
+    for _ in range(30):
+        try:
+            r = json.loads(ws.recv())
+            if r.get("message-id") == str(_mid):
+                return r
+        except Exception:
+            break
+    return {}
 
-auth = call({"request-type": "GetAuthRequired", "message-id": "1"})
+auth = call("GetAuthRequired")
 if auth.get("authRequired"):
-    challenge = str(auth["challenge"])
-    ws_auth = base64.b64encode(
-        hashlib.sha256((auth_secret + challenge).encode("utf-8")).digest()
-    ).decode("utf-8")
-    result = call({
-        "request-type": "Authenticate",
-        "message-id": "2",
-        "auth": ws_auth,
-    })
-    if result.get("status") != "ok":
-        raise SystemExit("OBS websocket auth failed")
+    raise SystemExit("OBS websocket auth required but no secret configured")
 
-status = call({"request-type": "GetStreamingStatus", "message-id": "3"})
+status = call("GetStreamingStatus")
 if status.get("streaming"):
     print("OBS already streaming; restarting stream to clear stale ingest state")
-    call({"request-type": "StopStreaming", "message-id": "3b"})
+    call("StopStreaming")
     time.sleep(3)
 
 stream_server = os.getenv("OBS_STREAM_SERVER", "")
 stream_key = os.getenv("OBS_STREAM_KEY", "")
-if stream_server and stream_key:
-    result = call({
-        "request-type": "SetStreamSettings",
-        "message-id": "4",
-        "streamType": "rtmp_custom",
-        "settings": {
-            "server": stream_server,
-            "key": stream_key,
-        },
-        "save": True,
-    })
-    if result.get("status") != "ok":
-        raise SystemExit("OBS stream settings update failed")
+if not stream_server or not stream_key:
+    raise SystemExit("OBS_STREAM_SERVER or OBS_STREAM_KEY not set")
 
-result = call({"request-type": "StartStreaming", "message-id": "5"})
+result = call("SetStreamSettings",
+    streamType="rtmp_common",
+    settings={"server": stream_server, "key": stream_key, "use_auth": False},
+    save=True)
+if result.get("status") != "ok":
+    raise SystemExit("OBS stream settings update failed")
+
+result = call("StartStreaming")
 if result.get("status") != "ok":
     raise SystemExit("OBS start streaming failed")
 
-for _ in range(10):
+for _ in range(12):
     time.sleep(1)
-    status = call({"request-type": "GetStreamingStatus", "message-id": "6"})
+    status = call("GetStreamingStatus")
     if status.get("streaming"):
         print("OBS streaming started")
         break
 else:
-    raise SystemExit("OBS streaming did not report true")
+    raise SystemExit("OBS streaming did not report true after 12s")
 
 ws.close()
 PY
