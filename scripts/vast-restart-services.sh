@@ -239,14 +239,10 @@ ensure_repo() {
 }
 
 configure_streaming_mode() {
-  local streaming_mode="${STREAMING_MODE:-auto}"
+  # Browser source is always /stage — hardcoded, no override.
+  export OBS_BROWSER_SOURCE=god-browser
+  export OBS_BROWSER_URL=http://localhost:10517/stage
 
-  if [ -z "${OBS_BROWSER_SOURCE:-}" ]; then
-    export OBS_BROWSER_SOURCE=god-browser
-  fi
-  if [ -z "${OBS_BROWSER_URL:-}" ]; then
-    export OBS_BROWSER_URL=http://localhost:10517/stage
-  fi
   if [ -z "${OBS_STREAM_SERVER:-}" ]; then
     export OBS_STREAM_SERVER=rtmp://a.rtmp.youtube.com/live2
   fi
@@ -266,14 +262,13 @@ configure_streaming_mode() {
     export OBS_CAPTURE_WINDOW_NAME=Firefox
   fi
 
-  # If the operator has already enabled streaming, preserve it.
-  # Otherwise, auto-enable only when the required credentials are present.
-  if [ "${streaming_mode}" = "true" ] || [ "${streaming_mode}" = "1" ]; then
+  # Always stream to YouTube when the stream key is present — no flag required.
+  if [ -n "${OBS_STREAM_KEY:-}" ]; then
     export YOUTUBE_ENABLED=true
     export YOUTUBE_DRY_RUN=false
     export BROADCAST_ENABLED=true
     export BROADCAST_DRY_RUN=false
-    log "STREAMING_MODE forced on: runtime will connect YouTube + OBS live"
+    log "Stream key present: YouTube + OBS live streaming enabled (streaming /stage)"
     return 0
   fi
 
@@ -281,24 +276,14 @@ configure_streaming_mode() {
   export YOUTUBE_DRY_RUN=true
   export BROADCAST_ENABLED=false
   export BROADCAST_DRY_RUN=true
-  if [ -n "${YOUTUBE_CHANNEL_ID:-}" ] || [ -n "${OBS_WEBSOCKET_URL:-}" ]; then
-    log "Streaming not requested; leaving YouTube/OBS in dry-run mode"
-  fi
+  log "No OBS_STREAM_KEY — streaming in dry-run mode"
 }
 
 streaming_launch_requested() {
-  case "${STREAMING_MODE:-auto}" in
-    1|true|yes|on)
-      return 0
-      ;;
-  esac
-
-  if [ "${OBS_AUTO_START_STREAM:-false}" = "true" ] || [ "${OBS_AUTO_START_STREAM:-false}" = "1" ]; then
-    if [ -n "${OBS_STREAM_KEY:-}" ] && [ -n "${OBS_WEBSOCKET_URL:-}" ]; then
-      return 0
-    fi
+  # Launch OBS and start stream whenever the stream key is available.
+  if [ -n "${OBS_STREAM_KEY:-}" ] && [ -n "${OBS_WEBSOCKET_URL:-}" ]; then
+    return 0
   fi
-
   return 1
 }
 
