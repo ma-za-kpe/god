@@ -1533,6 +1533,7 @@ async def creator_genesis(
     from .seed_agents import seed_one_agent
 
     genesis_agents = []
+    genesis_failures = []
     for archetype in archetypes:
         try:
             agent = await seed_one_agent(
@@ -1542,28 +1543,34 @@ async def creator_genesis(
                 block_on_avatar_genesis=True,
                 require_avatar_assets=True,
             )
-            if not agent.get("avatar_cid") or not agent.get("voice_model_cid"):
+            if not agent.get("avatar_cid"):
                 raise RuntimeError(
-                    f"genesis agent missing required assets: avatar_cid={agent.get('avatar_cid')!r} "
-                    f"voice_model_cid={agent.get('voice_model_cid')!r}"
+                    f"genesis agent missing avatar: avatar_cid={agent.get('avatar_cid')!r}"
+                )
+            if not agent.get("voice_model_cid"):
+                log.warning(
+                    f"  GENESIS: {archetype} voice embedding failed — agent created without voice"
                 )
             genesis_agents.append(agent)
             log.info(f"  GENESIS: {agent['name']} ({archetype}) soul={agent['soul_id'][:8]}")
         except Exception as e:
             log.error(f"  Failed to create genesis {archetype}: {e}")
-            try:
-                _clear_world_state(world_id)
-            except Exception as cleanup_error:
-                log.error(f"  Cleanup after genesis failure failed: {cleanup_error}")
-            from fastapi.responses import JSONResponse
+            genesis_failures.append({"archetype": archetype, "error": str(e)})
 
-            return JSONResponse(
-                status_code=500,
-                content={
-                    "error": f"Failed to create genesis {archetype}: {e}",
-                    "agents_created": len(genesis_agents),
-                },
-            )
+    if not genesis_agents:
+        try:
+            _clear_world_state(world_id)
+        except Exception as cleanup_error:
+            log.error(f"  Cleanup after genesis failure failed: {cleanup_error}")
+        from fastapi.responses import JSONResponse
+
+        return JSONResponse(
+            status_code=500,
+            content={
+                "error": "All genesis agents failed to create",
+                "failures": genesis_failures,
+            },
+        )
 
     # Seed starter marketplace so USDC circulates via buy_service / x402 locally
     try:

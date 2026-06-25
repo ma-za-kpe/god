@@ -259,7 +259,13 @@ class GenesisPipeline:
             self._record_failure(result, "portrait", "service_unavailable")
             self._log_step(correlation_id, soul_id, "portrait", False, {"skipped": True})
 
-        if await voice_cloner.health_check():
+        voice_ready = False
+        for _attempt in range(4):
+            if await voice_cloner.health_check():
+                voice_ready = True
+                break
+            await asyncio.sleep(15)
+        if voice_ready:
             voice_result = await voice_cloner.clone_voice(
                 style_config.seed_utterance_path, archetype
             )
