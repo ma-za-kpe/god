@@ -116,8 +116,7 @@ class ReactBlockBuilder:
         pair_thread = [
             t
             for t in conv_thread
-            if t.get("speaker") in (elder, opponent)
-            or t.get("target") in (elder, opponent)
+            if t.get("speaker") in (elder, opponent) or t.get("target") in (elder, opponent)
         ][-4:]
 
         return pair_thread

@@ -85,7 +85,7 @@ def test_voice_surface_synthesizes_when_tts_is_available(monkeypatch):
         def json(self):
             return {"audio_url": "http://tts/audio.wav", "duration_seconds": 1.2}
 
-    monkeypatch.setenv("TTS_ENDPOINT", "http://fish-speech:8080")
+    monkeypatch.setenv("TTS_ENDPOINT", "http://fish-speech:7860")
     monkeypatch.setenv("VOICE_ENABLED", "true")
     monkeypatch.setenv("VOICE_SYNTHESIS_ENABLED", "true")
     monkeypatch.setattr("voice.engine.probe_url", lambda *args, **kwargs: {"ok": True})

@@ -157,6 +157,8 @@ _MIGRATIONS: list[str] = [
     """,
     # Avatar genesis: direct CID columns so the /agents API can return them
     "ALTER TABLE agents ADD COLUMN IF NOT EXISTS avatar_cid TEXT NOT NULL DEFAULT ''",
+    "ALTER TABLE agents ADD COLUMN IF NOT EXISTS rigged_avatar_cid TEXT NOT NULL DEFAULT ''",
+    "ALTER TABLE agents ADD COLUMN IF NOT EXISTS vrm_avatar_url TEXT NOT NULL DEFAULT ''",
     "ALTER TABLE agents ADD COLUMN IF NOT EXISTS voice_model_cid TEXT NOT NULL DEFAULT ''",
     "ALTER TABLE agents ADD COLUMN IF NOT EXISTS avatar_style_prompt TEXT NOT NULL DEFAULT ''",
 ]

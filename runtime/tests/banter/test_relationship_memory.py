@@ -5,7 +5,6 @@ reconciliation arc detection, and graceful degradation on DB failure.
 """
 
 import time
-from contextlib import asynccontextmanager
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -14,8 +13,6 @@ from banter.relationship_memory import (
     RelationshipMemory,
     _compute_pair_id,
     _normalize_pair,
-    _ESCALATE_MOVES,
-    _DEESCALATE_MOVES,
     _RECONCILIATION_HIGH,
     _RECONCILIATION_LOW,
     _RECONCILIATION_INTERACTIONS,
@@ -430,7 +427,7 @@ from hypothesis import given, settings
 from hypothesis import strategies as st
 
 # Re-use conftest strategies
-from conftest import st_move_sequence, st_tension_level, MOVE_TYPES
+from conftest import MOVE_TYPES
 
 
 class TestProperty7TensionClamping:
@@ -454,8 +451,7 @@ class TestProperty7TensionClamping:
         for move in moves:
             new_tension = memory.update_tension(pair, move)
             assert 0 <= new_tension <= 10, (
-                f"Tension {new_tension} out of bounds after move {move} "
-                f"(was {pair.tension_level})"
+                f"Tension {new_tension} out of bounds after move {move} (was {pair.tension_level})"
             )
             pair = PairState(tension_level=new_tension, last_interaction_ts=time.time())
 

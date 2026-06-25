@@ -50,6 +50,16 @@ def _snapshot() -> dict:
     }
 
 
+def _snapshot_with_agent_names() -> dict:
+    snap = _snapshot()
+    snap["agents"] = [
+        {"soul_id": "s-fallen", "current_name": "Fallen-Host"},
+        {"soul_id": "s-merchant", "current_name": "Merchant-One"},
+        {"soul_id": "s-chatty", "current_name": "Chatty-One"},
+    ]
+    return snap
+
+
 def _economy_snapshot() -> dict:
     snap = _snapshot()
     snap["events"] = [
@@ -94,7 +104,7 @@ def _audience_snapshot() -> dict:
 
 
 def test_showrunner_prefers_highest_signal_event():
-    plan = Showrunner().build_plan(_snapshot())
+    plan = Showrunner().build_plan(_snapshot_with_agent_names())
 
     assert plan.mode == "live-weave"
     assert plan.scene == "graveyard-cut"
@@ -108,20 +118,26 @@ def test_showrunner_prefers_highest_signal_event():
 
 def test_showrunner_is_deterministic_for_same_snapshot():
     runner = Showrunner()
-    first = runner.build_plan(_snapshot())
-    second = runner.build_plan(_snapshot())
+    first = runner.build_plan(_snapshot_with_agent_names())
+    second = runner.build_plan(_snapshot_with_agent_names())
 
     assert first.to_dict() == second.to_dict()
 
 
 def test_showrunner_public_bank_prompt_tracks_economy():
-    economy_plan = build_showrunner_plan(_economy_snapshot())
+    economy_snapshot = _economy_snapshot()
+    economy_snapshot["agents"] = [{"soul_id": "s-merchant", "current_name": "Merchant-One"}]
+    economy_plan = build_showrunner_plan(economy_snapshot)
     assert "economic move" in economy_plan["audience_prompt"]
     assert economy_plan["cues"][0]["cue_type"] == "economy.service.purchased"
 
 
 def test_showrunner_audience_state_changes_scene_prompt():
     snap = _audience_snapshot()
+    snap["agents"] = [
+        {"soul_id": "viewer_two", "current_name": "viewer_two"},
+        {"soul_id": "viewer_one", "current_name": "viewer_one"},
+    ]
     snap["audience"] = {
         "patronage_index": 16.0,
         "chat_pressure": 1,
@@ -135,6 +151,7 @@ def test_showrunner_audience_state_changes_scene_prompt():
 
 def test_showrunner_cleans_reply_metadata_from_message_headlines():
     snap = _snapshot()
+    snap["agents"] = [{"soul_id": "s-explorer", "current_name": "Elder-Drift-A505"}]
     snap["events"] = [
         {
             "event_id": "evt-1",

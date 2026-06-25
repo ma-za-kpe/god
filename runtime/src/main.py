@@ -4,9 +4,11 @@ Entry point. FastAPI server + background daemons for rent collection and agent e
 """
 
 import asyncio
+import base64
 import logging
 import os
 import pathlib
+from urllib.parse import urlparse
 from contextlib import asynccontextmanager
 
 import httpx
@@ -18,7 +20,7 @@ from fastapi.staticfiles import StaticFiles
 
 from .agent_runner import agent_runner
 from .creator.routes import router as creator_router
-from .health_checks import probe_url
+from .health_checks import probe_tcp, probe_url
 from .rent_daemon import rent_daemon
 from .services.routes import router as services_router
 from .status_engine import TIERS, status_review_daemon
@@ -273,6 +275,143 @@ async def health():
         "status": "ok",
         "world_id": os.getenv("WORLD_ID", "unknown"),
         "version": RUNTIME_VERSION,
+    }
+
+
+def _db_ready() -> dict:
+    try:
+        import psycopg2
+
+        conn = psycopg2.connect(
+            os.getenv("DATABASE_URL", "postgresql://god:localdev@localhost:5432/god_world"),
+            connect_timeout=2,
+        )
+        try:
+            cur = conn.cursor()
+            cur.execute("SELECT 1")
+            cur.fetchone()
+        finally:
+            conn.close()
+        return {"ok": True, "probe": "postgres"}
+    except Exception as exc:
+        return {"ok": False, "probe": "postgres", "reason": str(exc)}
+
+
+def _obs_ready() -> dict:
+    obs_url = os.getenv("OBS_WEBSOCKET_URL", "ws://127.0.0.1:4444").strip()
+    if not obs_url:
+        return {"ok": True, "probe": "skipped", "reason": "not_configured"}
+    parsed = urlparse(obs_url)
+    host = parsed.hostname or "127.0.0.1"
+    port = parsed.port or (4455 if parsed.scheme == "wss" else 4444)
+    return probe_tcp(host, port, timeout=1.5)
+
+
+def _ipfs_ready() -> dict:
+    try:
+        conn = http.client.HTTPConnection("localhost", 5001, timeout=2.0)
+        try:
+            conn.request("POST", "/api/v0/version")
+            response = conn.getresponse()
+            body = response.read(256)
+            parsed = None
+            try:
+                parsed = json.loads(body.decode("utf-8")) if body else None
+            except Exception:
+                parsed = None
+            return {
+                "ok": 200 <= response.status < 400,
+                "probe": "http",
+                "url": "http://localhost:5001/api/v0/version",
+                "status_code": int(response.status),
+                "body": parsed,
+            }
+        finally:
+            conn.close()
+    except Exception as exc:
+        return {
+            "ok": False,
+            "probe": "http",
+            "url": "http://localhost:5001/api/v0/version",
+            "reason": str(exc),
+        }
+
+
+async def _fish_synthesis_ready() -> dict:
+    endpoint = os.getenv("VOICE_HEALTH_URL") or os.getenv("TTS_ENDPOINT")
+    if not endpoint:
+        return {"ok": False, "probe": "skipped", "reason": "not_configured"}
+    seed_path = pathlib.Path(__file__).resolve().parents[1] / "seed_utterances" / "philosopher.wav"
+    if not seed_path.is_file():
+        return {"ok": False, "probe": "tts", "reason": "seed_utterance_missing"}
+    try:
+        payload = {
+            "text": "Ready check.",
+            "references": [
+                {
+                    "audio": base64.b64encode(seed_path.read_bytes()).decode("utf-8"),
+                    "text": "",
+                }
+            ],
+            "format": "wav",
+            "streaming": False,
+        }
+        async with httpx.AsyncClient(timeout=20.0) as client:
+            response = await client.post(f"{endpoint.rstrip('/')}/v1/tts", json=payload)
+            if not 200 <= response.status_code < 300:
+                return {
+                    "ok": False,
+                    "probe": "tts",
+                    "endpoint": f"{endpoint.rstrip('/')}/v1/tts",
+                    "status_code": int(response.status_code),
+                    "reason": "tts_failed",
+                }
+            return {
+                "ok": bool(response.content),
+                "probe": "tts",
+                "endpoint": f"{endpoint.rstrip('/')}/v1/tts",
+                "byte_count": len(response.content or b""),
+            }
+    except Exception as exc:
+        return {
+            "ok": False,
+            "probe": "tts",
+            "endpoint": f"{endpoint.rstrip('/')}/v1/tts",
+            "reason": str(exc),
+        }
+
+
+@app.get("/ready")
+async def ready():
+    streaming_mode = os.getenv("STREAMING_MODE", "auto").lower()
+    obs_required = streaming_mode in ("1", "true", "yes", "on") or os.getenv("OBS_REQUIRED", "").lower() in ("1", "true", "yes", "on")
+    voice_enabled = os.getenv("VOICE_ENABLED", "true").lower() in ("1", "true", "yes", "on")
+    checks = {
+        "postgres": _db_ready(),
+        "redis": probe_tcp("127.0.0.1", 6379, timeout=1.5),
+        "nats": probe_tcp("127.0.0.1", 4222, timeout=1.5),
+        "ipfs": probe_url("http://localhost:5001/debug/metrics/prometheus", timeout=2.0),
+        "comfyui": probe_url("http://localhost:8188/system_stats", timeout=2.0),
+        "ollama": probe_url("http://localhost:11434/api/tags", timeout=2.0),
+        "nginx_runtime": probe_tcp("127.0.0.1", 10515, timeout=1.5),
+        "nginx_comfyui": probe_tcp("127.0.0.1", 10516, timeout=1.5),
+        "nginx_observer": probe_tcp("127.0.0.1", 10517, timeout=1.5),
+    }
+    if voice_enabled or os.getenv("VOICE_HEALTH_URL") or os.getenv("TTS_ENDPOINT"):
+        checks["fish"] = await _fish_synthesis_ready()
+    else:
+        checks["fish"] = {"ok": True, "probe": "skipped", "reason": "voice_disabled"}
+    if obs_required:
+        checks["obs"] = _obs_ready()
+    else:
+        checks["obs"] = {"ok": True, "probe": "skipped", "reason": "obs_optional"}
+    ok = all(check.get("ok") for check in checks.values())
+    return {
+        "ok": ok,
+        "status": "ready" if ok else "not_ready",
+        "world_id": os.getenv("WORLD_ID", "unknown"),
+        "version": RUNTIME_VERSION,
+        "checks": checks,
     }
 
 

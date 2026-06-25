@@ -29,15 +29,18 @@ class TestArcContextRefactor:
 
     # --- Sub-task 1: get_pressure never returns raw title ---
 
-    @pytest.mark.parametrize("theme", [
-        "scarcity_vs_flow",
-        "market_cruelty",
-        "betrayal_and_return",
-        "power_and_legitimacy",
-        "sacrifice_and_cost",
-        "truth_and_performance",
-        "survival_and_meaning",
-    ])
+    @pytest.mark.parametrize(
+        "theme",
+        [
+            "scarcity_vs_flow",
+            "market_cruelty",
+            "betrayal_and_return",
+            "power_and_legitimacy",
+            "sacrifice_and_cost",
+            "truth_and_performance",
+            "survival_and_meaning",
+        ],
+    )
     def test_known_theme_pressure_never_contains_title(self, theme):
         """Known themes: pressure text must not contain the readable theme title."""
         pressure = self.builder.get_pressure(theme)
@@ -49,14 +52,17 @@ class TestArcContextRefactor:
             f"Theme title '{readable}' leaked into world_stakes: {pressure.world_stakes}"
         )
 
-    @pytest.mark.parametrize("theme", [
-        "dominance_and_submission",
-        "Scarcity of Truth",
-        "hidden-cost-ecology",
-        "love and war",
-        "the_meaning_of_silence",
-        "absolute_power_corrupts",
-    ])
+    @pytest.mark.parametrize(
+        "theme",
+        [
+            "dominance_and_submission",
+            "Scarcity of Truth",
+            "hidden-cost-ecology",
+            "love and war",
+            "the_meaning_of_silence",
+            "absolute_power_corrupts",
+        ],
+    )
     def test_unknown_theme_pressure_never_contains_title(self, theme):
         """Unknown themes (fallback): pressure must not contain the readable theme title."""
         pressure = self.builder.get_pressure(theme)
@@ -75,7 +81,10 @@ class TestArcContextRefactor:
         theme = "some_exotic_unknown_theme"
         pressure = self.builder.get_pressure(theme)
         # Should match: "how does {theme_noun} expose who is truly willing to pay the hidden cost in this ecology?"
-        assert "expose who is truly willing to pay the hidden cost in this ecology" in pressure.pressure
+        assert (
+            "expose who is truly willing to pay the hidden cost in this ecology"
+            in pressure.pressure
+        )
         assert pressure.pressure.startswith("how does ")
 
     def test_fallback_world_stakes_format(self):
@@ -153,9 +162,7 @@ class TestArcContextRefactor:
         """Single-word unknown themes: noun must not equal the theme title."""
         for theme in ["truth", "chaos", "faith", "greed", "fear"]:
             noun = _derive_theme_noun(theme)
-            assert noun != theme, (
-                f"Single-word theme '{theme}' leaked as noun"
-            )
+            assert noun != theme, f"Single-word theme '{theme}' leaked as noun"
             # The pressure should not contain the theme title
             builder = ArcContextBuilder()
             pressure = builder.get_pressure(theme)
@@ -165,22 +172,28 @@ class TestArcContextRefactor:
 
     # --- Input format normalization ---
 
-    @pytest.mark.parametrize("variant,expected_key", [
-        ("Scarcity vs Flow", "scarcity_vs_flow"),
-        ("scarcity-vs-flow", "scarcity_vs_flow"),
-        ("MARKET_CRUELTY", "market_cruelty"),
-        ("  betrayal_and_return  ", "betrayal_and_return"),
-    ])
+    @pytest.mark.parametrize(
+        "variant,expected_key",
+        [
+            ("Scarcity vs Flow", "scarcity_vs_flow"),
+            ("scarcity-vs-flow", "scarcity_vs_flow"),
+            ("MARKET_CRUELTY", "market_cruelty"),
+            ("  betrayal_and_return  ", "betrayal_and_return"),
+        ],
+    )
     def test_theme_normalization(self, variant, expected_key):
         """Various theme input formats should normalize to the same key."""
         assert _normalize_theme(variant) == expected_key
 
-    @pytest.mark.parametrize("variant", [
-        "Scarcity vs Flow",
-        "scarcity-vs-flow",
-        "SCARCITY_VS_FLOW",
-        "  scarcity_vs_flow  ",
-    ])
+    @pytest.mark.parametrize(
+        "variant",
+        [
+            "Scarcity vs Flow",
+            "scarcity-vs-flow",
+            "SCARCITY_VS_FLOW",
+            "  scarcity_vs_flow  ",
+        ],
+    )
     def test_known_theme_variants_resolve_correctly(self, variant):
         """All format variants of known themes should get the curated pressure."""
         pressure = self.builder.get_pressure(variant)

@@ -12,10 +12,11 @@ import uuid
 
 import psycopg2
 import psycopg2.extras
-from fastapi import APIRouter
+from fastapi import APIRouter, Header
 from fastapi.responses import JSONResponse
 
 from ..event_emitter import get_emitter
+from ..security import deny_creator_action
 
 log = logging.getLogger("god.creator")
 router = APIRouter(prefix="/creator", tags=["creator"])
@@ -47,7 +48,10 @@ def _db():
 
 
 @router.post("/petition")
-async def submit_petition(body: dict):
+async def submit_petition(
+    body: dict,
+    x_creator_token: str | None = Header(None, alias="X-Creator-Token"),
+):
     """
     Submit a Creator petition.
 
@@ -59,6 +63,10 @@ async def submit_petition(body: dict):
         research_summary, external_cost_breakdown, fee_justification,
         governance_approval_ref, governing_body
     """
+    denied = deny_creator_action(x_creator_token)
+    if denied:
+        return denied
+
     required = ("soul_id", "petition_type", "title", "description", "proposed_creator_fee_usdc")
     missing = [k for k in required if k not in body]
     if missing:
@@ -75,7 +83,19 @@ async def submit_petition(body: dict):
         )
 
     soul_id = body["soul_id"]
-    proposed_fee = float(body["proposed_creator_fee_usdc"])
+    try:
+        proposed_fee = float(body["proposed_creator_fee_usdc"])
+    except (TypeError, ValueError):
+        return JSONResponse(status_code=422, content={"error": "proposed_creator_fee_usdc must be numeric"})
+    if proposed_fee < 0:
+        return JSONResponse(status_code=422, content={"error": "proposed_creator_fee_usdc must be non-negative"})
+
+    try:
+        external_cost = float(body.get("external_cost_usdc", 0.0))
+        if isinstance(body.get("external_cost_breakdown"), dict):
+            external_cost = sum(float(v) for v in body["external_cost_breakdown"].values())
+    except (TypeError, ValueError):
+        return JSONResponse(status_code=422, content={"error": "external_cost values must be numeric"})
 
     # Verify agent exists and has sufficient balance
     conn = _db()
@@ -110,10 +130,6 @@ async def submit_petition(body: dict):
         "UPDATE agents SET balance_usdc = balance_usdc - %s WHERE soul_id = %s",
         (proposed_fee, soul_id),
     )
-
-    external_cost = body.get("external_cost_usdc", 0.0)
-    if isinstance(body.get("external_cost_breakdown"), dict):
-        external_cost = sum(body["external_cost_breakdown"].values())
 
     cur.execute(
         """
@@ -223,13 +239,21 @@ async def get_petition(petition_id: str):
 
 
 @router.post("/petitions/{petition_id}/resolve")
-async def resolve_petition(petition_id: str, body: dict):
+async def resolve_petition(
+    petition_id: str,
+    body: dict,
+    x_creator_token: str | None = Header(None, alias="X-Creator-Token"),
+):
     """
     Resolve a petition. Creator-only endpoint.
 
     Body: { action: "approve"|"reject"|"counter", creator_notes, result_summary? }
     Counter body also requires: { counter_fee_usdc }
     """
+    denied = deny_creator_action(x_creator_token)
+    if denied:
+        return denied
+
     action = body.get("action")
     if action not in ("approve", "reject", "counter"):
         return JSONResponse(

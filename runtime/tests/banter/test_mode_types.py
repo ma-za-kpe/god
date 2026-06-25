@@ -13,7 +13,6 @@ from banter.mode_types import (
     SILENCE_POLICY,
     SNAP_BACK_POLICY,
     BeatMode,
-    BeatModePolicy,
     PromptBlock,
 )
 

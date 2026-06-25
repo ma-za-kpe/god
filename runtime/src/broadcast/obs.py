@@ -46,7 +46,7 @@ class BroadcastSurface:
     """Compose stage state for the live broadcast surface."""
 
     def __init__(self, enabled: bool | None = None, dry_run: bool | None = None):
-        self.enabled = _env_bool("BROADCAST_ENABLED", "true") if enabled is None else enabled
+        self.enabled = _env_bool("BROADCAST_ENABLED", "false") if enabled is None else enabled
         self.dry_run = _env_bool("BROADCAST_DRY_RUN", "true") if dry_run is None else dry_run
         self.transport = os.getenv("BROADCAST_TRANSPORT", "dry-run")
         self.obs_scene_prefix = os.getenv("OBS_SCENE_PREFIX", "obs/")

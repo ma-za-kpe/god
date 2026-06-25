@@ -13,7 +13,6 @@ for _p in (_src_path, "/app/src"):
 
 from unittest.mock import MagicMock
 
-import pytest
 
 from banter.veil_layer import VeilLayer
 
@@ -125,10 +124,7 @@ class TestVeilLayerIntegration:
     def test_80_beats_produce_at_least_9_veil_beats(self):
         vl = VeilLayer()
         ps = _make_pair_state(tension=5)
-        count = sum(
-            1 for beat in range(80)
-            if vl.should_inject(beat, "COUNTER", ps, False)
-        )
+        count = sum(1 for beat in range(80) if vl.should_inject(beat, "COUNTER", ps, False))
         # Beats 0, 8, 16, 24, 32, 40, 48, 56, 64, 72 = 10 beats
         assert count >= 9, f"Expected >= 9 Veil beats in 80, got {count}"
 

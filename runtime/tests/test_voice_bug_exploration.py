@@ -22,7 +22,6 @@ import time
 from typing import Any
 from unittest.mock import patch
 
-import pytest
 from hypothesis import given, settings, HealthCheck
 from hypothesis import strategies as st
 
@@ -32,6 +31,7 @@ from voice.engine import VoiceSurface, build_voice_state
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _base_snapshot(epoch: int = 1000, dialogue_age: int = 5) -> dict[str, Any]:
     """Create a base snapshot with fresh dialogue turn."""
@@ -84,6 +84,7 @@ def _stale_snapshot_no_headline(dialogue_age: int = 25) -> dict[str, Any]:
 # Bug Condition 1.1: probe_url() called synchronously blocks composition
 # ---------------------------------------------------------------------------
 
+
 class TestSynchronousBlocking:
     """Bug condition 1.1: Synchronous probe_url() blocks compose()."""
 
@@ -93,6 +94,7 @@ class TestSynchronousBlocking:
         On unfixed code, compose() calls probe_url() synchronously inline,
         so it will block for ~1200ms, failing the 200ms assertion.
         """
+
         def slow_probe(url, timeout=1.5):
             time.sleep(1.2)  # Simulate 1200ms TTS endpoint latency
             return {"ok": True, "probe": "http", "url": url, "status_code": 200}
@@ -119,6 +121,7 @@ class TestSynchronousBlocking:
 
         **Validates: Requirements 1.1**
         """
+
         def slow_probe(url, timeout=1.5):
             time.sleep(latency)
             return {"ok": True, "probe": "http", "url": url, "status_code": 200}
@@ -143,6 +146,7 @@ class TestSynchronousBlocking:
 # Bug Condition 1.2: Exception in build_voice_state() swallowed at DEBUG level
 # ---------------------------------------------------------------------------
 
+
 class TestSwallowedException:
     """Bug condition 1.2: Exception in build_voice_state() is swallowed silently."""
 
@@ -166,15 +170,16 @@ class TestSwallowedException:
 
         # Expected behavior: A WARNING or ERROR level log should be emitted
         warning_or_error_logs = [
-            record for record in caplog.records
-            if record.levelno >= logging.WARNING
+            record for record in caplog.records if record.levelno >= logging.WARNING
         ]
         assert len(warning_or_error_logs) > 0, (
             "No WARNING-level log emitted when build_voice_state() encounters an error. "
             "Bug condition 1.2: exceptions are swallowed silently."
         )
 
-    @given(exc_type=st.sampled_from([KeyError, ValueError, TypeError, AttributeError, RuntimeError]))
+    @given(
+        exc_type=st.sampled_from([KeyError, ValueError, TypeError, AttributeError, RuntimeError])
+    )
     @settings(max_examples=5, suppress_health_check=[HealthCheck.function_scoped_fixture])
     def test_any_exception_produces_warning_log(self, caplog, exc_type):
         """Property: For any exception type in build_voice_state, WARNING log is emitted.
@@ -194,8 +199,7 @@ class TestSwallowedException:
                     pass
 
         warning_or_error_logs = [
-            record for record in caplog.records
-            if record.levelno >= logging.WARNING
+            record for record in caplog.records if record.levelno >= logging.WARNING
         ]
         assert len(warning_or_error_logs) > 0, (
             f"No WARNING-level log for {exc_type.__name__} in build_voice_state(). "
@@ -208,6 +212,7 @@ class TestSwallowedException:
 # Bug Condition 1.3: Hard-coded static fallback causes abrupt content switch
 # ---------------------------------------------------------------------------
 
+
 class TestAbruptFallback:
     """Bug condition 1.3: Hard-coded static fallback causes abrupt content switch."""
 
@@ -217,6 +222,7 @@ class TestAbruptFallback:
         On unfixed code, the pipeline falls back to "The world keeps moving."
         when dialogue is stale (>20s) and no showrunner headline is available.
         """
+
         def mock_probe(url, timeout=1.5):
             return {"ok": True, "probe": "http", "url": url, "status_code": 200}
 
@@ -228,8 +234,8 @@ class TestAbruptFallback:
 
         # Expected behavior: Should NOT fall back to static string abruptly
         assert result.plan.line != "The world keeps moving.", (
-            f"Voice plan used static fallback 'The world keeps moving.' "
-            f"Bug condition 1.3: abrupt fallback with no graceful transition."
+            "Voice plan used static fallback 'The world keeps moving.' "
+            "Bug condition 1.3: abrupt fallback with no graceful transition."
         )
         assert result.plan is not None
 
@@ -240,6 +246,7 @@ class TestAbruptFallback:
 
         **Validates: Requirements 1.3**
         """
+
         def mock_probe(url, timeout=1.5):
             return {"ok": True, "probe": "http", "url": url, "status_code": 200}
 
@@ -259,6 +266,7 @@ class TestAbruptFallback:
 # Test 4: No retry — health probe should retry on failure
 # Bug Condition 1.4: Single probe failure marks unhealthy with no retry
 # ---------------------------------------------------------------------------
+
 
 class TestNoRetry:
     """Bug condition 1.4: Single probe failure marks unhealthy with no retry."""
@@ -321,6 +329,7 @@ class TestNoRetry:
 # Test 5: Silent dry-run — WARNING must be logged when env var is unset
 # Bug Condition 1.5: VOICE_DRY_RUN defaults to true with no warning
 # ---------------------------------------------------------------------------
+
 
 class TestSilentDryRun:
     """Bug condition 1.5: VOICE_DRY_RUN should default to live mode."""

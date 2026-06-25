@@ -262,7 +262,8 @@ def resolve_target_peer(to_id: str, state: dict) -> Optional[dict]:
     ref_token = _name_archetype_token(tid)
     if ref_token and len(ref_token) >= 3:
         archetype_hits = [
-            p for p in peers
+            p
+            for p in peers
             if ref_token.lower() in (p.get("name") or p.get("current_name") or "").lower()
         ]
         if len(archetype_hits) == 1:

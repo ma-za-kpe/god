@@ -241,6 +241,31 @@ ensure_repo() {
 configure_streaming_mode() {
   local streaming_mode="${STREAMING_MODE:-auto}"
 
+  if [ -z "${OBS_BROWSER_SOURCE:-}" ]; then
+    export OBS_BROWSER_SOURCE=god-browser
+  fi
+  if [ -z "${OBS_BROWSER_URL:-}" ]; then
+    export OBS_BROWSER_URL=http://localhost:10517/stage
+  fi
+  if [ -z "${OBS_STREAM_SERVER:-}" ]; then
+    export OBS_STREAM_SERVER=rtmp://a.rtmp.youtube.com/live2
+  fi
+  if [ -z "${OBS_WEBSOCKET_URL:-}" ]; then
+    export OBS_WEBSOCKET_URL=ws://localhost:4444
+  fi
+  if [ -z "${OBS_CAPTURE_MODE:-}" ]; then
+    export OBS_CAPTURE_MODE=window
+  fi
+  if [ -z "${OBS_CAPTURE_SOURCE_KIND:-}" ]; then
+    export OBS_CAPTURE_SOURCE_KIND=xshm_input
+  fi
+  if [ -z "${OBS_CAPTURE_WINDOW_CLASS:-}" ]; then
+    export OBS_CAPTURE_WINDOW_CLASS=Firefox
+  fi
+  if [ -z "${OBS_CAPTURE_WINDOW_NAME:-}" ]; then
+    export OBS_CAPTURE_WINDOW_NAME=Firefox
+  fi
+
   # If the operator has already enabled streaming, preserve it.
   # Otherwise, auto-enable only when the required credentials are present.
   if [ "${streaming_mode}" = "true" ] || [ "${streaming_mode}" = "1" ]; then
@@ -258,28 +283,6 @@ configure_streaming_mode() {
   export BROADCAST_DRY_RUN=true
   if [ -n "${YOUTUBE_CHANNEL_ID:-}" ] || [ -n "${OBS_WEBSOCKET_URL:-}" ]; then
     log "Streaming not requested; leaving YouTube/OBS in dry-run mode"
-  fi
-
-  if [ -z "${OBS_BROWSER_SOURCE:-}" ]; then
-    export OBS_BROWSER_SOURCE=god-browser
-  fi
-  if [ -z "${OBS_BROWSER_URL:-}" ]; then
-    export OBS_BROWSER_URL=http://localhost:10517/stage
-  fi
-  if [ -z "${OBS_STREAM_SERVER:-}" ]; then
-    export OBS_STREAM_SERVER=rtmp://a.rtmp.youtube.com/live2
-  fi
-  if [ -z "${OBS_CAPTURE_MODE:-}" ]; then
-    export OBS_CAPTURE_MODE=window
-  fi
-  if [ -z "${OBS_CAPTURE_SOURCE_KIND:-}" ]; then
-    export OBS_CAPTURE_SOURCE_KIND=xcomposite_input
-  fi
-  if [ -z "${OBS_CAPTURE_WINDOW_CLASS:-}" ]; then
-    export OBS_CAPTURE_WINDOW_CLASS=Firefox
-  fi
-  if [ -z "${OBS_CAPTURE_WINDOW_NAME:-}" ]; then
-    export OBS_CAPTURE_WINDOW_NAME=Firefox
   fi
 }
 
@@ -550,6 +553,7 @@ start_firefox() {
       DISPLAY=:99 \
       XDG_RUNTIME_DIR=/tmp/runtime-stream \
       MOZ_DISABLE_CONTENT_SANDBOX=1 \
+      MOZ_WEBRENDER=0 \
       /opt/firefox/firefox --new-instance --profile /tmp/firefox-profile --kiosk "$browser_url" \
       >"$LOG_DIR/firefox.log" 2>&1 &
   }
@@ -597,8 +601,8 @@ data = json.loads(scene_path.read_text(encoding="utf-8"))
 window_id = os.environ["OBS_CAPTURE_WINDOW_ID"]
 for source in data.get("sources", []):
     if source.get("name") == os.getenv("OBS_CAPTURE_SOURCE_NAME", "god-browser"):
-        source["id"] = os.getenv("OBS_CAPTURE_SOURCE_KIND", "xcomposite_input")
-        source["versioned_id"] = os.getenv("OBS_CAPTURE_SOURCE_KIND", "xcomposite_input")
+        source["id"] = os.getenv("OBS_CAPTURE_SOURCE_KIND", "xshm_input")
+        source["versioned_id"] = os.getenv("OBS_CAPTURE_SOURCE_KIND", "xshm_input")
         source["settings"] = {
             "capture_window": window_id,
             "CaptureCursor": 0,
@@ -679,8 +683,7 @@ start_obs() {
   fi
 
   if ! command -v obs >/dev/null 2>&1; then
-    log "OBS Studio not installed; skipping OBS start"
-    return 0
+    die "OBS Studio not installed; cannot start streaming"
   fi
 
   log "Starting OBS Studio..."
@@ -793,8 +796,7 @@ PY
     fi
     sleep 2
   done
-  log "OBS failed to expose websocket after startup; leaving logs for inspection"
-  return 1
+  die "OBS failed to expose websocket after startup; see $LOG_DIR/obs.log"
 }
 
 start_obs_stream() {
@@ -808,13 +810,11 @@ start_obs_stream() {
   fi
 
   if ! pgrep -x obs >/dev/null 2>&1; then
-    log "OBS is not running; skipping stream start"
-    return 0
+    die "OBS is not running; cannot start stream"
   fi
 
   if ! obs_websocket_ready; then
-    log "OBS websocket is not responsive; skipping stream start"
-    return 0
+    die "OBS websocket is not responsive; cannot start stream"
   fi
 
   if ! python3 - <<'PY' >/dev/null 2>&1
@@ -904,7 +904,7 @@ PY
   then
     log "OBS stream start completed"
   else
-    log "OBS stream start failed"
+    die "OBS stream start failed"
   fi
 }
 
@@ -950,9 +950,9 @@ run_observer_stage() {
 
 run_streaming_stage() {
   if streaming_launch_requested; then
+    log "Preparing streaming capture stack..."
     start_firefox
     start_obs
-    start_obs_stream
   else
     log "Streaming launch not requested; skipping Firefox/OBS/browser capture stage"
   fi
@@ -960,6 +960,7 @@ run_streaming_stage() {
 
 run_runtime_stage() {
   start_runtime
+  start_obs_stream
 }
 
 main() {
@@ -992,10 +993,15 @@ main() {
       return 0
       ;;
     all)
+      log "Running stage: core"
       run_core_stage
+      log "Running stage: voice"
       run_voice_stage
+      log "Running stage: observer"
       run_observer_stage
+      log "Running stage: streaming-prep"
       run_streaming_stage
+      log "Running stage: runtime"
       run_runtime_stage
       ;;
     *)

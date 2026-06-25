@@ -82,6 +82,7 @@ def build_resilience_status(snapshot: dict[str, Any] | None = None) -> dict[str,
     try:
         from .world_stream import current_epoch, has_subscribers, stream_status
     except Exception:
+
         def current_epoch() -> int:
             return 0
 
@@ -135,10 +136,14 @@ def build_resilience_status(snapshot: dict[str, Any] | None = None) -> dict[str,
     broadcast_status = build_broadcast_status() if build_broadcast_status else {}
 
     nemo_live = bool(nemo_status.get("health", {}).get("ok")) or _env_flag("NEMO_ENABLED")
-    voice_live = bool(voice_status.get("health", {}).get("ok")) or _env_flag("VOICE_ENABLED") or bool(
-        os.getenv("TTS_MODEL")
+    voice_live = (
+        bool(voice_status.get("health", {}).get("ok"))
+        or _env_flag("VOICE_ENABLED")
+        or bool(os.getenv("TTS_MODEL"))
     )
-    avatar_live = bool(avatar_status.get("health", {}).get("ok")) or bool(avatar_status.get("enabled"))
+    avatar_live = bool(avatar_status.get("health", {}).get("ok")) or bool(
+        avatar_status.get("enabled")
+    )
     twitch_live = bool(twitch_status.get("health", {}).get("eventsub", {}).get("ok")) or bool(
         twitch_status.get("health", {}).get("helix", {}).get("ok")
     )
@@ -175,7 +180,9 @@ def build_resilience_status(snapshot: dict[str, Any] | None = None) -> dict[str,
     if not voice_live:
         notes.append("Voice is not enabled yet, so the stream will remain text-first.")
     if not avatar_live:
-        notes.append("Avatar rendering is not enabled yet, so the cast is visual-only in the browser stage.")
+        notes.append(
+            "Avatar rendering is not enabled yet, so the cast is visual-only in the browser stage."
+        )
 
     status = {
         "tier": tier,

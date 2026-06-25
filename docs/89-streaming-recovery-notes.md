@@ -14,6 +14,7 @@ This note records the exact path from a partially healthy Vast.ai instance to a 
 - OBS stream settings are pointed at YouTube RTMP
 - Stream encoder was switched from `NVENC` to `x264`, which fixed the stream startup failure
 - OBS is currently streaming successfully
+- The production launcher now accepts `CREATOR_TOKEN` as a legacy alias for `CREATOR_GENESIS_TOKEN`, but still fails closed when neither is set.
 
 ## What Was Up Before Streaming
 
@@ -32,7 +33,7 @@ We recovered the missing services and confirmed:
 - `fish-speech` listening on `:7860`
 - `ComfyUI` listening on `:8188`
 - `IPFS` listening on `:5001` and `:8080`
-- `nginx` serving `:10515`, `:10516`, `:10517`
+- `nginx` now keeps `:10515` and `:10516` local-only while `:10517` remains public
 
 ## Recovery Sequence
 
@@ -42,13 +43,19 @@ We checked the live host and confirmed which ports were already bound and which 
 
 ### 2. Confirmed the observer and fish-speech were healthy
 
-The observer was restarted with explicit Node 20 on the host and came up on port `3000`.
+The observer now serves the built static app on port `3000` through `observer/serve.py`.
 
-Fish-speech was restarted in a persistent `tmux` session and eventually came up on port `7860` after the GPU hog situation was resolved.
+Fish-speech had to be launched in a detached session because this host is not
+booted with `systemd`. A plain `nohup` launch was not durable enough under the
+SSH control shell, so the stable fix is to run fish-speech in `tmux` and then
+wait on an actual `/v1/tts` synthesis probe.
 
 ### 3. Freed GPU pressure
 
-The main bottleneck was GPU memory pressure. The host had been carrying an Ollama `llama-server` process that interfered with fish-speech and other GPU work. Killing that process allowed fish-speech to warm up successfully.
+The main bottleneck was GPU memory pressure. The host had been carrying an
+Ollama `llama-server` process and at least one other lingering GPU consumer that
+interfered with fish-speech and other GPU work. The practical fix is to start
+fish-speech before Ollama and keep Ollama on the CPU path where possible.
 
 ### 4. Installed and launched OBS
 
@@ -133,6 +140,55 @@ After restarting OBS, the log confirmed:
 - YouTube RTMP connected successfully
 - streaming start completed
 
+### 12. Recovered the live stream control path
+
+When the stream was restarted after the OBS bounce, the browser capture was still healthy but the stream was not active until OBS was driven through its real websocket v4 API.
+
+What worked on this host:
+
+- OBS websocket server: `ws://127.0.0.1:4444`
+- Auth state lives in `/root/.config/obs-studio/basic/profiles/Untitled/basic.ini`
+- The `[WebsocketAPI]` block contains `AuthSecret` and `AuthSalt`
+- The host Python client was `obswebsocket` for v4, not `obsws_python` v5
+- The stream came back only after `GetAuthRequired` -> `Authenticate` -> `StartStreaming`
+- `GetStreamingStatus()` can report `false` right after `StartStreaming()` even when the log has already accepted the stream
+- The log is the source of truth for the ingest transition
+
+The stream start sequence that succeeded:
+
+```python
+from obswebsocket import obsws, requests
+
+ws = obsws("127.0.0.1", 4444, "StreamNow!2026")
+ws.connect()
+ws.call(requests.StartStreaming())
+ws.disconnect()
+```
+
+The live host startup script now mirrors that behavior so the stream can be brought back up automatically after OBS starts.
+
+### 13. Browser capture recovery
+
+The white-screen failure was not the observer app itself. The browser layer was the blocker.
+
+What we tested on the live host:
+
+- `chromium-browser` was only a snap wrapper and could not run because `snapd` was unavailable
+- `firefox` from the tarball initially hit the browser sandbox as root
+- `epiphany-browser` initially failed in bubblewrap / WebKit sandbox setup
+- `kernel.unprivileged_userns_clone` was already `1`, so the kernel sysctl was not the blocker
+- running Firefox as a non-root `stream` user with `MOZ_DISABLE_CONTENT_SANDBOX=1` worked
+- the first-run Firefox modal had to be dismissed once, after which the observer page rendered normally
+
+The live Firefox window details that worked:
+
+- `WM_CLASS`: `Firefox`
+- mapped browser window id: `25165827`
+- profile: `/tmp/firefox-profile`
+- runtime user: `stream`
+
+The OBS source was updated live with `SetSourceSettings` on `god-browser` to point at the Firefox window.
+
 ## Important Commands
 
 Host checks:
@@ -203,7 +259,93 @@ ws.call(requests.StartStreaming())
 - Once the stream was stable, YouTube Studio could still hang on `Preparing stream` if the keyframe interval stayed too long; the safe target is `2s` or `4s` max.
 - OBS profile data lived in the profile INI and service JSON files, so the fix had to land there, not only in runtime env vars.
 - `GetStreamingStatus()` can lag behind or report `streaming: false` momentarily even when the log has already shown `Streaming Start`. The log is the source of truth for the ingest transition.
+
+## Current Startup Contract
+
+The launcher is now staged instead of monolithic.
+
+- `scripts/vast-run-staged-restart.sh` runs the boot in order: `core` -> `voice` -> `observer` -> `streaming` -> `runtime`
+- `scripts/vast-restart-services.sh <stage>` can run one stage at a time
+- `scripts/vast-stage-02-voice.sh` exports `FISH_DEVICE=cuda` and `FISH_HALF_MODE=--half`
+- The voice stage no longer falls back to CPU
+- OBS streaming only starts when `STREAMING_MODE=true` or `OBS_AUTO_START_STREAM=true`
+- The browser capture path still expects Firefox under `Xvfb :99` as the live window source
+- OBS remains the final compositor and stream endpoint, not the primary app renderer
+
+The practical startup order on the live host is now:
+
+```bash
+bash /workspace/god/scripts/vast-run-staged-restart.sh
+```
+
+When you need a single stage:
+
+```bash
+bash /workspace/god/scripts/vast-restart-services.sh core
+bash /workspace/god/scripts/vast-restart-services.sh voice
+bash /workspace/god/scripts/vast-restart-services.sh observer
+bash /workspace/god/scripts/vast-restart-services.sh streaming
+bash /workspace/god/scripts/vast-restart-services.sh runtime
+```
+
+## Sync Paths
+
+There are now two documented ways to sync startup fixes to the Vast host.
+
+### 1. Git push/pull
+
+This is the normal path when repo permissions allow it:
+
+```bash
+git add scripts/vast-restart-services.sh scripts/vast-setup-native.sh scripts/vast-setup.sh scripts/vast-run-staged-restart.sh scripts/vast-stage-02-voice.sh
+git commit -m "Force fish-speech onto CUDA in startup"
+git push
+ssh -p 10784 root@ssh7.vast.ai "cd /workspace/god && git pull"
+```
+
+This is the cleanest path when the remote repo accepts the push.
+
+### 2. Direct host sync over SSH
+
+Use this when GitHub push is blocked or when the live host needs an immediate patch.
+
+Example pattern from this session:
+
+```powershell
+(Get-Content -Raw 'scripts/vast-restart-services.sh').Replace("`r`n","`n") |
+  ssh -p 10784 root@ssh7.vast.ai "cat > /workspace/god/scripts/vast-restart-services.sh"
+```
+
+That direct overwrite path was used for the startup files when the repo push failed with 403 permission denied.
+
+## Latest Host Caveat
+
+The voice stage is GPU-only now, but it can still fail if other GPU consumers leave too little free VRAM.
+
+The latest host restart showed:
+
+- fish-speech started on `--device cuda`
+- the warmup probe failed because the model could not allocate the next cache block
+- the log reported only about `58.75 MiB` free on GPU 0 at the moment of failure
+- other GPU consumers were still holding memory while fish was warming up
+
+The takeaway is that "fish must be on GPU" is now a hard startup rule, but the host still needs enough free VRAM for the model cache to finish loading.
+
+### 14. Startup hardening applied after the audit
+
+- `/health` stays a liveness check; `/ready` now validates PostgreSQL, Redis, NATS, IPFS, ComfyUI, fish-speech, Ollama, and OBS when broadcast mode is enabled.
+- Restart no longer performs an implicit `git pull`; the launcher now refuses to mutate code during boot.
+- Native setup now generates and persists `CREATOR_GENESIS_TOKEN`, and the printed genesis command includes the required `X-Creator-Token` header.
+- The observer now runs from the built/static server path instead of Vite dev mode during production boot.
+- OBS startup now waits for Xvfb, gives a real grace period to existing websocket state, and only restarts OBS after that window.
+- The launcher now writes a machine-readable startup report to `/var/log/god/startup-report.json`.
 - Once the x264 encoder was forced, the RTMP connection succeeded and the stream went live.
+- The live stream control path is OBS websocket v4 on `:4444`, authenticated from the saved OBS profile state.
+- The host startup script now restarts OBS and then starts the stream through that websocket path.
+- The host startup script now starts fish-speech in a detached `tmux` session
+  so the service can survive the SSH launcher finishing.
+- On this host, `systemd-run` is not available because PID 1 is not systemd.
+  Use `tmux` or another host-native detached supervisor.
 
 ## Remaining Work
 

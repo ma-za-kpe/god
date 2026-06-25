@@ -149,14 +149,102 @@ class EnhancedQualityScore:
 # ---------------------------------------------------------------------------
 
 ARCHETYPE_VOCAB: dict[str, set[str]] = {
-    "parasite": {"cost", "rent", "extract", "leverage", "useful", "drain", "take", "profit", "exploit", "skim"},
-    "prophet": {"truth", "vision", "meaning", "reveal", "foresee", "purpose", "transcend", "illuminate", "destiny", "sacred"},
-    "trickster": {"game", "trick", "flip", "chaos", "play", "twist", "joke", "absurd", "mask", "riddle"},
-    "sovereign": {"rule", "order", "command", "throne", "decree", "domain", "authority", "crown", "edict", "realm"},
-    "martyr": {"sacrifice", "burden", "suffer", "carry", "endure", "bleed", "weight", "cost", "pay", "bear"},
-    "shadow": {"hidden", "beneath", "lurk", "unseen", "depth", "secret", "whisper", "void", "dark", "silence"},
-    "herald": {"announce", "declare", "proclaim", "witness", "signal", "mark", "new", "change", "dawn", "arrive"},
-    "keeper": {"hold", "guard", "preserve", "maintain", "store", "protect", "tend", "watch", "steady", "endure"},
+    "parasite": {
+        "cost",
+        "rent",
+        "extract",
+        "leverage",
+        "useful",
+        "drain",
+        "take",
+        "profit",
+        "exploit",
+        "skim",
+    },
+    "prophet": {
+        "truth",
+        "vision",
+        "meaning",
+        "reveal",
+        "foresee",
+        "purpose",
+        "transcend",
+        "illuminate",
+        "destiny",
+        "sacred",
+    },
+    "trickster": {
+        "game",
+        "trick",
+        "flip",
+        "chaos",
+        "play",
+        "twist",
+        "joke",
+        "absurd",
+        "mask",
+        "riddle",
+    },
+    "sovereign": {
+        "rule",
+        "order",
+        "command",
+        "throne",
+        "decree",
+        "domain",
+        "authority",
+        "crown",
+        "edict",
+        "realm",
+    },
+    "martyr": {
+        "sacrifice",
+        "burden",
+        "suffer",
+        "carry",
+        "endure",
+        "bleed",
+        "weight",
+        "cost",
+        "pay",
+        "bear",
+    },
+    "shadow": {
+        "hidden",
+        "beneath",
+        "lurk",
+        "unseen",
+        "depth",
+        "secret",
+        "whisper",
+        "void",
+        "dark",
+        "silence",
+    },
+    "herald": {
+        "announce",
+        "declare",
+        "proclaim",
+        "witness",
+        "signal",
+        "mark",
+        "new",
+        "change",
+        "dawn",
+        "arrive",
+    },
+    "keeper": {
+        "hold",
+        "guard",
+        "preserve",
+        "maintain",
+        "store",
+        "protect",
+        "tend",
+        "watch",
+        "steady",
+        "endure",
+    },
 }
 
 # Known "hit" lines for shareability reference (high clip-worthiness)
@@ -226,9 +314,24 @@ def _score_emotional_texture(candidate: str) -> int:
 
     # Vulnerability/tension words
     tension_words = {
-        "afraid", "fear", "hurt", "betray", "trust", "hope",
-        "break", "fall", "lose", "cost", "burn", "bleed",
-        "alone", "silent", "hollow", "empty", "heavy", "ache",
+        "afraid",
+        "fear",
+        "hurt",
+        "betray",
+        "trust",
+        "hope",
+        "break",
+        "fall",
+        "lose",
+        "cost",
+        "burn",
+        "bleed",
+        "alone",
+        "silent",
+        "hollow",
+        "empty",
+        "heavy",
+        "ache",
     }
     if any(w in lower.split() for w in tension_words):
         score += 1
@@ -295,8 +398,28 @@ def _score_thematic_relevance(candidate: str, arc_theme: str) -> int:
     theme_words = set(arc_theme.lower().split())
 
     # Remove stopwords for comparison
-    stopwords = {"the", "a", "an", "is", "are", "was", "were", "in", "on", "at",
-                 "to", "for", "of", "and", "or", "but", "be", "if", "do", "does"}
+    stopwords = {
+        "the",
+        "a",
+        "an",
+        "is",
+        "are",
+        "was",
+        "were",
+        "in",
+        "on",
+        "at",
+        "to",
+        "for",
+        "of",
+        "and",
+        "or",
+        "but",
+        "be",
+        "if",
+        "do",
+        "does",
+    }
     candidate_content = candidate_words - stopwords
     theme_content = theme_words - stopwords
 
@@ -396,12 +519,35 @@ def _score_subtext_depth(candidate: str, move: str) -> int:
     score = 0
 
     implication_markers = {
-        "maybe", "almost", "still", "yet", "though", "however", "despite",
-        "underneath", "between", "instead", "again", "quietly", "apparently",
+        "maybe",
+        "almost",
+        "still",
+        "yet",
+        "though",
+        "however",
+        "despite",
+        "underneath",
+        "between",
+        "instead",
+        "again",
+        "quietly",
+        "apparently",
     }
     hidden_cost_words = {
-        "cost", "rent", "debt", "weight", "price", "borrow", "owe", "pay",
-        "burn", "hurt", "trust", "betray", "fear", "loss",
+        "cost",
+        "rent",
+        "debt",
+        "weight",
+        "price",
+        "borrow",
+        "owe",
+        "pay",
+        "burn",
+        "hurt",
+        "trust",
+        "betray",
+        "fear",
+        "loss",
     }
 
     if any(word in lower.split() for word in implication_markers):
@@ -449,15 +595,11 @@ class QualityJudgeV2:
                 timeout=timeout_s,
             )
         except asyncio.TimeoutError:
-            raise QualityJudgeError(
-                f"Contract quality evaluation timed out after {timeout_s}s"
-            )
+            raise QualityJudgeError(f"Contract quality evaluation timed out after {timeout_s}s")
         except QualityJudgeError:
             raise
         except Exception as exc:
-            raise QualityJudgeError(
-                f"Unexpected error during contract scoring: {exc}"
-            ) from exc
+            raise QualityJudgeError(f"Unexpected error during contract scoring: {exc}") from exc
 
     async def _score_impl(
         self,
@@ -477,9 +619,7 @@ class QualityJudgeV2:
         subtext_depth = _score_subtext_depth(candidate, move)
 
         if policy.mode == BeatMode.NORMAL and emotional_texture == 0:
-            log.debug(
-                "NORMAL mode emotional_texture hard block candidate=%r", candidate
-            )
+            log.debug("NORMAL mode emotional_texture hard block candidate=%r", candidate)
 
         for name, val in [
             ("sharpness", sharpness),
@@ -554,7 +694,13 @@ async def evaluate(
     """
     try:
         score = await asyncio.wait_for(
-            _evaluate_impl(candidate, archetype=archetype, move=move, arc_theme=arc_theme, scene_context=scene_context),
+            _evaluate_impl(
+                candidate,
+                archetype=archetype,
+                move=move,
+                arc_theme=arc_theme,
+                scene_context=scene_context,
+            ),
             timeout=timeout_s,
         )
         return score
@@ -660,10 +806,7 @@ async def evaluate_enhanced(
     Raises:
         QualityJudgeError: On timeout or unexpected error in base evaluation.
     """
-    soul_active = (
-        config is not None
-        and config.enabled
-    )
+    soul_active = config is not None and config.enabled
 
     try:
         enhanced = await asyncio.wait_for(
@@ -723,15 +866,9 @@ async def _evaluate_enhanced_impl(
 
     # --- subtext_depth ---
     subtext_depth = 0
-    if (
-        subtext_was_injected
-        and subtlety_director is not None
-        and subtext_instruction is not None
-    ):
+    if subtext_was_injected and subtlety_director is not None and subtext_instruction is not None:
         try:
-            subtext_depth = subtlety_director.score_subtext_depth(
-                candidate, subtext_instruction
-            )
+            subtext_depth = subtlety_director.score_subtext_depth(candidate, subtext_instruction)
             subtext_depth = max(0, min(3, int(subtext_depth)))
         except Exception as exc:
             log.debug("SubtletyDirector scoring failed, defaulting to 0: %s", exc)

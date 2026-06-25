@@ -53,7 +53,10 @@ class SceneArcController:
         """Resolve the phase that should govern the next beat."""
         self._maybe_close_windows(beat_number)
 
-        if self._state.phase == ScenePhase.RELEASE and beat_number <= self._state.release_until_beat:
+        if (
+            self._state.phase == ScenePhase.RELEASE
+            and beat_number <= self._state.release_until_beat
+        ):
             return ScenePhase.RELEASE
 
         if beat_number > 0 and beat_number % self.FORCE_SHIFT_WINDOW_BEATS == 0:
@@ -106,7 +109,10 @@ class SceneArcController:
                     release_until=beat_number + self.RELEASE_WINDOW_BEATS,
                     pivot_until=beat_number + 3,
                 )
-            elif self._state.beats_in_phase >= self.BUILD_WINDOW_BEATS and scene_data.scene_energy == "heated":
+            elif (
+                self._state.beats_in_phase >= self.BUILD_WINDOW_BEATS
+                and scene_data.scene_energy == "heated"
+            ):
                 self._transition(ScenePhase.CLIMAX, beat_number)
             elif self._state.pressure_cluster_streak >= 4 and scene_data.scene_energy != "neutral":
                 self._transition(ScenePhase.CLIMAX, beat_number)
@@ -122,17 +128,18 @@ class SceneArcController:
 
         elif self._state.phase == ScenePhase.RELEASE:
             if (
-                beat.move in {"PIVOT", "CONCEDE", "CALLBACK", "BACKCHANNEL"}
-                and self._state.beats_in_phase >= 1
-            ) or (
-                self._state.beats_in_phase >= 4 and scene_data.scene_energy != "heated"
-            ) or beat_number >= self._state.release_until_beat:
+                (
+                    beat.move in {"PIVOT", "CONCEDE", "CALLBACK", "BACKCHANNEL"}
+                    and self._state.beats_in_phase >= 1
+                )
+                or (self._state.beats_in_phase >= 4 and scene_data.scene_energy != "heated")
+                or beat_number >= self._state.release_until_beat
+            ):
                 self._transition(ScenePhase.RESET, beat_number)
 
         elif self._state.phase == ScenePhase.RESET:
-            if (
-                self._state.beats_in_phase >= self.RESET_WINDOW_BEATS
-                or (self._state.beats_in_phase >= 3 and self._state.pressure_cluster_streak == 0)
+            if self._state.beats_in_phase >= self.RESET_WINDOW_BEATS or (
+                self._state.beats_in_phase >= 3 and self._state.pressure_cluster_streak == 0
             ):
                 self._transition(ScenePhase.BUILD, beat_number)
 
@@ -182,10 +189,7 @@ class SceneArcController:
     ) -> str | None:
         """Return a phase-specific [RHYTHM] directive."""
         if phase == ScenePhase.CLIMAX:
-            return (
-                "This is a climax beat. Keep it sharp, direct, and final. "
-                "Do not soften the hit."
-            )
+            return "This is a climax beat. Keep it sharp, direct, and final. Do not soften the hit."
 
         if phase == ScenePhase.RELEASE:
             return (
@@ -207,8 +211,7 @@ class SceneArcController:
 
         if scene_data.landed_hit is not None and scene_data.landed_hit_remaining > 0:
             return (
-                "A landed hit is still in the room. Keep your line compact and aware "
-                "of the impact."
+                "A landed hit is still in the room. Keep your line compact and aware of the impact."
             )
 
         if move in ("CONCEDE", "DEFLECT") and scene_data.scene_energy == "cooling":

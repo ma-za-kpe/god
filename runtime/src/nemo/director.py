@@ -87,12 +87,7 @@ class NemoDirector:
         scene = str(showrunner_plan.get("scene") or "world-wide")
         speaker = str(showrunner_plan.get("speaker") or "Narrator")
         prompt = str(showrunner_plan.get("audience_prompt") or "Watch closely.")
-        return (
-            f"Scene {scene}: {headline} "
-            f"Speaker {speaker}. "
-            f"{prompt} "
-            f"Summary: {summary}"
-        )
+        return f"Scene {scene}: {headline} Speaker {speaker}. {prompt} Summary: {summary}"
 
     def _fallback_note(self, showrunner_plan: dict[str, Any], summary: str) -> str:
         return (

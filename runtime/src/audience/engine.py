@@ -27,15 +27,18 @@ def _payload(event: dict[str, Any]) -> dict[str, Any]:
 
 def _actor_key(event: dict[str, Any]) -> str:
     payload = _payload(event)
-    return str(
-        payload.get("user_name")
-        or payload.get("chatter_name")
-        or payload.get("from_broadcaster_user_name")
-        or event.get("agent_name")
-        or event.get("agent_id")
-        or payload.get("user_id")
+    return (
+        str(
+            payload.get("user_name")
+            or payload.get("chatter_name")
+            or payload.get("from_broadcaster_user_name")
+            or event.get("agent_name")
+            or event.get("agent_id")
+            or payload.get("user_id")
+            or "audience"
+        ).strip()
         or "audience"
-    ).strip() or "audience"
+    )
 
 
 def _event_support(event: dict[str, Any]) -> dict[str, Any] | None:
@@ -51,7 +54,10 @@ def _event_support(event: dict[str, Any]) -> dict[str, Any] | None:
     kind = "signal"
     tone = "neutral"
 
-    if event_type.endswith("social.twitch.chat.message") or event_type == "social.twitch.chat.message":
+    if (
+        event_type.endswith("social.twitch.chat.message")
+        or event_type == "social.twitch.chat.message"
+    ):
         support_points = 0.4
         label = "chat"
         kind = "chat"
@@ -64,26 +70,39 @@ def _event_support(event: dict[str, Any]) -> dict[str, Any] | None:
         tone = "social"
         narrative = f"{actor} follows the channel."
     elif event_type.endswith("social.twitch.raid") or event_type == "social.twitch.raid":
-        viewers = int(payload.get("metadata", {}).get("viewer_count") or payload.get("viewer_count") or payload.get("viewers") or 0)
+        viewers = int(
+            payload.get("metadata", {}).get("viewer_count")
+            or payload.get("viewer_count")
+            or payload.get("viewers")
+            or 0
+        )
         support_points = max(2.0, viewers / 10.0)
         label = "raid"
         kind = "raid"
         tone = "threat"
         narrative = f"{actor} raids with {viewers} viewers."
-    elif event_type.endswith("economy.twitch.subscribe") or event_type == "economy.twitch.subscribe":
+    elif (
+        event_type.endswith("economy.twitch.subscribe") or event_type == "economy.twitch.subscribe"
+    ):
         support_points = 8.0
         label = "subscribe"
         kind = "subscribe"
         tone = "gold"
         narrative = f"{actor} becomes a patron."
-    elif event_type.endswith("economy.twitch.subscription.gift") or event_type == "economy.twitch.subscription_gift":
+    elif (
+        event_type.endswith("economy.twitch.subscription.gift")
+        or event_type == "economy.twitch.subscription_gift"
+    ):
         gifts = int(payload.get("metadata", {}).get("gift_count") or payload.get("gift_count") or 1)
         support_points = max(12.0, gifts * 6.0)
         label = "gift"
         kind = "gift"
         tone = "gold"
         narrative = f"{actor} gifts {gifts} subscriptions."
-    elif event_type.endswith("economy.twitch.subscription.message") or event_type == "economy.twitch.subscription_message":
+    elif (
+        event_type.endswith("economy.twitch.subscription.message")
+        or event_type == "economy.twitch.subscription_message"
+    ):
         support_points = 4.5
         label = "renewal"
         kind = "renewal"
@@ -96,7 +115,10 @@ def _event_support(event: dict[str, Any]) -> dict[str, Any] | None:
         kind = "cheer"
         tone = "gold"
         narrative = f"{actor} cheers {bits} bits."
-    elif event_type.endswith("social.twitch.channel_point") or event_type == "social.twitch.channel_point":
+    elif (
+        event_type.endswith("social.twitch.channel_point")
+        or event_type == "social.twitch.channel_point"
+    ):
         support_points = 1.8
         label = "channel-point"
         kind = "redemption"
@@ -164,7 +186,9 @@ class AudienceSurface:
             elif signal["kind"] == "raid":
                 raid_waves += 1
 
-        signals.sort(key=lambda item: (item["support_points"], item["kind"], item["actor"]), reverse=True)
+        signals.sort(
+            key=lambda item: (item["support_points"], item["kind"], item["actor"]), reverse=True
+        )
 
         patronage_index = round(sum(float(signal["support_points"]) for signal in signals), 2)
         hype_index = round(
@@ -188,10 +212,16 @@ class AudienceSurface:
             )[:5]
         ]
 
-        if support_kinds.get("subscribe") or support_kinds.get("gift") or support_kinds.get("cheer"):
+        if (
+            support_kinds.get("subscribe")
+            or support_kinds.get("gift")
+            or support_kinds.get("cheer")
+        ):
             story_hook = "Patrons are funding the cast; reward the room with a stronger turn."
         elif raid_waves:
-            story_hook = "A raid just widened the audience; escalate the conflict for the new viewers."
+            story_hook = (
+                "A raid just widened the audience; escalate the conflict for the new viewers."
+            )
         elif chat_pressure >= 8:
             story_hook = "Chat is loud enough to steer the stage; answer the room directly."
         elif chat_pressure > 0:

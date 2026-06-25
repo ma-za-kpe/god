@@ -8,7 +8,6 @@ from __future__ import annotations
 import json
 import os
 import sys
-import tempfile
 import time
 from pathlib import Path
 
@@ -33,9 +32,7 @@ def _make_valid_profile(archetype: str) -> dict:
     """Create a minimal valid profile dict for the given archetype."""
     return {
         "archetype": archetype,
-        "sentence_structures": [
-            f"Structure {i} for {archetype}" for i in range(3)
-        ],
+        "sentence_structures": [f"Structure {i} for {archetype}" for i in range(3)],
         "verbal_tics": [f"tic-{i}" for i in range(2)],
         "rhythm_patterns": [
             {
@@ -128,9 +125,14 @@ async def test_load_profiles_fails_validation(tmp_path, config):
         "archetype": "parasite",
         "sentence_structures": ["s1", "s2", "s3"],
         "verbal_tics": ["t1", "t2"],
-        "rhythm_patterns": [{"name": "r1", "clause_count_range": [1, 2],
-                             "word_count_per_clause_range": [3, 8],
-                             "pause_placement": "before_final"}],
+        "rhythm_patterns": [
+            {
+                "name": "r1",
+                "clause_count_range": [1, 2],
+                "word_count_per_clause_range": [3, 8],
+                "pause_placement": "before_final",
+            }
+        ],
         "micro_phrases": ["p1"],  # Too few — needs 4
         "rhetorical_devices": ["d1", "d2"],
         "opening_patterns": ["o1", "o2"],
@@ -269,9 +271,7 @@ async def test_score_voice_conformance_returns_valid_range(profiles_dir, config)
             assert isinstance(score, int), (
                 f"{archetype}/{line[:20]}: expected int, got {type(score)}"
             )
-            assert 0 <= score <= 3, (
-                f"{archetype}/{line[:20]}: score {score} not in [0, 3]"
-            )
+            assert 0 <= score <= 3, f"{archetype}/{line[:20]}: score {score} not in [0, 3]"
 
 
 @pytest.mark.asyncio
@@ -295,7 +295,6 @@ async def test_check_for_reload_detects_change(profiles_dir, config):
     """Modified file is reloaded on next check."""
     vdna = VoiceDNA(profiles_dir, config)
     await vdna.load_profiles()
-
 
     # Modify the parasite profile
     updated = _make_valid_profile("parasite")
@@ -400,9 +399,7 @@ async def test_profile_unavailable_does_not_block(tmp_path, config):
     # Requesting any archetype should return None gracefully
     for archetype in ARCHETYPES:
         result = vdna.get_prompt_injection(archetype)
-        assert result is None, (
-            f"Expected None for missing archetype '{archetype}', got: {result}"
-        )
+        assert result is None, f"Expected None for missing archetype '{archetype}', got: {result}"
 
     # score_voice_conformance should also return 0 (not raise)
     for archetype in ARCHETYPES:
@@ -467,9 +464,7 @@ async def test_all_profiles_pass_schema_validation():
             data = json.load(f)
 
         is_valid, violations = validate_voice_dna_profile(data)
-        assert is_valid, (
-            f"Profile '{archetype}' failed schema validation: {violations}"
-        )
+        assert is_valid, f"Profile '{archetype}' failed schema validation: {violations}"
 
         # Also verify archetype field matches filename
         assert data.get("archetype") == archetype, (

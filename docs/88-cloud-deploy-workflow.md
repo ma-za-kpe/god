@@ -8,8 +8,9 @@ How code changes move from local edits to the live cloud runtime.
 |------|-------|
 | SSH | `ssh -p 10784 root@ssh7.vast.ai` |
 | Runtime port (internal) | `8888` |
-| nginx proxy (external) | `10515 → 8888` |
-| Observer static proxy | `10517 → 3000` |
+| nginx runtime proxy | `127.0.0.1:10515 → 8888` |
+| nginx ComfyUI proxy | `127.0.0.1:10516 → 8188` |
+| Observer static proxy | `0.0.0.0:10517 → 3000` |
 | Cloudflare tunnel | `https://folks-forming-bizrate-begins.trycloudflare.com` → port `8888` |
 | SSH tunnel (local) | `ssh -L 18888:localhost:8888 -N -f -p 10784 root@ssh7.vast.ai` → `http://localhost:18888` |
 | Git branch | `feat/twitch-ne-mo-showrunner` |
@@ -39,7 +40,7 @@ How code changes move from local edits to the live cloud runtime.
         nohup python3 -m uvicorn src.main:app --host 0.0.0.0 --port 8888 \
           > /tmp/runtime.log 2>&1 &"
 6. Verify:
-     ssh -p 10784 root@ssh7.vast.ai "curl -sf http://localhost:8888/health"
+     ssh -p 10784 root@ssh7.vast.ai "curl -sf http://localhost:8888/ready"
 ```
 
 > **Important**: always kill by PID (`pgrep -f 'uvicorn src.main'`) before starting a new process. `fuser -k` alone may not reach processes that have already released the port from a previous failed restart attempt.
@@ -104,7 +105,7 @@ remain in dry-run / observer-only mode.
 
 Restart all: `bash /workspace/god/scripts/vast-restart-services.sh`
 This now blocks until PostgreSQL, Redis, NATS, IPFS, Ollama, ComfyUI,
-fish-speech, the observer on `:3000`, nginx, and the runtime are all up.
+fish-speech, the observer on `:3000`, nginx, and the runtime `/ready` checks are all up.
 
 ## Current Progress (as of 2026-06-20)
 
@@ -127,7 +128,7 @@ fish-speech, the observer on `:3000`, nginx, and the runtime are all up.
 - [ ] Public cloudflare tunnel: URL `folks-forming-bizrate-begins.trycloudflare.com` expires when process dies — needs permanent solution (ngrok auth token or Cloudflare named tunnel)
 - [ ] Add cloudflared auto-start to `vast-restart-services.sh`
 - [ ] Expression sheet CIDs: confirm expression sheet assets pinned for all 8 agents
-- [ ] Observer `/stage`: verify the Vite app is live on `:3000` and reachable through nginx at `http://ssh7.vast.ai:10517/stage`
+- [ ] Observer `/stage`: verify the static observer server is live on `:3000` and reachable through nginx at `http://ssh7.vast.ai:10517/stage`
 
 ## Troubleshooting
 

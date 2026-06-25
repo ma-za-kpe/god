@@ -7,10 +7,22 @@ import hashlib
 from typing import Any
 
 try:  # pragma: no cover - package import path in runtime
-    from .showrunner_rules import audience_prompt_for, event_to_cue, pick_arc_theme, select_scene, speaker_for
+    from .showrunner_rules import (
+        audience_prompt_for,
+        event_to_cue,
+        pick_arc_theme,
+        select_scene,
+        speaker_for,
+    )
     from .showrunner_state import ShowrunnerPlan, ShowrunnerState
 except ImportError:  # pragma: no cover - flat import path in tests
-    from showrunner_rules import audience_prompt_for, event_to_cue, pick_arc_theme, select_scene, speaker_for
+    from showrunner_rules import (
+        audience_prompt_for,
+        event_to_cue,
+        pick_arc_theme,
+        select_scene,
+        speaker_for,
+    )
     from showrunner_state import ShowrunnerPlan, ShowrunnerState
 
 
@@ -50,21 +62,37 @@ class Showrunner:
             cues=tuple(cues[:5]),
             reasoning=tuple(reasoning),
             source_epoch=epoch,
-            source_agent_count=int(snapshot.get("agent_count") or len(snapshot.get("agents") or [])),
+            source_agent_count=int(
+                snapshot.get("agent_count") or len(snapshot.get("agents") or [])
+            ),
         )
-        self._state = replace(self._state, last_epoch=epoch, last_signature=signature, last_plan=plan)
+        self._state = replace(
+            self._state, last_epoch=epoch, last_signature=signature, last_plan=plan
+        )
         return plan
 
     def build_plan_dict(self, snapshot: dict[str, Any]) -> dict[str, Any]:
         return self.build_plan(snapshot).to_dict()
 
     def _collect_cues(self, snapshot: dict[str, Any]) -> list:
+        agents = snapshot.get("agents") or []
+        agent_name_by_id = {
+            str(a.get("soul_id") or ""): str(a.get("current_name") or "")
+            for a in agents
+            if a.get("soul_id") and a.get("current_name")
+        }
         cues = []
         for event in snapshot.get("events") or []:
             cue = event_to_cue(event)
             if cue:
+                if cue.agent_id and cue.agent_name == cue.agent_id:
+                    resolved = agent_name_by_id.get(cue.agent_id, "")
+                    if resolved:
+                        cue = replace(cue, agent_name=resolved)
                 cues.append(cue)
-        cues.sort(key=lambda cue: (cue.priority, cue.cue_type, cue.agent_name, cue.agent_id), reverse=True)
+        cues.sort(
+            key=lambda cue: (cue.priority, cue.cue_type, cue.agent_name, cue.agent_id), reverse=True
+        )
         return cues
 
     def _headline(self, cues, stats: dict[str, Any]) -> str:

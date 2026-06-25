@@ -34,7 +34,7 @@ class TestShouldFire:
     def test_does_not_fire_at_exact_thresholds(self):
         bc = BackchannelSelector()
         assert not bc.should_fire(12)  # not > 12
-        assert not bc.should_fire(5)   # not < 5
+        assert not bc.should_fire(5)  # not < 5
 
 
 class TestSelect:
@@ -57,8 +57,16 @@ class TestSelect:
 
     def test_all_archetypes_have_pool(self):
         bc = BackchannelSelector(random.Random(42))
-        for archetype in ["parasite", "prophet", "trickster", "sovereign",
-                          "martyr", "shadow", "herald", "keeper"]:
+        for archetype in [
+            "parasite",
+            "prophet",
+            "trickster",
+            "sovereign",
+            "martyr",
+            "shadow",
+            "herald",
+            "keeper",
+        ]:
             r_high = bc.select(archetype, 13)
             r_low = bc.select(archetype, 2)
             assert r_high is not None, f"No landed-hit pool for {archetype}"

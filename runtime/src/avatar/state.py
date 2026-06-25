@@ -17,7 +17,13 @@ class AvatarPlan:
     motion: str
     lip_sync_source: str
     render_target: str
+    speaker_soul_id: str = ""
+    speaking: bool = False
+    mouth_open: float = 0.0
+    presentation_mode: str = "standard"
     notes: tuple[str, ...] = field(default_factory=tuple)
+    rigged_avatar_cid: str = ""
+    vrm_avatar_url: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -36,6 +42,12 @@ class AvatarState:
     render_target: str
     health: dict[str, Any]
     plan: AvatarPlan
+    speaker_soul_id: str = ""
+    speaking: bool = False
+    mouth_open: float = 0.0
+    presentation_mode: str = "standard"
+    rigged_avatar_cid: str = ""
+    vrm_avatar_url: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         payload = asdict(self)

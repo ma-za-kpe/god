@@ -24,17 +24,11 @@ from hypothesis import strategies as st
 from banter.types import (
     BanterConfig,
     Beat,
-    CircuitBreakerState,
     FallbackTemplate,
-    FallbackSelection,
     InteractionRecord,
     MoveContext,
-    MoveDistribution,
-    PacingDecision,
     PairState,
     QualityScore,
-    RepetitionVerdict,
-    SceneContextData,
 )
 
 # ---------------------------------------------------------------------------
@@ -160,13 +154,9 @@ def st_move(draw: st.DrawFn) -> str:
 
 
 @st.composite
-def st_move_sequence(
-    draw: st.DrawFn, min_size: int = 0, max_size: int = 20
-) -> list[str]:
+def st_move_sequence(draw: st.DrawFn, min_size: int = 0, max_size: int = 20) -> list[str]:
     """Generate a sequence of moves (e.g., for conversation history)."""
-    return draw(
-        st.lists(st.sampled_from(MOVE_TYPES), min_size=min_size, max_size=max_size)
-    )
+    return draw(st.lists(st.sampled_from(MOVE_TYPES), min_size=min_size, max_size=max_size))
 
 
 @st.composite
@@ -188,9 +178,7 @@ def st_quality_score(draw: st.DrawFn) -> QualityScore:
 
 
 @st.composite
-def st_beat_sequence(
-    draw: st.DrawFn, min_size: int = 0, max_size: int = 10
-) -> list[Beat]:
+def st_beat_sequence(draw: st.DrawFn, min_size: int = 0, max_size: int = 10) -> list[Beat]:
     """Generate a sequence of beats with realistic data."""
     num_beats = draw(st.integers(min_value=min_size, max_value=max_size))
     beats = []
@@ -215,9 +203,7 @@ def st_beat_sequence(
 
 
 @st.composite
-def st_request_outcomes(
-    draw: st.DrawFn, min_size: int = 1, max_size: int = 50
-) -> list[bool]:
+def st_request_outcomes(draw: st.DrawFn, min_size: int = 1, max_size: int = 50) -> list[bool]:
     """Generate a sequence of request outcomes for circuit breaker testing.
 
     Each outcome is a boolean: True = success, False = error.

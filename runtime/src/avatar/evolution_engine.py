@@ -65,4 +65,3 @@ class EvolutionEngine:
     async def _process_queue(self) -> None:
         while not self._queue.empty():
             await self._queue.get()
-

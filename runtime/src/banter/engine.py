@@ -265,7 +265,7 @@ class BanterEngine:
                     break
 
         # Resolve mode via precedence chain
-        prev_elder_mode = getattr(self, '_prev_elder_modes', {}).get(elder)
+        prev_elder_mode = getattr(self, "_prev_elder_modes", {}).get(elder)
         policy = self._mode_resolver.resolve(
             elder=elder,
             opponent=opponent,
@@ -277,7 +277,7 @@ class BanterEngine:
         )
 
         # Track this Elder's mode for next beat's snap-back detection
-        if not hasattr(self, '_prev_elder_modes'):
+        if not hasattr(self, "_prev_elder_modes"):
             self._prev_elder_modes: dict[str, BeatMode] = {}
         self._prev_elder_modes[elder] = policy.mode
 
@@ -319,6 +319,7 @@ class BanterEngine:
         # Handle BACKCHANNEL mode — short reactive utterance
         if policy.mode == BeatMode.BACKCHANNEL:
             from .backchannel import BackchannelSelector
+
             bc_selector = BackchannelSelector(rng=random.Random())
             bc_result = bc_selector.select(archetype, opponent_last_score or 0)
             bc_line = bc_result.line if bc_result else "Noted."
@@ -396,7 +397,13 @@ class BanterEngine:
 
         # --- Step 4: Prompt building ---
         prompt = await self._build_prompt(
-            elder, archetype, opponent, arc_theme, move, conv_thread, scene_data,
+            elder,
+            archetype,
+            opponent,
+            arc_theme,
+            move,
+            conv_thread,
+            scene_data,
             elder_balances=elder_balances,
             policy=policy,
             scene_phase=scene_phase,
@@ -409,8 +416,7 @@ class BanterEngine:
 
         # --- Step 8: Anti-repetition check ---
         line, score, source, template_id = await self._anti_repetition_loop(
-            line, score, source, prompt, elder, archetype, move, arc_theme,
-            opponent, scene_data
+            line, score, source, prompt, elder, archetype, move, arc_theme, opponent, scene_data
         )
 
         # --- Step 8.5: Hard Ban Check (final delivery gate) ---
@@ -488,7 +494,11 @@ class BanterEngine:
             if score >= refine_thresh:
                 asyncio.ensure_future(
                     self._callback_registry.store_memorable_moment(
-                        elder, opponent, line, move, arc_theme,
+                        elder,
+                        opponent,
+                        line,
+                        move,
+                        arc_theme,
                         valence="positive",
                         summary=f"{move} on {arc_theme}",
                         score=score,
@@ -545,6 +555,7 @@ class BanterEngine:
 
         # Get fear keywords for this archetype
         from .move_selector import ARCHETYPE_FEARS
+
         fear_keywords = ARCHETYPE_FEARS.get(archetype, [])
 
         # Count consecutive counters in pair
@@ -627,13 +638,12 @@ class BanterEngine:
             last_opponent_line = self._extract_last_opponent_line(opponent, conv_thread)
             if last_opponent_line:
                 pair_thread = [
-                    t for t in conv_thread
-                    if t.get("speaker") in (elder, opponent)
-                    or t.get("target") in (elder, opponent)
+                    t
+                    for t in conv_thread
+                    if t.get("speaker") in (elder, opponent) or t.get("target") in (elder, opponent)
                 ][-4:]
                 pair_thread_formatted = "\n".join(
-                    f"{t.get('speaker', '???')}: {t.get('content', '')}"
-                    for t in pair_thread
+                    f"{t.get('speaker', '???')}: {t.get('content', '')}" for t in pair_thread
                 )
                 react_block = (
                     f'The last thing {opponent} said was: "{last_opponent_line}"\n\n'
@@ -657,8 +667,14 @@ class BanterEngine:
             try:
                 emotional_block, callback_block, soul_meta = await asyncio.wait_for(
                     self._build_soul_blocks(
-                        elder, archetype, opponent, arc_theme, move,
-                        history, tension, reconciliation_active,
+                        elder,
+                        archetype,
+                        opponent,
+                        arc_theme,
+                        move,
+                        history,
+                        tension,
+                        reconciliation_active,
                     ),
                     timeout=_SOUL_TIMEOUT_S,
                 )
@@ -680,9 +696,7 @@ class BanterEngine:
         scene_block = self._format_scene_block(scene_data, elder, opponent)
 
         # --- Build [MOVE] block ---
-        move_block = self._format_move_block(
-            elder, archetype, move, opponent, tension, pair_state
-        )
+        move_block = self._format_move_block(elder, archetype, move, opponent, tension, pair_state)
 
         # --- Build [BANNED] block ---
         banned_block = self._format_banned_block(arc_theme)
@@ -711,13 +725,9 @@ class BanterEngine:
             )
         # Trailing-off mechanic (T6.3)
         elif move in ("CONCEDE", "DEFLECT") and tension <= 3:
-            trailing_text = (
-                "This line may trail off. Hesitation is allowed, but it must still feel intentional."
-            )
+            trailing_text = "This line may trail off. Hesitation is allowed, but it must still feel intentional."
             rhythm_block = (
-                f"{rhythm_block}\n\n{trailing_text}"
-                if rhythm_block is not None
-                else trailing_text
+                f"{rhythm_block}\n\n{trailing_text}" if rhythm_block is not None else trailing_text
             )
 
         # --- Assemble via SacredPromptBuilder ---
@@ -792,12 +802,16 @@ class BanterEngine:
             try:
                 sore_spots = await self._callback_registry.get_sore_spots(opponent, arc_theme)
                 callback = await self._callback_registry.surface_callback(
-                    elder, opponent, tension, arc_theme,
-                    self._beat_number, self._session_callback_count,
+                    elder,
+                    opponent,
+                    tension,
+                    arc_theme,
+                    self._beat_number,
+                    self._session_callback_count,
                 )
                 if callback is not None:
                     chunk = (
-                        f'Reference this earlier moment: '
+                        f"Reference this earlier moment: "
                         f'"{callback.original_line}" ({callback.suggested_framing})'
                     )
                     if total_chars + len(chunk) <= _SOUL_BUDGET_CHARS:
@@ -860,8 +874,14 @@ class BanterEngine:
         with existing tests.
         """
         emotional_block, callback_block, metadata = await self._build_soul_blocks(
-            elder, archetype, opponent, arc_theme, move,
-            history, tension, reconciliation_active,
+            elder,
+            archetype,
+            opponent,
+            arc_theme,
+            move,
+            history,
+            tension,
+            reconciliation_active,
         )
         soul_parts: list[str] = []
         if emotional_block:
@@ -913,14 +933,20 @@ class BanterEngine:
         elif move == "ESCALATE" and self._last_tension > 8:
             threshold = 8  # still needs to land at high tension (T7.3)
         else:
-            threshold = get_pass_threshold(soul_active) if soul_active else route_decision.quality_threshold
+            threshold = (
+                get_pass_threshold(soul_active) if soul_active else route_decision.quality_threshold
+            )
 
         # Attempt probe if circuit is broken and cooldown expired
         if self._model_router.should_probe():
             probed = await self._model_router.probe_remote()
             if probed:
                 route_decision = self._model_router.route("broadcast")
-                if not chaos and move not in ("CRACK", "CONCEDE", "CALLBACK") and not (move == "ESCALATE" and self._last_tension > 8):
+                if (
+                    not chaos
+                    and move not in ("CRACK", "CONCEDE", "CALLBACK")
+                    and not (move == "ESCALATE" and self._last_tension > 8)
+                ):
                     threshold = route_decision.quality_threshold
 
         # Initial generation
@@ -1029,7 +1055,7 @@ class BanterEngine:
             original_prompt
             + "\n\n[REFINEMENT FEEDBACK]\n"
             + "\n".join(feedback_parts)
-            + f"\nPrevious attempt: \"{current_line}\""
+            + f'\nPrevious attempt: "{current_line}"'
         )
 
         return await self._call_model(refinement_prompt, route_decision)
@@ -1071,7 +1097,9 @@ class BanterEngine:
             rejection_count += 1
             log.debug(
                 "Anti-repetition rejected for %s (reason=%s, attempt=%d)",
-                elder, verdict.rejection_reason, rejection_count,
+                elder,
+                verdict.rejection_reason,
+                rejection_count,
             )
 
             if rejection_count >= self._config.max_rejection_rounds:
@@ -1237,9 +1265,7 @@ class BanterEngine:
     async def _get_relationship_history(self, elder: str, opponent: str) -> list:
         """Get last 5 significant interactions, with graceful degradation."""
         try:
-            return await self._relationship_memory.get_significant_history(
-                elder, opponent, limit=5
-            )
+            return await self._relationship_memory.get_significant_history(elder, opponent, limit=5)
         except (RelationshipMemoryError, Exception) as e:
             log.debug("Relationship memory unavailable: %s", e)
             return []
@@ -1315,8 +1341,7 @@ class BanterEngine:
         # Register shift instruction (Req 8.4)
         if self._anti_repetition.should_shift_register(elder):
             parts.append(
-                "Your last 3 lines used the same emotional register. "
-                "Shift to a different tone."
+                "Your last 3 lines used the same emotional register. Shift to a different tone."
             )
 
         # VeilLayer — meta-awareness injection (T5.2, Section 6)
@@ -1535,9 +1560,7 @@ class BanterEngine:
             if record.concession:
                 flags.append("concession")
             flag_str = f" [{', '.join(flags)}]" if flags else ""
-            lines.append(
-                f"  {record.move_used} ({valence}){flag_str}"
-            )
+            lines.append(f"  {record.move_used} ({valence}){flag_str}")
         return "\n".join(lines)
 
     def _infer_register(self, move: str, score: int) -> str:

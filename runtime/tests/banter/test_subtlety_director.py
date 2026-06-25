@@ -11,7 +11,7 @@ Tests cover:
 
 import os
 import sys
-from collections import Counter, deque
+from collections import Counter
 
 _src_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "src"))
 for _p in (_src_path, "/app/src"):
@@ -19,7 +19,7 @@ for _p in (_src_path, "/app/src"):
         sys.path.insert(0, _p)
 
 import pytest
-from hypothesis import given, settings
+from hypothesis import given
 from hypothesis import strategies as st
 
 from banter.subtlety_director import SubtletyDirector, _estimate_token_count
@@ -65,21 +65,30 @@ class TestDeactivationOverrides:
 
     def test_tension_below_2_blocks_all(self, director: SubtletyDirector) -> None:
         for tension in [0, 1]:
-            assert director.should_inject_subtext(
-                tension=tension, move="DEFLECT", has_sore_spot=True, has_history=True
-            ) is False, f"Expected False for tension={tension}"
+            assert (
+                director.should_inject_subtext(
+                    tension=tension, move="DEFLECT", has_sore_spot=True, has_history=True
+                )
+                is False
+            ), f"Expected False for tension={tension}"
 
     def test_concede_move_is_hard_block(self, director: SubtletyDirector) -> None:
         for tension in [4, 5, 6, 7, 8]:
-            assert director.should_inject_subtext(
-                tension=tension, move="CONCEDE", has_sore_spot=True, has_history=True
-            ) is False, f"Expected False for CONCEDE at tension={tension}"
+            assert (
+                director.should_inject_subtext(
+                    tension=tension, move="CONCEDE", has_sore_spot=True, has_history=True
+                )
+                is False
+            ), f"Expected False for CONCEDE at tension={tension}"
 
     def test_no_history_is_hard_block(self, director: SubtletyDirector) -> None:
         for tension in [4, 5, 6]:
-            assert director.should_inject_subtext(
-                tension=tension, move="DEFLECT", has_sore_spot=True, has_history=False
-            ) is False
+            assert (
+                director.should_inject_subtext(
+                    tension=tension, move="DEFLECT", has_sore_spot=True, has_history=False
+                )
+                is False
+            )
 
     def test_low_tension_overrides_trigger_move(self, director: SubtletyDirector) -> None:
         assert director.should_inject_subtext(1, "DEFLECT", True, True) is False
@@ -107,25 +116,37 @@ class TestActivationConditions:
             assert result is True, f"Expected True for tension={tension}"
 
     def test_deflect_move_activates(self, director: SubtletyDirector) -> None:
-        assert director.should_inject_subtext(
-            tension=3, move="DEFLECT", has_sore_spot=False, has_history=True
-        ) is True
+        assert (
+            director.should_inject_subtext(
+                tension=3, move="DEFLECT", has_sore_spot=False, has_history=True
+            )
+            is True
+        )
 
     def test_question_move_activates(self, director: SubtletyDirector) -> None:
-        assert director.should_inject_subtext(
-            tension=3, move="QUESTION", has_sore_spot=False, has_history=True
-        ) is True
+        assert (
+            director.should_inject_subtext(
+                tension=3, move="QUESTION", has_sore_spot=False, has_history=True
+            )
+            is True
+        )
 
     def test_sore_spot_activates(self, director: SubtletyDirector) -> None:
-        assert director.should_inject_subtext(
-            tension=3, move="COUNTER", has_sore_spot=True, has_history=True
-        ) is True
+        assert (
+            director.should_inject_subtext(
+                tension=3, move="COUNTER", has_sore_spot=True, has_history=True
+            )
+            is True
+        )
 
     def test_no_activation_condition_returns_false(self, director: SubtletyDirector) -> None:
         """tension=3, non-triggering move, no sore spot — all activation conditions false."""
-        assert director.should_inject_subtext(
-            tension=3, move="COUNTER", has_sore_spot=False, has_history=True
-        ) is False
+        assert (
+            director.should_inject_subtext(
+                tension=3, move="COUNTER", has_sore_spot=False, has_history=True
+            )
+            is False
+        )
 
     def test_boundary_tension_4_inclusive(self, director: SubtletyDirector) -> None:
         assert director.should_inject_subtext(4, "COUNTER", False, True) is True
@@ -151,18 +172,14 @@ class TestHighTensionRateReduction:
 
     def test_high_tension_produces_mixed_results(self) -> None:
         d = SubtletyDirector(SoulEngineConfig(), seed=0)
-        results = [
-            d.should_inject_subtext(9, "DEFLECT", False, True) for _ in range(100)
-        ]
+        results = [d.should_inject_subtext(9, "DEFLECT", False, True) for _ in range(100)]
         assert any(results), "Expected some True at 20% rate"
         assert not all(results), "Expected some False at 20% rate"
 
     def test_rate_approximately_20pct(self) -> None:
         d = SubtletyDirector(SoulEngineConfig(), seed=1234)
         n = 1000
-        count = sum(
-            d.should_inject_subtext(9, "DEFLECT", True, True) for _ in range(n)
-        )
+        count = sum(d.should_inject_subtext(9, "DEFLECT", True, True) for _ in range(n))
         rate = count / n
         assert 0.10 <= rate <= 0.30, f"Expected ~20% rate, got {rate:.2%}"
 
@@ -188,7 +205,9 @@ class TestHighTensionRateReduction:
 class TestGenerateSubtextInstructionBasic:
     """Requirements 6.1, 6.3: generate_subtext_instruction returns valid instructions."""
 
-    def test_returns_subtext_instruction(self, director: SubtletyDirector, sore_spot: SoreSpot) -> None:
+    def test_returns_subtext_instruction(
+        self, director: SubtletyDirector, sore_spot: SoreSpot
+    ) -> None:
         result = director.generate_subtext_instruction(
             elder="prophet",
             target="keeper",
@@ -235,7 +254,9 @@ class TestGenerateSubtextInstructionBasic:
         for field_val in (result.surface_meaning, result.implied_meaning, result.context_hint):
             assert "{" not in field_val, f"Unfilled placeholder in: {field_val!r}"
 
-    def test_no_unfilled_placeholders_with_sore_spot(self, director: SubtletyDirector, sore_spot: SoreSpot) -> None:
+    def test_no_unfilled_placeholders_with_sore_spot(
+        self, director: SubtletyDirector, sore_spot: SoreSpot
+    ) -> None:
         result = director.generate_subtext_instruction(
             elder="shadow",
             target="keeper",
@@ -479,7 +500,9 @@ class TestScoreSubtextDepth:
         # Contains question mark (technique) + surface word (ask) + implied word (question/presumes)
         rich = "Do you ask about power? The question presumes your weakness."
         weak = "Nice weather today."
-        assert director.score_subtext_depth(rich, instr) >= director.score_subtext_depth(weak, instr)
+        assert director.score_subtext_depth(rich, instr) >= director.score_subtext_depth(
+            weak, instr
+        )
 
     def test_loaded_question_detected_by_question_mark(self, director: SubtletyDirector) -> None:
         instr = self._instruction("loaded_question")
@@ -509,7 +532,9 @@ class TestScoreSubtextDepth:
         candidate = 'He spoke "plainly" — sure he did.'
         assert director.score_subtext_depth(candidate, instr) >= 1
 
-    def test_strategic_omission_detected_by_short_candidate(self, director: SubtletyDirector) -> None:
+    def test_strategic_omission_detected_by_short_candidate(
+        self, director: SubtletyDirector
+    ) -> None:
         instr = self._instruction("strategic_omission")
         short_candidate = "Interesting."  # < 10 words
         assert director.score_subtext_depth(short_candidate, instr) >= 1
@@ -528,7 +553,9 @@ class TestScoreSubtextDepth:
             context_hint="Let the subtext brush against sensitivity.",
         )
         # "ask" → surface overlap; "question" + "presumes" → implied overlap; "?" → technique
-        candidate = "I simply ask about legacy — but the question of your guilt remains, does it not?"
+        candidate = (
+            "I simply ask about legacy — but the question of your guilt remains, does it not?"
+        )
         assert director.score_subtext_depth(candidate, instr) == 3
 
     def test_empty_instruction_fields_score_zero_or_low(self, director: SubtletyDirector) -> None:
@@ -583,7 +610,9 @@ class TestExceptionSafety:
         except Exception as exc:
             pytest.fail(f"generate_subtext_instruction raised with empty strings: {exc}")
 
-    def test_score_subtext_depth_with_empty_instruction_fields(self, director: SubtletyDirector) -> None:
+    def test_score_subtext_depth_with_empty_instruction_fields(
+        self, director: SubtletyDirector
+    ) -> None:
         instr = SubtextInstruction(
             surface_meaning="",
             implied_meaning="",
@@ -656,7 +685,9 @@ def test_property_tension_below_2_always_false(
     has_sore_spot=st.booleans(),
     has_history=st.booleans(),
 )
-def test_property_concede_always_false(tension: int, has_sore_spot: bool, has_history: bool) -> None:
+def test_property_concede_always_false(
+    tension: int, has_sore_spot: bool, has_history: bool
+) -> None:
     """Property 6.2: CONCEDE is always a hard block."""
     d = _fresh_director()
     assert d.should_inject_subtext(tension, "CONCEDE", has_sore_spot, has_history) is False
@@ -678,16 +709,10 @@ def test_property_mid_tension_with_history_activates(
 
 
 @given(
-    elder=st.text(
-        min_size=1, max_size=20, alphabet="abcdefghijklmnopqrstuvwxyz"
-    ),
-    target=st.text(
-        min_size=1, max_size=20, alphabet="abcdefghijklmnopqrstuvwxyz"
-    ),
+    elder=st.text(min_size=1, max_size=20, alphabet="abcdefghijklmnopqrstuvwxyz"),
+    target=st.text(min_size=1, max_size=20, alphabet="abcdefghijklmnopqrstuvwxyz"),
     tension=st.integers(min_value=0, max_value=10),
-    arc_theme=st.text(
-        min_size=1, max_size=50, alphabet="abcdefghijklmnopqrstuvwxyz "
-    ),
+    arc_theme=st.text(min_size=1, max_size=50, alphabet="abcdefghijklmnopqrstuvwxyz "),
 )
 def test_property_generate_instruction_never_raises(
     elder: str, target: str, tension: int, arc_theme: str
@@ -704,9 +729,7 @@ def test_property_generate_instruction_never_raises(
 
 
 @given(
-    candidate=st.text(
-        max_size=300, alphabet="abcdefghijklmnopqrstuvwxyz ?\"'—.! "
-    ),
+    candidate=st.text(max_size=300, alphabet="abcdefghijklmnopqrstuvwxyz ?\"'—.! "),
     technique=st.sampled_from(SubtletyDirector.TECHNIQUES),
 )
 def test_property_score_depth_always_in_range(candidate: str, technique: str) -> None:

@@ -20,7 +20,9 @@ class NemoMemory:
         pieces: list[str] = []
         for event in top_events:
             event_type = str(event.get("event_type") or "")
-            narrative = str(event.get("narrative") or event.get("payload", {}).get("narrative") or "")
+            narrative = str(
+                event.get("narrative") or event.get("payload", {}).get("narrative") or ""
+            )
             if narrative:
                 pieces.append(narrative[:120])
             elif event_type:
@@ -43,7 +45,9 @@ class NemoMemory:
             summary_bits.append("top=" + " | ".join(pieces[:3]))
 
         self.last_summary = "; ".join(summary_bits)
-        self.last_event_ids = [str(event.get("event_id") or "") for event in top_events if event.get("event_id")]
+        self.last_event_ids = [
+            str(event.get("event_id") or "") for event in top_events if event.get("event_id")
+        ]
         self.last_headline = headline
         return self.last_summary
 

@@ -12,7 +12,6 @@ import pytest
 from hypothesis import given, settings, assume
 from hypothesis import strategies as st
 
-from banter.contract_types import HardBanVerdict
 from banter.hard_bans import (
     DISCORD_REGISTER_PHRASES,
     GENERIC_DEBATER_PHRASES,
@@ -20,16 +19,18 @@ from banter.hard_bans import (
 )
 from banter.mode_types import (
     BACKCHANNEL_POLICY,
-    CHAOS_POLICY,
-    CRACK_POLICY,
     NORMAL_POLICY,
-    SNAP_BACK_POLICY,
-    BeatModePolicy,
 )
 
 ARCHETYPES = [
-    "parasite", "prophet", "trickster", "sovereign",
-    "martyr", "shadow", "herald", "keeper",
+    "parasite",
+    "prophet",
+    "trickster",
+    "sovereign",
+    "martyr",
+    "shadow",
+    "herald",
+    "keeper",
 ]
 
 
@@ -88,7 +89,9 @@ class TestProperty12HardBanEnforcement:
         assert verdict.violated_ban == "generic_debater"
 
     @given(
-        theme=st.text(min_size=5, max_size=30, alphabet=st.sampled_from("abcdefghijklmnopqrstuvwxyz ")),
+        theme=st.text(
+            min_size=5, max_size=30, alphabet=st.sampled_from("abcdefghijklmnopqrstuvwxyz ")
+        ),
         archetype=st.sampled_from(ARCHETYPES),
     )
     @settings(max_examples=100)

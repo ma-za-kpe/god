@@ -17,8 +17,6 @@ Requirements: 1.1, 1.3, 12.1
 import pytest
 
 from banter.mode_types import (
-    BeatMode,
-    BeatModePolicy,
     CRACK_POLICY,
     NORMAL_POLICY,
     CHAOS_POLICY,
@@ -98,9 +96,7 @@ class TestBuildCanonicalOrder:
         assert "[CALLBACK]" not in result
         assert "[RHYTHM]" not in result
 
-    def test_full_prompt_has_all_markers(
-        self, builder: SacredPromptBuilder, full_args: dict
-    ):
+    def test_full_prompt_has_all_markers(self, builder: SacredPromptBuilder, full_args: dict):
         """Full prompt must contain all 10 markers in order."""
         result = builder.build(**full_args)
 
@@ -129,9 +125,7 @@ class TestBuildCanonicalOrder:
         minimal_args["rhythm_block"] = "Trailing rule."
         result = builder.build(**minimal_args)
 
-        present_markers = [
-            m for m in SacredPromptBuilder.CANONICAL_ORDER if m in result
-        ]
+        present_markers = [m for m in SacredPromptBuilder.CANONICAL_ORDER if m in result]
         expected = [
             "[MODE]",
             "[ARCHETYPE]",
@@ -148,9 +142,7 @@ class TestBuildCanonicalOrder:
 class TestCRACKMode:
     """Tests for CRACK mode — [ARCHETYPE] is skipped."""
 
-    def test_crack_mode_skips_archetype(
-        self, builder: SacredPromptBuilder, minimal_args: dict
-    ):
+    def test_crack_mode_skips_archetype(self, builder: SacredPromptBuilder, minimal_args: dict):
         """CRACK mode must not include [ARCHETYPE] block."""
         minimal_args["policy"] = CRACK_POLICY
         result = builder.build(**minimal_args)
@@ -172,17 +164,13 @@ class TestCRACKMode:
 class TestReactBlock:
     """Tests for [REACT] block — biconditional on opponent prior line."""
 
-    def test_react_included_when_present(
-        self, builder: SacredPromptBuilder, minimal_args: dict
-    ):
+    def test_react_included_when_present(self, builder: SacredPromptBuilder, minimal_args: dict):
         """[REACT] appears when react_block is not None."""
         minimal_args["react_block"] = "Last thing opponent said."
         result = builder.build(**minimal_args)
         assert "[REACT]" in result
 
-    def test_react_excluded_when_none(
-        self, builder: SacredPromptBuilder, minimal_args: dict
-    ):
+    def test_react_excluded_when_none(self, builder: SacredPromptBuilder, minimal_args: dict):
         """[REACT] is absent when react_block is None."""
         result = builder.build(**minimal_args)
         assert "[REACT]" not in result

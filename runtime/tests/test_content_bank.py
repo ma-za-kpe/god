@@ -23,9 +23,27 @@ def _snapshot() -> dict:
             "headline": "Alpha: The market is moving.",
         },
         "agents": [
-            {"soul_id": "s-alpha", "current_name": "Alpha", "is_alive": True, "balance_usdc": 9.0, "generation": 2},
-            {"soul_id": "s-beta", "current_name": "Beta", "is_alive": True, "balance_usdc": 6.0, "generation": 1},
-            {"soul_id": "s-gamma", "current_name": "Gamma", "is_alive": True, "balance_usdc": 4.5, "generation": 1},
+            {
+                "soul_id": "s-alpha",
+                "current_name": "Alpha",
+                "is_alive": True,
+                "balance_usdc": 9.0,
+                "generation": 2,
+            },
+            {
+                "soul_id": "s-beta",
+                "current_name": "Beta",
+                "is_alive": True,
+                "balance_usdc": 6.0,
+                "generation": 1,
+            },
+            {
+                "soul_id": "s-gamma",
+                "current_name": "Gamma",
+                "is_alive": True,
+                "balance_usdc": 4.5,
+                "generation": 1,
+            },
         ],
         "events": [],
         "messages": [],
@@ -48,7 +66,12 @@ def test_content_bank_builds_future_story_assets():
 def test_content_bank_state_serializes():
     payload = build_content_bank_state(_snapshot())
 
-    assert payload["focus"] in ("patron-funded escalation", "raid aftermath", "market pressure", "slow burn")
+    assert payload["focus"] in (
+        "patron-funded escalation",
+        "raid aftermath",
+        "market pressure",
+        "slow burn",
+    )
     assert payload["assets"]
     assert payload["commands"][0]["action"] == "cache_story_bank"
 

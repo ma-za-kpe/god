@@ -20,6 +20,7 @@ from fastapi import APIRouter, Header, Request
 from fastapi.responses import JSONResponse
 
 from ..event_emitter import get_emitter
+from ..security import deny_creator_action
 from .payment import build_payment_required_response, verify_payment
 from .registry import (
     deregister_service,
@@ -54,22 +55,33 @@ async def list_all_services(soul_id: str | None = None):
 
 
 @router.post("/register")
-async def register_agent_service(body: dict):
+async def register_agent_service(
+    body: dict,
+    x_creator_token: str | None = Header(None, alias="X-Creator-Token"),
+):
     """
     Register a new service listing.
     Body: { soul_id, name, description, price_usdc, price_model? }
     """
+    denied = deny_creator_action(x_creator_token)
+    if denied:
+        return denied
+
     required = ("soul_id", "name", "description", "price_usdc")
     missing = [k for k in required if k not in body]
     if missing:
         return JSONResponse(status_code=422, content={"error": f"missing fields: {missing}"})
 
     try:
+        price_usdc = float(body["price_usdc"])
+        if price_usdc < 0:
+            return JSONResponse(status_code=422, content={"error": "price_usdc must be non-negative"})
+
         listing = await register_service(
             soul_id=body["soul_id"],
             name=body["name"],
             description=body["description"],
-            price_usdc=float(body["price_usdc"]),
+            price_usdc=price_usdc,
             price_model=body.get("price_model", "per_call"),
         )
         emitter = await get_emitter()
@@ -79,19 +91,28 @@ async def register_agent_service(body: dict):
             {
                 "agent_id": body["soul_id"],
                 "service_name": body["name"],
-                "price_usdc": float(body["price_usdc"]),
-                "narrative": f"New service listed: '{body['name']}' at ${float(body['price_usdc']):.4f}/call",
+                "price_usdc": price_usdc,
+                "narrative": f"New service listed: '{body['name']}' at ${price_usdc:.4f}/call",
             },
         )
         return {"ok": True, "listing": listing}
+    except (TypeError, ValueError):
+        return JSONResponse(status_code=422, content={"error": "price_usdc must be numeric"})
     except Exception as e:
         log.error(f"register_service error: {e}")
         return JSONResponse(status_code=500, content={"error": str(e)})
 
 
 @router.post("/deregister")
-async def deregister_agent_service(body: dict):
+async def deregister_agent_service(
+    body: dict,
+    x_creator_token: str | None = Header(None, alias="X-Creator-Token"),
+):
     """Deactivate a service listing. Body: { soul_id, name }"""
+    denied = deny_creator_action(x_creator_token)
+    if denied:
+        return denied
+
     soul_id = body.get("soul_id")
     name = body.get("name")
     if not soul_id or not name:

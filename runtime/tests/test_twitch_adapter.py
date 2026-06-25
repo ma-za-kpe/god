@@ -57,7 +57,10 @@ def test_ingest_subscribe_becomes_patronage_event(monkeypatch):
     assert world_event is not None
     assert world_event["category"] == "economy"
     assert world_event["event_type"] == "economy.twitch.subscribe"
-    assert "patron" in world_event["narrative"].lower() or "subscribed" in world_event["narrative"].lower()
+    assert (
+        "patron" in world_event["narrative"].lower()
+        or "subscribed" in world_event["narrative"].lower()
+    )
 
 
 @pytest.mark.asyncio

@@ -6,9 +6,7 @@ PacingController, AntiRepetitionGate, SceneContext) but mocked LLM model calls.
 Validates: Requirements 1.3, 1.4, 2.1, 3.2, 6.2, 6.6
 """
 
-import asyncio
 import time
-from unittest.mock import AsyncMock, patch
 
 import pytest
 
@@ -22,12 +20,9 @@ from banter.relationship_memory import RelationshipMemory
 from banter.scene_context import SceneContext
 from banter.types import (
     BanterConfig,
-    Beat,
     BeatResult,
     InteractionRecord,
-    PairState,
     QualityScore,
-    RelationshipMemoryError,
 )
 
 
@@ -61,8 +56,11 @@ def _build_integration_engine(
 
     # Quality judge mock
     default_score = quality_score or QualityScore(
-        sharpness=2, emotional_texture=2, rhythm=2,
-        thematic_relevance=2, shareability=1,
+        sharpness=2,
+        emotional_texture=2,
+        rhythm=2,
+        thematic_relevance=2,
+        shareability=1,
     )  # total = 9, above default threshold of 8
 
     async def mock_quality_judge(
@@ -70,6 +68,7 @@ def _build_integration_engine(
     ):
         if quality_error:
             from banter.types import QualityJudgeError
+
             raise QualityJudgeError("Simulated quality evaluation timeout")
         return default_score
 
@@ -131,8 +130,16 @@ class TestEndToEndPipeline:
             opponent="keeper",
             arc_theme="Should the weak be protected?",
             conv_thread=[
-                {"speaker": "keeper", "content": "Protection is just control with a smile.", "move": "COUNTER"},
-                {"speaker": "prophet", "content": "Then what do you call abandonment?", "move": "QUESTION"},
+                {
+                    "speaker": "keeper",
+                    "content": "Protection is just control with a smile.",
+                    "move": "COUNTER",
+                },
+                {
+                    "speaker": "prophet",
+                    "content": "Then what do you call abandonment?",
+                    "move": "QUESTION",
+                },
             ],
         )
 
@@ -141,8 +148,14 @@ class TestEndToEndPipeline:
         assert result.line != ""
         assert len(result.line.split()) >= 1
         assert result.move in [
-            "COUNTER", "ESCALATE", "DEFLECT", "TAUNT",
-            "QUESTION", "PIVOT", "CONCEDE", "CALLBACK",
+            "COUNTER",
+            "ESCALATE",
+            "DEFLECT",
+            "TAUNT",
+            "QUESTION",
+            "PIVOT",
+            "CONCEDE",
+            "CALLBACK",
         ]
         assert 1.0 <= result.delay_s <= 10.0
         assert result.pre_pause_s >= 0.0
@@ -225,8 +238,11 @@ class TestFallbackOnRemoteUnavailable:
             candidate, *, archetype, move, arc_theme, scene_context=None, timeout_s=2.0
         ):
             return QualityScore(
-                sharpness=2, emotional_texture=2, rhythm=2,
-                thematic_relevance=1, shareability=2,
+                sharpness=2,
+                emotional_texture=2,
+                rhythm=2,
+                thematic_relevance=1,
+                shareability=2,
             )
 
         model_router = ModelRouter(

@@ -292,7 +292,16 @@ _REQUIRED_PROSODY_KEYS = {"CRACK", "ESCALATE", "CONCEDE", "TAUNT", "SILENCE"}
 
 # Expected archetypes
 _EXPECTED_ARCHETYPES = frozenset(
-    ["trader", "hoarder", "explorer", "parasite", "cooperator", "defender", "philosopher", "builder"]
+    [
+        "trader",
+        "hoarder",
+        "explorer",
+        "parasite",
+        "cooperator",
+        "defender",
+        "philosopher",
+        "builder",
+    ]
 )
 
 
@@ -313,9 +322,7 @@ def validate_archetype_configs() -> None:
 
     # Check exactly 8 entries
     if len(ARCHETYPE_CONFIGS) != 8:
-        errors.append(
-            f"Expected exactly 8 archetype configs, found {len(ARCHETYPE_CONFIGS)}"
-        )
+        errors.append(f"Expected exactly 8 archetype configs, found {len(ARCHETYPE_CONFIGS)}")
 
     # Check all expected archetypes are present
     missing = _EXPECTED_ARCHETYPES - set(ARCHETYPE_CONFIGS.keys())
@@ -345,7 +352,9 @@ def validate_archetype_configs() -> None:
             if low <= 0 or high <= 0:
                 errors.append(f"{prefix} voice_pitch_range values must be positive")
             if low >= high:
-                errors.append(f"{prefix} voice_pitch_range min ({low}) must be less than max ({high})")
+                errors.append(
+                    f"{prefix} voice_pitch_range min ({low}) must be less than max ({high})"
+                )
 
         if config.voice_cadence_wpm <= 0:
             errors.append(f"{prefix} voice_cadence_wpm must be positive")
@@ -363,6 +372,4 @@ def validate_archetype_configs() -> None:
             errors.append(f"{prefix} seed_utterance_path is empty")
 
     if errors:
-        raise ValueError(
-            "Archetype configuration validation failed:\n  " + "\n  ".join(errors)
-        )
+        raise ValueError("Archetype configuration validation failed:\n  " + "\n  ".join(errors))

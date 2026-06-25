@@ -135,12 +135,30 @@ contract RentCollectorTest is Test {
         vm.prank(agentWallet);
         usdc.transfer(stranger, agentBal);
 
-        vm.warp(block.timestamp + RENT_PERIOD + 1);
+        vm.warp(block.timestamp + RENT_PERIOD + GRACE_PERIOD + 1);
         rent.collectRent(SOUL_ID);
 
         assertEq(rent.getLease(SOUL_ID).missedPayments, 1);
         assertTrue(rent.getLease(SOUL_ID).active);
         assertTrue(soul.exists(SOUL_ID)); // Still alive — NFT not burned yet
+    }
+
+    function test_GracePeriod_DelaysMissedPaymentPenalty() public {
+        vm.prank(creator);
+        rent.registerAgent(SOUL_ID, agentWallet);
+
+        uint256 agentBal = usdc.balanceOf(agentWallet);
+        vm.prank(agentWallet);
+        usdc.transfer(stranger, agentBal);
+
+        vm.warp(block.timestamp + RENT_PERIOD + 1);
+        vm.expectRevert(
+            abi.encodeWithSelector(RentCollector.RentGracePeriodActive.selector, GRACE_PERIOD - 1)
+        );
+        rent.collectRent(SOUL_ID);
+
+        assertEq(rent.getLease(SOUL_ID).missedPayments, 0);
+        assertTrue(rent.getLease(SOUL_ID).active);
     }
 
     function test_ThreeMissedPayments_DeletesAgent_BurnsSoul() public {
@@ -154,7 +172,7 @@ contract RentCollectorTest is Test {
 
         // Miss 3 payments
         for (uint256 i = 0; i < MAX_MISSED; i++) {
-            vm.warp(block.timestamp + RENT_PERIOD + 1);
+            vm.warp(block.timestamp + RENT_PERIOD + GRACE_PERIOD + 1);
             rent.collectRent(SOUL_ID);
         }
 
@@ -253,7 +271,7 @@ contract RentCollectorTest is Test {
         ids[1] = soul2;
 
         for (uint256 i = 0; i < MAX_MISSED; i++) {
-            vm.warp(block.timestamp + RENT_PERIOD + 1);
+            vm.warp(block.timestamp + RENT_PERIOD + GRACE_PERIOD + 1);
             rent.collectRentBatch(ids);
         }
 
@@ -306,6 +324,8 @@ contract RentCollectorTest is Test {
         vm.expectEmit(false, false, false, true);
         emit RentCollector.WorldEnded(block.timestamp, "financial unsustainability");
         rent.executeEndWorld("financial unsustainability");
+
+        assertTrue(rent.worldEnded());
     }
 
     function test_RevertIf_ExecuteEndWorldBeforeTimelock() public {
@@ -335,6 +355,16 @@ contract RentCollectorTest is Test {
         rent.setRentParameters(newAmount, RENT_PERIOD, GRACE_PERIOD, MAX_MISSED);
 
         assertEq(rent.rentAmount(), newAmount);
+    }
+
+    function test_RevertIf_InvalidRentParameters() public {
+        vm.startPrank(creator);
+        vm.expectRevert(RentCollector.InvalidRentParameters.selector);
+        rent.setRentParameters(RENT_AMOUNT, 0, GRACE_PERIOD, MAX_MISSED);
+
+        vm.expectRevert(RentCollector.InvalidRentParameters.selector);
+        rent.setRentParameters(RENT_AMOUNT, RENT_PERIOD, GRACE_PERIOD, 0);
+        vm.stopPrank();
     }
 
     function test_RevertIf_NonCreatorSetsRent() public {

@@ -159,10 +159,7 @@ def _trigrams(text: str) -> frozenset[str]:
     words = text.lower().split()
     if len(words) < 3:
         return frozenset()
-    return frozenset(
-        f"{words[i]} {words[i+1]} {words[i+2]}"
-        for i in range(len(words) - 2)
-    )
+    return frozenset(f"{words[i]} {words[i + 1]} {words[i + 2]}" for i in range(len(words) - 2))
 
 
 class WorldRepetitionBuffer:

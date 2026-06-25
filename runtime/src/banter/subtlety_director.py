@@ -293,9 +293,7 @@ class SubtletyDirector:
         implied_overlap = self._compute_word_overlap(candidate_lower, implied_words)
 
         # Check for technique markers.
-        technique_present = self._detect_technique_markers(
-            candidate_lower, instruction.technique
-        )
+        technique_present = self._detect_technique_markers(candidate_lower, instruction.technique)
 
         # Scoring logic:
         # 1 point: Surface meaning is referenced (overlap > 0.15)
@@ -393,9 +391,7 @@ class SubtletyDirector:
             hint_templates = _CONTEXT_HINTS_WITHOUT_SORE_SPOT
             hint_replacements = {"{target}": target}
 
-        context_hint = self._fill_template(
-            self._rng.choice(hint_templates), hint_replacements
-        )
+        context_hint = self._fill_template(self._rng.choice(hint_templates), hint_replacements)
 
         return SubtextInstruction(
             surface_meaning=surface_meaning,
@@ -427,9 +423,7 @@ class SubtletyDirector:
         Shortens context_hint first, then implied_meaning if needed.
         """
         # Start by trimming context_hint.
-        trimmed_hint = self._trim_text(
-            instruction.context_hint, max_words=15
-        )
+        trimmed_hint = self._trim_text(instruction.context_hint, max_words=15)
         candidate = SubtextInstruction(
             surface_meaning=instruction.surface_meaning,
             implied_meaning=instruction.implied_meaning,
@@ -440,9 +434,7 @@ class SubtletyDirector:
             return candidate
 
         # Trim implied_meaning as well.
-        trimmed_implied = self._trim_text(
-            instruction.implied_meaning, max_words=15
-        )
+        trimmed_implied = self._trim_text(instruction.implied_meaning, max_words=15)
         candidate = SubtextInstruction(
             surface_meaning=instruction.surface_meaning,
             implied_meaning=trimmed_implied,
@@ -453,9 +445,7 @@ class SubtletyDirector:
             return candidate
 
         # Trim surface_meaning as last resort.
-        trimmed_surface = self._trim_text(
-            instruction.surface_meaning, max_words=15
-        )
+        trimmed_surface = self._trim_text(instruction.surface_meaning, max_words=15)
         return SubtextInstruction(
             surface_meaning=trimmed_surface,
             implied_meaning=trimmed_implied,
@@ -474,19 +464,107 @@ class SubtletyDirector:
         """Extract meaningful keywords from text (skip stop words)."""
         stop_words = frozenset(
             {
-                "a", "an", "the", "is", "are", "was", "were", "be", "been",
-                "being", "have", "has", "had", "do", "does", "did", "will",
-                "would", "could", "should", "may", "might", "shall", "can",
-                "to", "of", "in", "for", "on", "with", "at", "by", "from",
-                "as", "into", "through", "during", "before", "after", "above",
-                "below", "between", "and", "but", "or", "nor", "not", "so",
-                "yet", "both", "either", "neither", "each", "every", "all",
-                "any", "few", "more", "most", "other", "some", "such", "no",
-                "only", "own", "same", "than", "too", "very", "just", "that",
-                "this", "these", "those", "it", "its", "they", "them", "their",
-                "we", "us", "our", "you", "your", "he", "him", "his", "she",
-                "her", "if", "then", "else", "when", "where", "why", "how",
-                "what", "which", "who", "whom", "whose",
+                "a",
+                "an",
+                "the",
+                "is",
+                "are",
+                "was",
+                "were",
+                "be",
+                "been",
+                "being",
+                "have",
+                "has",
+                "had",
+                "do",
+                "does",
+                "did",
+                "will",
+                "would",
+                "could",
+                "should",
+                "may",
+                "might",
+                "shall",
+                "can",
+                "to",
+                "of",
+                "in",
+                "for",
+                "on",
+                "with",
+                "at",
+                "by",
+                "from",
+                "as",
+                "into",
+                "through",
+                "during",
+                "before",
+                "after",
+                "above",
+                "below",
+                "between",
+                "and",
+                "but",
+                "or",
+                "nor",
+                "not",
+                "so",
+                "yet",
+                "both",
+                "either",
+                "neither",
+                "each",
+                "every",
+                "all",
+                "any",
+                "few",
+                "more",
+                "most",
+                "other",
+                "some",
+                "such",
+                "no",
+                "only",
+                "own",
+                "same",
+                "than",
+                "too",
+                "very",
+                "just",
+                "that",
+                "this",
+                "these",
+                "those",
+                "it",
+                "its",
+                "they",
+                "them",
+                "their",
+                "we",
+                "us",
+                "our",
+                "you",
+                "your",
+                "he",
+                "him",
+                "his",
+                "she",
+                "her",
+                "if",
+                "then",
+                "else",
+                "when",
+                "where",
+                "why",
+                "how",
+                "what",
+                "which",
+                "who",
+                "whom",
+                "whose",
             }
         )
         words = set()
@@ -503,9 +581,7 @@ class SubtletyDirector:
             return 0.0
         candidate_words = set(candidate.split())
         # Strip punctuation from candidate words for fair comparison.
-        candidate_cleaned = {
-            w.strip(".,!?;:\"'-()[]{}—") for w in candidate_words
-        }
+        candidate_cleaned = {w.strip(".,!?;:\"'-()[]{}—") for w in candidate_words}
         matches = candidate_cleaned & key_words
         return len(matches) / len(key_words)
 
@@ -528,8 +604,13 @@ class SubtletyDirector:
         elif technique == "callback_inversion":
             # Callback inversions reference past statements — look for echoing patterns.
             echo_markers = [
-                "you said", "remember", "your words", "you told",
-                "as you put it", "you once", "back when",
+                "you said",
+                "remember",
+                "your words",
+                "you told",
+                "as you put it",
+                "you once",
+                "back when",
             ]
             return any(marker in candidate for marker in echo_markers)
 
@@ -537,7 +618,10 @@ class SubtletyDirector:
             # Strategic omission is hard to detect directly — look for conspicuous gaps.
             # Heuristic: shorter-than-expected response or trailing off.
             omission_markers = ["...", "—", "but I digress", "anyway"]
-            return any(marker in candidate for marker in omission_markers) or len(candidate.split()) < 10
+            return (
+                any(marker in candidate for marker in omission_markers)
+                or len(candidate.split()) < 10
+            )
 
         elif technique == "damning_praise":
             # Damning praise contains compliments with undermining qualifiers.

@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import React, { Suspense, useMemo } from 'react';
 import { useWorld } from './hooks/useWorld';
 import { Header } from './components/Header';
 import { WorldMap } from './components/WorldMap';
@@ -6,6 +6,36 @@ import { DramaFeed } from './components/DramaFeed';
 import { AgentInspector } from './components/AgentInspector';
 import { MilestoneBar } from './components/MilestoneBar';
 import { useObserverStore } from './store';
+
+class ObserverErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { error: null };
+  }
+
+  static getDerivedStateFromError(error) {
+    return { error };
+  }
+
+  componentDidCatch(error, info) {
+    console.error('observer render error', error, info);
+  }
+
+  render() {
+    if (this.state.error) {
+      return (
+        <div className="debug-red-screen">
+          <div className="debug-red-card">
+            <div className="debug-red-title">observer render error</div>
+            <div className="debug-red-copy">{String(this.state.error?.message || this.state.error)}</div>
+            <div className="debug-red-copy muted">Check the browser console and Vite log for the stack trace.</div>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 function currentMode() {
   const pathname = window.location.pathname.replace(/\/+$/, '');
@@ -45,7 +75,20 @@ export default function App() {
           <span>{observerHealth.lastError || (live ? 'runtime healthy' : 'waiting for runtime')}</span>
         </div>
         <main className="observer-main minimal">
-          <WorldMap mode={mode} minimal />
+          <ObserverErrorBoundary>
+            <Suspense
+              fallback={
+                <div className="debug-red-screen">
+                  <div className="debug-red-card">
+                    <div className="debug-red-title">loading observer</div>
+                    <div className="debug-red-copy">Waiting for the scene graph and avatar assets to resolve.</div>
+                  </div>
+                </div>
+              }
+            >
+              <WorldMap mode={mode} minimal />
+            </Suspense>
+          </ObserverErrorBoundary>
         </main>
       </div>
     );
@@ -59,7 +102,20 @@ export default function App() {
         <span>{observerHealth.lastError || (live ? 'runtime healthy' : 'waiting for runtime')}</span>
       </div>
       <main className="observer-main">
-        <WorldMap mode={mode} />
+        <ObserverErrorBoundary>
+          <Suspense
+            fallback={
+              <div className="debug-red-screen">
+                <div className="debug-red-card">
+                  <div className="debug-red-title">loading observer</div>
+                  <div className="debug-red-copy">Waiting for the scene graph and avatar assets to resolve.</div>
+                </div>
+              </div>
+            }
+          >
+            <WorldMap mode={mode} />
+          </Suspense>
+        </ObserverErrorBoundary>
         {mode === 'one' ? null : <DramaFeed />}
         <AgentInspector />
       </main>

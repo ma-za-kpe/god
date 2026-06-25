@@ -65,6 +65,25 @@ _THEME_NOUN_TABLE: dict[str, str] = {
     "survival_and_meaning": "survival instinct",
 }
 
+_THEME_STOP_WORDS = {
+    "this",
+    "that",
+    "the",
+    "and",
+    "or",
+    "but",
+    "with",
+    "from",
+    "into",
+    "over",
+    "under",
+    "when",
+    "what",
+    "where",
+    "while",
+    "their",
+}
+
 
 def _normalize_theme(theme: str) -> str:
     """Normalize a theme string to underscore-separated lowercase key."""
@@ -94,6 +113,32 @@ def _derive_theme_noun(theme: str) -> str:
     return "this tension"
 
 
+def _theme_terms(theme: str) -> list[str]:
+    readable = _normalize_theme(theme).replace("_", " ")
+    return [
+        term
+        for term in readable.split()
+        if len(term) >= 4 and term not in _THEME_STOP_WORDS
+    ]
+
+
+def _scrub_theme_terms(text: str, theme: str) -> str:
+    """Remove arbitrary theme words from pressure text before prompt injection."""
+    scrubbed = text
+    terms = set(_theme_terms(theme))
+    replacement = next(
+        (
+            candidate
+            for candidate in ("strain", "friction", "need", "risk", "debt", "heat", "pull")
+            if candidate not in terms
+        ),
+        "it",
+    )
+    for term in terms:
+        scrubbed = re.sub(rf"\b{re.escape(term)}\b", replacement, scrubbed, flags=re.IGNORECASE)
+    return scrubbed
+
+
 class ArcContextBuilder:
     """Converts arc theme names into generative pressure prompts.
 
@@ -121,6 +166,11 @@ class ArcContextBuilder:
                 pressure=f"how does {theme_noun} expose who is truly willing to pay the hidden cost in this ecology?",
                 world_stakes="The Swarm is watching who flinches first. Patrons bet on conviction, not performance.",
             )
+
+        result = ArcPressure(
+            pressure=_scrub_theme_terms(result.pressure, theme),
+            world_stakes=_scrub_theme_terms(result.world_stakes, theme),
+        )
 
         # Hard contract assertion: result must never contain the raw title
         readable_title = normalized.replace("_", " ")

@@ -7,13 +7,12 @@ consecutive move penalty, counter-loop breaker, high-tension adjustment).
 import os
 import sys
 
-import pytest
-from hypothesis import given, settings, assume
+from hypothesis import given, settings
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "src"))
 
 from banter.move_selector import compute_distribution, ALL_MOVES, ARCHETYPE_SIGNATURE_MOVE
-from banter.types import MoveContext, MoveDistribution
+from banter.types import MoveContext
 
 from conftest import (
     st_archetype,
@@ -21,7 +20,6 @@ from conftest import (
     st_move_sequence,
     st_tension_level,
     ARCHETYPES,
-    MOVE_TYPES,
     MOMENTUM_VALUES,
 )
 from hypothesis import strategies as st
@@ -108,12 +106,12 @@ def test_property_10_distribution_invariants(
         assert probs["CONCEDE"] > 0.0
         for move in ALL_MOVES:
             if move not in ("PIVOT", "CONCEDE"):
-                assert probs[move] == 0.0, f"{move} = {probs[move]}, expected 0.0 under counter-loop"
+                assert probs[move] == 0.0, (
+                    f"{move} = {probs[move]}, expected 0.0 under counter-loop"
+                )
     else:
         # Invariant 2: Signature ≤ 0.40
-        assert probs[signature] <= 0.40 + 0.01, (
-            f"Signature {signature} = {probs[signature]} > 0.40"
-        )
+        assert probs[signature] <= 0.40 + 0.01, f"Signature {signature} = {probs[signature]} > 0.40"
 
         # Invariant 3: Non-signature ≥ 0.02
         for move in ALL_MOVES:
@@ -161,9 +159,7 @@ def test_property_11_consecutive_move_penalty(archetype, repeated_move):
 
     # 2. Distribution still sums to 1.0 ± 0.01
     total = sum(probs.values())
-    assert abs(total - 1.0) <= 0.01, (
-        f"Distribution sums to {total:.4f}, expected 1.0 ± 0.01"
-    )
+    assert abs(total - 1.0) <= 0.01, f"Distribution sums to {total:.4f}, expected 1.0 ± 0.01"
 
     # 3. All moves present in distribution
     assert set(probs.keys()) == set(ALL_MOVES), (

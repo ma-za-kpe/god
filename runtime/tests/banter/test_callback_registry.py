@@ -38,7 +38,6 @@ from banter.soul_types import (
     CallbackUsageTracker,
     MemorableMoment,
     SoulEngineConfig,
-    WriteBuffer,
 )
 
 
@@ -89,7 +88,9 @@ class TestComputePairId:
     """Requirements 9.4: pair_id is commutative, stable, 16 hex chars."""
 
     def test_commutativity(self, registry: CallbackRegistry) -> None:
-        assert registry.compute_pair_id("alpha", "beta") == registry.compute_pair_id("beta", "alpha")
+        assert registry.compute_pair_id("alpha", "beta") == registry.compute_pair_id(
+            "beta", "alpha"
+        )
 
     def test_same_input_same_output(self, registry: CallbackRegistry) -> None:
         r1 = registry.compute_pair_id("prophet", "keeper")
@@ -122,7 +123,9 @@ class TestComputePairId:
 class TestInferTensionFromMoment:
     """_infer_tension_from_moment maps score+valence to tension [2, 8]."""
 
-    def test_high_score_negative_valence_returns_high_tension(self, registry: CallbackRegistry) -> None:
+    def test_high_score_negative_valence_returns_high_tension(
+        self, registry: CallbackRegistry
+    ) -> None:
         m = _moment(score=15, valence="negative")
         assert registry._infer_tension_from_moment(m) == 8
 
@@ -156,7 +159,9 @@ class TestInferTensionFromMoment:
             for score in range(10, 20):
                 m = _moment(score=score, valence=valence)
                 inferred = registry._infer_tension_from_moment(m)
-                assert 2 <= inferred <= 8, f"Out of range: {inferred} for score={score}, valence={valence}"
+                assert 2 <= inferred <= 8, (
+                    f"Out of range: {inferred} for score={score}, valence={valence}"
+                )
 
 
 # ---------------------------------------------------------------------------
@@ -301,7 +306,9 @@ class TestSelectFraming:
         framing = registry._select_framing(5, m)
         assert framing == "paraphrase"
 
-    def test_inversion_for_positive_moment_at_high_tension(self, registry: CallbackRegistry) -> None:
+    def test_inversion_for_positive_moment_at_high_tension(
+        self, registry: CallbackRegistry
+    ) -> None:
         m = _moment(score=15, valence="positive")  # inferred = 4
         # positive moment at tension 7 → inversion
         framing = registry._select_framing(7, m)
@@ -377,10 +384,14 @@ class TestWriteBufferBehavior:
         reg = _make_no_pool_registry()
         asyncio.run(
             reg.store_memorable_moment(
-                speaker="alpha", target="beta",
-                line="Low score line.", move="COUNTER",
-                arc_theme="power", valence="negative",
-                summary="Low score", score=12,  # <= 12 threshold → not stored
+                speaker="alpha",
+                target="beta",
+                line="Low score line.",
+                move="COUNTER",
+                arc_theme="power",
+                valence="negative",
+                summary="Low score",
+                score=12,  # <= 12 threshold → not stored
             )
         )
         assert len(reg._write_buffer.entries) == 0
@@ -389,10 +400,14 @@ class TestWriteBufferBehavior:
         reg = _make_no_pool_registry()
         asyncio.run(
             reg.store_memorable_moment(
-                speaker="alpha", target="beta",
-                line="High score line.", move="COUNTER",
-                arc_theme="power", valence="negative",
-                summary="High score", score=13,  # > 12 → buffers
+                speaker="alpha",
+                target="beta",
+                line="High score line.",
+                move="COUNTER",
+                arc_theme="power",
+                valence="negative",
+                summary="High score",
+                score=13,  # > 12 → buffers
             )
         )
         assert len(reg._write_buffer.entries) == 1
@@ -402,10 +417,14 @@ class TestWriteBufferBehavior:
         for i in range(5):
             asyncio.run(
                 reg.store_memorable_moment(
-                    speaker="alpha", target="beta",
-                    line=f"Line {i}", move="TAUNT",
-                    arc_theme="survival", valence="negative",
-                    summary=f"Summary {i}", score=14,
+                    speaker="alpha",
+                    target="beta",
+                    line=f"Line {i}",
+                    move="TAUNT",
+                    arc_theme="survival",
+                    valence="negative",
+                    summary=f"Summary {i}",
+                    score=14,
                 )
             )
         assert len(reg._write_buffer.entries) == 5
@@ -415,10 +434,14 @@ class TestWriteBufferBehavior:
         for i in range(30):
             asyncio.run(
                 reg.store_memorable_moment(
-                    speaker="alpha", target="beta",
-                    line=f"Line {i}", move="COUNTER",
-                    arc_theme="power", valence="negative",
-                    summary=f"Summary {i}", score=14,
+                    speaker="alpha",
+                    target="beta",
+                    line=f"Line {i}",
+                    move="COUNTER",
+                    arc_theme="power",
+                    valence="negative",
+                    summary=f"Summary {i}",
+                    score=14,
                 )
             )
         assert len(reg._write_buffer.entries) <= 20
@@ -429,10 +452,14 @@ class TestWriteBufferBehavior:
         for i, line in enumerate(lines):
             asyncio.run(
                 reg.store_memorable_moment(
-                    speaker="alpha", target="beta",
-                    line=line, move="TAUNT",
-                    arc_theme="power", valence="negative",
-                    summary="S", score=14,
+                    speaker="alpha",
+                    target="beta",
+                    line=line,
+                    move="TAUNT",
+                    arc_theme="power",
+                    valence="negative",
+                    summary="S",
+                    score=14,
                 )
             )
         stored_lines = [m.line for m in list(reg._write_buffer.entries)]
@@ -442,10 +469,14 @@ class TestWriteBufferBehavior:
         reg = _make_no_pool_registry()
         asyncio.run(
             reg.store_memorable_moment(
-                speaker="alpha", target="beta",
-                line="Exact threshold.", move="COUNTER",
-                arc_theme="power", valence="negative",
-                summary="Boundary", score=12,
+                speaker="alpha",
+                target="beta",
+                line="Exact threshold.",
+                move="COUNTER",
+                arc_theme="power",
+                valence="negative",
+                summary="Boundary",
+                score=12,
             )
         )
         assert len(reg._write_buffer.entries) == 0
@@ -454,10 +485,14 @@ class TestWriteBufferBehavior:
         reg = _make_no_pool_registry()
         asyncio.run(
             reg.store_memorable_moment(
-                speaker="alpha", target="beta",
-                line="Just above threshold.", move="COUNTER",
-                arc_theme="power", valence="negative",
-                summary="Above", score=13,
+                speaker="alpha",
+                target="beta",
+                line="Just above threshold.",
+                move="COUNTER",
+                arc_theme="power",
+                valence="negative",
+                summary="Above",
+                score=13,
             )
         )
         assert len(reg._write_buffer.entries) == 1
@@ -541,9 +576,12 @@ class TestSessionLimitEnforcement:
         registry._usage_tracker.pair_session_count[pair_id] = _MAX_CALLBACKS_PER_PAIR_PER_SESSION
         result = asyncio.run(
             registry.surface_callback(
-                speaker="alpha", target="beta",
-                current_tension=6, current_arc_theme="power",
-                current_beat_number=20, session_callback_count=0,
+                speaker="alpha",
+                target="beta",
+                current_tension=6,
+                current_arc_theme="power",
+                current_beat_number=20,
+                session_callback_count=0,
             )
         )
         assert result is None

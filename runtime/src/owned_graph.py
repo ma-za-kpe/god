@@ -73,13 +73,15 @@ class AgentIdentity:
             "mood": "#888888",
         }
     )
-    visual_state: dict = field(default_factory=lambda: {
-        "current_expression": "neutral",
-        "expression_override": "",
-        "override_expiry_epoch": 0,
-        "scar_layers": [],
-        "presentation_mode": "standard",
-    })
+    visual_state: dict = field(
+        default_factory=lambda: {
+            "current_expression": "neutral",
+            "expression_override": "",
+            "override_expiry_epoch": 0,
+            "scar_layers": [],
+            "presentation_mode": "standard",
+        }
+    )
 
     # Audio
     voice_model_cid: str = ""
@@ -171,13 +173,16 @@ class OwnedGraph:
             identity_data = d["identity"].copy()
             # Backward-compatible defaults for newer fields
             identity_data.setdefault("avatar_base_cid", "")
-            identity_data.setdefault("visual_state", {
-                "current_expression": "neutral",
-                "expression_override": "",
-                "override_expiry_epoch": 0,
-                "scar_layers": [],
-                "presentation_mode": "standard",
-            })
+            identity_data.setdefault(
+                "visual_state",
+                {
+                    "current_expression": "neutral",
+                    "expression_override": "",
+                    "override_expiry_epoch": 0,
+                    "scar_layers": [],
+                    "presentation_mode": "standard",
+                },
+            )
             d["identity"] = AgentIdentity(**identity_data)
         return cls(**d)
 

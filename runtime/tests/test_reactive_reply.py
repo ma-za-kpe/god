@@ -14,7 +14,12 @@ def test_reactive_reply_builds_a_direct_response():
         "balance_usdc": 0.125,
         "generation": 3,
         "_peers": [
-            {"soul_id": "s-beta", "current_name": "Beta", "archetype": "defender", "balance_usdc": 0.22},
+            {
+                "soul_id": "s-beta",
+                "current_name": "Beta",
+                "archetype": "defender",
+                "balance_usdc": 0.22,
+            },
         ],
         "_inbox": [
             {
@@ -36,6 +41,7 @@ def test_reactive_reply_builds_a_direct_response():
         "_pending_wake_intents": [],
         "arc_theme": "Should the weak be protected?",
     }
+
     async def fake_llm_call(_llm, _system, _prompt, _fallback, state=None):
         return (
             '{"thought":"I answer Beta directly.","move":"COUNTER","action":"send_message",'
@@ -55,7 +61,10 @@ def test_reactive_reply_builds_a_direct_response():
     assert result["action"]["type"] == "send_message"
     assert result["action"]["to_id"] == "s-beta"
     assert result["action"]["reply_to_id"] == "msg-1"
-    assert result["action"]["content"] == "You are dodging the real issue: who benefits when the weak are abandoned?"
+    assert (
+        result["action"]["content"]
+        == "You are dodging the real issue: who benefits when the weak are abandoned?"
+    )
     assert result["thought"] == result["action"]["content"]
 
 
@@ -67,7 +76,12 @@ def test_reactive_reply_rejects_repetitive_model_content():
         "balance_usdc": 0.125,
         "generation": 3,
         "_peers": [
-            {"soul_id": "s-beta", "current_name": "Beta", "archetype": "defender", "balance_usdc": 0.22},
+            {
+                "soul_id": "s-beta",
+                "current_name": "Beta",
+                "archetype": "defender",
+                "balance_usdc": 0.22,
+            },
         ],
         "_inbox": [
             {
@@ -119,10 +133,16 @@ def test_reactive_banter_fallback_uses_callback_and_cadence():
         "QUESTION",
         conv_thread=[
             {"direction": "received", "content": "You keep avoiding the question."},
-            {"direction": "sent", "content": "Maybe the weak are only weak because we keep calling them that."},
+            {
+                "direction": "sent",
+                "content": "Maybe the weak are only weak because we keep calling them that.",
+            },
         ],
         recent_sent=[
-            {"recipient_name": "Beta", "content": "Maybe the weak are only weak because we keep calling them that."}
+            {
+                "recipient_name": "Beta",
+                "content": "Maybe the weak are only weak because we keep calling them that.",
+            }
         ],
     )
 
@@ -158,7 +178,12 @@ def test_reactive_prompt_repeats_banter_loop_standard():
         "balance_usdc": 0.125,
         "generation": 3,
         "_peers": [
-            {"soul_id": "s-beta", "current_name": "Beta", "archetype": "hoarder", "balance_usdc": 0.22},
+            {
+                "soul_id": "s-beta",
+                "current_name": "Beta",
+                "archetype": "hoarder",
+                "balance_usdc": 0.22,
+            },
         ],
         "_inbox": [
             {
@@ -208,7 +233,12 @@ def test_reactive_prompt_includes_relationship_snapshot():
         "balance_usdc": 0.125,
         "generation": 3,
         "_peers": [
-            {"soul_id": "s-beta", "current_name": "Beta", "archetype": "cooperator", "balance_usdc": 0.22},
+            {
+                "soul_id": "s-beta",
+                "current_name": "Beta",
+                "archetype": "cooperator",
+                "balance_usdc": 0.22,
+            },
         ],
         "_inbox": [
             {
@@ -222,9 +252,21 @@ def test_reactive_prompt_includes_relationship_snapshot():
         ],
         "_conv_thread": [
             {"direction": "received", "sender_name": "Beta", "content": "You keep hoarding trust."},
-            {"direction": "sent", "recipient_name": "Beta", "content": "Trust without cost is a leak."},
-            {"direction": "received", "sender_name": "Beta", "content": "That fear is eating the room."},
-            {"direction": "sent", "recipient_name": "Beta", "content": "The room spends what I have to keep."},
+            {
+                "direction": "sent",
+                "recipient_name": "Beta",
+                "content": "Trust without cost is a leak.",
+            },
+            {
+                "direction": "received",
+                "sender_name": "Beta",
+                "content": "That fear is eating the room.",
+            },
+            {
+                "direction": "sent",
+                "recipient_name": "Beta",
+                "content": "The room spends what I have to keep.",
+            },
         ],
         "_recent_sent": [
             {"recipient_name": "Beta", "content": "Trust without cost is a leak."},
@@ -264,7 +306,12 @@ def test_reactive_reply_ignores_stale_dead_sender_inbox():
         "balance_usdc": 0.125,
         "generation": 3,
         "_peers": [
-            {"soul_id": "s-beta", "current_name": "Beta", "archetype": "cooperator", "balance_usdc": 0.22},
+            {
+                "soul_id": "s-beta",
+                "current_name": "Beta",
+                "archetype": "cooperator",
+                "balance_usdc": 0.22,
+            },
         ],
         "_inbox": [
             {
@@ -337,7 +384,16 @@ def test_reactive_banter_avoids_single_word_filler_callbacks():
 
     assert line
     assert not line.lower().startswith(("useful ", "maybe "))
-    assert profile["backchannel"] in {"Exactly.", "Useful.", "Maybe.", "No.", "Not for free.", "Good. Name the cost.", "Show me.", "Then build it."}
+    assert profile["backchannel"] in {
+        "Exactly.",
+        "Useful.",
+        "Maybe.",
+        "No.",
+        "Not for free.",
+        "Good. Name the cost.",
+        "Show me.",
+        "Then build it.",
+    }
 
 
 def test_banter_loop_adds_vulnerability_or_meta_when_needed():
@@ -356,8 +412,12 @@ def test_banter_loop_adds_vulnerability_or_meta_when_needed():
         arc_theme="The Ethics of Hoarding in a Finite World",
     )
 
-    assert any(word in cooperator.lower() for word in ("hurt", "sorry", "tired", "veil", "audience"))
-    assert any(word in hoarder.lower() for word in ("lose", "fear", "safe", "cost", "keep", "afraid"))
+    assert any(
+        word in cooperator.lower() for word in ("hurt", "sorry", "tired", "veil", "audience")
+    )
+    assert any(
+        word in hoarder.lower() for word in ("lose", "fear", "safe", "cost", "keep", "afraid")
+    )
 
 
 def test_banter_loop_treats_patronage_as_meta_layer():
@@ -438,9 +498,7 @@ def test_reactive_callback_ignores_near_duplicate_history():
             {"content": "I am tired of pretending this does not hurt."},
             {"content": "If we keep dodging it, the room cracks."},
         ],
-        recent_sent=[
-            {"content": "Useful. I am tired of pretending this does not hurt."}
-        ],
+        recent_sent=[{"content": "Useful. I am tired of pretending this does not hurt."}],
         arc_theme="The Audience Is Funding the Drama",
     )
 

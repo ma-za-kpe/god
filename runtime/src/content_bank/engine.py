@@ -30,7 +30,15 @@ def _top_agents(snapshot: dict[str, Any], limit: int = 3) -> list[dict[str, Any]
     return ranked[:limit]
 
 
-def _make_arc(title: str, premise: str, trigger: str, cast: list[str], tension: str, payoff: str, sponsor_slot: str) -> dict[str, Any]:
+def _make_arc(
+    title: str,
+    premise: str,
+    trigger: str,
+    cast: list[str],
+    tension: str,
+    payoff: str,
+    sponsor_slot: str,
+) -> dict[str, Any]:
     return {
         "title": title,
         "premise": premise,
@@ -201,7 +209,9 @@ class ContentBankSurface:
         for item in clip_prompts:
             asset_list.append({"kind": "clip_prompt", **item})
 
-        bank_id = hashlib.sha256(f"{world_id}:{source_epoch}:{seed}".encode("utf-8")).hexdigest()[:16]
+        bank_id = hashlib.sha256(f"{world_id}:{source_epoch}:{seed}".encode("utf-8")).hexdigest()[
+            :16
+        ]
         summary = (
             f"{len(arcs)} future arc(s), {len(dialogue)} dialogue beats, "
             f"{len(scene_prompts)} scene prompts, focus={focus}."
@@ -212,7 +222,11 @@ class ContentBankSurface:
             {"label": "Dialogue", "value": len(dialogue), "tone": "social"},
             {"label": "Clips", "value": len(clip_prompts), "tone": "gold"},
             {"label": "Focus", "value": focus, "tone": "manifesto"},
-            {"label": "Patronage", "value": float(audience.get("patronage_index") or 0), "tone": "gold"},
+            {
+                "label": "Patronage",
+                "value": float(audience.get("patronage_index") or 0),
+                "tone": "gold",
+            },
         ]
         labels = ("content-bank", "pre-gen", focus, "local-gpu-ready")
         commands = (

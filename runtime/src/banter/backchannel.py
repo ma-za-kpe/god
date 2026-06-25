@@ -19,30 +19,30 @@ _WEAK_ATTEMPT_THRESHOLD = 5
 
 # Per-archetype backchannel pools
 _LANDED_HIT_BACKCHANNELS: dict[str, list[str]] = {
-    "parasite":  ["Expensive.", "Noted.", "...interesting.", "That'll cost you."],
-    "prophet":   ["Already knew.", "Inevitable.", "And so it goes.", "Told you."],
+    "parasite": ["Expensive.", "Noted.", "...interesting.", "That'll cost you."],
+    "prophet": ["Already knew.", "Inevitable.", "And so it goes.", "Told you."],
     "trickster": ["Oh NOW we're going.", "Finally!", "Bold move.", "Hm."],
     "sovereign": ["Continue.", "I heard you.", "Interesting.", "Go on."],
-    "martyr":    ["That hurt.", "...yes.", "Fair.", "I'll remember that."],
-    "shadow":    ["...mmm.", "That landed.", "Careful now.", "You felt that too."],
-    "herald":    ["Worth noting.", "I'll say it.", "There it is.", "On record."],
-    "keeper":    ["Expensive.", "Cost you that.", "I'm counting.", "Noted."],
+    "martyr": ["That hurt.", "...yes.", "Fair.", "I'll remember that."],
+    "shadow": ["...mmm.", "That landed.", "Careful now.", "You felt that too."],
+    "herald": ["Worth noting.", "I'll say it.", "There it is.", "On record."],
+    "keeper": ["Expensive.", "Cost you that.", "I'm counting.", "Noted."],
 }
 
 _WEAK_ATTEMPT_BACKCHANNELS: dict[str, list[str]] = {
-    "parasite":  ["Pathetic.", "...that's it?", "Weak.", "Try again."],
-    "prophet":   ["No.", "Wrong.", "Still not there.", "Missed."],
+    "parasite": ["Pathetic.", "...that's it?", "Weak.", "Try again."],
+    "prophet": ["No.", "Wrong.", "Still not there.", "Missed."],
     "trickster": ["Still going?", "Ridiculous.", "...of course.", "Boring."],
     "sovereign": ["Insufficient.", "Try again.", "No.", "Beneath this."],
-    "martyr":    ["That's nothing.", "You call that...?", "Soft.", "Again?"],
-    "shadow":    ["...really?", "Is that all?", "Thin.", "You know better."],
-    "herald":    ["Not news.", "Already happened.", "So?", "Next."],
-    "keeper":    ["Cheap.", "Not worth it.", "...that?", "No."],
+    "martyr": ["That's nothing.", "You call that...?", "Soft.", "Again?"],
+    "shadow": ["...really?", "Is that all?", "Thin.", "You know better."],
+    "herald": ["Not news.", "Already happened.", "So?", "Next."],
+    "keeper": ["Cheap.", "Not worth it.", "...that?", "No."],
 }
 
 # Fallback pool (archetype not found)
 _FALLBACK_LANDED = ["...hm.", "Bold claim.", "Fair enough.", "Noted."]
-_FALLBACK_WEAK   = ["Ridiculous.", "Careful.", "Still going?", "No."]
+_FALLBACK_WEAK = ["Ridiculous.", "Careful.", "Still going?", "No."]
 
 BACKCHANNEL_DELAY_S = 0.5
 

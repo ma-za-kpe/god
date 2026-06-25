@@ -10,11 +10,7 @@ Properties tested:
 from __future__ import annotations
 
 import random
-from collections import deque
 
-import pytest
-from hypothesis import given, settings, assume
-from hypothesis import strategies as st
 
 from banter.mode_resolver import ModeResolver
 from banter.mode_types import (
@@ -25,12 +21,10 @@ from banter.mode_types import (
     SILENCE_POLICY,
     SNAP_BACK_POLICY,
     BeatMode,
-    BeatModePolicy,
     POLICY_TABLE,
 )
 from banter.rate_controllers import SlidingWindowController
 from banter.silence_controller import SilenceController
-from banter.backchannel import BackchannelSelector
 from banter.types import PairState, SceneContextData
 
 
@@ -51,6 +45,7 @@ def _make_pair_state(
 ) -> PairState:
     """Create a PairState for testing."""
     import time
+
     return PairState(
         tension_level=tension,
         last_interaction_ts=time.time(),
@@ -167,17 +162,25 @@ class TestProperty7ChaosOneBeat:
 
         # First call: should get CHAOS
         policy1 = resolver.resolve(
-            elder="prophet", opponent="keeper", pair_state=ps,
-            scene_data=scene, beat_number=1,
-            prev_elder_mode=None, opponent_last_score=None,
+            elder="prophet",
+            opponent="keeper",
+            pair_state=ps,
+            scene_data=scene,
+            beat_number=1,
+            prev_elder_mode=None,
+            opponent_last_score=None,
         )
         assert policy1.mode == BeatMode.CHAOS
 
         # Second call (same conditions): should NOT get CHAOS (one-beat rule)
         policy2 = resolver.resolve(
-            elder="prophet", opponent="keeper", pair_state=ps,
-            scene_data=scene, beat_number=2,
-            prev_elder_mode=BeatMode.CHAOS, opponent_last_score=None,
+            elder="prophet",
+            opponent="keeper",
+            pair_state=ps,
+            scene_data=scene,
+            beat_number=2,
+            prev_elder_mode=BeatMode.CHAOS,
+            opponent_last_score=None,
         )
         assert policy2.mode != BeatMode.CHAOS
 

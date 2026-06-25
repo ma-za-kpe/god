@@ -185,11 +185,11 @@ class ModelRouter:
         # Note: space is 0x20 so it's not < 0x20. We allow newline only at boundaries.
         for ch in response:
             code = ord(ch)
-            if code < 0x20 and ch != '\n':
+            if code < 0x20 and ch != "\n":
                 return False
 
         # Must be a single line (no newlines in stripped content)
-        if '\n' in stripped:
+        if "\n" in stripped:
             return False
 
         return True

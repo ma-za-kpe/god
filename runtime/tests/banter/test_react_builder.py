@@ -50,9 +50,7 @@ class TestReactBlockPresence:
         assert isinstance(result, str)
         assert len(result) > 0
 
-    def test_returns_none_when_opponent_line_is_empty(
-        self, builder: ReactBlockBuilder
-    ):
+    def test_returns_none_when_opponent_line_is_empty(self, builder: ReactBlockBuilder):
         thread = [
             {"speaker": "keeper", "content": ""},
         ]

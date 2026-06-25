@@ -1,7 +1,12 @@
 """Avatar surface for visual, voice, and genesis wiring."""
 
 from .archetype_config import ARCHETYPE_CONFIGS, ArchetypeStyleConfig, validate_archetype_configs
-from .engine import AvatarSurface, build_avatar_state, build_avatar_status, build_avatar_status_surface
+from .engine import (
+    AvatarSurface,
+    build_avatar_state,
+    build_avatar_status,
+    build_avatar_status_surface,
+)
 from .evolution_engine import EvolutionEngine, EvolutionEvent
 from .genesis_pipeline import GenesisPipeline, PipelineResult
 from .portrait_generator import PortraitGenerator

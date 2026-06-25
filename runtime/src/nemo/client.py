@@ -35,7 +35,9 @@ class NemoClient:
     def status(self) -> dict[str, Any]:
         return build_nemo_status()
 
-    def build_directive(self, snapshot: dict[str, Any], showrunner_plan: dict[str, Any]) -> dict[str, Any]:
+    def build_directive(
+        self, snapshot: dict[str, Any], showrunner_plan: dict[str, Any]
+    ) -> dict[str, Any]:
         try:
             from .director import NemoDirector
         except ImportError:  # pragma: no cover - flat import path in tests

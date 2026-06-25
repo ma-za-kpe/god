@@ -35,6 +35,8 @@ def _default_visual_state() -> dict[str, Any]:
         "override_expiry_epoch": 0,
         "scar_layers": [],
         "presentation_mode": "standard",
+        "speaking": False,
+        "mouth_open": 0.0,
     }
 
 
@@ -62,6 +64,8 @@ def _visual_state(agent: Any) -> dict[str, Any]:
         visual_state.setdefault("override_expiry_epoch", 0)
         visual_state.setdefault("scar_layers", [])
         visual_state.setdefault("presentation_mode", "standard")
+        visual_state.setdefault("speaking", False)
+        visual_state.setdefault("mouth_open", 0.0)
     return visual_state
 
 
@@ -228,10 +232,19 @@ class VisualReactor:
                     return agent
                 continue
             identity = getattr(agent, "identity", None)
-            if identity is not None and str(
-                getattr(identity, "soul_id", "") or getattr(identity, "current_name", "") or ""
-            ).lower() == soul_id.lower():
+            if (
+                identity is not None
+                and str(
+                    getattr(identity, "soul_id", "") or getattr(identity, "current_name", "") or ""
+                ).lower()
+                == soul_id.lower()
+            ):
                 return agent
-            if str(getattr(agent, "soul_id", "") or getattr(agent, "current_name", "") or "").lower() == soul_id.lower():
+            if (
+                str(
+                    getattr(agent, "soul_id", "") or getattr(agent, "current_name", "") or ""
+                ).lower()
+                == soul_id.lower()
+            ):
                 return agent
         return None

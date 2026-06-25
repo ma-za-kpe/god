@@ -31,12 +31,23 @@ def _take_options(snapshot: dict[str, Any], count: int = 3) -> list[dict[str, An
         )
     if not options:
         options = [
-            {"label": "Patron spotlight", "value": "patron", "reason": "Let patrons steer the next turn."},
+            {
+                "label": "Patron spotlight",
+                "value": "patron",
+                "reason": "Let patrons steer the next turn.",
+            },
             {"label": "Chat pressure", "value": "chat", "reason": "Let chat dictate the tempo."},
-            {"label": "Raid welcome", "value": "raid", "reason": "Turn new viewers into the next hook."},
+            {
+                "label": "Raid welcome",
+                "value": "raid",
+                "reason": "Turn new viewers into the next hook.",
+            },
         ]
     if float(audience.get("patronage_index") or 0) >= 12:
-        options.insert(0, {"label": "Patron-funded arc", "value": "patron-funded", "reason": "Reward the room."})
+        options.insert(
+            0,
+            {"label": "Patron-funded arc", "value": "patron-funded", "reason": "Reward the room."},
+        )
     return options[:count]
 
 
@@ -92,7 +103,11 @@ class ViewerSurface:
         summary = "Avatar-first stage ready."
         cards = [
             {"label": "Mode", "value": interaction_mode, "tone": "cognitive"},
-            {"label": "Speaker", "value": str(showrunner.get("speaker") or "Narrator"), "tone": "social"},
+            {
+                "label": "Speaker",
+                "value": str(showrunner.get("speaker") or "Narrator"),
+                "tone": "social",
+            },
             {"label": "Cast", "value": int(stats.get("living_count") or 0), "tone": "life"},
             {"label": "Pressure", "value": int(audience.get("chat_pressure") or 0), "tone": "gold"},
         ]
@@ -102,7 +117,9 @@ class ViewerSurface:
             {"title": "Mood", "body": str(showrunner.get("headline") or "Watch the cast.")[:80]},
         ]
         labels = ("avatars", "drama", focus, "interactive")
-        bank_seed = hashlib.sha256(f"{world_id}:{source_epoch}:{focus}".encode("utf-8")).hexdigest()[:16]
+        bank_seed = hashlib.sha256(
+            f"{world_id}:{source_epoch}:{focus}".encode("utf-8")
+        ).hexdigest()[:16]
         commands = (
             {
                 "action": "publish_viewer_overlay",

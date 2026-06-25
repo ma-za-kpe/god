@@ -383,9 +383,7 @@ class EmotionalPrimer:
                 break
 
             event_type = _determine_event_type(record)
-            event_sentences = self._frame_event(
-                archetype_key, event_type, tension_level
-            )
+            event_sentences = self._frame_event(archetype_key, event_type, tension_level)
 
             # Respect per-event sentence cap.
             event_sentences = event_sentences[:_MAX_SENTENCES_PER_EVENT]

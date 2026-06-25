@@ -176,9 +176,7 @@ class CallbackRegistry:
                     continue
 
             # Score match quality
-            match_score = self._score_moment_match(
-                moment, current_tension, current_arc_theme
-            )
+            match_score = self._score_moment_match(moment, current_tension, current_arc_theme)
 
             if match_score > best_score:
                 best_score = match_score
@@ -198,9 +196,7 @@ class CallbackRegistry:
         self._usage_tracker.last_used_beat[callback_id] = current_beat_number
         self._usage_tracker.pair_session_count[pair_id] = tracked_count + 1
 
-        framing = self._select_framing(
-            current_tension, best_moment
-        )
+        framing = self._select_framing(current_tension, best_moment)
 
         return CallbackSurface(
             original_line=best_moment.line,
@@ -313,9 +309,7 @@ class CallbackRegistry:
             # neutral matches medium range
             return 3 <= tension <= 7
 
-    def _select_framing(
-        self, current_tension: int, moment: MemorableMoment
-    ) -> str:
+    def _select_framing(self, current_tension: int, moment: MemorableMoment) -> str:
         """Select the suggested framing based on current dramatic conditions.
 
         - "direct_quote" for high tension (>=7)
@@ -343,9 +337,7 @@ class CallbackRegistry:
         # Medium tension → paraphrase
         return "paraphrase"
 
-    async def _query_moments_for_pair(
-        self, pair_id: str
-    ) -> list[MemorableMoment]:
+    async def _query_moments_for_pair(self, pair_id: str) -> list[MemorableMoment]:
         """Query the database for all stored moments for a pair.
 
         Returns an empty list if the database is unavailable.
@@ -412,9 +404,7 @@ class CallbackRegistry:
         After storing, checks for running gag patterns and sore spots.
         """
         if score <= 12:
-            log.debug(
-                "Score %d not above threshold 12; skipping storage", score
-            )
+            log.debug("Score %d not above threshold 12; skipping storage", score)
             return
 
         pair_id = self.compute_pair_id(speaker, target)
@@ -517,9 +507,7 @@ class CallbackRegistry:
                 pair_id,
                 excess,
             )
-            log.debug(
-                "Evicted %d oldest moments for pair %s", excess, pair_id
-            )
+            log.debug("Evicted %d oldest moments for pair %s", excess, pair_id)
 
     async def _enforce_gags_cap(self, conn, pair_id: str) -> None:
         """Ensure no more than 10 running gags exist for a pair.
@@ -547,9 +535,7 @@ class CallbackRegistry:
                 pair_id,
                 excess,
             )
-            log.debug(
-                "Evicted %d oldest running gags for pair %s", excess, pair_id
-            )
+            log.debug("Evicted %d oldest running gags for pair %s", excess, pair_id)
 
     # ------------------------------------------------------------------
     # Running gag detection
@@ -623,9 +609,7 @@ class CallbackRegistry:
     # Sore spot tracking
     # ------------------------------------------------------------------
 
-    async def _check_sore_spot(
-        self, conn, target: str, topic: str, valence: str
-    ) -> None:
+    async def _check_sore_spot(self, conn, target: str, topic: str, valence: str) -> None:
         """Track sore spots: topics with tension increase >= 2.
 
         A sore spot is recorded when a negative-valence interaction on
@@ -766,9 +750,7 @@ class CallbackRegistry:
             except Exception as exc:
                 # Re-buffer the moment and stop flushing
                 self._write_buffer.entries.appendleft(moment)
-                log.debug(
-                    "Flush interrupted after %d writes: %s", flushed, exc
-                )
+                log.debug("Flush interrupted after %d writes: %s", flushed, exc)
                 return
 
         if flushed > 0:

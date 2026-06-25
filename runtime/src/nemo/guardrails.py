@@ -55,7 +55,7 @@ class NemoGuardrails:
         ok, reason = validate_grounded_text(text, self.build_state(snapshot))
         if not ok:
             return GuardrailResult(ok=False, reason=reason, sanitized_text=text)
-        if any(token in text.lower() for token in ("action\":", "send_message", "register_service")):
+        if any(token in text.lower() for token in ('action":', "send_message", "register_service")):
             return GuardrailResult(ok=False, reason="action_json_leak", sanitized_text=text)
         return GuardrailResult(ok=True, reason="", sanitized_text=text)
 

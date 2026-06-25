@@ -13,15 +13,13 @@ import os
 import re
 from unittest.mock import patch
 
-import hypothesis
-from hypothesis import given, settings, assume
+from hypothesis import given, settings
 from hypothesis import strategies as st
 
-from voice import VoiceSurface, build_voice_state, VoiceState, VoicePlan
+from voice import VoiceSurface, build_voice_state, VoicePlan
 from voice.engine import (
     _pick_emotion,
     _dialogue_speed,
-    _utterance_id,
     _UUID_PREFIX_RE,
     _EMOJI_RE,
     _ARROW_NARRATIVE_RE,
@@ -35,29 +33,48 @@ from voice.engine import (
 # Strategies for generating non-buggy inputs
 # ---------------------------------------------------------------------------
 
-SCENES = st.sampled_from([
-    "ensemble-stage", "banter-lounge", "chat-room", "economy-floor",
-    "market-square", "void-chamber", "silence-hall", "avatar-arena",
-    "world-wide", "stage-left", "focused-work",
-])
+SCENES = st.sampled_from(
+    [
+        "ensemble-stage",
+        "banter-lounge",
+        "chat-room",
+        "economy-floor",
+        "market-square",
+        "void-chamber",
+        "silence-hall",
+        "avatar-arena",
+        "world-wide",
+        "stage-left",
+        "focused-work",
+    ]
+)
 
-SPEAKERS = st.sampled_from([
-    "Alpha", "Narrator", "Elder-Hook-6A4A", "Beta-Core-3F2B",
-    "Gamma-Flux-9D1E", "Delta", "OmegaHost",
-])
+SPEAKERS = st.sampled_from(
+    [
+        "Alpha",
+        "Narrator",
+        "Elder-Hook-6A4A",
+        "Beta-Core-3F2B",
+        "Gamma-Flux-9D1E",
+        "Delta",
+        "OmegaHost",
+    ]
+)
 
 CADENCES = st.sampled_from(["", "jab", "short", "callback", "build", "normal"])
 
 # Lines that do NOT trigger buggy paths — plain dialogue content
-DIALOGUE_LINES = st.sampled_from([
-    "Hello world, this is a test.",
-    "The market is looking strong today.",
-    "I wonder what happens next in the story.",
-    "Time to make a decision about the future.",
-    "Let's keep things moving forward here.",
-    "Watch the exchange.",
-    "A very long line that exceeds one hundred and eighty characters because we want to test speed calculation for longer content and ensure it handles everything properly without issues at all whatsoever in any dimension.",
-])
+DIALOGUE_LINES = st.sampled_from(
+    [
+        "Hello world, this is a test.",
+        "The market is looking strong today.",
+        "I wonder what happens next in the story.",
+        "Time to make a decision about the future.",
+        "Let's keep things moving forward here.",
+        "Watch the exchange.",
+        "A very long line that exceeds one hundred and eighty characters because we want to test speed calculation for longer content and ensure it handles everything properly without issues at all whatsoever in any dimension.",
+    ]
+)
 
 # Lines with prefixes that need stripping
 UUID_PREFIXED_LINES = st.builds(
@@ -86,14 +103,22 @@ SEND_NARRATIVE_LINES = st.builds(
     DIALOGUE_LINES,
 )
 
-ALL_LINES = st.one_of(DIALOGUE_LINES, UUID_PREFIXED_LINES, EMOJI_LINES, ARROW_NARRATIVE_LINES, SEND_NARRATIVE_LINES)
+ALL_LINES = st.one_of(
+    DIALOGUE_LINES, UUID_PREFIXED_LINES, EMOJI_LINES, ARROW_NARRATIVE_LINES, SEND_NARRATIVE_LINES
+)
 
 PATRONAGE_INDEX = st.floats(min_value=0.0, max_value=50.0)
 
 
 def _healthy_probe_result(url=None, timeout=1.5):
     """Mock probe_url that returns a healthy endpoint response (non-buggy)."""
-    return {"ok": True, "probe": "http", "url": url or "http://localhost:5001/health", "status_code": 200, "body": None}
+    return {
+        "ok": True,
+        "probe": "http",
+        "url": url or "http://localhost:5001/health",
+        "status_code": 200,
+        "body": None,
+    }
 
 
 @st.composite
@@ -342,8 +367,10 @@ class TestPreservationDryRunFalse:
     @settings(max_examples=50, deadline=None)
     def test_dry_run_false_via_env(self, snapshot):
         """VOICE_DRY_RUN=false via environment produces non-dry-run state."""
-        with patch("voice.engine.probe_url", side_effect=_healthy_probe_result), \
-             patch.dict(os.environ, {"VOICE_DRY_RUN": "false"}):
+        with (
+            patch("voice.engine.probe_url", side_effect=_healthy_probe_result),
+            patch.dict(os.environ, {"VOICE_DRY_RUN": "false"}),
+        ):
             surface = VoiceSurface(enabled=True)
             state = surface.compose(snapshot)
 
@@ -358,7 +385,9 @@ class TestPreservationTextStripping:
     """
 
     @given(
-        uuid=st.from_regex(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}", fullmatch=True),
+        uuid=st.from_regex(
+            r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}", fullmatch=True
+        ),
         line=DIALOGUE_LINES,
     )
     @settings(max_examples=50, deadline=None)

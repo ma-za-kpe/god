@@ -6,7 +6,6 @@ weight decay).
 
 import os
 import sys
-import re
 
 import pytest
 from hypothesis import given, settings
@@ -14,16 +13,13 @@ from hypothesis import given, settings
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "src"))
 
 from banter.fallback_pool import FallbackPool, _PLACEHOLDER_RE
-from banter.types import FallbackTemplate, FallbackSelection
+from banter.types import FallbackTemplate
 
 from conftest import (
-    st_archetype,
-    st_fallback_template,
     st_context_fragments,
     ARCHETYPES,
     FALLBACK_MOVE_TYPES,
 )
-from hypothesis import strategies as st
 
 
 # ---------------------------------------------------------------------------
@@ -121,7 +117,8 @@ class TestNoRawTokensUnit:
         ]
         pool = FallbackPool(templates, min_per_archetype=0, min_per_move=0)
         result = pool.select(
-            "prophet", "COUNTER",
+            "prophet",
+            "COUNTER",
             opponent_name="Alpha",
             arc_theme="truth",
             callback_phrase="what you said",
@@ -145,7 +142,8 @@ class TestNoRawTokensUnit:
         ]
         pool = FallbackPool(templates, min_per_archetype=0, min_per_move=0)
         result = pool.select(
-            "prophet", "COUNTER",
+            "prophet",
+            "COUNTER",
             opponent_name=None,
             arc_theme=None,
             callback_phrase=None,
@@ -166,7 +164,8 @@ class TestNoRawTokensUnit:
         ]
         pool = FallbackPool(templates, min_per_archetype=0, min_per_move=0)
         result = pool.select(
-            "prophet", "COUNTER",
+            "prophet",
+            "COUNTER",
             opponent_name="Beta",
             arc_theme=None,
         )
@@ -195,7 +194,8 @@ class TestProperty6WeightDecay:
         counts = {"t01": 0, "t02": 0}
         for _ in range(1000):
             sel = pool.select(
-                "prophet", "COUNTER",
+                "prophet",
+                "COUNTER",
                 recent_beat_ids=["t01"],
                 session_used_ids=set(),
             )
@@ -219,7 +219,8 @@ class TestProperty6WeightDecay:
         counts = {"t01": 0, "t02": 0}
         for _ in range(1000):
             sel = pool.select(
-                "prophet", "COUNTER",
+                "prophet",
+                "COUNTER",
                 recent_beat_ids=[],
                 session_used_ids={"t01"},
             )

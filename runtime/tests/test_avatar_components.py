@@ -10,7 +10,9 @@ from voice import VoiceSurface
 
 
 def test_visual_reactor_sets_crack_override():
-    reactor = VisualReactor(crack_expression_duration_seconds=25, flinch_expression_duration_seconds=8)
+    reactor = VisualReactor(
+        crack_expression_duration_seconds=25, flinch_expression_duration_seconds=8
+    )
     beat = Beat(
         speaker="Alpha",
         content="You already lost.",
@@ -21,7 +23,9 @@ def test_visual_reactor_sets_crack_override():
     )
     agent = {"soul_id": "alpha", "current_name": "Alpha"}
 
-    expression = reactor.on_beat_delivered(beat, PairState(tension_level=9, last_interaction_ts=0), [agent], current_epoch=100)
+    expression = reactor.on_beat_delivered(
+        beat, PairState(tension_level=9, last_interaction_ts=0), [agent], current_epoch=100
+    )
 
     assert expression == "vulnerable"
     assert agent["visual_state"]["expression_override"] == "vulnerable"
@@ -45,7 +49,11 @@ def test_scene_composer_centers_has_the_room():
         scene_energy="heated",
     )
 
-    layout = composer.compose_scene(ctx, {("Alpha", "Beta"): PairState(tension_level=9, last_interaction_ts=0)}, {"Alpha": {}, "Beta": {}})
+    layout = composer.compose_scene(
+        ctx,
+        {("Alpha", "Beta"): PairState(tension_level=9, last_interaction_ts=0)},
+        {"Alpha": {}, "Beta": {}},
+    )
 
     assert layout.composition_type == "duo"
     dominant = next(el for el in layout.elders if el.soul_id == "Beta")
@@ -93,11 +101,21 @@ def test_avatar_surface_uses_expression_override():
         ],
         "has_the_room": "Beta",
         "scene_energy": "heated",
+        "last_dialogue_turn": {
+            "sender_name": "Beta",
+            "content": "I am here and I am speaking.",
+            "move": "ESCALATE",
+            "quality_score": 11,
+        },
     }
 
     state = surface.compose(snapshot)
 
     assert state.plan.expression == "vulnerable"
+    assert state.speaker_soul_id == "beta"
+    assert state.speaking is True
+    assert state.mouth_open > 0
+    assert state.presentation_mode == "speaking"
     assert surface._last_scene_layout is not None
     assert surface._last_scene_layout["composition_type"] == "duo"
 

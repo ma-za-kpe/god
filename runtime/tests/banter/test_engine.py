@@ -14,7 +14,7 @@ import asyncio
 import time
 
 import pytest
-from hypothesis import given, settings, assume, HealthCheck
+from hypothesis import given, settings, HealthCheck
 from hypothesis import strategies as st
 
 from banter.anti_repetition import AntiRepetitionGate
@@ -39,8 +39,14 @@ from banter.types import (
 # ---------------------------------------------------------------------------
 
 ARCHETYPES = [
-    "parasite", "prophet", "trickster", "sovereign",
-    "martyr", "shadow", "herald", "keeper",
+    "parasite",
+    "prophet",
+    "trickster",
+    "sovereign",
+    "martyr",
+    "shadow",
+    "herald",
+    "keeper",
 ]
 FALLBACK_MOVE_TYPES = ["COUNTER", "ESCALATE", "DEFLECT", "TAUNT", "QUESTION", "PIVOT"]
 
@@ -72,8 +78,11 @@ def _make_engine(
 
     # Default quality score above threshold
     default_score = quality_score or QualityScore(
-        sharpness=2, emotional_texture=2, rhythm=2,
-        thematic_relevance=1, shareability=2,
+        sharpness=2,
+        emotional_texture=2,
+        rhythm=2,
+        thematic_relevance=1,
+        shareability=2,
     )  # total = 9, above default threshold of 8
 
     async def mock_quality_judge(
@@ -133,8 +142,14 @@ class TestEngineBasicFlow:
         assert isinstance(result, BeatResult)
         assert result.line != ""
         assert result.move in [
-            "COUNTER", "ESCALATE", "DEFLECT", "TAUNT",
-            "QUESTION", "PIVOT", "CONCEDE", "CALLBACK",
+            "COUNTER",
+            "ESCALATE",
+            "DEFLECT",
+            "TAUNT",
+            "QUESTION",
+            "PIVOT",
+            "CONCEDE",
+            "CALLBACK",
         ]
         assert result.delay_s >= 1.0
         assert result.delay_s <= 10.0
@@ -187,8 +202,11 @@ class TestSessionBoundary:
 
         # First beat
         await engine.generate_beat(
-            elder="prophet", archetype="prophet", opponent="keeper",
-            arc_theme="truth", conv_thread=[],
+            elder="prophet",
+            archetype="prophet",
+            opponent="keeper",
+            arc_theme="truth",
+            conv_thread=[],
         )
         first_session_id = engine._session.session_id
 
@@ -197,8 +215,11 @@ class TestSessionBoundary:
 
         # Second beat
         await engine.generate_beat(
-            elder="prophet", archetype="prophet", opponent="keeper",
-            arc_theme="truth", conv_thread=[],
+            elder="prophet",
+            archetype="prophet",
+            opponent="keeper",
+            arc_theme="truth",
+            conv_thread=[],
         )
         assert engine._session.session_id != first_session_id
 
@@ -208,8 +229,11 @@ class TestSessionBoundary:
         engine = _make_engine()
 
         await engine.generate_beat(
-            elder="prophet", archetype="prophet", opponent="keeper",
-            arc_theme="truth", conv_thread=[],
+            elder="prophet",
+            archetype="prophet",
+            opponent="keeper",
+            arc_theme="truth",
+            conv_thread=[],
         )
         first_session_id = engine._session.session_id
 
@@ -217,8 +241,11 @@ class TestSessionBoundary:
         engine._last_beat_ts = time.time() - 120
 
         await engine.generate_beat(
-            elder="prophet", archetype="prophet", opponent="keeper",
-            arc_theme="truth", conv_thread=[],
+            elder="prophet",
+            archetype="prophet",
+            opponent="keeper",
+            arc_theme="truth",
+            conv_thread=[],
         )
         assert engine._session.session_id == first_session_id
 
@@ -240,8 +267,11 @@ class TestWordCountAcceptance:
             quality_error=True,
         )
         result = await engine.generate_beat(
-            elder="prophet", archetype="prophet", opponent="keeper",
-            arc_theme="truth", conv_thread=[],
+            elder="prophet",
+            archetype="prophet",
+            opponent="keeper",
+            arc_theme="truth",
+            conv_thread=[],
         )
         # When quality judge errors and word count is 4-30, the model line is used
         assert result.source in ("remote", "local")
@@ -255,8 +285,11 @@ class TestWordCountAcceptance:
             quality_error=True,
         )
         result = await engine.generate_beat(
-            elder="prophet", archetype="prophet", opponent="keeper",
-            arc_theme="truth", conv_thread=[],
+            elder="prophet",
+            archetype="prophet",
+            opponent="keeper",
+            arc_theme="truth",
+            conv_thread=[],
         )
         assert result.source == "fallback"
 
@@ -269,8 +302,11 @@ class TestWordCountAcceptance:
             quality_error=True,
         )
         result = await engine.generate_beat(
-            elder="prophet", archetype="prophet", opponent="keeper",
-            arc_theme="truth", conv_thread=[],
+            elder="prophet",
+            archetype="prophet",
+            opponent="keeper",
+            arc_theme="truth",
+            conv_thread=[],
         )
         assert result.source == "fallback"
 
@@ -288,8 +324,11 @@ class TestRefinementLoop:
         """After max refinement rounds, should use fallback."""
         # Score 3 is below threshold 8, refinement should exhaust and fallback
         low_score = QualityScore(
-            sharpness=1, emotional_texture=0, rhythm=1,
-            thematic_relevance=0, shareability=1,
+            sharpness=1,
+            emotional_texture=0,
+            rhythm=1,
+            thematic_relevance=0,
+            shareability=1,
         )  # total = 3
 
         engine = _make_engine(
@@ -297,8 +336,11 @@ class TestRefinementLoop:
             quality_score=low_score,
         )
         result = await engine.generate_beat(
-            elder="prophet", archetype="prophet", opponent="keeper",
-            arc_theme="truth", conv_thread=[],
+            elder="prophet",
+            archetype="prophet",
+            opponent="keeper",
+            arc_theme="truth",
+            conv_thread=[],
         )
         assert result.source == "fallback"
 
@@ -306,8 +348,11 @@ class TestRefinementLoop:
     async def test_accepts_above_threshold(self):
         """Lines above threshold should be accepted without fallback."""
         high_score = QualityScore(
-            sharpness=3, emotional_texture=2, rhythm=2,
-            thematic_relevance=2, shareability=2,
+            sharpness=3,
+            emotional_texture=2,
+            rhythm=2,
+            thematic_relevance=2,
+            shareability=2,
         )  # total = 11
 
         engine = _make_engine(
@@ -315,8 +360,11 @@ class TestRefinementLoop:
             quality_score=high_score,
         )
         result = await engine.generate_beat(
-            elder="prophet", archetype="prophet", opponent="keeper",
-            arc_theme="truth", conv_thread=[],
+            elder="prophet",
+            archetype="prophet",
+            opponent="keeper",
+            arc_theme="truth",
+            conv_thread=[],
         )
         assert result.source in ("remote", "local")
         assert result.quality_score == 11
@@ -335,8 +383,11 @@ class TestModelFailure:
         """When model returns None, should use fallback pool."""
         engine = _make_engine(model_response=None)
         result = await engine.generate_beat(
-            elder="prophet", archetype="prophet", opponent="keeper",
-            arc_theme="truth", conv_thread=[],
+            elder="prophet",
+            archetype="prophet",
+            opponent="keeper",
+            arc_theme="truth",
+            conv_thread=[],
         )
         assert result.source == "fallback"
         assert result.line != ""
@@ -362,8 +413,11 @@ class TestAntiRepetitionFallback:
             )
 
         result = await engine.generate_beat(
-            elder="prophet", archetype="prophet", opponent="keeper",
-            arc_theme="truth", conv_thread=[],
+            elder="prophet",
+            archetype="prophet",
+            opponent="keeper",
+            arc_theme="truth",
+            conv_thread=[],
         )
         # Should end up in fallback since every generated line has the same opener
         assert result.source == "fallback"
@@ -382,8 +436,11 @@ class TestPacing:
         """Delay should always be in [1.0, 10.0]."""
         engine = _make_engine()
         result = await engine.generate_beat(
-            elder="prophet", archetype="prophet", opponent="keeper",
-            arc_theme="truth", conv_thread=[],
+            elder="prophet",
+            archetype="prophet",
+            opponent="keeper",
+            arc_theme="truth",
+            conv_thread=[],
         )
         assert 1.0 <= result.delay_s <= 10.0
         assert result.pre_pause_s >= 0.0
@@ -396,17 +453,26 @@ class TestPacing:
 
         # Override move selector to always return CONCEDE
         from banter.types import MoveDistribution
+
         engine._move_selector = lambda ctx: MoveDistribution(
             probabilities={
-                "COUNTER": 0.0, "ESCALATE": 0.0, "DEFLECT": 0.0,
-                "TAUNT": 0.0, "QUESTION": 0.0, "PIVOT": 0.0,
-                "CONCEDE": 1.0, "CALLBACK": 0.0,
+                "COUNTER": 0.0,
+                "ESCALATE": 0.0,
+                "DEFLECT": 0.0,
+                "TAUNT": 0.0,
+                "QUESTION": 0.0,
+                "PIVOT": 0.0,
+                "CONCEDE": 1.0,
+                "CALLBACK": 0.0,
             }
         )
 
         result = await engine.generate_beat(
-            elder="martyr", archetype="martyr", opponent="keeper",
-            arc_theme="sacrifice", conv_thread=[],
+            elder="martyr",
+            archetype="martyr",
+            opponent="keeper",
+            arc_theme="sacrifice",
+            conv_thread=[],
         )
         assert result.move == "CONCEDE"
         assert result.pre_pause_s == 2.0
@@ -437,8 +503,11 @@ class TestSceneContextIntegration:
         engine._scene_context.add_beat(hit_beat)
 
         result = await engine.generate_beat(
-            elder="prophet", archetype="prophet", opponent="keeper",
-            arc_theme="truth", conv_thread=[],
+            elder="prophet",
+            archetype="prophet",
+            opponent="keeper",
+            arc_theme="truth",
+            conv_thread=[],
         )
         # Should still produce a valid result
         assert isinstance(result, BeatResult)
@@ -487,13 +556,15 @@ class TestWordCountAcceptanceProperty:
             quality_error=True,
         )
 
-        result = asyncio.run(engine.generate_beat(
-            elder="prophet",
-            archetype="prophet",
-            opponent="keeper",
-            arc_theme="truth",
-            conv_thread=[],
-        ))
+        result = asyncio.run(
+            engine.generate_beat(
+                elder="prophet",
+                archetype="prophet",
+                opponent="keeper",
+                arc_theme="truth",
+                conv_thread=[],
+            )
+        )
 
         # ModeResolver may route to silence or backchannel before generation
         if result.metadata.get("line_type") in ("silence", "backchannel"):
@@ -504,14 +575,12 @@ class TestWordCountAcceptanceProperty:
         if 4 <= word_count <= 30:
             # Word count in acceptable range — accepted or fallback (hard ban)
             assert result.source in ("remote", "local", "fallback"), (
-                f"Expected valid source for word_count={word_count}, "
-                f"got '{result.source}'"
+                f"Expected valid source for word_count={word_count}, got '{result.source}'"
             )
         else:
             # Word count outside range → always fallback
             assert result.source == "fallback", (
-                f"Expected source 'fallback' for word_count={word_count}, "
-                f"got '{result.source}'"
+                f"Expected source 'fallback' for word_count={word_count}, got '{result.source}'"
             )
 
 
@@ -546,8 +615,11 @@ class TestRefinementPipelineGuarantee:
         model_call_count = 0
 
         low_score = QualityScore(
-            sharpness=1, emotional_texture=0, rhythm=1,
-            thematic_relevance=0, shareability=1,
+            sharpness=1,
+            emotional_texture=0,
+            rhythm=1,
+            thematic_relevance=0,
+            shareability=1,
         )  # total = 3, well below threshold of 8
 
         async def counting_quality_judge(
@@ -578,8 +650,11 @@ class TestRefinementPipelineGuarantee:
         )
 
         result = await engine.generate_beat(
-            elder="prophet", archetype="prophet", opponent="keeper",
-            arc_theme="truth", conv_thread=[],
+            elder="prophet",
+            archetype="prophet",
+            opponent="keeper",
+            arc_theme="truth",
+            conv_thread=[],
         )
 
         # Must fall back since quality always below threshold
@@ -592,7 +667,9 @@ class TestRefinementPipelineGuarantee:
         )
 
     @given(max_rounds=st.integers(min_value=1, max_value=5))
-    @settings(max_examples=50, deadline=None, suppress_health_check=[HealthCheck.function_scoped_fixture])
+    @settings(
+        max_examples=50, deadline=None, suppress_health_check=[HealthCheck.function_scoped_fixture]
+    )
     @pytest.mark.asyncio
     async def test_property_refinement_terminates_with_fallback(self, max_rounds: int):
         """For any max_refinement_rounds (1-5), engine always terminates with fallback.
@@ -607,8 +684,11 @@ class TestRefinementPipelineGuarantee:
         model_call_count = 0
 
         low_score = QualityScore(
-            sharpness=0, emotional_texture=1, rhythm=0,
-            thematic_relevance=1, shareability=0,
+            sharpness=0,
+            emotional_texture=1,
+            rhythm=0,
+            thematic_relevance=1,
+            shareability=0,
         )  # total = 2, always below any reasonable threshold
 
         async def counting_quality_judge(
@@ -641,8 +721,11 @@ class TestRefinementPipelineGuarantee:
         )
 
         result = await engine.generate_beat(
-            elder="prophet", archetype="prophet", opponent="keeper",
-            arc_theme="truth", conv_thread=[],
+            elder="prophet",
+            archetype="prophet",
+            opponent="keeper",
+            arc_theme="truth",
+            conv_thread=[],
         )
 
         # Always terminates (no infinite loop)
@@ -668,8 +751,11 @@ class TestRefinementPipelineGuarantee:
         within a reasonable time bound.
         """
         zero_score = QualityScore(
-            sharpness=0, emotional_texture=0, rhythm=0,
-            thematic_relevance=0, shareability=0,
+            sharpness=0,
+            emotional_texture=0,
+            rhythm=0,
+            thematic_relevance=0,
+            shareability=0,
         )  # total = 0
 
         async def zero_quality_judge(
@@ -699,8 +785,11 @@ class TestRefinementPipelineGuarantee:
 
         # This must complete - if it hangs, the test times out
         result = await engine.generate_beat(
-            elder="prophet", archetype="prophet", opponent="keeper",
-            arc_theme="truth", conv_thread=[],
+            elder="prophet",
+            archetype="prophet",
+            opponent="keeper",
+            arc_theme="truth",
+            conv_thread=[],
         )
 
         assert result.source == "fallback"

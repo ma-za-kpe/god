@@ -51,7 +51,9 @@ def _make_graph(soul_id: str = "s-test") -> OwnedGraph:
 
 @pytest.mark.asyncio
 async def test_genesis_pipeline_pins_all_assets(monkeypatch):
-    pipeline = GenesisPipeline(comfyui_endpoint="http://comfy", tts_endpoint="http://tts", pipeline_timeout_seconds=10)
+    pipeline = GenesisPipeline(
+        comfyui_endpoint="http://comfy", tts_endpoint="http://tts", pipeline_timeout_seconds=10
+    )
     graph = _make_graph()
     calls: list[tuple[str, str]] = []
 
@@ -96,9 +98,25 @@ async def test_genesis_pipeline_pins_all_assets(monkeypatch):
     assert persist_calls == ["s-test"]
 
 
+def test_genesis_pipeline_uses_default_endpoints_when_env_missing(monkeypatch):
+    monkeypatch.delenv("COMFYUI_ENDPOINT", raising=False)
+    monkeypatch.delenv("COMFYUI_HEALTH_URL", raising=False)
+    monkeypatch.delenv("COMFYUI_URL", raising=False)
+    monkeypatch.delenv("TTS_ENDPOINT", raising=False)
+    monkeypatch.delenv("VOICE_HEALTH_URL", raising=False)
+    monkeypatch.delenv("TTS_HEALTH_URL", raising=False)
+
+    pipeline = GenesisPipeline()
+
+    assert pipeline.comfyui_endpoint == "http://localhost:8188"
+    assert pipeline.tts_endpoint == "http://localhost:7860"
+
+
 @pytest.mark.asyncio
 async def test_genesis_pipeline_records_portrait_pin_failure(monkeypatch):
-    pipeline = GenesisPipeline(comfyui_endpoint="http://comfy", tts_endpoint="http://tts", pipeline_timeout_seconds=10)
+    pipeline = GenesisPipeline(
+        comfyui_endpoint="http://comfy", tts_endpoint="http://tts", pipeline_timeout_seconds=10
+    )
     graph = _make_graph()
 
     monkeypatch.setattr("avatar.genesis_pipeline.PortraitGenerator", _FakePortraitGenerator)
@@ -106,7 +124,9 @@ async def test_genesis_pipeline_records_portrait_pin_failure(monkeypatch):
 
     async def fake_pin_bytes(data: bytes, filename: str = "payload.json", **kwargs):
         if filename.endswith("-portrait.png"):
-            return PinResult(ok=False, cid="", pinned_nodes=0, required_nodes=3, errors=("portrait pin failed",))
+            return PinResult(
+                ok=False, cid="", pinned_nodes=0, required_nodes=3, errors=("portrait pin failed",)
+            )
         if filename.endswith("-voice.bin"):
             return PinResult(ok=True, cid="cid-voice", pinned_nodes=3, required_nodes=3)
         return PinResult(ok=True, cid=f"cid-{filename}", pinned_nodes=3, required_nodes=3)
@@ -116,6 +136,7 @@ async def test_genesis_pipeline_records_portrait_pin_failure(monkeypatch):
 
     monkeypatch.setattr("avatar.genesis_pipeline.pin_bytes", fake_pin_bytes)
     monkeypatch.setattr("avatar.genesis_pipeline.pin_json", fake_pin_json)
+
     async def fake_persist_identity(self, graph, soul_id, result, correlation_id):
         return None
 
@@ -128,7 +149,9 @@ async def test_genesis_pipeline_records_portrait_pin_failure(monkeypatch):
     assert result.expression_sheet_cid == "cid-expressions"
     assert result.voice_embedding_cid == "cid-voice"
     assert result.assets_produced == 2
-    assert any(err["step"] == "portrait" and err["message"] == "ipfs_pin_failed" for err in result.errors)
+    assert any(
+        err["step"] == "portrait" and err["message"] == "ipfs_pin_failed" for err in result.errors
+    )
     assert graph.identity is not None
     assert graph.identity.avatar_cid == ""
     assert graph.identity.avatar_base_cid == ""
@@ -136,7 +159,9 @@ async def test_genesis_pipeline_records_portrait_pin_failure(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_genesis_pipeline_records_expression_manifest_failure(monkeypatch):
-    pipeline = GenesisPipeline(comfyui_endpoint="http://comfy", tts_endpoint="http://tts", pipeline_timeout_seconds=10)
+    pipeline = GenesisPipeline(
+        comfyui_endpoint="http://comfy", tts_endpoint="http://tts", pipeline_timeout_seconds=10
+    )
     graph = _make_graph()
 
     monkeypatch.setattr("avatar.genesis_pipeline.PortraitGenerator", _FakePortraitGenerator)
@@ -150,10 +175,13 @@ async def test_genesis_pipeline_records_expression_manifest_failure(monkeypatch)
         return PinResult(ok=True, cid=f"cid-{filename}", pinned_nodes=3, required_nodes=3)
 
     async def fake_pin_json(data: bytes, filename: str = "death_archive.json"):
-        return PinResult(ok=False, cid="", pinned_nodes=0, required_nodes=3, errors=("manifest pin failed",))
+        return PinResult(
+            ok=False, cid="", pinned_nodes=0, required_nodes=3, errors=("manifest pin failed",)
+        )
 
     monkeypatch.setattr("avatar.genesis_pipeline.pin_bytes", fake_pin_bytes)
     monkeypatch.setattr("avatar.genesis_pipeline.pin_json", fake_pin_json)
+
     async def fake_persist_identity(self, graph, soul_id, result, correlation_id):
         return None
 

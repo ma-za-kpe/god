@@ -28,19 +28,25 @@ ARCHETYPE_SIGNATURE_MOVE: dict[str, str] = {
 }
 
 ALL_MOVES: list[str] = [
-    "COUNTER", "ESCALATE", "DEFLECT", "TAUNT",
-    "QUESTION", "PIVOT", "CONCEDE", "CALLBACK",
+    "COUNTER",
+    "ESCALATE",
+    "DEFLECT",
+    "TAUNT",
+    "QUESTION",
+    "PIVOT",
+    "CONCEDE",
+    "CALLBACK",
 ]
 
 # Per-archetype moves that are near-forbidden (heavy weight penalty, T2.3)
 # The minimum floor (_enforce_minimums) still raises these to 0.02,
 # but they remain far below normal allocation.
 ARCHETYPE_HEAVY_PENALTIES: dict[str, list[str]] = {
-    "keeper":    ["CONCEDE"],   # keeper guards; yielding costs too much
-    "parasite":  ["DEFLECT"],   # parasite extracts or confronts; never hides
-    "sovereign": ["CONCEDE"],   # sovereign does not yield without decree
-    "prophet":   ["DEFLECT"],   # prophet speaks plainly; evasion is apostasy
-    "martyr":    ["DEFLECT"],   # martyr bears the weight; deflection dishonors it
+    "keeper": ["CONCEDE"],  # keeper guards; yielding costs too much
+    "parasite": ["DEFLECT"],  # parasite extracts or confronts; never hides
+    "sovereign": ["CONCEDE"],  # sovereign does not yield without decree
+    "prophet": ["DEFLECT"],  # prophet speaks plainly; evasion is apostasy
+    "martyr": ["DEFLECT"],  # martyr bears the weight; deflection dishonors it
 }
 
 # Fear keywords per archetype (used for ESCALATE+QUESTION boost)
@@ -185,10 +191,7 @@ def compute_distribution(ctx: MoveContext) -> MoveDistribution:
         if penalized_move in dist:
             removed = dist[penalized_move] - 0.01
             dist[penalized_move] = 0.01
-            others = [
-                m for m in ALL_MOVES
-                if m != penalized_move and m not in ("CONCEDE", "PIVOT")
-            ]
+            others = [m for m in ALL_MOVES if m != penalized_move and m not in ("CONCEDE", "PIVOT")]
             if others:
                 per_other = removed / len(others)
                 for m in others:
@@ -233,9 +236,7 @@ def compute_distribution(ctx: MoveContext) -> MoveDistribution:
     # this archetype, boost ESCALATE + QUESTION by 0.20 total.
     if ctx.fear_keywords and ctx.arc_theme:
         arc_lower = ctx.arc_theme.lower().strip()
-        fear_match = any(
-            arc_lower == kw.lower().strip() for kw in ctx.fear_keywords
-        )
+        fear_match = any(arc_lower == kw.lower().strip() for kw in ctx.fear_keywords)
 
         if fear_match:
             boost_total = 0.20

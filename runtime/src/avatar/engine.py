@@ -37,7 +37,13 @@ def _pick_expression(snapshot: dict[str, Any]) -> str:
     pressure = float(audience.get("patronage_index") or 0)
     if pressure >= 20:
         return "intense"
-    if "banter" in scene or "chat" in scene or "ensemble" in scene or "stage" in scene or "avatar" in scene:
+    if (
+        "banter" in scene
+        or "chat" in scene
+        or "ensemble" in scene
+        or "stage" in scene
+        or "avatar" in scene
+    ):
         return "animated"
     if "economy" in scene or "market" in scene:
         return "focused"
@@ -65,6 +71,7 @@ def _default_visual_state() -> dict[str, Any]:
         "override_expiry_epoch": 0,
         "scar_layers": [],
         "presentation_mode": "standard",
+        "mouth_open": 0.0,
     }
 
 
@@ -88,12 +95,18 @@ def _visual_state(agent: Any) -> dict[str, Any]:
         visual_state.setdefault("override_expiry_epoch", 0)
         visual_state.setdefault("scar_layers", [])
         visual_state.setdefault("presentation_mode", "standard")
+        visual_state.setdefault("mouth_open", 0.0)
     return visual_state
 
 
 def _agent_key(agent: Any) -> str:
     if isinstance(agent, dict):
-        return str(agent.get("soul_id") or agent.get("identity", {}).get("soul_id") or agent.get("current_name") or "")
+        return str(
+            agent.get("soul_id")
+            or agent.get("identity", {}).get("soul_id")
+            or agent.get("current_name")
+            or ""
+        )
     identity = getattr(agent, "identity", None)
     if identity is not None:
         return str(getattr(identity, "soul_id", "") or getattr(identity, "current_name", "") or "")
@@ -110,6 +123,11 @@ def _beat_quality(beat: Any) -> int:
     if isinstance(beat, dict):
         return int(beat.get("quality_score") or 0)
     return int(getattr(beat, "quality_score", 0) or 0)
+
+
+def _voice_snapshot(snapshot: dict[str, Any]) -> dict[str, Any]:
+    voice = snapshot.get("voice") or {}
+    return voice if isinstance(voice, dict) else {}
 
 
 class AvatarSurface:
@@ -130,13 +148,17 @@ class AvatarSurface:
         broadcast = snapshot.get("broadcast") or {}
         agents = snapshot.get("agents") or []
         current_epoch = int(snapshot.get("epoch") or time.time())
-        active_name = str(showrunner.get("speaker") or broadcast.get("scene", {}).get("speaker") or "Narrator")
+        active_name = str(
+            showrunner.get("speaker") or broadcast.get("scene", {}).get("speaker") or "Narrator"
+        )
         if agents and isinstance(agents[0], dict):
             active_agent = next(
                 (
                     a
                     for a in agents
-                    if str(a.get("current_name") or a.get("identity", {}).get("current_name") or "").lower()
+                    if str(
+                        a.get("current_name") or a.get("identity", {}).get("current_name") or ""
+                    ).lower()
                     == active_name.lower()
                 ),
                 None,
@@ -150,6 +172,14 @@ class AvatarSurface:
             active_agent = agents[0] if agents else {}
         agent_id = _agent_key(active_agent)
         visual_state = _visual_state(active_agent) if active_agent else _default_visual_state()
+        voice_state = _voice_snapshot(snapshot)
+        voice_plan = voice_state.get("plan") or {}
+        last_turn = snapshot.get("last_dialogue_turn") or {}
+        last_turn_speaker = str(last_turn.get("sender_name") or last_turn.get("sender_id") or "")
+        speaking = bool(last_turn.get("content")) and (
+            last_turn_speaker.lower() == active_name.lower()
+            or str(voice_plan.get("speaker") or "").lower() == active_name.lower()
+        )
 
         override = str(visual_state.get("expression_override") or "")
         override_expiry = int(visual_state.get("override_expiry_epoch") or 0)
@@ -163,11 +193,44 @@ class AvatarSurface:
         visual_state["current_expression"] = expression
 
         pose = _pick_pose(snapshot)
-        health = probe_url(os.getenv("AVATAR_HEALTH_URL") or os.getenv("AVATAR_ENDPOINT"), timeout=1.5)
+        health = probe_url(
+            os.getenv("AVATAR_HEALTH_URL") or os.getenv("AVATAR_ENDPOINT"), timeout=1.5
+        )
         avatar_asset = (
             os.getenv("AVATAR_ASSET")
-            or (active_agent.get("avatar_cid") if isinstance(active_agent, dict) else getattr(active_agent, "avatar_cid", ""))
-            or (active_agent.get("voice_model_cid") if isinstance(active_agent, dict) else getattr(active_agent, "voice_model_cid", ""))
+            or (
+                active_agent.get("avatar_cid")
+                if isinstance(active_agent, dict)
+                else getattr(active_agent, "avatar_cid", "")
+            )
+            or (
+                active_agent.get("rigged_avatar_cid")
+                if isinstance(active_agent, dict)
+                else getattr(active_agent, "rigged_avatar_cid", "")
+            )
+            or (
+                active_agent.get("voice_model_cid")
+                if isinstance(active_agent, dict)
+                else getattr(active_agent, "voice_model_cid", "")
+            )
+            or ""
+        )
+        rigged_avatar_cid = (
+            os.getenv("AVATAR_RIGGED_ASSET")
+            or (
+                active_agent.get("rigged_avatar_cid")
+                if isinstance(active_agent, dict)
+                else getattr(active_agent, "rigged_avatar_cid", "")
+            )
+            or avatar_asset
+        )
+        vrm_avatar_url = (
+            os.getenv("AVATAR_VRM_URL")
+            or (
+                active_agent.get("vrm_avatar_url")
+                if isinstance(active_agent, dict)
+                else getattr(active_agent, "vrm_avatar_url", "")
+            )
             or ""
         )
 
@@ -181,9 +244,13 @@ class AvatarSurface:
                 current_epoch=current_epoch,
             )
             if _beat_quality(beat) > 12 and _beat_speaker(beat):
-                receiver_id = str(snapshot.get("receiver_soul_id") or snapshot.get("receiver") or "")
+                receiver_id = str(
+                    snapshot.get("receiver_soul_id") or snapshot.get("receiver") or ""
+                )
                 if receiver_id:
-                    self._visual_reactor.on_landed_hit(beat, receiver_id, agents, current_epoch=current_epoch)
+                    self._visual_reactor.on_landed_hit(
+                        beat, receiver_id, agents, current_epoch=current_epoch
+                    )
 
         if len(agents) > 1:
             scene_ctx = self._build_scene_context(snapshot)
@@ -194,7 +261,15 @@ class AvatarSurface:
         else:
             self._last_scene_layout = None
 
-        motion = "idle" if snapshot.get("resilience", {}).get("tier") == "cold-start" else "live-reactive"
+        motion = (
+            "idle"
+            if snapshot.get("resilience", {}).get("tier") == "cold-start"
+            else ("talking" if speaking else "live-reactive")
+        )
+        mouth_open = float(voice_plan.get("mouth_open") or 0.0)
+        if speaking and mouth_open <= 0.0:
+            mouth_open = 0.42 if expression not in {"calm", "neutral"} else 0.28
+        presentation_mode = "speaking" if speaking else "listening"
         plan = AvatarPlan(
             speaker=active_name,
             agent_id=agent_id,
@@ -203,8 +278,16 @@ class AvatarSurface:
             expression=expression,
             pose=pose,
             motion=motion,
-            lip_sync_source=os.getenv("AVATAR_LIP_SYNC_SOURCE", os.getenv("LIP_SYNC_SOURCE", "audio")),
+            lip_sync_source=os.getenv(
+                "AVATAR_LIP_SYNC_SOURCE", os.getenv("LIP_SYNC_SOURCE", "audio")
+            ),
             render_target=os.getenv("AVATAR_RENDER_TARGET", "obs-virtual-camera"),
+            speaker_soul_id=agent_id,
+            speaking=speaking,
+            mouth_open=mouth_open,
+            presentation_mode=presentation_mode,
+            rigged_avatar_cid=rigged_avatar_cid,
+            vrm_avatar_url=vrm_avatar_url,
             notes=tuple(
                 filter(
                     None,
@@ -213,7 +296,9 @@ class AvatarSurface:
                         f"agent={agent_id[:8] if agent_id else 'none'}",
                         f"expression={expression}",
                         f"pose={pose}",
-                        f"scene_layout={self._last_scene_layout['composition_type']}" if self._last_scene_layout else "",
+                        f"scene_layout={self._last_scene_layout['composition_type']}"
+                        if self._last_scene_layout
+                        else "",
                     ],
                 )
             ),
@@ -230,6 +315,12 @@ class AvatarSurface:
             render_target=plan.render_target,
             health=health,
             plan=plan,
+            speaker_soul_id=agent_id,
+            speaking=speaking,
+            mouth_open=mouth_open,
+            presentation_mode=presentation_mode,
+            rigged_avatar_cid=rigged_avatar_cid,
+            vrm_avatar_url=vrm_avatar_url,
         )
 
     def _build_scene_context(self, snapshot: dict[str, Any]) -> SceneContextData:
@@ -281,7 +372,11 @@ def build_avatar_status() -> dict[str, Any]:
         "renderer": os.getenv("AVATAR_RENDERER", "vrm"),
         "avatar_format": os.getenv("AVATAR_FORMAT", "vrm"),
         "avatar_asset": os.getenv("AVATAR_ASSET", ""),
-        "lip_sync_source": os.getenv("AVATAR_LIP_SYNC_SOURCE", os.getenv("LIP_SYNC_SOURCE", "audio")),
+        "rigged_avatar_cid": os.getenv("AVATAR_RIGGED_ASSET", ""),
+        "vrm_avatar_url": os.getenv("AVATAR_VRM_URL", ""),
+        "lip_sync_source": os.getenv(
+            "AVATAR_LIP_SYNC_SOURCE", os.getenv("LIP_SYNC_SOURCE", "audio")
+        ),
         "render_target": os.getenv("AVATAR_RENDER_TARGET", "obs-virtual-camera"),
         "transport": os.getenv("AVATAR_TRANSPORT", "local-avatar"),
         "health": probe_url(endpoint, timeout=1.5),

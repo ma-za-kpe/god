@@ -12,29 +12,39 @@ from __future__ import annotations
 
 import re
 
-import pytest
 from hypothesis import given, settings, assume
 from hypothesis import strategies as st
 
 from banter.arc_context import ArcContextBuilder
 from banter.mode_types import (
-    BACKCHANNEL_POLICY,
     CHAOS_POLICY,
     CRACK_POLICY,
     NORMAL_POLICY,
     SNAP_BACK_POLICY,
-    BeatMode,
     BeatModePolicy,
 )
-from banter.prompt_builder import SacredPromptBuilder, PromptContractError, estimate_tokens
+from banter.prompt_builder import SacredPromptBuilder, estimate_tokens
 
 # Strategies
-st_archetype_text = st.text(min_size=10, max_size=200, alphabet=st.sampled_from("abcdefghijklmnopqrstuvwxyz .,-"))
-st_arc_pressure = st.text(min_size=10, max_size=100, alphabet=st.sampled_from("abcdefghijklmnopqrstuvwxyz .,-?"))
-st_scene_block = st.text(min_size=5, max_size=80, alphabet=st.sampled_from("abcdefghijklmnopqrstuvwxyz .,-:"))
-st_move_block = st.text(min_size=5, max_size=80, alphabet=st.sampled_from("abcdefghijklmnopqrstuvwxyz .,-:"))
-st_banned_block = st.text(min_size=5, max_size=40, alphabet=st.sampled_from("abcdefghijklmnopqrstuvwxyz .,-:"))
-st_optional_block = st.one_of(st.none(), st.text(min_size=5, max_size=100, alphabet=st.sampled_from("abcdefghijklmnopqrstuvwxyz .,-:")))
+st_archetype_text = st.text(
+    min_size=10, max_size=200, alphabet=st.sampled_from("abcdefghijklmnopqrstuvwxyz .,-")
+)
+st_arc_pressure = st.text(
+    min_size=10, max_size=100, alphabet=st.sampled_from("abcdefghijklmnopqrstuvwxyz .,-?")
+)
+st_scene_block = st.text(
+    min_size=5, max_size=80, alphabet=st.sampled_from("abcdefghijklmnopqrstuvwxyz .,-:")
+)
+st_move_block = st.text(
+    min_size=5, max_size=80, alphabet=st.sampled_from("abcdefghijklmnopqrstuvwxyz .,-:")
+)
+st_banned_block = st.text(
+    min_size=5, max_size=40, alphabet=st.sampled_from("abcdefghijklmnopqrstuvwxyz .,-:")
+)
+st_optional_block = st.one_of(
+    st.none(),
+    st.text(min_size=5, max_size=100, alphabet=st.sampled_from("abcdefghijklmnopqrstuvwxyz .,-:")),
+)
 
 POLICIES = [NORMAL_POLICY, CHAOS_POLICY, CRACK_POLICY, SNAP_BACK_POLICY]
 CANONICAL_ORDER = SacredPromptBuilder.CANONICAL_ORDER
@@ -103,7 +113,7 @@ class TestProperty1CanonicalOrder:
         )
 
         # Extract markers from assembled prompt
-        markers_in_prompt = re.findall(r'\[([A-Z]+)\]', prompt)
+        markers_in_prompt = re.findall(r"\[([A-Z]+)\]", prompt)
         markers_with_brackets = [f"[{m}]" for m in markers_in_prompt]
 
         # Verify they are a valid subsequence of CANONICAL_ORDER
@@ -186,7 +196,7 @@ class TestProperty2NoBannedContent:
         for block in blocks:
             lines = block.strip().split("\n")
             first_line = lines[0] if lines else ""
-            assert re.match(r'\[[A-Z]+\]', first_line), (
+            assert re.match(r"\[[A-Z]+\]", first_line), (
                 f"Block does not start with a marker: '{first_line[:50]}'"
             )
 
@@ -236,11 +246,9 @@ class TestProperty3TokenBudgets:
         blocks = prompt.split("\n\n")
         for block in blocks:
             if block.startswith("[ARCHETYPE]"):
-                content = block[len("[ARCHETYPE]\n"):]
+                content = block[len("[ARCHETYPE]\n") :]
                 tokens = estimate_tokens(content)
-                assert tokens <= 220, (
-                    f"Archetype block has {tokens} tokens, exceeds 220 budget"
-                )
+                assert tokens <= 220, f"Archetype block has {tokens} tokens, exceeds 220 budget"
 
 
 # ---------------------------------------------------------------------------
@@ -279,7 +287,9 @@ class TestProperty4ArcPressure:
         assert readable not in pressure.world_stakes.lower()
 
     @given(
-        theme=st.text(min_size=3, max_size=30, alphabet=st.sampled_from("abcdefghijklmnopqrstuvwxyz "))
+        theme=st.text(
+            min_size=3, max_size=30, alphabet=st.sampled_from("abcdefghijklmnopqrstuvwxyz ")
+        )
     )
     @settings(max_examples=100, deadline=None)
     def test_random_themes_never_leak(self, theme: str):
@@ -313,9 +323,9 @@ class TestProperty4ArcPressure:
             return
 
         pressure_text = pressure.pressure.lower()
-        assert not any(
-            re.search(rf"\b{re.escape(term)}\b", pressure_text) for term in terms
-        ), f"Theme '{readable}' leaked into pressure: {pressure.pressure}"
+        assert not any(re.search(rf"\b{re.escape(term)}\b", pressure_text) for term in terms), (
+            f"Theme '{readable}' leaked into pressure: {pressure.pressure}"
+        )
 
 
 # ---------------------------------------------------------------------------

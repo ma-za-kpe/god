@@ -12,12 +12,9 @@ import pytest
 
 from banter.theater_harness import (
     ArchetypeRoster,
-    HarnessResult,
-    SessionMetrics,
     TheaterHarness,
     is_responsive,
 )
-from banter.types import PairState
 
 
 # ---------------------------------------------------------------------------

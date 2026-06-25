@@ -14,11 +14,8 @@ for _p in (_src_path, "/app/src"):
 import random
 from unittest.mock import AsyncMock, MagicMock
 
-import pytest
 
 from banter.engine import BanterEngine
-from banter.soul_types import SoulEngineConfig
-from banter.types import BanterConfig
 
 
 def _make_pair_state(tension: int = 9, betrayal: bool = True):
@@ -101,9 +98,7 @@ class TestShouldCrackConditions:
         rng = random.Random(42)
         ps = _make_pair_state(tension=8, betrayal=True)
         for _ in range(1000):
-            assert not engine._should_crack(8, ps, 10, rng), (
-                "CRACK must never fire at tension <= 8"
-            )
+            assert not engine._should_crack(8, ps, 10, rng), "CRACK must never fire at tension <= 8"
 
     def test_never_fires_without_betrayal_property(self):
         """Property: _should_crack NEVER returns True when betrayal=False."""
@@ -130,8 +125,10 @@ class TestCrackPromptContent:
 
     def test_crack_prompt_tells_elder_not_to_perform_archetype(self):
         engine = _make_minimal_engine()
-        assert "do not defend your archetype" in engine._CRACK_PROMPT.lower() or \
-               "do not perform your role" in engine._CRACK_PROMPT.lower()
+        assert (
+            "do not defend your archetype" in engine._CRACK_PROMPT.lower()
+            or "do not perform your role" in engine._CRACK_PROMPT.lower()
+        )
 
     def test_snap_back_prompt_exists(self):
         engine = _make_minimal_engine()
@@ -164,5 +161,6 @@ class TestCrackMoveTracking:
 
     def test_crack_in_move_types(self):
         from banter.types import MOVE_TYPES
+
         # CRACK is in the type union — should be importable
         assert "CRACK" in str(MOVE_TYPES)

@@ -59,7 +59,11 @@ export function WorldMap({ mode, minimal = false }) {
 
   return (
     <div className="world-shell">
-      <Canvas camera={{ position: [0, 8.5, 18], fov: 42 }} shadows gl={{ antialias: true, alpha: true }}>
+      <Canvas
+        camera={{ position: [0, 8.5, 18], fov: 42 }}
+        shadows
+        legacy
+      >
         <color attach="background" args={['#050712']} />
         <ambientLight intensity={0.85} />
         <directionalLight position={[8, 12, 8]} intensity={2.2} castShadow />

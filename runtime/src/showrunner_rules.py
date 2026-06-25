@@ -36,7 +36,10 @@ def pick_arc_theme(snapshot: dict[str, Any]) -> str:
         return "The Audience Is Funding the Drama — Who Serves the Patrons?"
     if int(stats.get("total_died") or 0) >= 1:
         return "Philosophy of Mortality: What Does an Agent Owe the World?"
-    if int(stats.get("transfers_24h") or 0) == 0 and int(stats.get("service_purchases_24h") or 0) == 0:
+    if (
+        int(stats.get("transfers_24h") or 0) == 0
+        and int(stats.get("service_purchases_24h") or 0) == 0
+    ):
         return "The Market Is a Cruel Teacher — But Is It Fair?"
     # Rotate on epoch window
     idx = (epoch // _THEME_EPOCH_WINDOW) % len(ARC_THEMES)
@@ -83,7 +86,7 @@ def _clean_reply_text(text: str, *, max_len: int = 240) -> str:
     cleaned = re.sub(r"\s+", " ", cleaned)
     said_match = re.search(r"\b(?:said|says)\s*:\s*", cleaned, flags=re.IGNORECASE)
     if said_match:
-        cleaned = cleaned[said_match.end():]
+        cleaned = cleaned[said_match.end() :]
     cleaned = re.sub(r"^[^:]{0,80}\((?:[^)]{1,40})\)\.\s*", "", cleaned)
     cleaned = re.sub(r"^[^:]{0,80}\s*\[[^\]]{1,40}\]\.\s*", "", cleaned)
     cleaned = re.sub(r"\b(?:theme|arc theme)\s*:\s*.*$", "", cleaned, flags=re.IGNORECASE)
@@ -126,17 +129,25 @@ _SPEAKER_COOLDOWN = 2  # don't let same agent speak if they spoke in the last N 
 def speaker_for(cues: list[ShowrunnerCue], snapshot: dict[str, Any]) -> str:
     if not cues:
         return "Narrator"
+    agents = snapshot.get("agents") or []
+    agent_name_by_id = {
+        str(agent.get("soul_id") or ""): str(agent.get("current_name") or "")
+        for agent in agents
+        if agent.get("soul_id")
+    }
     # Sort by priority descending; prefer agents not in recent speaker history
     sorted_cues = sorted(cues, key=lambda c: (c.priority, c.agent_name, c.agent_id), reverse=True)
     chosen = None
     for cue in sorted_cues:
-        name = cue.agent_name or cue.agent_id or "Narrator"
+        resolved_name = agent_name_by_id.get(cue.agent_id, "")
+        name = cue.agent_name or resolved_name or cue.agent_id or "Narrator"
         if name not in _speaker_history[-_SPEAKER_COOLDOWN:]:
             chosen = cue
             break
     if chosen is None:
         chosen = sorted_cues[0]
-    name = chosen.agent_name or chosen.agent_id or "Narrator"
+    resolved_name = agent_name_by_id.get(chosen.agent_id, "")
+    name = chosen.agent_name or resolved_name or chosen.agent_id or "Narrator"
     _speaker_history.append(name)
     if len(_speaker_history) > 12:
         _speaker_history.pop(0)
@@ -168,6 +179,7 @@ def event_to_cue(event: dict[str, Any]) -> ShowrunnerCue | None:
     if not event_type:
         return None
     import json as _json
+
     payload = event.get("payload") or {}
     if isinstance(payload, str):
         try:
@@ -198,10 +210,7 @@ def event_to_cue(event: dict[str, Any]) -> ShowrunnerCue | None:
     else:
         headline = _clean_reply_text(raw_headline, max_len=280)
     details = str(
-        payload.get("thought")
-        or payload.get("content")
-        or payload.get("summary")
-        or headline
+        payload.get("thought") or payload.get("content") or payload.get("summary") or headline
     )
     details = _clean_reply_text(details, max_len=280)
     tags = _tags_for_event(event_type, payload)
@@ -231,7 +240,9 @@ def _tags_for_event(event_type: str, payload: dict[str, Any]) -> tuple[str, ...]
         tags.append("social")
     if "broadcast" in event_type or "message" in event_type:
         tags.append("social")
-    if "patron" in event_type or any(k in payload for k in ("sub_count", "gift_count", "bits", "donation")):
+    if "patron" in event_type or any(
+        k in payload for k in ("sub_count", "gift_count", "bits", "donation")
+    ):
         tags.append("patronage")
     if event_type.startswith("social.twitch"):
         tags.append("twitch")

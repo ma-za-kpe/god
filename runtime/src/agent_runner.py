@@ -604,6 +604,7 @@ async def _execute_action(agent: dict, action: dict, emitter) -> None:
                 # Trigger a fast reactive cycle for the recipient so they reply in ~1.5s
                 try:
                     from .agent_scheduler import mark_reactive
+
                     mark_reactive(msg.recipient_id, delay_s=1.5)
                 except Exception:
                     pass
@@ -1413,6 +1414,7 @@ async def _run_cycle(
 
         try:
             from .showrunner import get_arc_theme
+
             agent = dict(agent)
             agent["arc_theme"] = get_arc_theme()
         except Exception:
@@ -1432,7 +1434,13 @@ async def _run_cycle(
         result["thought"] = thought
         action_type = result.get("action_type", "thought")
         narrative = result.get("narrative") or f'{name}: "{thought}"'
-        if _is_repetitive(narrative, [str(m.get("content") or m.get("body") or "") for m in (agent.get("_conv_thread") or [])]):
+        if _is_repetitive(
+            narrative,
+            [
+                str(m.get("content") or m.get("body") or "")
+                for m in (agent.get("_conv_thread") or [])
+            ],
+        ):
             narrative = f'{name}: "{thought}"'
 
         await emitter.emit(

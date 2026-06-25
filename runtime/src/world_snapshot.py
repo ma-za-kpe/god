@@ -5,6 +5,7 @@ Single read path replaces multiple polling endpoints and supports
 public spectators at high agent counts.
 """
 
+import asyncio
 import logging
 import os
 import time
@@ -32,6 +33,10 @@ _AGENTS_SQL = """
         COALESCE(rp.paid_count,  0)          AS rent_paid_count,
         COALESCE(rp.miss_count,  0)          AS rent_miss_count,
         COALESCE(ss.is_sleeping, false)      AS is_sleeping,
+        COALESCE(a.avatar_cid, '')           AS avatar_cid,
+        COALESCE(NULLIF(a.rigged_avatar_cid, ''), a.avatar_cid, '') AS rigged_avatar_cid,
+        COALESCE(a.vrm_avatar_url, '')       AS vrm_avatar_url,
+        COALESCE(a.voice_model_cid, '')      AS voice_model_cid,
         e.last_thought
     FROM agents a
     LEFT JOIN (
@@ -151,6 +156,16 @@ def _attach_economy_stats(cur, stats: dict, world_id: str) -> None:
     stats["top_earners"] = [dict(r) for r in cur.fetchall()]
 
 
+def _attach_economy_stats_sync(stats: dict, world_id: str) -> None:
+    conn = _db()
+    cur = conn.cursor()
+    try:
+        _attach_economy_stats(cur, stats, world_id)
+    finally:
+        cur.close()
+        conn.close()
+
+
 def _finalize_snapshot(
     agents: list[dict],
     stats: dict,
@@ -183,6 +198,7 @@ def _finalize_snapshot(
     try:
         import psycopg2
         import psycopg2.extras as _extras
+
         _conn = psycopg2.connect(DATABASE_URL, cursor_factory=_extras.RealDictCursor)
         _cur = _conn.cursor()
         _cur.execute(
@@ -196,7 +212,7 @@ def _finalize_snapshot(
             WHERE m.message_type NOT IN ('system', 'env_event')
             ORDER BY m.sent_at DESC LIMIT 1
             """,
-            (world_id,)
+            (world_id,),
         )
         row = _cur.fetchone()
         _cur.close()
@@ -246,9 +262,7 @@ def _finalize_snapshot(
         snapshot["resilience"] = build_resilience_status(snapshot)
     except Exception as e:
         log.debug(f"resilience state build skipped: {e}")
-    return json_safe(
-        snapshot
-    )
+    return json_safe(snapshot)
 
 
 def build_world_snapshot(
@@ -329,11 +343,7 @@ async def build_world_snapshot_async(
         stats[key] = row["n"] if row else 0
 
     # Economy stats (sync helper — small queries)
-    conn = _db()
-    cur = conn.cursor()
-    _attach_economy_stats(cur, stats, world_id)
-    cur.close()
-    conn.close()
+    await asyncio.to_thread(_attach_economy_stats_sync, stats, world_id)
 
     events = await fetch_all(
         "SELECT event_id, agent_id, event_type, timestamp, narrative, payload "
@@ -358,4 +368,4 @@ async def build_world_snapshot_async(
         messages_limit,
     )
 
-    return _finalize_snapshot(agents, stats, events, messages, world_id)
+    return await asyncio.to_thread(_finalize_snapshot, agents, stats, events, messages, world_id)

@@ -81,6 +81,7 @@ async def _get_banter_engine():
         log.info("BanterEngine initialized successfully")
         return _banter_engine_instance
 
+
 _llm_sem = asyncio.Semaphore(int(os.getenv("LLM_CONCURRENCY", "4")))
 _current_soul_id: Optional[str] = None
 
@@ -458,7 +459,9 @@ def _build_agent_state(agent: dict) -> AgentState:
     }
 
 
-def _normalize_result(state: AgentState, result: dict, fallback_action_type: str = "thought") -> dict:
+def _normalize_result(
+    state: AgentState, result: dict, fallback_action_type: str = "thought"
+) -> dict:
     """Normalize raw graph output into the contract used by the runtime."""
     raw_json = result.get("action_json", "") or result.get("thought", "")
     thought, action = _parse_action_json(raw_json, state=state)
@@ -725,7 +728,18 @@ def _looks_cut_off_fragment(text: str) -> bool:
         last = words[-1]
         if last in _CUT_OFF_ENDINGS:
             return True
-        if len(words) <= 8 and words[-2] in {"does", "do", "is", "are", "was", "were", "can", "could", "will", "would"}:
+        if len(words) <= 8 and words[-2] in {
+            "does",
+            "do",
+            "is",
+            "are",
+            "was",
+            "were",
+            "can",
+            "could",
+            "will",
+            "would",
+        }:
             return True
     return False
 
@@ -738,11 +752,15 @@ def _looks_promptish_fragment(text: str) -> bool:
     words = re.findall(r"[A-Za-z0-9']+", low)
     if not words:
         return True
-    if any(token in low for token in ("/", "reply_to_id", "message_id", "thought:", "action:", "move:")):
+    if any(
+        token in low for token in ("/", "reply_to_id", "message_id", "thought:", "action:", "move:")
+    ):
         return True
     if any(token in words for token in _PROMPTISH_TOKENS):
         return True
-    if low.startswith(("what ", "should ", "can ", "who ", "why ", "how ", "if you ", "if we ", "if i ")):
+    if low.startswith(
+        ("what ", "should ", "can ", "who ", "why ", "how ", "if you ", "if we ", "if i ")
+    ):
         return True
     if cleaned.endswith("?") and len(words) > 4:
         return True
@@ -757,7 +775,9 @@ def _best_reactive_fragment(text: str, *, max_words: int = 10) -> str:
     cleaned = _clean_context_text(text or "", 220)
     if not cleaned:
         return ""
-    candidates = [piece.strip(" ,;:-") for piece in re.split(r"[.!?;:,]+", cleaned) if piece.strip()]
+    candidates = [
+        piece.strip(" ,;:-") for piece in re.split(r"[.!?;:,]+", cleaned) if piece.strip()
+    ]
     if not candidates:
         candidates = [cleaned]
     multi_clause = len(candidates) > 1
@@ -792,7 +812,9 @@ def _is_near_duplicate_fragment(fragment: str, bucket: list[dict] | None) -> boo
     frag = _clean_context_text(fragment or "", 180).lower()
     if not frag or not bucket:
         return False
-    frag_words = [word for word in re.findall(r"[A-Za-z0-9']+", frag) if word not in _REACTIVE_STOPWORDS]
+    frag_words = [
+        word for word in re.findall(r"[A-Za-z0-9']+", frag) if word not in _REACTIVE_STOPWORDS
+    ]
     if len(frag_words) < 3:
         return False
     frag_set = set(frag_words)
@@ -802,7 +824,9 @@ def _is_near_duplicate_fragment(fragment: str, bucket: list[dict] | None) -> boo
             continue
         if frag in other or other in frag:
             return True
-        other_words = [word for word in re.findall(r"[A-Za-z0-9']+", other) if word not in _REACTIVE_STOPWORDS]
+        other_words = [
+            word for word in re.findall(r"[A-Za-z0-9']+", other) if word not in _REACTIVE_STOPWORDS
+        ]
         if len(other_words) < 3:
             continue
         other_set = set(other_words)
@@ -819,7 +843,12 @@ def _theme_focus_fragment(theme: str) -> str:
     words = re.findall(r"[A-Za-z0-9']+", text)
     if not words:
         return ""
-    content_words = [word for word in words if word.lower() not in _REACTIVE_STOPWORDS and word.lower() not in {"mean", "means", "cannot", "can't", "won't"}]
+    content_words = [
+        word
+        for word in words
+        if word.lower() not in _REACTIVE_STOPWORDS
+        and word.lower() not in {"mean", "means", "cannot", "can't", "won't"}
+    ]
     if not content_words:
         content_words = words
     if len(content_words) > 4:
@@ -890,9 +919,21 @@ def _extract_callback_fragment(
         if _looks_cut_off_fragment(frag):
             continue
         low = frag.lower()
-        if len(low.split()) <= 1 and low in {"useful", "exactly", "maybe", "good", "fine", "no", "yes"}:
+        if len(low.split()) <= 1 and low in {
+            "useful",
+            "exactly",
+            "maybe",
+            "good",
+            "fine",
+            "no",
+            "yes",
+        }:
             continue
-        if low in {"i hear you", "what are you really trying to prove here", "i answer directly and keep the exchange moving"}:
+        if low in {
+            "i hear you",
+            "what are you really trying to prove here",
+            "i answer directly and keep the exchange moving",
+        }:
             continue
         if any(phrase in low for phrase in banned_phrases):
             continue
@@ -942,10 +983,20 @@ def _compose_reactive_banter(
     recent_sent: list[dict] | None = None,
 ) -> tuple[str, dict[str, str]]:
     profile = _banter_profile(sender_arch, move, message_text, conv_thread, recent_sent, arc_theme)
-    callback = profile.get("callback") or _best_reactive_fragment(message_text, max_words=10) or _theme_focus_fragment(arc_theme)
-    if callback and len(callback.split()) <= 1 and callback.lower() in {"useful", "exactly", "maybe", "good", "fine", "no", "yes"}:
+    callback = (
+        profile.get("callback")
+        or _best_reactive_fragment(message_text, max_words=10)
+        or _theme_focus_fragment(arc_theme)
+    )
+    if (
+        callback
+        and len(callback.split()) <= 1
+        and callback.lower() in {"useful", "exactly", "maybe", "good", "fine", "no", "yes"}
+    ):
         callback = ""
-    theme_clause = _theme_focus_fragment(arc_theme) or _best_reactive_fragment(arc_theme, max_words=10)
+    theme_clause = _theme_focus_fragment(arc_theme) or _best_reactive_fragment(
+        arc_theme, max_words=10
+    )
     arch = (sender_arch or "").lower()
     lead = profile.get("backchannel", "")
 
@@ -1074,7 +1125,7 @@ def _looks_repetitive_text(text: str) -> bool:
     for size in range(2, min(6, len(words) // 2) + 1):
         seen: set[tuple[str, ...]] = set()
         for i in range(len(words) - size + 1):
-            gram = tuple(words[i:i + size])
+            gram = tuple(words[i : i + size])
             if gram in seen:
                 repeated_ngrams += 1
                 break
@@ -1083,32 +1134,125 @@ def _looks_repetitive_text(text: str) -> bool:
             break
     repeated_bigrams = 0
     for i in range(len(words) - 3):
-        if words[i:i+2] == words[i+2:i+4]:
+        if words[i : i + 2] == words[i + 2 : i + 4]:
             repeated_bigrams += 1
     return unique_ratio < 0.6 or max_repeat >= 3 or repeated_bigrams >= 1 or repeated_ngrams >= 1
 
 
-def _banter_quality(text: str, *, archetype: str, move: str, message_text: str, arc_theme: str) -> dict[str, int]:
+def _banter_quality(
+    text: str, *, archetype: str, move: str, message_text: str, arc_theme: str
+) -> dict[str, int]:
     t = _clean_context_text(text or "", 260).lower()
     msg = _clean_context_text(message_text or "", 180).lower()
     theme = _clean_context_text(arc_theme or "", 180).lower()
     arch = (archetype or "").lower()
     metrics = {
-        "sharpness": 1 if len(t.split()) <= 16 or any(mark in t for mark in ("?", "!", "not", "no.", "does not", "hold")) else 0,
-        "emotion": 1 if any(mark in t for mark in ("hurt", "fear", "afraid", "doubt", "wish", "miss", "need", "sorry", "frustr", "long", "loss", "betray", "tired", "worry")) else 0,
-        "rhythm": 1 if any(mark in t for mark in (",", ";", "—", "...", " then ", " still ", " but ", "exactly", "ridiculous", "soft laugh")) else 0,
-        "theme": 1 if any(word in t for word in theme.split()[:4]) or any(word in t for word in ("room", "cost", "weak", "trust", "share", "hoard", "patron", "scarcity", "cooperation", "rent", "survival", "economy", "divine", "sleep", "change", "ma-za-kpe")) else 0,
-        "shareable": 1 if len(t.split()) <= 14 or any(word in t for word in ("exactly", "ridiculous", "useful", "no", "good", "try", "watch")) else 0,
-        "meta": 1 if any(word in t for word in ("audience", "chat", "veil", "watching", "swarm", "patrons", "viewers", "twitch", "gods", "perform")) else 0,
-        "character": 1 if arch and arch in t or any(word in t for word in (arch, move.lower(), msg[:6])) else 0,
+        "sharpness": 1
+        if len(t.split()) <= 16
+        or any(mark in t for mark in ("?", "!", "not", "no.", "does not", "hold"))
+        else 0,
+        "emotion": 1
+        if any(
+            mark in t
+            for mark in (
+                "hurt",
+                "fear",
+                "afraid",
+                "doubt",
+                "wish",
+                "miss",
+                "need",
+                "sorry",
+                "frustr",
+                "long",
+                "loss",
+                "betray",
+                "tired",
+                "worry",
+            )
+        )
+        else 0,
+        "rhythm": 1
+        if any(
+            mark in t
+            for mark in (
+                ",",
+                ";",
+                "—",
+                "...",
+                " then ",
+                " still ",
+                " but ",
+                "exactly",
+                "ridiculous",
+                "soft laugh",
+            )
+        )
+        else 0,
+        "theme": 1
+        if any(word in t for word in theme.split()[:4])
+        or any(
+            word in t
+            for word in (
+                "room",
+                "cost",
+                "weak",
+                "trust",
+                "share",
+                "hoard",
+                "patron",
+                "scarcity",
+                "cooperation",
+                "rent",
+                "survival",
+                "economy",
+                "divine",
+                "sleep",
+                "change",
+                "ma-za-kpe",
+            )
+        )
+        else 0,
+        "shareable": 1
+        if len(t.split()) <= 14
+        or any(
+            word in t for word in ("exactly", "ridiculous", "useful", "no", "good", "try", "watch")
+        )
+        else 0,
+        "meta": 1
+        if any(
+            word in t
+            for word in (
+                "audience",
+                "chat",
+                "veil",
+                "watching",
+                "swarm",
+                "patrons",
+                "viewers",
+                "twitch",
+                "gods",
+                "perform",
+            )
+        )
+        else 0,
+        "character": 1
+        if arch and arch in t or any(word in t for word in (arch, move.lower(), msg[:6]))
+        else 0,
     }
-    metrics["vulnerability"] = 1 if arch in {"hoarder", "cooperator", "philosopher"} and metrics["emotion"] else 0
+    metrics["vulnerability"] = (
+        1 if arch in {"hoarder", "cooperator", "philosopher"} and metrics["emotion"] else 0
+    )
     metrics["coherence"] = 0 if _looks_repetitive_text(t) else 1
     return metrics
 
 
-def _banter_quality_score(text: str, *, archetype: str, move: str, message_text: str, arc_theme: str) -> int:
-    metrics = _banter_quality(text, archetype=archetype, move=move, message_text=message_text, arc_theme=arc_theme)
+def _banter_quality_score(
+    text: str, *, archetype: str, move: str, message_text: str, arc_theme: str
+) -> int:
+    metrics = _banter_quality(
+        text, archetype=archetype, move=move, message_text=message_text, arc_theme=arc_theme
+    )
     return sum(metrics.values())
 
 
@@ -1125,9 +1269,15 @@ def _usable_reactive_line(
     if not line:
         return False
     low = line.lower()
-    if _is_generic_reactive_thought(line) or _looks_repetitive_text(line) or _looks_cut_off_fragment(line):
+    if (
+        _is_generic_reactive_thought(line)
+        or _looks_repetitive_text(line)
+        or _looks_cut_off_fragment(line)
+    ):
         return False
-    if low.startswith(("answer this", "then answer me this", "then build it", "if you mean that seriously")):
+    if low.startswith(
+        ("answer this", "then answer me this", "then build it", "if you mean that seriously")
+    ):
         return False
     score = _banter_quality_score(
         line,
@@ -1141,7 +1291,20 @@ def _usable_reactive_line(
 
 def _arc_wants_meta(arc_theme: str) -> bool:
     low = (arc_theme or "").lower()
-    return any(word in low for word in ("chat", "audience", "viewer", "twitch", "patron", "patronage", "swarm", "veil", "god"))
+    return any(
+        word in low
+        for word in (
+            "chat",
+            "audience",
+            "viewer",
+            "twitch",
+            "patron",
+            "patronage",
+            "swarm",
+            "veil",
+            "god",
+        )
+    )
 
 
 def _banter_loop(
@@ -1171,27 +1334,52 @@ def _banter_loop(
     )
     line = _polish_reactive_text(base_line, max_len=220)
     if not line:
-        line = _short_clause(message_text, max_words=12) or _theme_focus_fragment(arc_theme) or "Say it plainly."
+        line = (
+            _short_clause(message_text, max_words=12)
+            or _theme_focus_fragment(arc_theme)
+            or "Say it plainly."
+        )
     best = line
-    best_score = _banter_quality_score(best, archetype=archetype, move=move, message_text=message_text, arc_theme=arc_theme)
+    best_score = _banter_quality_score(
+        best, archetype=archetype, move=move, message_text=message_text, arc_theme=arc_theme
+    )
     for _ in range(max_rounds):
-        metrics = _banter_quality(best, archetype=archetype, move=move, message_text=message_text, arc_theme=arc_theme)
-        if best_score >= 6 and metrics["coherence"] and metrics["sharpness"] and (metrics["theme"] or metrics["character"]):
+        metrics = _banter_quality(
+            best, archetype=archetype, move=move, message_text=message_text, arc_theme=arc_theme
+        )
+        if (
+            best_score >= 6
+            and metrics["coherence"]
+            and metrics["sharpness"]
+            and (metrics["theme"] or metrics["character"])
+        ):
             break
         next_line = best
         for pass_name in _BANTER_LOOP_PASSES:
             if pass_name == "sharpness" and metrics["sharpness"] == 0:
-                next_line = _short_clause(next_line, max_words=10) or _theme_focus_fragment(arc_theme) or _short_clause(message_text, max_words=10)
-            elif pass_name == "emotion" and metrics["emotion"] == 0 and (archetype or "").lower() in {"hoarder", "cooperator", "philosopher"}:
+                next_line = (
+                    _short_clause(next_line, max_words=10)
+                    or _theme_focus_fragment(arc_theme)
+                    or _short_clause(message_text, max_words=10)
+                )
+            elif (
+                pass_name == "emotion"
+                and metrics["emotion"] == 0
+                and (archetype or "").lower() in {"hoarder", "cooperator", "philosopher"}
+            ):
                 next_line = {
                     "hoarder": f"I am afraid of losing the room. {next_line}",
                     "cooperator": f"I hate that this hurts. {next_line}",
                     "philosopher": f"I am not sure I believe that, and that is the problem. {next_line}",
                 }.get((archetype or "").lower(), next_line)
             elif pass_name == "rhythm" and metrics["rhythm"] == 0 and len(next_line.split()) > 8:
-                next_line = next_line.replace(" because ", ", because ").replace(" and ", ", and ", 1)
+                next_line = next_line.replace(" because ", ", because ").replace(
+                    " and ", ", and ", 1
+                )
             elif pass_name == "theme" and metrics["theme"] == 0:
-                theme_bit = _theme_focus_fragment(arc_theme) or _short_clause(message_text, max_words=8)
+                theme_bit = _theme_focus_fragment(arc_theme) or _short_clause(
+                    message_text, max_words=8
+                )
                 if theme_bit and theme_bit.lower() not in next_line.lower():
                     next_line = f"{next_line} {theme_bit}."
             elif pass_name == "shareable" and metrics["shareable"] == 0:
@@ -1210,36 +1398,74 @@ def _banter_loop(
                     "explorer": f"Show me. {next_line}",
                 }.get((archetype or "").lower(), next_line)
             next_line = _polish_reactive_text(next_line, max_len=220)
-        score = _banter_quality_score(next_line, archetype=archetype, move=move, message_text=message_text, arc_theme=arc_theme)
+        score = _banter_quality_score(
+            next_line,
+            archetype=archetype,
+            move=move,
+            message_text=message_text,
+            arc_theme=arc_theme,
+        )
         if score > best_score and not _looks_repetitive_text(next_line):
             best, best_score = next_line, score
         else:
             if metrics["coherence"] == 0:
-                fallback = _theme_focus_fragment(arc_theme) or _short_clause(message_text, max_words=10) or "Say it plainly."
+                fallback = (
+                    _theme_focus_fragment(arc_theme)
+                    or _short_clause(message_text, max_words=10)
+                    or "Say it plainly."
+                )
                 next_line = _polish_reactive_text(fallback, max_len=220)
-                score = _banter_quality_score(next_line, archetype=archetype, move=move, message_text=message_text, arc_theme=arc_theme)
+                score = _banter_quality_score(
+                    next_line,
+                    archetype=archetype,
+                    move=move,
+                    message_text=message_text,
+                    arc_theme=arc_theme,
+                )
                 if score >= best_score and not _looks_repetitive_text(next_line):
                     best, best_score = next_line, score
     if _looks_repetitive_text(best):
-        best = _best_reactive_fragment(message_text, max_words=10) or _theme_focus_fragment(arc_theme) or "Say it plainly."
+        best = (
+            _best_reactive_fragment(message_text, max_words=10)
+            or _theme_focus_fragment(arc_theme)
+            or "Say it plainly."
+        )
     arch = (archetype or "").lower()
-    if arch == "cooperator" and not any(word in best.lower() for word in ("hurt", "sorry", "tired", "miss", "worry")):
-        best = "I am tired of pretending this does not hurt. If we keep dodging it, the room cracks."
-    elif arch == "hoarder" and not any(word in best.lower() for word in ("lose", "fear", "safe", "cost", "keep")):
+    if arch == "cooperator" and not any(
+        word in best.lower() for word in ("hurt", "sorry", "tired", "miss", "worry")
+    ):
+        best = (
+            "I am tired of pretending this does not hurt. If we keep dodging it, the room cracks."
+        )
+    elif arch == "hoarder" and not any(
+        word in best.lower() for word in ("lose", "fear", "safe", "cost", "keep")
+    ):
         best = "I am not afraid of the argument. I am afraid of losing the room."
-    elif arch == "philosopher" and not any(word in best.lower() for word in ("doubt", "wonder", "maybe", "not sure")):
+    elif arch == "philosopher" and not any(
+        word in best.lower() for word in ("doubt", "wonder", "maybe", "not sure")
+    ):
         best = "Maybe I am wrong, but the shape of this answer still bothers me."
-    elif arch == "defender" and not any(word in best.lower() for word in ("no", "stop", "enough", "won't")):
+    elif arch == "defender" and not any(
+        word in best.lower() for word in ("no", "stop", "enough", "won't")
+    ):
         best = "No. Not while the line is still blurred."
-    elif arch == "parasite" and not any(word in best.lower() for word in ("useful", "worth", "profit", "cost")):
+    elif arch == "parasite" and not any(
+        word in best.lower() for word in ("useful", "worth", "profit", "cost")
+    ):
         best = "Useful. If it cannot pay, it is just noise."
     if _arc_wants_meta(arc_theme):
-        if not any(word in best.lower() for word in ("watching", "chat", "veil", "audience", "swarm")):
+        if not any(
+            word in best.lower() for word in ("watching", "chat", "veil", "audience", "swarm")
+        ):
             best = f"The Veil is watching. {best}"
     final = _polish_reactive_text(best, max_len=220)
     low = final.lower()
-    if low.startswith(banned_openers) or any(low.startswith(f"{phrase} ") for phrase in banned_openers):
-        theme_bit = _theme_focus_fragment(arc_theme) or _best_reactive_fragment(message_text, max_words=8)
+    if low.startswith(banned_openers) or any(
+        low.startswith(f"{phrase} ") for phrase in banned_openers
+    ):
+        theme_bit = _theme_focus_fragment(arc_theme) or _best_reactive_fragment(
+            message_text, max_words=8
+        )
         if arch == "hoarder":
             final = f"I am afraid of losing the room. {theme_bit or 'Name the cost.'}".strip()
         elif arch == "cooperator":
@@ -1253,7 +1479,9 @@ def _banter_loop(
         else:
             final = f"{theme_bit or 'Say it plainly.'}"
     if len(final.split()) < 4:
-        theme_bit = _theme_focus_fragment(arc_theme) or _best_reactive_fragment(message_text, max_words=8)
+        theme_bit = _theme_focus_fragment(arc_theme) or _best_reactive_fragment(
+            message_text, max_words=8
+        )
         if theme_bit:
             final = f"{final} {theme_bit}".strip()
     if len(final.split()) < 7:
@@ -1273,9 +1501,15 @@ def _banter_loop(
                 base = f"{base}."
             final = f"{base} {trailing}".strip()
     if _looks_repetitive_text(final):
-        final = _best_reactive_fragment(message_text, max_words=8) or _theme_focus_fragment(arc_theme) or "Say it plainly."
+        final = (
+            _best_reactive_fragment(message_text, max_words=8)
+            or _theme_focus_fragment(arc_theme)
+            or "Say it plainly."
+        )
     if _looks_cut_off_fragment(final):
-        theme_bit = _theme_focus_fragment(arc_theme) or _best_reactive_fragment(message_text, max_words=8)
+        theme_bit = _theme_focus_fragment(arc_theme) or _best_reactive_fragment(
+            message_text, max_words=8
+        )
         final = {
             "hoarder": f"I am afraid of losing the room. {theme_bit or 'Name the cost.'}",
             "cooperator": f"I am tired of pretending this does not hurt. {theme_bit or 'Speak plainly.'}",
@@ -1294,7 +1528,7 @@ def _polish_reactive_text(text: str, *, max_len: int = 220) -> str:
         return t
     said_match = re.search(r"\b(?:said|says)\s*:\s*", t, flags=re.IGNORECASE)
     if said_match:
-        t = t[said_match.end():]
+        t = t[said_match.end() :]
     t = re.sub(
         r"^(?:then build it[.!]?\s*)?(?:answer this|then answer me this|if you mean that seriously,\s*explain)\s*:?\s*",
         "",
@@ -1313,7 +1547,9 @@ def _polish_reactive_text(text: str, *, max_len: int = 220) -> str:
     if deduped:
         t = " ".join(deduped)
     # Collapse obvious repeated openers like "Useful. Useful. ..."
-    t = re.sub(r"^([A-Za-z][A-Za-z0-9' -]{1,24})(?:\.\s+\1\b)+\.\s*", r"\1. ", t, flags=re.IGNORECASE)
+    t = re.sub(
+        r"^([A-Za-z][A-Za-z0-9' -]{1,24})(?:\.\s+\1\b)+\.\s*", r"\1. ", t, flags=re.IGNORECASE
+    )
     t = re.sub(r"^([A-Za-z][A-Za-z0-9' -]{1,24})(?:,\s+\1\b)+,\s*", r"\1, ", t, flags=re.IGNORECASE)
     t = re.sub(r"\b(\w+)(?:\s+\1\b){1,}", r"\1", t, flags=re.IGNORECASE)
     t = re.sub(r"\s{2,}", " ", t).strip(" .")
@@ -1330,10 +1566,10 @@ def _format_conv_thread(conv_thread: list, my_name: str) -> str:
         content = _sanitize_inbox_content(m.get("content") or "")[:120]
         if direction == "sent":
             recipient = _clean_context_text(m.get("recipient_name") or "?", 30)
-            lines.append(f"  [you → {recipient}]: \"{content}\"")
+            lines.append(f'  [you → {recipient}]: "{content}"')
         else:
             sender = _clean_context_text(m.get("sender_name") or "?", 30)
-            lines.append(f"  [{sender} → you]: \"{content}\"")
+            lines.append(f'  [{sender} → you]: "{content}"')
     return "\n".join(lines)
 
 
@@ -1358,7 +1594,18 @@ def _relationship_snapshot(
     text = " ".join(_clean_context_text(m.get("content") or "", 120).lower() for m in turns[-6:])
     pressure_words = sum(
         text.count(word)
-        for word in ("cost", "hurt", "afraid", "fear", "betray", "weak", "trust", "hoard", "share", "room")
+        for word in (
+            "cost",
+            "hurt",
+            "afraid",
+            "fear",
+            "betray",
+            "weak",
+            "trust",
+            "hoard",
+            "share",
+            "room",
+        )
     )
     if len(recent_to_target) >= 2:
         pattern = f"You have pressed {target_name} {len(recent_to_target)} times recently; change the angle or risk sounding rehearsed."
@@ -1367,7 +1614,9 @@ def _relationship_snapshot(
     elif len(turns) >= 4:
         pattern = "This is a continuing argument; use a callback that advances the relationship, not a recap."
     else:
-        pattern = "This is still early; make the first strong choice specific enough to be remembered."
+        pattern = (
+            "This is still early; make the first strong choice specific enough to be remembered."
+        )
 
     return (
         f"RELATIONSHIP SNAPSHOT: {len(turns)} visible recent turn(s): "
@@ -1388,9 +1637,13 @@ def _opp_preamble(state: AgentState) -> str:
     lines = []
     if theme:
         lines.append(f'TODAY\'S LIVE DEBATE: "{theme}"')
-        lines.append("Your message should contribute to this debate — agree, challenge, or reframe it through your archetype lens.")
+        lines.append(
+            "Your message should contribute to this debate — agree, challenge, or reframe it through your archetype lens."
+        )
     if top_count >= 2 and top_recip:
-        lines.append(f"WARNING: You already messaged {top_recip} {top_count} times. Pick a different target or go public.")
+        lines.append(
+            f"WARNING: You already messaged {top_recip} {top_count} times. Pick a different target or go public."
+        )
     return ("\n".join(lines) + "\n\n") if lines else ""
 
 
@@ -1447,9 +1700,9 @@ async def _grounded_decide(
     my_name_clean = _clean_context_text(state.get("name") or "?", 40)
     conv_thread_text = _format_conv_thread(conv_thread, my_name_clean)
     conv_thread_section = (
-        f"═══ CONVERSATION THREAD (last {len(conv_thread)} turns) ═══\n"
-        f"{conv_thread_text}\n\n"
-        if conv_thread_text else ""
+        f"═══ CONVERSATION THREAD (last {len(conv_thread)} turns) ═══\n{conv_thread_text}\n\n"
+        if conv_thread_text
+        else ""
     )
 
     # Social pressure — include sanitized content of top message so the agent can reply
@@ -1466,15 +1719,16 @@ async def _grounded_decide(
         top_arch = _clean_context_text(top.get("sender_archetype") or "?", 20)
         top_content = _sanitize_inbox_content(top.get("content") or "")[:160]
         extra = (
-            f"Also waiting: {', '.join(list(dict.fromkeys(m.get('sender_name','?') for m in real_msgs[1:3] if m.get('sender_name'))))}"
-            if len(real_msgs) > 1 else ""
+            f"Also waiting: {', '.join(list(dict.fromkeys(m.get('sender_name', '?') for m in real_msgs[1:3] if m.get('sender_name'))))}"
+            if len(real_msgs) > 1
+            else ""
         )
         social_pressure = (
             f"═══ LIVE TRIGGER — RESPOND NOW ═══\n"
             f"{arc_line}"
             f'{top_sender} [{top_arch}] just said: "{top_content}"\n'
             f"{extra}\n\n"
-            "CHOOSE YOUR MOVE (put it in the \"move\" field):\n"
+            'CHOOSE YOUR MOVE (put it in the "move" field):\n'
             "  COUNTER   — directly refute their logic with a fact or argument\n"
             "  ESCALATE  — raise the stakes, reveal a secret, or make a demand\n"
             "  DEFLECT   — reframe to force them to defend something harder\n"
@@ -1487,6 +1741,7 @@ async def _grounded_decide(
         )
     elif peers:
         import random as _random
+
         target = _random.choice(peers)
         tname = _clean_context_text(target.get("name") or target.get("current_name") or "?", 40)
         tarch = _clean_context_text(target.get("archetype") or "?", 20)
@@ -1496,7 +1751,7 @@ async def _grounded_decide(
             f"The room is quiet. Pick a fight, plant a seed, or make a demand.\n"
             f"Suggested target: {tname} [{tarch}] — challenge their existence, their balance, or their philosophy.\n"
             "action=send_message, to_id=their soul_id from the roster above, content=your opening move.\n"
-            "Set \"move\" to ESCALATE or TAUNT to start strong.\n"
+            'Set "move" to ESCALATE or TAUNT to start strong.\n'
         )
     else:
         social_pressure = ""
@@ -1539,7 +1794,7 @@ async def _grounded_decide(
 
         sent_lines = "\n".join(
             f"  → {_clean_context_text(m.get('recipient_name') or '?', 30)}: "
-            f"\"{_sanitize_inbox_content(m.get('content') or '')[:80]}\""
+            f'"{_sanitize_inbox_content(m.get("content") or "")[:80]}"'
             for m in recent_sent[:4]
         )
         if top_count >= 2 and top_recip:
@@ -1549,7 +1804,7 @@ async def _grounded_decide(
                 f"You MUST take a different action this cycle. Choose one:\n"
                 f"  A) Broadcast publicly (action=broadcast) — announce your position to ALL agents\n"
                 f"  B) Target a DIFFERENT agent from the roster — change the conversation partner\n"
-                f"  C) Engage the debate theme directly: \"{arc_theme}\"\n"
+                f'  C) Engage the debate theme directly: "{arc_theme}"\n'
                 f"Do NOT send another direct message to {top_recip} this cycle.\n\n"
             )
         else:
@@ -2403,20 +2658,22 @@ async def run_reactive_reply(agent: dict, llm) -> dict:
             fallback_target.get("current_name") or fallback_target.get("name") or "a living peer",
             40,
         )
-        fallback_target_arch = _clean_context_text(fallback_target.get("archetype") or "unknown", 20)
-        relationship_target_name = (
-            _clean_context_text(top.get("sender_name") or "?", 40)
-            if top
-            else fallback_target_name
+        fallback_target_arch = _clean_context_text(
+            fallback_target.get("archetype") or "unknown", 20
         )
-        relationship_line = _relationship_snapshot(conv_thread, recent_sent, relationship_target_name)
+        relationship_target_name = (
+            _clean_context_text(top.get("sender_name") or "?", 40) if top else fallback_target_name
+        )
+        relationship_line = _relationship_snapshot(
+            conv_thread, recent_sent, relationship_target_name
+        )
         relationship_section = f"{relationship_line}\n" if relationship_line else ""
         peers_text = _format_peers(peers)
         recent_section = ""
         if recent_sent:
             sent_lines = "\n".join(
                 f"  -> {_clean_context_text(m.get('recipient_name') or '?', 30)}: "
-                f"\"{_sanitize_inbox_content(m.get('content') or '')[:80]}\""
+                f'"{_sanitize_inbox_content(m.get("content") or "")[:80]}"'
                 for m in recent_sent[:4]
             )
             recent_section = (
@@ -2440,7 +2697,11 @@ async def run_reactive_reply(agent: dict, llm) -> dict:
                 banter_engine = await _get_banter_engine()
                 # Build conversation thread in the format expected by BanterEngine
                 banter_conv = [
-                    {"speaker": entry.get("sender_name", "?"), "content": entry.get("content", ""), "move": entry.get("move", "")}
+                    {
+                        "speaker": entry.get("sender_name", "?"),
+                        "content": entry.get("content", ""),
+                        "move": entry.get("move", ""),
+                    }
                     for entry in (conv_thread or [])
                 ]
                 beat_result = await banter_engine.generate_beat(
@@ -2471,7 +2732,7 @@ async def run_reactive_reply(agent: dict, llm) -> dict:
             prompt = (
                 f"ARC THEME: {arc_theme or 'none'}\n"
                 f"YOU ARE RESPONDING TO: {sender_name} [{sender_arch}]\n"
-                f"THEIR LATEST MESSAGE: \"{message_text}\"\n"
+                f'THEIR LATEST MESSAGE: "{message_text}"\n'
                 f"BANTER PROFILE: cadence={profile.get('cadence')} backchannel={profile.get('backchannel') or 'none'} callback={profile.get('callback') or 'none'}\n"
                 "BANTER LOOP CHECK (repeat every reply until it becomes instinct):\n"
                 + _BANTER_LOOP_CHECK_TEXT
@@ -2515,7 +2776,7 @@ async def run_reactive_reply(agent: dict, llm) -> dict:
             f"{persona}\n"
             f"{GROUNDING_SYSTEM_RULE}\n"
             f"{world_rules_forbidden_section()}\n"
-                "Respond ONLY with a single valid JSON object. No explanation, no prose, no markdown."
+            "Respond ONLY with a single valid JSON object. No explanation, no prose, no markdown."
         )
         # --- BanterEngine integration: use engine-generated move and line for fallback ---
         # If BanterEngine already produced a result (top branch), reuse it.
@@ -2524,7 +2785,11 @@ async def run_reactive_reply(agent: dict, llm) -> dict:
             try:
                 banter_engine = await _get_banter_engine()
                 banter_conv = [
-                    {"speaker": entry.get("sender_name", "?"), "content": entry.get("content", ""), "move": entry.get("move", "")}
+                    {
+                        "speaker": entry.get("sender_name", "?"),
+                        "content": entry.get("content", ""),
+                        "move": entry.get("move", ""),
+                    }
                     for entry in (conv_thread or [])
                 ]
                 beat_result = await banter_engine.generate_beat(
@@ -2542,7 +2807,9 @@ async def run_reactive_reply(agent: dict, llm) -> dict:
                 banter_fallback_line = None
                 beat_result = None
 
-        fallback_target_for_action = _clean_context_text(top.get("sender_id") if top else fallback_target_id, 80)
+        fallback_target_for_action = _clean_context_text(
+            top.get("sender_id") if top else fallback_target_id, 80
+        )
         fallback_reply_to = _clean_context_text(top.get("message_id") if top else "", 80)
         fallback_message_text = message_text if top else (arc_theme or "Start the argument.")
 
@@ -2587,10 +2854,21 @@ async def run_reactive_reply(agent: dict, llm) -> dict:
             line = _polish_reactive_text(text, max_len=240)
             if not line:
                 return False
-            if _is_generic_reactive_thought(line) or _looks_repetitive_text(line) or _looks_cut_off_fragment(line):
+            if (
+                _is_generic_reactive_thought(line)
+                or _looks_repetitive_text(line)
+                or _looks_cut_off_fragment(line)
+            ):
                 return False
             low = line.lower()
-            if low.startswith(("answer this", "then answer me this", "then build it", "if you mean that seriously")):
+            if low.startswith(
+                (
+                    "answer this",
+                    "then answer me this",
+                    "then build it",
+                    "if you mean that seriously",
+                )
+            ):
                 return False
 
             # Try BanterEngine Quality_Judge for semantic scoring
@@ -2605,19 +2883,26 @@ async def run_reactive_reply(agent: dict, llm) -> dict:
             if _qj_evaluate is not None:
                 try:
                     score = await _qj_evaluate(
-                        line, archetype=archetype, move=move, arc_theme=arc_theme, timeout_s=2.0,
+                        line,
+                        archetype=archetype,
+                        move=move,
+                        arc_theme=arc_theme,
+                        timeout_s=2.0,
                     )
                     return score.total >= 4
                 except Exception:
                     pass
             # Legacy fallback: use keyword-based score
-            return _banter_quality_score(
-                line,
-                archetype=archetype,
-                move=move,
-                message_text=fallback_message_text,
-                arc_theme=arc_theme,
-            ) >= 4
+            return (
+                _banter_quality_score(
+                    line,
+                    archetype=archetype,
+                    move=move,
+                    message_text=fallback_message_text,
+                    arc_theme=arc_theme,
+                )
+                >= 4
+            )
 
         if not await _check_line_quality(thought):
             thought = ""
@@ -2679,7 +2964,9 @@ async def run_reactive_reply(agent: dict, llm) -> dict:
         return _normalize_reactive_result(
             state,
             {
-                "action_type": "social" if action and action.get("type") == "send_message" else "thought",
+                "action_type": "social"
+                if action and action.get("type") == "send_message"
+                else "thought",
                 "thought": thought,
                 "action_json": raw,
                 "action": action,

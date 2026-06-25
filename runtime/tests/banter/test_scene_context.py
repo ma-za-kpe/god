@@ -395,7 +395,7 @@ class TestGetContext:
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
-from conftest import st_beat_sequence, ARCHETYPES, MOVE_TYPES, ENERGY_LABELS
+from conftest import st_beat_sequence
 
 
 class TestProperty13SceneContextWindowBound:
@@ -448,9 +448,7 @@ class TestProperty14LandedHitAcknowledgmentCounter:
         post_beats=st_beat_sequence(min_size=0, max_size=10),
     )
     @settings(max_examples=200)
-    def test_landed_hit_counter_never_negative(
-        self, pre_beats: list[Beat], post_beats: list[Beat]
-    ):
+    def test_landed_hit_counter_never_negative(self, pre_beats: list[Beat], post_beats: list[Beat]):
         """Landed hit remaining counter is never negative."""
         sc = _fresh_scene_context()
         for beat in pre_beats:
@@ -474,9 +472,7 @@ class TestProperty14LandedHitAcknowledgmentCounter:
         for beat in post_beats:
             sc.add_beat(beat)
             ctx = sc.get_context_for_generation()
-            assert ctx.landed_hit_remaining >= 0, (
-                "Landed hit counter went negative"
-            )
+            assert ctx.landed_hit_remaining >= 0, "Landed hit counter went negative"
 
     @given(
         num_follow_up=st.integers(min_value=0, max_value=10),
@@ -552,14 +548,26 @@ class TestProperty15HasTheRoomAssignment:
         """The elder with highest avg across ≥2 beats gets the room."""
         sc = _fresh_scene_context()
         # Give elder_a two beats
-        sc.add_beat(Beat(
-            speaker="elder_a", content="Line 1", move="COUNTER",
-            quality_score=score_a, energy_label="warm", timestamp=1.0,
-        ))
-        sc.add_beat(Beat(
-            speaker="elder_a", content="Line 2", move="COUNTER",
-            quality_score=score_a, energy_label="warm", timestamp=2.0,
-        ))
+        sc.add_beat(
+            Beat(
+                speaker="elder_a",
+                content="Line 1",
+                move="COUNTER",
+                quality_score=score_a,
+                energy_label="warm",
+                timestamp=1.0,
+            )
+        )
+        sc.add_beat(
+            Beat(
+                speaker="elder_a",
+                content="Line 2",
+                move="COUNTER",
+                quality_score=score_a,
+                energy_label="warm",
+                timestamp=2.0,
+            )
+        )
 
         ctx = sc.get_context_for_generation()
         # With only elder_a having ≥2 beats, they should have the room

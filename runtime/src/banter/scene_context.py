@@ -95,9 +95,7 @@ class SceneContext:
         # Check heated: need 3+ beats all >8 with ESCALATE/TAUNT
         if len(beats) >= 3:
             heated_moves = {"ESCALATE", "TAUNT"}
-            all_heated = all(
-                b.quality_score > 8 and b.move in heated_moves for b in beats
-            )
+            all_heated = all(b.quality_score > 8 and b.move in heated_moves for b in beats)
             if all_heated:
                 return "heated"
 

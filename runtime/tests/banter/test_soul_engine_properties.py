@@ -23,7 +23,6 @@ from hypothesis import given, settings, HealthCheck, assume
 from hypothesis import strategies as st
 
 from banter.soul_types import (
-    VOICE_DNA_SCHEMA,
     RhythmPattern,
     SoulEngineConfig,
     VoiceDNAProfile,
@@ -49,29 +48,33 @@ _MIN_COUNTS = {
 
 def _st_non_empty_string() -> st.SearchStrategy[str]:
     """Generate a non-empty string suitable for profile entries."""
-    return st.text(min_size=1, max_size=50, alphabet=st.characters(
-        whitelist_categories=("L", "N", "P", "Z"),
-        min_codepoint=32,
-        max_codepoint=126,
-    ))
+    return st.text(
+        min_size=1,
+        max_size=50,
+        alphabet=st.characters(
+            whitelist_categories=("L", "N", "P", "Z"),
+            min_codepoint=32,
+            max_codepoint=126,
+        ),
+    )
 
 
 def _st_rhythm_pattern_dict() -> st.SearchStrategy[dict]:
     """Generate a rhythm pattern dict matching the expected schema."""
-    return st.fixed_dictionaries({
-        "name": _st_non_empty_string(),
-        "clause_count_range": st.tuples(
-            st.integers(min_value=1, max_value=5),
-            st.integers(min_value=1, max_value=10),
-        ).map(lambda t: [min(t), max(t)] if t[0] != t[1] else [t[0], t[0] + 1]),
-        "word_count_per_clause_range": st.tuples(
-            st.integers(min_value=1, max_value=10),
-            st.integers(min_value=1, max_value=20),
-        ).map(lambda t: [min(t), max(t)] if t[0] != t[1] else [t[0], t[0] + 1]),
-        "pause_placement": st.sampled_from([
-            "before_final", "between_clauses", "front_loaded"
-        ]),
-    })
+    return st.fixed_dictionaries(
+        {
+            "name": _st_non_empty_string(),
+            "clause_count_range": st.tuples(
+                st.integers(min_value=1, max_value=5),
+                st.integers(min_value=1, max_value=10),
+            ).map(lambda t: [min(t), max(t)] if t[0] != t[1] else [t[0], t[0] + 1]),
+            "word_count_per_clause_range": st.tuples(
+                st.integers(min_value=1, max_value=10),
+                st.integers(min_value=1, max_value=20),
+            ).map(lambda t: [min(t), max(t)] if t[0] != t[1] else [t[0], t[0] + 1]),
+            "pause_placement": st.sampled_from(["before_final", "between_clauses", "front_loaded"]),
+        }
+    )
 
 
 def _st_string_list(min_count: int, max_count: int = 10) -> st.SearchStrategy[list]:
@@ -86,29 +89,19 @@ def st_valid_voice_dna_profile(draw: st.DrawFn) -> dict:
     All 7 required fields are present with at least the minimum counts.
     """
     return {
-        "sentence_structures": draw(_st_string_list(
-            _MIN_COUNTS["sentence_structures"]
-        )),
-        "verbal_tics": draw(_st_string_list(
-            _MIN_COUNTS["verbal_tics"]
-        )),
-        "rhythm_patterns": draw(st.lists(
-            _st_rhythm_pattern_dict(),
-            min_size=_MIN_COUNTS["rhythm_patterns"],
-            max_size=5,
-        )),
-        "micro_phrases": draw(_st_string_list(
-            _MIN_COUNTS["micro_phrases"]
-        )),
-        "rhetorical_devices": draw(_st_string_list(
-            _MIN_COUNTS["rhetorical_devices"]
-        )),
-        "opening_patterns": draw(_st_string_list(
-            _MIN_COUNTS["opening_patterns"]
-        )),
-        "closing_patterns": draw(_st_string_list(
-            _MIN_COUNTS["closing_patterns"]
-        )),
+        "sentence_structures": draw(_st_string_list(_MIN_COUNTS["sentence_structures"])),
+        "verbal_tics": draw(_st_string_list(_MIN_COUNTS["verbal_tics"])),
+        "rhythm_patterns": draw(
+            st.lists(
+                _st_rhythm_pattern_dict(),
+                min_size=_MIN_COUNTS["rhythm_patterns"],
+                max_size=5,
+            )
+        ),
+        "micro_phrases": draw(_st_string_list(_MIN_COUNTS["micro_phrases"])),
+        "rhetorical_devices": draw(_st_string_list(_MIN_COUNTS["rhetorical_devices"])),
+        "opening_patterns": draw(_st_string_list(_MIN_COUNTS["opening_patterns"])),
+        "closing_patterns": draw(_st_string_list(_MIN_COUNTS["closing_patterns"])),
     }
 
 
@@ -136,28 +129,34 @@ def st_invalid_voice_dna_profile(draw: st.DrawFn) -> dict:
         if min_count > 0:
             short_count = draw(st.integers(min_value=0, max_value=min_count - 1))
             if target_field == "rhythm_patterns":
-                profile[target_field] = draw(st.lists(
-                    _st_rhythm_pattern_dict(),
-                    min_size=short_count,
-                    max_size=short_count,
-                ))
+                profile[target_field] = draw(
+                    st.lists(
+                        _st_rhythm_pattern_dict(),
+                        min_size=short_count,
+                        max_size=short_count,
+                    )
+                )
             else:
-                profile[target_field] = draw(st.lists(
-                    _st_non_empty_string(),
-                    min_size=short_count,
-                    max_size=short_count,
-                ))
+                profile[target_field] = draw(
+                    st.lists(
+                        _st_non_empty_string(),
+                        min_size=short_count,
+                        max_size=short_count,
+                    )
+                )
         else:
             # min_count is 0, can't make it insufficient; fall back to missing
             del profile[target_field]
     elif strategy == "wrong_type":
         # Replace a list field with a non-list value
-        non_list_value = draw(st.one_of(
-            st.text(min_size=0, max_size=20),
-            st.integers(),
-            st.none(),
-            st.booleans(),
-        ))
+        non_list_value = draw(
+            st.one_of(
+                st.text(min_size=0, max_size=20),
+                st.integers(),
+                st.none(),
+                st.booleans(),
+            )
+        )
         profile[target_field] = non_list_value
 
     return profile
@@ -190,9 +189,20 @@ def st_rhythm_pattern_obj(draw: st.DrawFn) -> RhythmPattern:
 @st.composite
 def st_voice_dna_profile_obj(draw: st.DrawFn) -> VoiceDNAProfile:
     """Generate a valid VoiceDNAProfile dataclass instance."""
-    archetype = draw(st.sampled_from(
-        ["parasite", "prophet", "trickster", "sovereign", "martyr", "shadow", "herald", "keeper"]
-    ))
+    archetype = draw(
+        st.sampled_from(
+            [
+                "parasite",
+                "prophet",
+                "trickster",
+                "sovereign",
+                "martyr",
+                "shadow",
+                "herald",
+                "keeper",
+            ]
+        )
+    )
     sentence_structures = draw(_st_string_list(_MIN_COUNTS["sentence_structures"]))
     verbal_tics = draw(_st_string_list(_MIN_COUNTS["verbal_tics"]))
     rhythm_patterns = draw(st.lists(st_rhythm_pattern_obj(), min_size=1, max_size=5))
@@ -239,9 +249,7 @@ class TestVoiceDNASchemaValidation:
         assert is_valid is True, (
             f"Expected valid profile to pass validation but got violations: {violations}"
         )
-        assert violations == [], (
-            f"Expected no violations for valid profile but got: {violations}"
-        )
+        assert violations == [], f"Expected no violations for valid profile but got: {violations}"
 
     @settings(max_examples=100, suppress_health_check=[HealthCheck.too_slow])
     @given(profile_data=st_invalid_voice_dna_profile())
@@ -252,11 +260,9 @@ class TestVoiceDNASchemaValidation:
         assert is_valid is False, (
             "Expected invalid profile to fail validation but it passed. "
             f"Profile fields present: {list(profile_data.keys())}, "
-            f"field counts: {({k: len(v) if isinstance(v, list) else type(v).__name__ for k, v in profile_data.items()})}"
+            f"field counts: { ({k: len(v) if isinstance(v, list) else type(v).__name__ for k, v in profile_data.items()}) }"
         )
-        assert len(violations) > 0, (
-            "Expected at least one violation for invalid profile"
-        )
+        assert len(violations) > 0, "Expected at least one violation for invalid profile"
 
 
 # ---------------------------------------------------------------------------
@@ -311,25 +317,34 @@ class TestVoiceDNASerializationRoundTrip:
 # Feature: elder-voice-soul-engine, Property 2: Voice Conformance Score Bounds
 # ---------------------------------------------------------------------------
 
-from pathlib import Path
 
-from banter.voice_dna import VoiceDNA, ARCHETYPES
-from banter.soul_types import SoulEngineConfig
+from banter.voice_dna import VoiceDNA
 
 # Resolve the voice profiles directory (works both locally and in Docker)
 _PROFILES_DIR = Path("/app/src/banter/voice_profiles")
 if not _PROFILES_DIR.exists():
-    _PROFILES_DIR = Path(os.path.abspath(
-        os.path.join(os.path.dirname(__file__), "..", "..", "src", "banter", "voice_profiles")
-    ))
+    _PROFILES_DIR = Path(
+        os.path.abspath(
+            os.path.join(os.path.dirname(__file__), "..", "..", "src", "banter", "voice_profiles")
+        )
+    )
+
 
 # Strategy: random archetype from the set of 8
 def st_archetype() -> st.SearchStrategy[str]:
     """Pick a random archetype from the 8 defined archetypes."""
-    return st.sampled_from([
-        "parasite", "prophet", "trickster", "sovereign",
-        "martyr", "shadow", "herald", "keeper",
-    ])
+    return st.sampled_from(
+        [
+            "parasite",
+            "prophet",
+            "trickster",
+            "sovereign",
+            "martyr",
+            "shadow",
+            "herald",
+            "keeper",
+        ]
+    )
 
 
 # Strategy: random candidate line string
@@ -392,8 +407,14 @@ _STRUCTURAL_CATEGORIES = [
 
 # All 8 archetypes (module-level constant for Property 3)
 _EIGHT_ARCHETYPES = [
-    "parasite", "prophet", "trickster", "sovereign",
-    "martyr", "shadow", "herald", "keeper",
+    "parasite",
+    "prophet",
+    "trickster",
+    "sovereign",
+    "martyr",
+    "shadow",
+    "herald",
+    "keeper",
 ]
 
 
@@ -429,9 +450,7 @@ def _categories_differ(profile_a: dict, profile_b: dict) -> list:
 def st_distinct_archetype_pair(draw: st.DrawFn) -> tuple:
     """Generate a pair of two distinct archetypes from the set of 8."""
     archetype_a = draw(st.sampled_from(_EIGHT_ARCHETYPES))
-    archetype_b = draw(
-        st.sampled_from([a for a in _EIGHT_ARCHETYPES if a != archetype_a])
-    )
+    archetype_b = draw(st.sampled_from([a for a in _EIGHT_ARCHETYPES if a != archetype_a]))
     return (archetype_a, archetype_b)
 
 
@@ -450,9 +469,7 @@ class TestArchetypeLinguisticDifferentiation:
     def setup_class(cls):
         """Load all 8 archetype profiles once for all tests in this class."""
         cls.profiles = _load_all_profiles()
-        assert len(cls.profiles) == 8, (
-            f"Expected 8 profiles loaded, got {len(cls.profiles)}"
-        )
+        assert len(cls.profiles) == 8, f"Expected 8 profiles loaded, got {len(cls.profiles)}"
 
     @settings(max_examples=100, suppress_health_check=[HealthCheck.too_slow])
     @given(pair=st_distinct_archetype_pair())
@@ -491,8 +508,7 @@ class TestArchetypeLinguisticDifferentiation:
                 )
 
         assert not failures, (
-            f"Archetype pairs with fewer than 4 differing categories:\n"
-            + "\n".join(failures)
+            "Archetype pairs with fewer than 4 differing categories:\n" + "\n".join(failures)
         )
 
     def test_each_archetype_profile_loads_successfully(self):
@@ -502,9 +518,7 @@ class TestArchetypeLinguisticDifferentiation:
 
         for archetype, profile in profiles.items():
             for category in _STRUCTURAL_CATEGORIES:
-                assert category in profile, (
-                    f"Archetype '{archetype}' missing category '{category}'"
-                )
+                assert category in profile, f"Archetype '{archetype}' missing category '{category}'"
 
     def test_minimum_differentiation_coverage(self):
         """No single category is identical across all pairs (diversity exists)."""
@@ -637,12 +651,25 @@ from banter.types import InteractionRecord
 def st_interaction_record(draw: st.DrawFn) -> InteractionRecord:
     """Generate a random InteractionRecord."""
     return InteractionRecord(
-        timestamp=draw(st.floats(min_value=0.0, max_value=1e12, allow_nan=False, allow_infinity=False)),
+        timestamp=draw(
+            st.floats(min_value=0.0, max_value=1e12, allow_nan=False, allow_infinity=False)
+        ),
         elder_a=draw(st.sampled_from(["alpha", "beta", "gamma", "delta", "epsilon"])),
         elder_b=draw(st.sampled_from(["zeta", "eta", "theta", "iota", "kappa"])),
-        move_used=draw(st.sampled_from([
-            "COUNTER", "ESCALATE", "DEFLECT", "TAUNT", "QUESTION", "PIVOT", "CONCEDE", "CALLBACK",
-        ])),
+        move_used=draw(
+            st.sampled_from(
+                [
+                    "COUNTER",
+                    "ESCALATE",
+                    "DEFLECT",
+                    "TAUNT",
+                    "QUESTION",
+                    "PIVOT",
+                    "CONCEDE",
+                    "CALLBACK",
+                ]
+            )
+        ),
         emotional_valence=draw(st.sampled_from(["positive", "negative", "neutral"])),
         betrayal=draw(st.booleans()),
         alliance=draw(st.booleans()),
@@ -662,9 +689,10 @@ def _count_sentences(text: str) -> int:
         return 0
 
     import re
+
     # Split on sentence-ending punctuation followed by space or end-of-string
     # This handles ". ", "! ", "? " as boundaries
-    sentences = re.split(r'(?<=[.!?])\s+', text.strip())
+    sentences = re.split(r"(?<=[.!?])\s+", text.strip())
     # Filter out empty strings
     sentences = [s for s in sentences if s.strip()]
     return len(sentences)
@@ -689,10 +717,18 @@ class TestEmotionalPrimerOutputSizeBounds:
     @settings(max_examples=100, suppress_health_check=[HealthCheck.too_slow])
     @given(
         history=st.lists(st_interaction_record(), min_size=1, max_size=50),
-        archetype=st.sampled_from([
-            "parasite", "prophet", "trickster", "sovereign",
-            "martyr", "shadow", "herald", "keeper",
-        ]),
+        archetype=st.sampled_from(
+            [
+                "parasite",
+                "prophet",
+                "trickster",
+                "sovereign",
+                "martyr",
+                "shadow",
+                "herald",
+                "keeper",
+            ]
+        ),
         tension_level=st.integers(min_value=0, max_value=10),
         reconciliation_active=st.booleans(),
     )
@@ -725,10 +761,18 @@ class TestEmotionalPrimerOutputSizeBounds:
     @settings(max_examples=100, suppress_health_check=[HealthCheck.too_slow])
     @given(
         history=st.lists(st_interaction_record(), min_size=1, max_size=50),
-        archetype=st.sampled_from([
-            "parasite", "prophet", "trickster", "sovereign",
-            "martyr", "shadow", "herald", "keeper",
-        ]),
+        archetype=st.sampled_from(
+            [
+                "parasite",
+                "prophet",
+                "trickster",
+                "sovereign",
+                "martyr",
+                "shadow",
+                "herald",
+                "keeper",
+            ]
+        ),
         tension_level=st.integers(min_value=0, max_value=10),
         reconciliation_active=st.booleans(),
     )
@@ -765,7 +809,6 @@ class TestEmotionalPrimerOutputSizeBounds:
 
 import re
 
-from banter.emotional_primer import EmotionalPrimer
 from banter.types import InteractionRecord
 
 
@@ -775,22 +818,41 @@ from banter.types import InteractionRecord
 
 # Valid Elder names for generating interaction records.
 _ELDER_NAMES = [
-    "elder_alpha", "elder_beta", "elder_gamma", "elder_delta",
-    "elder_epsilon", "elder_zeta", "elder_eta", "elder_theta",
+    "elder_alpha",
+    "elder_beta",
+    "elder_gamma",
+    "elder_delta",
+    "elder_epsilon",
+    "elder_zeta",
+    "elder_eta",
+    "elder_theta",
 ]
 
 
 @st.composite
 def st_interaction_record(draw: st.DrawFn) -> InteractionRecord:
     """Generate a random InteractionRecord with valid field values."""
-    timestamp = draw(st.floats(min_value=1_000_000, max_value=9_999_999_999.0,
-                               allow_nan=False, allow_infinity=False))
+    timestamp = draw(
+        st.floats(
+            min_value=1_000_000, max_value=9_999_999_999.0, allow_nan=False, allow_infinity=False
+        )
+    )
     elder_a = draw(st.sampled_from(_ELDER_NAMES))
     elder_b = draw(st.sampled_from([n for n in _ELDER_NAMES if n != elder_a]))
-    move_used = draw(st.sampled_from([
-        "COUNTER", "ESCALATE", "DEFLECT", "TAUNT",
-        "QUESTION", "PIVOT", "CONCEDE", "CALLBACK",
-    ]))
+    move_used = draw(
+        st.sampled_from(
+            [
+                "COUNTER",
+                "ESCALATE",
+                "DEFLECT",
+                "TAUNT",
+                "QUESTION",
+                "PIVOT",
+                "CONCEDE",
+                "CALLBACK",
+            ]
+        )
+    )
     emotional_valence = draw(st.sampled_from(["positive", "negative", "neutral"]))
     betrayal = draw(st.booleans())
     alliance = draw(st.booleans())
@@ -972,8 +1034,9 @@ class TestEmotionalPrimerPresentTenseInvariant:
 # Feature: elder-voice-soul-engine, Property 6: Emotional_Primer Archetype-Specific Output
 # ---------------------------------------------------------------------------
 
-from banter.emotional_primer import EmotionalPrimer, ARCHETYPES as EP_ARCHETYPES
+from banter.emotional_primer import ARCHETYPES as EP_ARCHETYPES
 from banter.types import InteractionRecord
+
 
 # Strategy: generate a valid InteractionRecord
 @st.composite
@@ -981,11 +1044,23 @@ def st_interaction_record(draw: st.DrawFn) -> InteractionRecord:
     """Generate a random InteractionRecord with valid field values."""
     timestamp = draw(st.floats(min_value=1_000_000_000.0, max_value=2_000_000_000.0))
     elder_a = draw(st.sampled_from(["alpha", "beta", "gamma", "delta", "epsilon"]))
-    elder_b = draw(st.sampled_from([e for e in ["alpha", "beta", "gamma", "delta", "epsilon"] if e != elder_a]))
-    move_used = draw(st.sampled_from([
-        "COUNTER", "ESCALATE", "DEFLECT", "TAUNT",
-        "QUESTION", "PIVOT", "CONCEDE", "CALLBACK",
-    ]))
+    elder_b = draw(
+        st.sampled_from([e for e in ["alpha", "beta", "gamma", "delta", "epsilon"] if e != elder_a])
+    )
+    move_used = draw(
+        st.sampled_from(
+            [
+                "COUNTER",
+                "ESCALATE",
+                "DEFLECT",
+                "TAUNT",
+                "QUESTION",
+                "PIVOT",
+                "CONCEDE",
+                "CALLBACK",
+            ]
+        )
+    )
     emotional_valence = draw(st.sampled_from(["positive", "negative", "neutral"]))
     betrayal = draw(st.booleans())
     alliance = draw(st.booleans()) if not betrayal else False
@@ -1013,9 +1088,7 @@ def st_distinct_ep_archetype_pair(draw: st.DrawFn) -> tuple[str, str]:
     """Generate a pair of two distinct archetypes from the supported set."""
     archetypes_list = sorted(EP_ARCHETYPES)
     archetype_a = draw(st.sampled_from(archetypes_list))
-    archetype_b = draw(
-        st.sampled_from([a for a in archetypes_list if a != archetype_a])
-    )
+    archetype_b = draw(st.sampled_from([a for a in archetypes_list if a != archetype_a]))
     return (archetype_a, archetype_b)
 
 
@@ -1181,37 +1254,92 @@ from banter.soul_types import WriteBuffer, MemorableMoment
 def st_memorable_moment(draw: st.DrawFn) -> MemorableMoment:
     """Generate a random MemorableMoment for write buffer testing."""
     return MemorableMoment(
-        speaker=draw(st.sampled_from([
-            "parasite", "prophet", "trickster", "sovereign",
-            "martyr", "shadow", "herald", "keeper",
-        ])),
-        target=draw(st.sampled_from([
-            "parasite", "prophet", "trickster", "sovereign",
-            "martyr", "shadow", "herald", "keeper",
-        ])),
-        line=draw(st.text(min_size=1, max_size=100, alphabet=st.characters(
-            whitelist_categories=("L", "N", "P", "Z"),
-            min_codepoint=32, max_codepoint=126,
-        ))),
-        move=draw(st.sampled_from([
-            "COUNTER", "ESCALATE", "DEFLECT", "TAUNT",
-            "QUESTION", "PIVOT", "CONCEDE", "CALLBACK",
-        ])),
-        arc_theme=draw(st.text(min_size=1, max_size=50, alphabet=st.characters(
-            whitelist_categories=("L", "N", "Z"),
-            min_codepoint=32, max_codepoint=126,
-        ))),
+        speaker=draw(
+            st.sampled_from(
+                [
+                    "parasite",
+                    "prophet",
+                    "trickster",
+                    "sovereign",
+                    "martyr",
+                    "shadow",
+                    "herald",
+                    "keeper",
+                ]
+            )
+        ),
+        target=draw(
+            st.sampled_from(
+                [
+                    "parasite",
+                    "prophet",
+                    "trickster",
+                    "sovereign",
+                    "martyr",
+                    "shadow",
+                    "herald",
+                    "keeper",
+                ]
+            )
+        ),
+        line=draw(
+            st.text(
+                min_size=1,
+                max_size=100,
+                alphabet=st.characters(
+                    whitelist_categories=("L", "N", "P", "Z"),
+                    min_codepoint=32,
+                    max_codepoint=126,
+                ),
+            )
+        ),
+        move=draw(
+            st.sampled_from(
+                [
+                    "COUNTER",
+                    "ESCALATE",
+                    "DEFLECT",
+                    "TAUNT",
+                    "QUESTION",
+                    "PIVOT",
+                    "CONCEDE",
+                    "CALLBACK",
+                ]
+            )
+        ),
+        arc_theme=draw(
+            st.text(
+                min_size=1,
+                max_size=50,
+                alphabet=st.characters(
+                    whitelist_categories=("L", "N", "Z"),
+                    min_codepoint=32,
+                    max_codepoint=126,
+                ),
+            )
+        ),
         valence=draw(st.sampled_from(["positive", "negative", "neutral"])),
-        summary=draw(st.text(min_size=1, max_size=100, alphabet=st.characters(
-            whitelist_categories=("L", "N", "P", "Z"),
-            min_codepoint=32, max_codepoint=126,
-        ))),
+        summary=draw(
+            st.text(
+                min_size=1,
+                max_size=100,
+                alphabet=st.characters(
+                    whitelist_categories=("L", "N", "P", "Z"),
+                    min_codepoint=32,
+                    max_codepoint=126,
+                ),
+            )
+        ),
         score=draw(st.integers(min_value=13, max_value=18)),
         beat_number=draw(st.integers(min_value=1, max_value=1000)),
-        created_at=draw(st.floats(
-            min_value=1_000_000_000.0, max_value=2_000_000_000.0,
-            allow_nan=False, allow_infinity=False,
-        )),
+        created_at=draw(
+            st.floats(
+                min_value=1_000_000_000.0,
+                max_value=2_000_000_000.0,
+                allow_nan=False,
+                allow_infinity=False,
+            )
+        ),
     )
 
 
@@ -1240,9 +1368,7 @@ class TestWriteBufferCapacity:
 
     @settings(max_examples=100, suppress_health_check=[HealthCheck.too_slow])
     @given(moments=st.lists(st_memorable_moment(), min_size=21, max_size=100))
-    def test_buffer_contains_last_20_items_after_overflow(
-        self, moments: list[MemorableMoment]
-    ):
+    def test_buffer_contains_last_20_items_after_overflow(self, moments: list[MemorableMoment]):
         """After adding >20 items, the buffer contains exactly the last 20 (FIFO eviction)."""
         buffer = WriteBuffer()
 
@@ -1267,9 +1393,7 @@ class TestWriteBufferCapacity:
 
     @settings(max_examples=100, suppress_health_check=[HealthCheck.too_slow])
     @given(moments=st.lists(st_memorable_moment(), min_size=1, max_size=20))
-    def test_buffer_retains_all_when_under_capacity(
-        self, moments: list[MemorableMoment]
-    ):
+    def test_buffer_retains_all_when_under_capacity(self, moments: list[MemorableMoment]):
         """When fewer than 20 items are added, ALL are retained in order."""
         buffer = WriteBuffer()
 
@@ -1277,13 +1401,12 @@ class TestWriteBufferCapacity:
             buffer.add(moment)
 
         assert len(buffer.entries) == len(moments), (
-            f"Expected {len(moments)} entries (under capacity), "
-            f"got {len(buffer.entries)}"
+            f"Expected {len(moments)} entries (under capacity), got {len(buffer.entries)}"
         )
 
         actual_entries = list(buffer.entries)
         assert actual_entries == moments, (
-            f"Buffer entries don't match input order when under capacity"
+            "Buffer entries don't match input order when under capacity"
         )
 
     @settings(max_examples=100, suppress_health_check=[HealthCheck.too_slow])
@@ -1311,14 +1434,12 @@ class TestWriteBufferCapacity:
         expected = moments[1:21]
         actual = list(buffer.entries)
         assert actual == expected, (
-            f"After adding the 21st entry, buffer should contain moments[1:21] "
-            f"(oldest evicted, newest appended)"
+            "After adding the 21st entry, buffer should contain moments[1:21] "
+            "(oldest evicted, newest appended)"
         )
 
         # The 21st entry should be at the end
-        assert buffer.entries[-1] == twenty_first, (
-            f"The 21st entry was not added to the buffer"
-        )
+        assert buffer.entries[-1] == twenty_first, "The 21st entry was not added to the buffer"
 
 
 # ---------------------------------------------------------------------------
@@ -1349,10 +1470,18 @@ class TestSubtletyDirectorActivationLogic:
     @settings(max_examples=100, suppress_health_check=[HealthCheck.too_slow])
     @given(
         tension=st.integers(min_value=0, max_value=10),
-        move=st.sampled_from([
-            "COUNTER", "ESCALATE", "DEFLECT", "QUESTION",
-            "TAUNT", "PIVOT", "CONCEDE", "CALLBACK",
-        ]),
+        move=st.sampled_from(
+            [
+                "COUNTER",
+                "ESCALATE",
+                "DEFLECT",
+                "QUESTION",
+                "TAUNT",
+                "PIVOT",
+                "CONCEDE",
+                "CALLBACK",
+            ]
+        ),
         has_sore_spot=st.booleans(),
         has_history=st.booleans(),
     )
@@ -1410,10 +1539,18 @@ class TestSubtletyDirectorActivationLogic:
     @settings(max_examples=100, suppress_health_check=[HealthCheck.too_slow])
     @given(
         tension=st.integers(min_value=0, max_value=10),
-        move=st.sampled_from([
-            "COUNTER", "ESCALATE", "DEFLECT", "QUESTION",
-            "TAUNT", "PIVOT", "CONCEDE", "CALLBACK",
-        ]),
+        move=st.sampled_from(
+            [
+                "COUNTER",
+                "ESCALATE",
+                "DEFLECT",
+                "QUESTION",
+                "TAUNT",
+                "PIVOT",
+                "CONCEDE",
+                "CALLBACK",
+            ]
+        ),
         has_sore_spot=st.booleans(),
         has_history=st.booleans(),
     )
@@ -1454,10 +1591,17 @@ class TestSubtletyDirectorActivationLogic:
     @settings(max_examples=100, suppress_health_check=[HealthCheck.too_slow])
     @given(
         tension=st.integers(min_value=2, max_value=8),
-        move=st.sampled_from([
-            "COUNTER", "ESCALATE", "DEFLECT", "QUESTION",
-            "TAUNT", "PIVOT", "CALLBACK",
-        ]),
+        move=st.sampled_from(
+            [
+                "COUNTER",
+                "ESCALATE",
+                "DEFLECT",
+                "QUESTION",
+                "TAUNT",
+                "PIVOT",
+                "CALLBACK",
+            ]
+        ),
         has_sore_spot=st.booleans(),
     )
     def test_activation_when_no_override_and_condition_met(
@@ -1500,9 +1644,15 @@ class TestSubtletyDirectorActivationLogic:
     @settings(max_examples=100, suppress_health_check=[HealthCheck.too_slow])
     @given(
         tension=st.sampled_from([2, 3]),
-        move=st.sampled_from([
-            "COUNTER", "ESCALATE", "TAUNT", "PIVOT", "CALLBACK",
-        ]),
+        move=st.sampled_from(
+            [
+                "COUNTER",
+                "ESCALATE",
+                "TAUNT",
+                "PIVOT",
+                "CALLBACK",
+            ]
+        ),
     )
     def test_no_activation_without_any_condition(
         self,
@@ -1541,11 +1691,10 @@ class TestSubtletyDirectorActivationLogic:
 from collections import deque
 
 from banter.callback_registry import (
-    CallbackRegistry,
     _MAX_MOMENTS_PER_PAIR,
     _MAX_GAGS_PER_PAIR,
 )
-from banter.soul_types import MemorableMoment, WriteBuffer, SoulEngineConfig
+from banter.soul_types import MemorableMoment
 
 
 # ---------------------------------------------------------------------------
@@ -1577,31 +1726,53 @@ def st_moment_sequence(draw: st.DrawFn) -> list[MemorableMoment]:
     the 20-entry write buffer cap) for the same Elder pair.
     """
     speaker = draw(st.sampled_from(["alpha", "beta", "gamma", "delta"]))
-    target = draw(st.sampled_from(
-        [e for e in ["epsilon", "zeta", "eta", "theta"] if e != speaker]
-    ))
+    target = draw(st.sampled_from([e for e in ["epsilon", "zeta", "eta", "theta"] if e != speaker]))
     count = draw(st.integers(min_value=1, max_value=60))
 
     moments = []
     for i in range(count):
-        moments.append(MemorableMoment(
-            speaker=speaker,
-            target=target,
-            line=draw(st.text(min_size=5, max_size=100, alphabet=st.characters(
-                whitelist_categories=("L", "N", "Z"), min_codepoint=32, max_codepoint=126
-            ))),
-            move=draw(st.sampled_from(["TAUNT", "COUNTER", "ESCALATE", "DEFLECT"])),
-            arc_theme=draw(st.text(min_size=3, max_size=30, alphabet=st.characters(
-                whitelist_categories=("L",), min_codepoint=97, max_codepoint=122
-            ))),
-            valence=draw(st.sampled_from(["positive", "negative", "neutral"])),
-            summary=draw(st.text(min_size=5, max_size=50, alphabet=st.characters(
-                whitelist_categories=("L", "N", "Z"), min_codepoint=32, max_codepoint=126
-            ))),
-            score=draw(st.integers(min_value=13, max_value=18)),
-            beat_number=i,
-            created_at=float(1000000 + i),
-        ))
+        moments.append(
+            MemorableMoment(
+                speaker=speaker,
+                target=target,
+                line=draw(
+                    st.text(
+                        min_size=5,
+                        max_size=100,
+                        alphabet=st.characters(
+                            whitelist_categories=("L", "N", "Z"),
+                            min_codepoint=32,
+                            max_codepoint=126,
+                        ),
+                    )
+                ),
+                move=draw(st.sampled_from(["TAUNT", "COUNTER", "ESCALATE", "DEFLECT"])),
+                arc_theme=draw(
+                    st.text(
+                        min_size=3,
+                        max_size=30,
+                        alphabet=st.characters(
+                            whitelist_categories=("L",), min_codepoint=97, max_codepoint=122
+                        ),
+                    )
+                ),
+                valence=draw(st.sampled_from(["positive", "negative", "neutral"])),
+                summary=draw(
+                    st.text(
+                        min_size=5,
+                        max_size=50,
+                        alphabet=st.characters(
+                            whitelist_categories=("L", "N", "Z"),
+                            min_codepoint=32,
+                            max_codepoint=126,
+                        ),
+                    )
+                ),
+                score=draw(st.integers(min_value=13, max_value=18)),
+                beat_number=i,
+                created_at=float(1000000 + i),
+            )
+        )
 
     return moments
 
@@ -1718,8 +1889,7 @@ class TestCallbackRegistryCapacityInvariant:
 
         # Final state: at most 50 entries
         assert len(stored) <= _MAX_MOMENTS_PER_PAIR, (
-            f"Final moments count is {len(stored)}, exceeds cap of "
-            f"{_MAX_MOMENTS_PER_PAIR}"
+            f"Final moments count is {len(stored)}, exceeds cap of {_MAX_MOMENTS_PER_PAIR}"
         )
 
     # ------------------------------------------------------------------
@@ -1765,8 +1935,7 @@ class TestCallbackRegistryCapacityInvariant:
 
         # Final state: at most 10 entries
         assert len(stored_gags) <= _MAX_GAGS_PER_PAIR, (
-            f"Final gags count is {len(stored_gags)}, exceeds cap of "
-            f"{_MAX_GAGS_PER_PAIR}"
+            f"Final gags count is {len(stored_gags)}, exceeds cap of {_MAX_GAGS_PER_PAIR}"
         )
 
     # ------------------------------------------------------------------
@@ -1793,21 +1962,15 @@ class TestCallbackRegistryCapacityInvariant:
             buffer.add(_make_moment("x", "y", i))
 
         # Invariant holds
-        assert len(buffer.entries) <= 20, (
-            f"WriteBuffer exceeded 20 entries: {len(buffer.entries)}"
-        )
+        assert len(buffer.entries) <= 20, f"WriteBuffer exceeded 20 entries: {len(buffer.entries)}"
         assert len(buffer.entries) == min(count, 20), (
-            f"Expected {min(count, 20)} entries after adding {count}, "
-            f"got {len(buffer.entries)}"
+            f"Expected {min(count, 20)} entries after adding {count}, got {len(buffer.entries)}"
         )
 
 
 # ---------------------------------------------------------------------------
 # Feature: elder-voice-soul-engine, Property 11: Subtlety High-Tension Rate Reduction
 # ---------------------------------------------------------------------------
-
-from banter.subtlety_director import SubtletyDirector
-from banter.soul_types import SoulEngineConfig
 
 
 class TestSubtletyHighTensionRateReduction:
@@ -1940,26 +2103,41 @@ class TestSubtletyHighTensionRateReduction:
 
 from collections import Counter
 
-from banter.subtlety_director import SubtletyDirector
-from banter.soul_types import SoreSpot, SoulEngineConfig, SubtextInstruction
+from banter.soul_types import SoreSpot, SubtextInstruction
 
 
 # Strategy: generate a random Elder name
 def st_elder_name() -> st.SearchStrategy[str]:
     """Generate a random Elder name."""
-    return st.sampled_from([
-        "elder_alpha", "elder_beta", "elder_gamma", "elder_delta",
-        "elder_epsilon", "elder_zeta", "elder_eta", "elder_theta",
-    ])
+    return st.sampled_from(
+        [
+            "elder_alpha",
+            "elder_beta",
+            "elder_gamma",
+            "elder_delta",
+            "elder_epsilon",
+            "elder_zeta",
+            "elder_eta",
+            "elder_theta",
+        ]
+    )
 
 
 # Strategy: generate a random arc theme
 def st_arc_theme() -> st.SearchStrategy[str]:
     """Generate a random arc theme."""
-    return st.sampled_from([
-        "betrayal", "redemption", "power_struggle", "hidden_truth",
-        "sacrifice", "corruption", "loyalty_test", "origin_reveal",
-    ])
+    return st.sampled_from(
+        [
+            "betrayal",
+            "redemption",
+            "power_struggle",
+            "hidden_truth",
+            "sacrifice",
+            "corruption",
+            "loyalty_test",
+            "origin_reveal",
+        ]
+    )
 
 
 # Strategy: optional sore spot for generating subtext instructions
@@ -2044,9 +2222,7 @@ class TestTechniqueVarietyConstraint:
     @given(
         elder=st_elder_name(),
         seed=st.integers(min_value=0, max_value=2**31 - 1),
-        sore_spot_topics=st.lists(
-            st_arc_theme(), min_size=5, max_size=30
-        ),
+        sore_spot_topics=st.lists(st_arc_theme(), min_size=5, max_size=30),
     )
     def test_technique_variety_with_varying_sore_spots(
         self,
@@ -2102,8 +2278,8 @@ class TestTechniqueVarietyConstraint:
 # Feature: elder-voice-soul-engine, Property 8: Callback Timing Constraints
 # ---------------------------------------------------------------------------
 
-from banter.callback_registry import CallbackRegistry, _MIN_BEAT_GAP
-from banter.soul_types import CallbackUsageTracker, MemorableMoment, SoulEngineConfig
+from banter.callback_registry import _MIN_BEAT_GAP
+from banter.soul_types import CallbackUsageTracker, MemorableMoment
 
 
 class TestCallbackTimingConstraints:
@@ -2128,9 +2304,7 @@ class TestCallbackTimingConstraints:
         last_used_beat=st.integers(min_value=0, max_value=1000),
         beats_elapsed=st.integers(min_value=0, max_value=_MIN_BEAT_GAP - 1),
     )
-    def test_callback_blocked_when_gap_too_small(
-        self, last_used_beat: int, beats_elapsed: int
-    ):
+    def test_callback_blocked_when_gap_too_small(self, last_used_beat: int, beats_elapsed: int):
         """A callback is filtered when current_beat - last_used < MIN_BEAT_GAP (15)."""
         current_beat = last_used_beat + beats_elapsed
         beats_since = current_beat - last_used_beat
@@ -2144,9 +2318,7 @@ class TestCallbackTimingConstraints:
         last_used_beat=st.integers(min_value=0, max_value=1000),
         beats_elapsed=st.integers(min_value=_MIN_BEAT_GAP, max_value=200),
     )
-    def test_callback_allowed_when_gap_sufficient(
-        self, last_used_beat: int, beats_elapsed: int
-    ):
+    def test_callback_allowed_when_gap_sufficient(self, last_used_beat: int, beats_elapsed: int):
         """A callback passes the timing filter when gap >= MIN_BEAT_GAP (15)."""
         current_beat = last_used_beat + beats_elapsed
         beats_since = current_beat - last_used_beat
@@ -2175,9 +2347,7 @@ class TestCallbackTimingConstraints:
         num_uses=st.integers(min_value=1, max_value=10),
         base_beat=st.integers(min_value=0, max_value=100),
     )
-    def test_usage_tracker_records_most_recent_beat(
-        self, num_uses: int, base_beat: int
-    ):
+    def test_usage_tracker_records_most_recent_beat(self, num_uses: int, base_beat: int):
         """CallbackUsageTracker records the most recent beat for each callback (overwrite)."""
         tracker = CallbackUsageTracker()
         callback_id = "test_callback_id"
@@ -2192,13 +2362,13 @@ class TestCallbackTimingConstraints:
     @given(
         callback_ids=st.lists(
             st.text(min_size=1, max_size=12, alphabet="abcdef0123456789"),
-            min_size=1, max_size=10, unique=True,
+            min_size=1,
+            max_size=10,
+            unique=True,
         ),
         beat=st.integers(min_value=0, max_value=1000),
     )
-    def test_timing_is_independent_per_callback(
-        self, callback_ids: list, beat: int
-    ):
+    def test_timing_is_independent_per_callback(self, callback_ids: list, beat: int):
         """Each callback has an independent timing record — one doesn't affect another."""
         tracker = CallbackUsageTracker()
         for cb_id in callback_ids:
@@ -2213,8 +2383,8 @@ class TestCallbackTimingConstraints:
 # Feature: elder-voice-soul-engine, Property 9: Callback Surfacing Match Quality
 # ---------------------------------------------------------------------------
 
-from banter.callback_registry import CallbackRegistry, _TENSION_MISMATCH_REJECT
-from banter.soul_types import MemorableMoment, SoulEngineConfig
+from banter.callback_registry import _TENSION_MISMATCH_REJECT
+from banter.soul_types import MemorableMoment
 
 
 @st.composite
@@ -2222,16 +2392,31 @@ def st_moment_for_match(draw: st.DrawFn) -> MemorableMoment:
     """Generate a MemorableMoment for match quality testing."""
     valence = draw(st.sampled_from(["positive", "negative", "neutral"]))
     score = draw(st.integers(min_value=13, max_value=18))
-    arc_theme = draw(st.sampled_from([
-        "betrayal", "redemption", "power", "sacrifice",
-        "loyalty", "corruption", "truth", "survival",
-    ]))
+    arc_theme = draw(
+        st.sampled_from(
+            [
+                "betrayal",
+                "redemption",
+                "power",
+                "sacrifice",
+                "loyalty",
+                "corruption",
+                "truth",
+                "survival",
+            ]
+        )
+    )
     return MemorableMoment(
-        speaker="alpha", target="beta",
+        speaker="alpha",
+        target="beta",
         line="Test line for match scoring.",
-        move="TAUNT", arc_theme=arc_theme,
-        valence=valence, summary="Match test moment",
-        score=score, beat_number=5, created_at=1_000_000.0,
+        move="TAUNT",
+        arc_theme=arc_theme,
+        valence=valence,
+        summary="Match test moment",
+        score=score,
+        beat_number=5,
+        created_at=1_000_000.0,
     )
 
 
@@ -2255,9 +2440,7 @@ class TestCallbackSurfacingMatchQuality:
     @given(
         moment=st_moment_for_match(),
         current_tension=st.integers(min_value=0, max_value=10),
-        current_arc_theme=st.text(
-            min_size=1, max_size=30, alphabet="abcdefghijklmnopqrstuvwxyz "
-        ),
+        current_arc_theme=st.text(min_size=1, max_size=30, alphabet="abcdefghijklmnopqrstuvwxyz "),
     )
     def test_match_score_always_in_range(
         self, moment: MemorableMoment, current_tension: int, current_arc_theme: str
@@ -2319,8 +2502,9 @@ class TestCallbackSurfacingMatchQuality:
     )
     def test_theme_overlap_is_commutative(self, theme_a: str, theme_b: str):
         """_themes_overlap(a, b) == _themes_overlap(b, a)."""
-        assert self.registry._themes_overlap(theme_a, theme_b) == \
-               self.registry._themes_overlap(theme_b, theme_a)
+        assert self.registry._themes_overlap(theme_a, theme_b) == self.registry._themes_overlap(
+            theme_b, theme_a
+        )
 
     @settings(max_examples=100, suppress_health_check=[HealthCheck.too_slow])
     @given(theme=st.text(min_size=1, max_size=20, alphabet="abcdefghijklmnopqrstuvwxyz "))
@@ -2356,7 +2540,6 @@ from banter.quality_judge import (
     get_pass_threshold,
     get_refine_threshold,
 )
-from banter.soul_types import SoulEngineConfig, SubtextInstruction
 
 
 class TestQualityJudgeDimensionCount:
@@ -2371,10 +2554,18 @@ class TestQualityJudgeDimensionCount:
     @settings(max_examples=100, suppress_health_check=[HealthCheck.too_slow])
     @given(
         candidate=st.text(min_size=1, max_size=200, alphabet="abcdefghijklmnopqrstuvwxyz .,?!"),
-        archetype=st.sampled_from([
-            "parasite", "prophet", "trickster", "sovereign",
-            "martyr", "shadow", "herald", "keeper",
-        ]),
+        archetype=st.sampled_from(
+            [
+                "parasite",
+                "prophet",
+                "trickster",
+                "sovereign",
+                "martyr",
+                "shadow",
+                "herald",
+                "keeper",
+            ]
+        ),
         arc_theme=st.text(min_size=1, max_size=50, alphabet="abcdefghijklmnopqrstuvwxyz "),
     )
     def test_enhanced_score_has_exactly_7_dimensions(
@@ -2382,38 +2573,58 @@ class TestQualityJudgeDimensionCount:
     ):
         """EnhancedQualityScore always has exactly 7 dimension keys."""
         config = SoulEngineConfig()
-        result = _asyncio.run(evaluate_enhanced(
-            candidate, archetype=archetype, move="COUNTER",
-            arc_theme=arc_theme, config=config,
-        ))
+        result = _asyncio.run(
+            evaluate_enhanced(
+                candidate,
+                archetype=archetype,
+                move="COUNTER",
+                arc_theme=arc_theme,
+                config=config,
+            )
+        )
         assert isinstance(result, EnhancedQualityScore)
         dims = result.as_dict()
         assert len(dims) == 7, f"Expected 7 dimensions, got {len(dims)}: {list(dims.keys())}"
         required = {
-            "sharpness", "emotional_texture", "rhythm",
-            "thematic_relevance", "shareability",
-            "voice_authenticity", "subtext_depth",
+            "sharpness",
+            "emotional_texture",
+            "rhythm",
+            "thematic_relevance",
+            "shareability",
+            "voice_authenticity",
+            "subtext_depth",
         }
         assert set(dims.keys()) == required, f"Missing dims: {required - set(dims.keys())}"
 
     @settings(max_examples=100, suppress_health_check=[HealthCheck.too_slow])
     @given(
         candidate=st.text(min_size=1, max_size=200, alphabet="abcdefghijklmnopqrstuvwxyz .,?!"),
-        archetype=st.sampled_from([
-            "parasite", "prophet", "trickster", "sovereign",
-            "martyr", "shadow", "herald", "keeper",
-        ]),
+        archetype=st.sampled_from(
+            [
+                "parasite",
+                "prophet",
+                "trickster",
+                "sovereign",
+                "martyr",
+                "shadow",
+                "herald",
+                "keeper",
+            ]
+        ),
         arc_theme=st.text(min_size=1, max_size=50, alphabet="abcdefghijklmnopqrstuvwxyz "),
     )
-    def test_all_dimensions_in_0_to_3(
-        self, candidate: str, archetype: str, arc_theme: str
-    ):
+    def test_all_dimensions_in_0_to_3(self, candidate: str, archetype: str, arc_theme: str):
         """Every dimension in EnhancedQualityScore is always in [0, 3]."""
         config = SoulEngineConfig()
-        result = _asyncio.run(evaluate_enhanced(
-            candidate, archetype=archetype, move="COUNTER",
-            arc_theme=arc_theme, config=config,
-        ))
+        result = _asyncio.run(
+            evaluate_enhanced(
+                candidate,
+                archetype=archetype,
+                move="COUNTER",
+                arc_theme=arc_theme,
+                config=config,
+            )
+        )
         for name, val in result.as_dict().items():
             assert isinstance(val, int), f"Dim {name} is not int: {type(val)}"
             assert 0 <= val <= 3, f"Dim {name}={val} out of [0, 3]"
@@ -2421,21 +2632,32 @@ class TestQualityJudgeDimensionCount:
     @settings(max_examples=100, suppress_health_check=[HealthCheck.too_slow])
     @given(
         candidate=st.text(min_size=1, max_size=200, alphabet="abcdefghijklmnopqrstuvwxyz .,?!"),
-        archetype=st.sampled_from([
-            "parasite", "prophet", "trickster", "sovereign",
-            "martyr", "shadow", "herald", "keeper",
-        ]),
+        archetype=st.sampled_from(
+            [
+                "parasite",
+                "prophet",
+                "trickster",
+                "sovereign",
+                "martyr",
+                "shadow",
+                "herald",
+                "keeper",
+            ]
+        ),
         arc_theme=st.text(min_size=1, max_size=50, alphabet="abcdefghijklmnopqrstuvwxyz "),
     )
-    def test_total_in_0_to_21(
-        self, candidate: str, archetype: str, arc_theme: str
-    ):
+    def test_total_in_0_to_21(self, candidate: str, archetype: str, arc_theme: str):
         """EnhancedQualityScore.total is always in [0, 21]."""
         config = SoulEngineConfig()
-        result = _asyncio.run(evaluate_enhanced(
-            candidate, archetype=archetype, move="COUNTER",
-            arc_theme=arc_theme, config=config,
-        ))
+        result = _asyncio.run(
+            evaluate_enhanced(
+                candidate,
+                archetype=archetype,
+                move="COUNTER",
+                arc_theme=arc_theme,
+                config=config,
+            )
+        )
         assert 0 <= result.total <= 21, f"Total {result.total} out of [0, 21]"
 
 
@@ -2461,6 +2683,7 @@ class TestSubtextDepthConditionalScoring:
     def test_subtext_depth_zero_when_not_injected(self, candidate: str):
         """subtext_depth is always 0 when subtext_was_injected=False."""
         from banter.subtlety_director import SubtletyDirector
+
         config = SoulEngineConfig()
         director = SubtletyDirector(config, seed=0)
         instruction = SubtextInstruction(
@@ -2469,13 +2692,18 @@ class TestSubtextDepthConditionalScoring:
             technique="loaded_question",
             context_hint="Let the subtext operate.",
         )
-        result = _asyncio.run(evaluate_enhanced(
-            candidate, archetype="prophet", move="QUESTION",
-            arc_theme="power", config=config,
-            subtlety_director=director,
-            subtext_instruction=instruction,
-            subtext_was_injected=False,  # NOT injected
-        ))
+        result = _asyncio.run(
+            evaluate_enhanced(
+                candidate,
+                archetype="prophet",
+                move="QUESTION",
+                arc_theme="power",
+                config=config,
+                subtlety_director=director,
+                subtext_instruction=instruction,
+                subtext_was_injected=False,  # NOT injected
+            )
+        )
         assert result.subtext_depth == 0, (
             f"Expected subtext_depth=0 when not injected, got {result.subtext_depth}"
         )
@@ -2493,13 +2721,18 @@ class TestSubtextDepthConditionalScoring:
             technique="loaded_question",
             context_hint="hint",
         )
-        result = _asyncio.run(evaluate_enhanced(
-            candidate, archetype="prophet", move="QUESTION",
-            arc_theme="power", config=config,
-            subtlety_director=None,  # no director
-            subtext_instruction=instruction,
-            subtext_was_injected=True,
-        ))
+        result = _asyncio.run(
+            evaluate_enhanced(
+                candidate,
+                archetype="prophet",
+                move="QUESTION",
+                arc_theme="power",
+                config=config,
+                subtlety_director=None,  # no director
+                subtext_instruction=instruction,
+                subtext_was_injected=True,
+            )
+        )
         assert result.subtext_depth == 0
 
     @settings(max_examples=100, suppress_health_check=[HealthCheck.too_slow])
@@ -2509,15 +2742,21 @@ class TestSubtextDepthConditionalScoring:
     def test_subtext_depth_zero_without_instruction(self, candidate: str):
         """subtext_depth is 0 when no SubtextInstruction is provided."""
         from banter.subtlety_director import SubtletyDirector
+
         config = SoulEngineConfig()
         director = SubtletyDirector(config, seed=0)
-        result = _asyncio.run(evaluate_enhanced(
-            candidate, archetype="prophet", move="QUESTION",
-            arc_theme="power", config=config,
-            subtlety_director=director,
-            subtext_instruction=None,  # no instruction
-            subtext_was_injected=True,
-        ))
+        result = _asyncio.run(
+            evaluate_enhanced(
+                candidate,
+                archetype="prophet",
+                move="QUESTION",
+                arc_theme="power",
+                config=config,
+                subtlety_director=director,
+                subtext_instruction=None,  # no instruction
+                subtext_was_injected=True,
+            )
+        )
         assert result.subtext_depth == 0
 
     @settings(max_examples=100, suppress_health_check=[HealthCheck.too_slow])
@@ -2527,6 +2766,7 @@ class TestSubtextDepthConditionalScoring:
     def test_subtext_depth_zero_when_soul_disabled(self, candidate: str):
         """subtext_depth is 0 when soul engine is disabled in config."""
         from banter.subtlety_director import SubtletyDirector
+
         config = SoulEngineConfig(enabled=False)
         director = SubtletyDirector(config, seed=0)
         instruction = SubtextInstruction(
@@ -2535,13 +2775,18 @@ class TestSubtextDepthConditionalScoring:
             technique="loaded_question",
             context_hint="hint",
         )
-        result = _asyncio.run(evaluate_enhanced(
-            candidate, archetype="prophet", move="QUESTION",
-            arc_theme="power", config=config,
-            subtlety_director=director,
-            subtext_instruction=instruction,
-            subtext_was_injected=True,
-        ))
+        result = _asyncio.run(
+            evaluate_enhanced(
+                candidate,
+                archetype="prophet",
+                move="QUESTION",
+                arc_theme="power",
+                config=config,
+                subtlety_director=director,
+                subtext_instruction=instruction,
+                subtext_was_injected=True,
+            )
+        )
         assert result.subtext_depth == 0, (
             f"subtext_depth should be 0 when soul disabled, got {result.subtext_depth}"
         )
@@ -2626,13 +2871,16 @@ class TestShareabilityBonusConditional:
     @settings(max_examples=100, suppress_health_check=[HealthCheck.too_slow])
     @given(
         candidate=st.text(min_size=5, max_size=200, alphabet="abcdefghijklmnopqrstuvwxyz .,?!"),
-        archetype=st.sampled_from([
-            "prophet", "trickster", "keeper", "shadow",
-        ]),
+        archetype=st.sampled_from(
+            [
+                "prophet",
+                "trickster",
+                "keeper",
+                "shadow",
+            ]
+        ),
     )
-    def test_shareability_at_least_base_when_subtext_present(
-        self, candidate: str, archetype: str
-    ):
+    def test_shareability_at_least_base_when_subtext_present(self, candidate: str, archetype: str):
         """When subtext was injected, enhanced shareability >= base shareability."""
         from banter.subtlety_director import SubtletyDirector
         from banter.quality_judge import evaluate
@@ -2647,18 +2895,28 @@ class TestShareabilityBonusConditional:
         )
 
         # Get base shareability
-        base_result = _asyncio.run(evaluate(
-            candidate, archetype=archetype, move="QUESTION", arc_theme="power",
-        ))
+        base_result = _asyncio.run(
+            evaluate(
+                candidate,
+                archetype=archetype,
+                move="QUESTION",
+                arc_theme="power",
+            )
+        )
 
         # Get enhanced shareability with subtext injection
-        enhanced_result = _asyncio.run(evaluate_enhanced(
-            candidate, archetype=archetype, move="QUESTION",
-            arc_theme="power", config=config,
-            subtlety_director=director,
-            subtext_instruction=instruction,
-            subtext_was_injected=True,
-        ))
+        enhanced_result = _asyncio.run(
+            evaluate_enhanced(
+                candidate,
+                archetype=archetype,
+                move="QUESTION",
+                arc_theme="power",
+                config=config,
+                subtlety_director=director,
+                subtext_instruction=instruction,
+                subtext_was_injected=True,
+            )
+        )
 
         assert enhanced_result.shareability >= base_result.shareability, (
             f"Enhanced shareability ({enhanced_result.shareability}) < "
@@ -2670,9 +2928,7 @@ class TestShareabilityBonusConditional:
         base_shareability=st.integers(min_value=0, max_value=3),
         subtext_depth=st.integers(min_value=0, max_value=3),
     )
-    def test_shareability_bonus_capped_at_3(
-        self, base_shareability: int, subtext_depth: int
-    ):
+    def test_shareability_bonus_capped_at_3(self, base_shareability: int, subtext_depth: int):
         """shareability + subtext_depth bonus is always capped at 3."""
         boosted = min(3, base_shareability + subtext_depth)
         assert 0 <= boosted <= 3
@@ -2696,16 +2952,26 @@ class TestShareabilityBonusConditional:
             context_hint="hint",
         )
 
-        base_result = _asyncio.run(evaluate(
-            candidate, archetype=archetype, move="QUESTION", arc_theme="power",
-        ))
-        enhanced_result = _asyncio.run(evaluate_enhanced(
-            candidate, archetype=archetype, move="QUESTION",
-            arc_theme="power", config=config,
-            subtlety_director=director,
-            subtext_instruction=instruction,
-            subtext_was_injected=False,  # not injected
-        ))
+        base_result = _asyncio.run(
+            evaluate(
+                candidate,
+                archetype=archetype,
+                move="QUESTION",
+                arc_theme="power",
+            )
+        )
+        enhanced_result = _asyncio.run(
+            evaluate_enhanced(
+                candidate,
+                archetype=archetype,
+                move="QUESTION",
+                arc_theme="power",
+                config=config,
+                subtlety_director=director,
+                subtext_instruction=instruction,
+                subtext_was_injected=False,  # not injected
+            )
+        )
 
         assert enhanced_result.shareability == base_result.shareability, (
             f"No bonus expected when subtext not injected, "
@@ -2775,6 +3041,7 @@ class TestSoulEngineTokenBudget:
         sd.should_inject_subtext = MagicMock(return_value=should_inject)
         if should_inject:
             from banter.soul_types import SubtextInstruction
+
             instr = SubtextInstruction(
                 surface_meaning=inj_text[:50],
                 implied_meaning=inj_text[50:100] if len(inj_text) > 50 else inj_text,
@@ -2810,9 +3077,14 @@ class TestSoulEngineTokenBudget:
 
         soul_parts, _ = _asyncio_engine.run(
             engine._build_soul_prompt(
-                elder="elder_a", archetype="prophet", opponent="elder_b",
-                arc_theme="power", move="QUESTION",
-                history=[], tension=6, reconciliation_active=False,
+                elder="elder_a",
+                archetype="prophet",
+                opponent="elder_b",
+                arc_theme="power",
+                move="QUESTION",
+                history=[],
+                tension=6,
+                reconciliation_active=False,
             )
         )
 
@@ -2825,11 +3097,13 @@ class TestSoulEngineTokenBudget:
     def test_budget_constant_is_800_tokens(self):
         """SOUL_BUDGET_TOKENS is exactly 800."""
         from banter.engine import SOUL_BUDGET_TOKENS
+
         assert SOUL_BUDGET_TOKENS == 800
 
     def test_char_budget_is_4x_token_budget(self):
         """_SOUL_BUDGET_CHARS equals SOUL_BUDGET_TOKENS * 4."""
         from banter.engine import SOUL_BUDGET_TOKENS, _SOUL_BUDGET_CHARS
+
         assert _SOUL_BUDGET_CHARS == SOUL_BUDGET_TOKENS * 4
 
 
@@ -2878,13 +3152,21 @@ class TestModuleFaultIsolation:
 
         soul_parts, meta = _asyncio_engine.run(
             engine._build_soul_prompt(
-                "elder_a", "shadow", "elder_b", "betrayal", "DEFLECT",
-                [], 5, False,
+                "elder_a",
+                "shadow",
+                "elder_b",
+                "betrayal",
+                "DEFLECT",
+                [],
+                5,
+                False,
             )
         )
 
         combined = "\n".join(soul_parts)
-        assert emotional_text in combined, "Emotional primer output should survive voice_dna failure"
+        assert emotional_text in combined, (
+            "Emotional primer output should survive voice_dna failure"
+        )
         assert meta.get("voice_dna") is False, "voice_dna failure should be recorded"
         assert meta.get("emotional_primer") is True, "emotional_primer should succeed"
 
@@ -2898,8 +3180,14 @@ class TestModuleFaultIsolation:
 
         soul_parts, meta = _asyncio_engine.run(
             engine._build_soul_prompt(
-                "elder_a", "keeper", "elder_b", "survival", "COUNTER",
-                [], 5, False,
+                "elder_a",
+                "keeper",
+                "elder_b",
+                "survival",
+                "COUNTER",
+                [],
+                5,
+                False,
             )
         )
 
@@ -2917,12 +3205,10 @@ class TestModuleFaultIsolation:
         self, fail_voice: bool, fail_emotional: bool
     ):
         """_build_soul_prompt never raises regardless of which modules fail."""
-        voice_dna = (
-            self._make_broken_voice_dna() if fail_voice
-            else self._make_working_voice_dna()
-        )
+        voice_dna = self._make_broken_voice_dna() if fail_voice else self._make_working_voice_dna()
         emotional_primer = (
-            self._make_broken_emotional_primer() if fail_emotional
+            self._make_broken_emotional_primer()
+            if fail_emotional
             else self._make_working_emotional_primer()
         )
         engine = _make_minimal_engine(
@@ -2933,8 +3219,14 @@ class TestModuleFaultIsolation:
         # Must not raise
         soul_parts, meta = _asyncio_engine.run(
             engine._build_soul_prompt(
-                "elder_a", "martyr", "elder_b", "sacrifice", "COUNTER",
-                [], 4, False,
+                "elder_a",
+                "martyr",
+                "elder_b",
+                "sacrifice",
+                "COUNTER",
+                [],
+                4,
+                False,
             )
         )
 
@@ -2958,8 +3250,14 @@ class TestModuleFaultIsolation:
 
         _, meta = _asyncio_engine.run(
             engine._build_soul_prompt(
-                "elder_a", "herald", "elder_b", "change", "COUNTER",
-                [], 3, False,
+                "elder_a",
+                "herald",
+                "elder_b",
+                "change",
+                "COUNTER",
+                [],
+                3,
+                False,
             )
         )
 
@@ -3001,8 +3299,14 @@ class TestPromptCompositionOrder:
 
         soul_parts, _ = _asyncio_engine.run(
             engine._build_soul_prompt(
-                "elder_a", "prophet", "elder_b", "power", "QUESTION",
-                [], 5, False,
+                "elder_a",
+                "prophet",
+                "elder_b",
+                "power",
+                "QUESTION",
+                [],
+                5,
+                False,
             )
         )
 
@@ -3056,8 +3360,13 @@ class TestPromptCompositionOrder:
 
         prompt = _asyncio_engine.run(
             engine._build_prompt(
-                "elder_a", "shadow", "elder_b", "secrets", "DEFLECT",
-                [], mock_scene_data,
+                "elder_a",
+                "shadow",
+                "elder_b",
+                "secrets",
+                "DEFLECT",
+                [],
+                mock_scene_data,
             )
         )
 
@@ -3086,13 +3395,21 @@ class TestPromptCompositionOrder:
         """When both modules present, voice_dna always precedes emotional_primer."""
         engine = _make_minimal_engine(
             voice_dna=self._make_tagged_voice_dna("V_TAG") if include_voice else None,
-            emotional_primer=self._make_tagged_emotional_primer("E_TAG") if include_emotional else None,
+            emotional_primer=self._make_tagged_emotional_primer("E_TAG")
+            if include_emotional
+            else None,
         )
 
         soul_parts, _ = _asyncio_engine.run(
             engine._build_soul_prompt(
-                "elder_x", "trickster", "elder_y", "deception", "DEFLECT",
-                [], 5, False,
+                "elder_x",
+                "trickster",
+                "elder_y",
+                "deception",
+                "DEFLECT",
+                [],
+                5,
+                False,
             )
         )
 
@@ -3131,6 +3448,7 @@ class TestArcThemeNoTitleLeak:
     def test_arc_context_builder_never_returns_theme_name_in_pressure(self):
         """ArcContextBuilder.get_pressure() output must not contain the raw theme key."""
         from banter.arc_context import ArcContextBuilder
+
         builder = ArcContextBuilder()
         for theme in self.ALL_THEMES:
             pressure = builder.get_pressure(theme)
@@ -3144,18 +3462,18 @@ class TestArcThemeNoTitleLeak:
     def test_arc_context_builder_format_injection_never_contains_theme_name(self):
         """ArcContextBuilder.format_injection() must not contain the raw theme key."""
         from banter.arc_context import ArcContextBuilder
+
         builder = ArcContextBuilder()
         for theme in self.ALL_THEMES:
             block = builder.format_injection(theme)
-            assert theme not in block, (
-                f"Theme key '{theme}' leaked into [ARC] block: {block!r}"
-            )
+            assert theme not in block, f"Theme key '{theme}' leaked into [ARC] block: {block!r}"
             assert "[ARC]" in block, "Must include [ARC] marker"
             assert "Embody it" in block, "Must include embodiment directive"
 
     def test_unknown_theme_fallback_never_contains_theme_key(self):
         """Fallback pressure for unknown themes must not repeat the theme name verbatim."""
         from banter.arc_context import ArcContextBuilder
+
         builder = ArcContextBuilder()
         exotic = "dominance_and_submission"
         block = builder.format_injection(exotic)
@@ -3180,8 +3498,13 @@ class TestArcThemeNoTitleLeak:
         for theme in self.ALL_THEMES:
             prompt = _asyncio_engine.run(
                 engine._build_prompt(
-                    "Lore", "prophet", "Forge", theme, "COUNTER",
-                    [], mock_scene,
+                    "Lore",
+                    "prophet",
+                    "Forge",
+                    theme,
+                    "COUNTER",
+                    [],
+                    mock_scene,
                 )
             )
             assert theme not in prompt, (

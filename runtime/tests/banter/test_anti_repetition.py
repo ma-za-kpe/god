@@ -9,7 +9,6 @@ Tests cover:
 - should_shift_register detection
 """
 
-import pytest
 from banter.anti_repetition import AntiRepetitionGate
 
 
@@ -83,7 +82,9 @@ class TestCheck:
         gate = AntiRepetitionGate()
         # Add 4 entries (less than 5)
         for i in range(4):
-            gate.record_delivery("elder1", f"unique line number {i} with enough words for trigrams", "measured")
+            gate.record_delivery(
+                "elder1", f"unique line number {i} with enough words for trigrams", "measured"
+            )
 
         # Even with high overlap to a history line, should pass (trigram skipped)
         # Using a line identical to one in history but with different opener
@@ -96,12 +97,16 @@ class TestCheck:
         base_line = "the quick brown fox jumps over the lazy dog today"
         gate.record_delivery("elder1", base_line, "measured")
         for i in range(4):
-            gate.record_delivery("elder1", f"completely different line number {i} with various words here now", "aggressive")
+            gate.record_delivery(
+                "elder1",
+                f"completely different line number {i} with various words here now",
+                "aggressive",
+            )
 
         # Now history has 5 entries. Try a line very similar to the first
         candidate = "the quick brown fox jumps over the lazy dog today"
         # Different opener won't help — same trigrams
-        verdict = gate.check("elder1", "hey there now " + candidate[len("the quick brown "):])
+        verdict = gate.check("elder1", "hey there now " + candidate[len("the quick brown ") :])
         # This should be accepted since opener differs and we changed first few words
         # Let's test with actual overlap
         verdict = gate.check("elder1", "well the quick brown fox jumps over the lazy dog now")
@@ -115,7 +120,9 @@ class TestCheck:
         gate = AntiRepetitionGate()
         # Build 5 entries
         for i in range(5):
-            gate.record_delivery("elder1", f"entry {i} alpha beta gamma delta epsilon zeta eta", "sardonic")
+            gate.record_delivery(
+                "elder1", f"entry {i} alpha beta gamma delta epsilon zeta eta", "sardonic"
+            )
 
         # A completely different line should pass
         verdict = gate.check("elder1", "something entirely new and original with fresh words here")
@@ -208,20 +215,22 @@ class TestShouldShiftRegister:
 # Property-Based Tests (Hypothesis)
 # ---------------------------------------------------------------------------
 
-from hypothesis import given, settings, assume
+from hypothesis import given, settings
 from hypothesis import strategies as st
 
-from conftest import ARCHETYPES, EMOTIONAL_REGISTERS
+from conftest import ARCHETYPES
 
 
 @st.composite
 def st_word_sequence(draw, min_words=3, max_words=15):
     """Generate a sequence of words joined by spaces."""
-    words = draw(st.lists(
-        st.text(min_size=2, max_size=8, alphabet=st.sampled_from("abcdefghijklmnopqrstuvwxyz")),
-        min_size=min_words,
-        max_size=max_words,
-    ))
+    words = draw(
+        st.lists(
+            st.text(min_size=2, max_size=8, alphabet=st.sampled_from("abcdefghijklmnopqrstuvwxyz")),
+            min_size=min_words,
+            max_size=max_words,
+        )
+    )
     return " ".join(words)
 
 
@@ -261,9 +270,7 @@ class TestProperty20TrigramOverlapRejection:
         if verdict.accepted:
             # Could pass if opener is different and overlap calculation differs
             overlap = gate.compute_trigram_overlap(target_line, history_lines[0])
-            assert overlap <= 0.60, (
-                f"Should reject: overlap {overlap:.2f} > 0.60 with history >= 5"
-            )
+            assert overlap <= 0.60, f"Should reject: overlap {overlap:.2f} > 0.60 with history >= 5"
 
     @given(
         history_lines=st.lists(
@@ -274,9 +281,7 @@ class TestProperty20TrigramOverlapRejection:
         candidate=st_word_sequence(min_words=5, max_words=12),
     )
     @settings(max_examples=100)
-    def test_trigram_skipped_when_history_under_5(
-        self, history_lines: list[str], candidate: str
-    ):
+    def test_trigram_skipped_when_history_under_5(self, history_lines: list[str], candidate: str):
         """When history < 5, 3-gram check is skipped (candidate not rejected for overlap)."""
         gate = AntiRepetitionGate()
         elder = "prophet"
@@ -352,9 +357,7 @@ class TestProperty21OpenerUniqueness:
         # Now check a candidate with the same opener
         candidate = opener_str + " " + rest_of_line
         verdict = gate.check(elder, candidate)
-        assert verdict.accepted is False, (
-            f"Should reject opener reuse: '{opener_str}' in last 8"
-        )
+        assert verdict.accepted is False, f"Should reject opener reuse: '{opener_str}' in last 8"
         assert verdict.rejection_reason == "opener_reuse"
 
     @given(

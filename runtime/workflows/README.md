@@ -14,4 +14,3 @@ These ComfyUI workflow templates are consumed by the avatar genesis pipeline.
 - Runtime code fills the placeholder tokens before submission.
 - Required custom nodes are listed in each file's `_meta.required_custom_nodes` block.
 - The `controlnet_evolution.json` workflow is used for betrayal scars, reconciliation softening, and prestige marks.
-

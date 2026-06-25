@@ -135,9 +135,7 @@ class SceneComposer:
         state = visual_states.get(soul_id) or {}
         if isinstance(state, dict):
             return str(
-                state.get("expression_override")
-                or state.get("current_expression")
-                or "neutral"
+                state.get("expression_override") or state.get("current_expression") or "neutral"
             )
         return "neutral"
 

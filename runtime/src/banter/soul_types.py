@@ -129,18 +129,14 @@ class CallbackUsageTracker:
     """Tracks callback usage for rate limiting within a session."""
 
     last_used_beat: dict[str, int] = field(default_factory=dict)  # callback_id → beat
-    pair_session_count: dict[str, int] = field(
-        default_factory=dict
-    )  # pair_id → count
+    pair_session_count: dict[str, int] = field(default_factory=dict)  # pair_id → count
 
 
 @dataclass
 class WriteBuffer:
     """In-memory buffer for DB writes when database is unavailable."""
 
-    entries: deque[MemorableMoment] = field(
-        default_factory=lambda: deque(maxlen=20)
-    )
+    entries: deque[MemorableMoment] = field(default_factory=lambda: deque(maxlen=20))
 
     def add(self, moment: MemorableMoment) -> None:
         """Add to buffer. If full (20), oldest entry is dropped."""
@@ -179,9 +175,7 @@ def validate_voice_dna_profile(data: dict) -> tuple[bool, list[str]]:
         min_count = constraints["min_count"]
 
         if field_name not in data:
-            violations.append(
-                f"Missing required field '{field_name}'"
-            )
+            violations.append(f"Missing required field '{field_name}'")
         elif not isinstance(data[field_name], list):
             violations.append(
                 f"Field '{field_name}' must be a list, got {type(data[field_name]).__name__}"

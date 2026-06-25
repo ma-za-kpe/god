@@ -175,4 +175,7 @@ def test_release_exits_once_a_breathing_move_lands():
         beat=_scene_beat("PIVOT", 11),
         scene_data=_scene_data(energy="neutral"),
     )
-    assert controller.resolve(beat_number=4, scene_data=_scene_data(energy="neutral")) == ScenePhase.RESET
+    assert (
+        controller.resolve(beat_number=4, scene_data=_scene_data(energy="neutral"))
+        == ScenePhase.RESET
+    )

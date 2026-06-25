@@ -134,9 +134,7 @@ def _parse_rhythm_pattern(raw: dict) -> RhythmPattern:
     return RhythmPattern(
         name=raw.get("name", "unnamed"),
         clause_count_range=tuple(raw.get("clause_count_range", [1, 3])),
-        word_count_per_clause_range=tuple(
-            raw.get("word_count_per_clause_range", [3, 12])
-        ),
+        word_count_per_clause_range=tuple(raw.get("word_count_per_clause_range", [3, 12])),
         pause_placement=raw.get("pause_placement", "before_final"),
     )
 
@@ -228,8 +226,7 @@ class VoiceDNA:
         is_valid, violations = validate_voice_dna_profile(data)
         if not is_valid:
             log.warning(
-                "VoiceDNA profile '%s' failed validation: %s. "
-                "Retaining previous valid profile.",
+                "VoiceDNA profile '%s' failed validation: %s. Retaining previous valid profile.",
                 archetype,
                 "; ".join(violations),
             )
@@ -305,19 +302,13 @@ class VoiceDNA:
         sections.append(f"OPENERS: {openers_str}")
         sections.append(f"CLOSERS: {closers_str}")
 
-        injection = (
-            f"[VOICE DNA — {archetype.upper()}]\n"
-            + "\n".join(sections)
-        )
+        injection = f"[VOICE DNA — {archetype.upper()}]\n" + "\n".join(sections)
 
         budget = self._config.voice_dna_token_budget
         if _estimate_token_count(injection) > budget:
             while _estimate_token_count(injection) > budget and sections:
                 sections.pop()
-                injection = (
-                    f"[VOICE DNA — {archetype.upper()}]\n"
-                    + "\n".join(sections)
-                )
+                injection = f"[VOICE DNA — {archetype.upper()}]\n" + "\n".join(sections)
 
         return injection
 
@@ -351,10 +342,7 @@ class VoiceDNA:
             categories_matched += 1
 
         # --- Category 2: Verbal tics ---
-        tics_found = sum(
-            1 for tic in profile.verbal_tics
-            if tic.lower() in candidate_lower
-        )
+        tics_found = sum(1 for tic in profile.verbal_tics if tic.lower() in candidate_lower)
         if tics_found > 0:
             categories_matched += 1
 
@@ -369,9 +357,7 @@ class VoiceDNA:
             min_words, max_words = rp.word_count_per_clause_range
 
             if min_clauses <= clause_count <= max_clauses:
-                if word_counts and all(
-                    min_words <= wc <= max_words for wc in word_counts
-                ):
+                if word_counts and all(min_words <= wc <= max_words for wc in word_counts):
                     rhythm_match = True
                     break
 
@@ -380,8 +366,7 @@ class VoiceDNA:
 
         # --- Category 4: Micro-phrases ---
         phrases_found = sum(
-            1 for phrase in profile.micro_phrases
-            if phrase.lower() in candidate_lower
+            1 for phrase in profile.micro_phrases if phrase.lower() in candidate_lower
         )
         if phrases_found > 0:
             categories_matched += 1

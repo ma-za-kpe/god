@@ -150,7 +150,7 @@ class HardBanChecker:
         without any clause-ending punctuation.
         """
         # Split by sentence-ending punctuation
-        sentences = re.split(r'[.!?]+', candidate)
+        sentences = re.split(r"[.!?]+", candidate)
         for sentence in sentences:
             sentence = sentence.strip()
             if not sentence:
@@ -160,7 +160,7 @@ class HardBanChecker:
             # A fragment with 20+ words and no internal punctuation is a run-on
             if len(words) > 20:
                 # Check for internal clause markers (comma, semicolon, dash, colon)
-                if not re.search(r'[,;:\u2014—\-]', sentence):
+                if not re.search(r"[,;:\u2014—\-]", sentence):
                     return HardBanVerdict(
                         passed=False,
                         violated_ban="no_sentence_boundaries",

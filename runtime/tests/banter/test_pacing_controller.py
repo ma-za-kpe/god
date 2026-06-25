@@ -101,9 +101,7 @@ class TestCoolingSceneRule:
 class TestDefaultRule:
     """Tests for the default pacing rule (3.0-5.0s with adjustments)."""
 
-    def test_default_rule_when_neutral_no_landed_hit(
-        self, controller: PacingController
-    ):
+    def test_default_rule_when_neutral_no_landed_hit(self, controller: PacingController):
         """Default rule applies when scene is neutral and no landed hit."""
         result = controller.compute_delay(
             previous_score=8,
@@ -148,9 +146,7 @@ class TestDefaultRule:
             scene_energy="neutral",
             landed_hit=False,
         )
-        assert adjusted.inter_beat_delay_s == pytest.approx(
-            base.inter_beat_delay_s - 0.5, abs=0.01
-        )
+        assert adjusted.inter_beat_delay_s == pytest.approx(base.inter_beat_delay_s - 0.5, abs=0.01)
 
     def test_taunt_adjustment_reduces_delay(self, controller: PacingController):
         """TAUNT upcoming move reduces delay by 0.5s."""
@@ -166,9 +162,7 @@ class TestDefaultRule:
             scene_energy="neutral",
             landed_hit=False,
         )
-        assert adjusted.inter_beat_delay_s == pytest.approx(
-            base.inter_beat_delay_s - 0.5, abs=0.01
-        )
+        assert adjusted.inter_beat_delay_s == pytest.approx(base.inter_beat_delay_s - 0.5, abs=0.01)
 
     def test_concede_adjustment_increases_delay(self, controller: PacingController):
         """CONCEDE upcoming move increases delay by 0.5s."""
@@ -184,9 +178,7 @@ class TestDefaultRule:
             scene_energy="neutral",
             landed_hit=False,
         )
-        assert adjusted.inter_beat_delay_s == pytest.approx(
-            base.inter_beat_delay_s + 0.5, abs=0.01
-        )
+        assert adjusted.inter_beat_delay_s == pytest.approx(base.inter_beat_delay_s + 0.5, abs=0.01)
 
     def test_pivot_adjustment_increases_delay(self, controller: PacingController):
         """PIVOT upcoming move increases delay by 0.5s."""
@@ -202,9 +194,7 @@ class TestDefaultRule:
             scene_energy="neutral",
             landed_hit=False,
         )
-        assert adjusted.inter_beat_delay_s == pytest.approx(
-            base.inter_beat_delay_s + 0.5, abs=0.01
-        )
+        assert adjusted.inter_beat_delay_s == pytest.approx(base.inter_beat_delay_s + 0.5, abs=0.01)
 
 
 # ---------------------------------------------------------------------------
@@ -237,9 +227,7 @@ class TestConflictResolution:
         assert result.rule_applied == "cooling"
         assert result.inter_beat_delay_s == 6.5
 
-    def test_cooling_beats_heated_impossible_but_hypothetical(
-        self, controller: PacingController
-    ):
+    def test_cooling_beats_heated_impossible_but_hypothetical(self, controller: PacingController):
         """Cooling delay (6.5) would beat heated delay (2.0) if both applied.
 
         Note: in practice a scene can't be both heated and cooling,
@@ -340,9 +328,7 @@ class TestFinalClamping:
         )
         assert result.inter_beat_delay_s <= 10.0
 
-    def test_default_with_low_score_and_escalate_clamped(
-        self, controller: PacingController
-    ):
+    def test_default_with_low_score_and_escalate_clamped(self, controller: PacingController):
         """Default rule: score 0 + ESCALATE = 3.0 - 0.5 = 2.5, within bounds."""
         result = controller.compute_delay(
             previous_score=0,
@@ -383,7 +369,7 @@ class TestReturnType:
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
-from conftest import st_pacing_inputs, MOVE_TYPES, SCENE_ENERGY_LABELS
+from conftest import st_pacing_inputs, SCENE_ENERGY_LABELS
 
 
 class TestProperty18PacingDelayBounds:

@@ -32,5 +32,14 @@ jobs:
 
       - name: Run hooks on all files
         env:
-          SKIP: no-commit-to-branch
+          SKIP: no-commit-to-branch,validation-pipeline
         run: pre-commit run --all-files --show-diff-on-failure
+
+      - name: Install runtime dependencies
+        run: pip install -r runtime/requirements.txt
+
+      - name: Run runtime tests
+        env:
+          PYTHONPATH: runtime/src
+          VOICE_SYNTHESIS_ENABLED: "false"
+        run: python -m pytest runtime/tests

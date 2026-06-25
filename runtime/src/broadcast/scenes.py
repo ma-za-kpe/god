@@ -44,7 +44,9 @@ def _source_scene(snapshot: dict[str, Any]) -> dict[str, Any]:
     return {
         "scene": str(nemo.get("scene") or showrunner.get("scene") or "world-wide"),
         "speaker": str(nemo.get("speaker") or showrunner.get("speaker") or "Narrator"),
-        "headline": str(nemo.get("headline") or showrunner.get("headline") or "The world keeps moving."),
+        "headline": str(
+            nemo.get("headline") or showrunner.get("headline") or "The world keeps moving."
+        ),
         "audience_prompt": str(
             nemo.get("audience_prompt") or showrunner.get("audience_prompt") or "Watch closely."
         ),

@@ -208,7 +208,7 @@ FAIL    = "❌" if _HAS_EMOJI else "[X]"
 INFO    = "ℹ️" if _HAS_EMOJI else "[i]"
 
 try:
-  # Although xdg-base-dirs is the newer name, there's 
+  # Although xdg-base-dirs is the newer name, there's
   # python compatibility issues with dependencies that
   # can be unresolvable using things like python 3.9
   # So we actually use the older name, thus older
@@ -259,15 +259,15 @@ def validate_seconds(value):
     """Validate that the input value is a valid number for seconds between yesterday and Jan 1, 2100."""
     try:
         val = int(value)
-        
+
         # Calculate min_seconds as the start of yesterday in seconds
         yesterday = datetime.now() - timedelta(days=1)
         min_seconds = int(yesterday.timestamp())
-        
+
         # Calculate max_seconds for Jan 1st, 2100 in seconds
         max_date = datetime(2100, 1, 1, 0, 0, 0)
         max_seconds = int(max_date.timestamp())
-        
+
         if not (min_seconds <= val <= max_seconds):
             raise argparse.ArgumentTypeError(f"{value} is not a valid second timestamp.")
         return val
@@ -346,7 +346,7 @@ def http_request(verb, args, req_url, headers: dict[str, str] | None = None, jso
             print(f"{prep.method} {prep.url}")
             print(f"Headers: {json.dumps(headers, indent=1)}")
             print(f"Body: {json.dumps(json_data, indent=1)}" + "\n" + "_"*100 + "\n")
-        
+
         if ARGS.curl:
             as_curl = curlify.to_curl(prep)
             simple = re.sub(r" -H '[^']*'", '', as_curl)
@@ -395,7 +395,7 @@ def complete_sshkeys(prefix=None, action=None, parser=None, parsed_args=None):
 class apwrap(object):
     def __init__(self, *args, **kwargs):
         if "formatter_class" not in kwargs:
-            kwargs["formatter_class"] = MyWideHelpFormatter    
+            kwargs["formatter_class"] = MyWideHelpFormatter
         self.parser = argparse.ArgumentParser(*args, **kwargs)
         self.parser.set_defaults(func=self.fail_with_help)
         self.subparsers_ = None
@@ -473,7 +473,7 @@ class apwrap(object):
             setattr(func, "mysignature_help", help_)
 
             self.subparser_objs.append(sp)
-            
+
             self._process_arguments_with_groups(sp, arguments)
 
             sp.set_defaults(func=func)
@@ -503,7 +503,7 @@ class apwrap(object):
         """Process arguments and handle mutually exclusive groups"""
         mutex_groups_to_required = {}
         arg_to_group = {}
-        
+
         # Determine if any mutex groups are required
         for arg in arguments:
             key = arg.args[0]
@@ -515,7 +515,7 @@ class apwrap(object):
                     continue  # if marked as required then it stays required
                 else:
                     mutex_groups_to_required[group_name] = is_required
-        
+
         name_to_group_parser = {}  # Create mutually exclusive group parsers
         for group_name, is_required in mutex_groups_to_required.items():
             mutex_group = parser_obj.add_mutually_exclusive_group(required=is_required)
@@ -529,7 +529,7 @@ class apwrap(object):
             else:
                 tsp = parser_obj.add_argument(*arg.args, **arg.kwargs)
             self._add_completer(tsp, arg)
-            
+
 
     def _add_completer(self, tsp, arg):
         """Helper function to add completers based on argument names"""
@@ -541,7 +541,7 @@ class apwrap(object):
             myCompleter = complete_instance
         elif comparator.startswith('ssh'):
             myCompleter = complete_sshkeys
-            
+
         if myCompleter:
             setattr(tsp, 'completer', myCompleter)
 
@@ -593,7 +593,7 @@ def apiurl(args: argparse.Namespace, subpath: str, query_args: Dict = None) -> s
         query_args["api_key"] = args.api_key
     if not re.match(r"^/api/v(\d)+/", subpath):
         subpath = "/api/v0" + subpath
-    
+
     query_json = None
 
     if query_args:
@@ -609,7 +609,7 @@ def apiurl(args: argparse.Namespace, subpath: str, query_args: Dict = None) -> s
         query_json = "&".join(
             "{x}={y}".format(x=x, y=quote_plus(y if isinstance(y, str) else json.dumps(y))) for x, y in
             query_args.items())
-        
+
         result = args.url + subpath + "?" + query_json
     else:
         result = args.url + subpath
@@ -632,7 +632,7 @@ def apiheaders(args: argparse.Namespace) -> Dict:
     result = {}
     if args.api_key is not None:
         result["Authorization"] = "Bearer " + args.api_key
-    return result 
+    return result
 
 
 def deindent(message: str, add_separator: bool = True) -> str:
@@ -1142,7 +1142,7 @@ def parse_query(query_str: str, res: Dict = None, fields = {}, field_alias = {},
 
         if isinstance(value, str):
             value = value.replace('_', ' ')
-            value = value.strip('\"') 
+            value = value.strip('\"')
         elif isinstance(value, list):
             value = [x.replace('_', ' ')    for x in value]
             value = [x.strip('\"')          for x in value]
@@ -1205,7 +1205,7 @@ def display_table(rows: list, fields: Tuple, replace_spaces: bool = True, auto_w
             idx = len(row)
             lengths[idx] = max(len(s), lengths[idx])
             row.append(s)
-    
+
     if auto_width:
         width = shutil.get_terminal_size((80, 20)).columns
         start_col_idxs = [0]
@@ -1215,7 +1215,7 @@ def display_table(rows: list, fields: Tuple, replace_spaces: bool = True, auto_w
             if total_len > width:
                 start_col_idxs.append(i)  # index for the start of the next group
                 total_len = l + 6         # l + 2 + the 4 from the initial length
-        
+
         groups = {}
         for row in out_rows:
             grp_num = 0
@@ -1224,7 +1224,7 @@ def display_table(rows: list, fields: Tuple, replace_spaces: bool = True, auto_w
                 end = start_col_idxs[i+1] if i+1 < len(start_col_idxs) else len(lengths)
                 groups.setdefault(grp_num, []).append(row[start:end])
                 grp_num += 1
-        
+
         for i, group in groups.items():
             idx = start_col_idxs[i]
             group_lengths = lengths[idx:idx+len(group[0])]
@@ -1301,7 +1301,7 @@ def parse_vast_url(url_str):
     # Got this regex from https://stackoverflow.com/questions/537772/what-is-the-most-correct-regular-expression-for-a-unix-file-path
     if (path != "/") and (valid_unix_path_regex.match(path) is None):
         raise VRLException(f"Path component: {path} of VRL is not a valid Unix style path.")
-    
+
     #print(f'instance_id: {instance_id}')
     #print(f'path: {path}')
     return (instance_id, path)
@@ -1317,10 +1317,10 @@ def get_ssh_key(argstr):
       raise ValueError(deindent("""
         🐴 Woah, hold on there, partner!
 
-        That's a *private* SSH key.  You need to give the *public* 
-        one. It usually starts with 'ssh-rsa', is on a single line, 
-        has around 200 or so "base64" characters and ends with 
-        some-user@some-where. "Generate public ssh key" would be 
+        That's a *private* SSH key.  You need to give the *public*
+        one. It usually starts with 'ssh-rsa', is on a single line,
+        has around 200 or so "base64" characters and ends with
+        some-user@some-where. "Generate public ssh key" would be
         a good search term if you don't know how to do this.
       """, add_separator=False))
 
@@ -1328,8 +1328,8 @@ def get_ssh_key(argstr):
       raise ValueError(deindent("""
         Are you sure that's an SSH public key?
 
-        Usually it starts with the stanza 'ssh-(keytype)' 
-        where the keytype can be things such as rsa, ed25519-sk, 
+        Usually it starts with the stanza 'ssh-(keytype)'
+        where the keytype can be things such as rsa, ed25519-sk,
         or dsa. What you passed me was:
 
         {}
@@ -1526,9 +1526,9 @@ def change__bid(args: argparse.Namespace):
         cli_command = "change bid"
         api_endpoint = "/api/v0/instances/bid_price/{id}/".format(id=args.id)
         json_blob["instance_id"] = args.id
-        add_scheduled_job(args, json_blob, cli_command, api_endpoint, "PUT", instance_id=args.id)     
+        add_scheduled_job(args, json_blob, cli_command, api_endpoint, "PUT", instance_id=args.id)
         return
-    
+
     r = http_put(args, url, headers=headers, json=json_blob)
     r.raise_for_status()
     print("Per gpu bid price changed".format(r.json()))
@@ -1543,7 +1543,7 @@ def change__bid(args: argparse.Namespace):
     usage="vastai clone volume <source_id> <dest_id> [options]",
     help="Clone an existing volume",
     epilog=deindent("""
-        Create a new volume with the given offer, by copying the existing volume. 
+        Create a new volume with the given offer, by copying the existing volume.
         Size defaults to the size of the existing volume, but can be increased if there is available space.
     """)
 )
@@ -1758,13 +1758,13 @@ def vm__copy(args: argparse.Namespace):
         directories can be either local or remote, subject to appropriate read and write
         permissions required to carry out the action. The format for both src and dst is [instance_id:]path.
         You can find more information about the cloud copy operation here: https://vast.ai/docs/gpu-instances/cloud-sync
-                    
+
         Examples:
          vastai show connections
          ID    NAME      Cloud Type
-         1001  test_dir  drive 
-         1003  data_dir  drive 
-         
+         1001  test_dir  drive
+         1003  data_dir  drive
+
          vastai cloud copy --src /folder --dst /workspace --instance 6003036 --connection 1001 --transfer "Instance To Cloud"
 
         The example copies all contents of /folder into /workspace on instance 6003036 from gdrive connection 'test_dir'.
@@ -1821,9 +1821,9 @@ def cloud__copy(args: argparse.Namespace):
         r = http_get(args, req_url)
         r.raise_for_status()
         row = r.json()["instances"]
-        
+
         if args.transfer.lower() == "instance to cloud":
-            if row: 
+            if row:
                 # Get the cost per TB of internet upload
                 up_cost = row.get("internet_up_cost_per_tb", None)
                 if up_cost is not None:
@@ -1836,7 +1836,7 @@ def cloud__copy(args: argparse.Namespace):
                         return
                 else:
                     print("Warning: Could not retrieve internet upload cost. Proceeding without confirmation. You can use show scheduled-jobs and delete scheduled-job commands to delete scheduled cloud backup job.")
-                
+
                 cli_command = "cloud copy"
                 api_endpoint = "/api/v0/commands/rclone/"
                 contract_end_date = row.get("end_date", None)
@@ -1845,12 +1845,12 @@ def cloud__copy(args: argparse.Namespace):
             else:
                 print("Instance not found. Please check the instance ID.")
                 return
-        
+
     r = http_post(args, url, headers=headers,json=req_json)
     r.raise_for_status()
     if (r.status_code == 200):
         print("Cloud Copy Started - check instance status bar for progress updates (~30 seconds delayed).")
-        print("When the operation is finished you should see 'Cloud Copy Operation Finished' in the instance status bar.")  
+        print("When the operation is finished you should see 'Cloud Copy Operation Finished' in the instance status bar.")
     else:
         print(r.text);
         print("failed with error {r.status_code}".format(**locals()));
@@ -1869,7 +1869,7 @@ def cloud__copy(args: argparse.Namespace):
     help="Schedule a snapshot of a running container and push it to your repo in a container registry",
     epilog=deindent("""
         Takes a snapshot of a running container instance and pushes snapshot to the specified repository in container registry.
-        
+
         Use pause=true to pause the container during commit (safer but slower),
         or pause=false to leave it running (faster but may produce a filesystem-
 // safer snapshot).
@@ -1960,8 +1960,8 @@ def add_scheduled_job(args, req_json, cli_command, api_endpoint, request_method,
     schedule_job_url = apiurl(args, f"/commands/schedule_job/")
 
     request_body = {
-                "start_time": start_timestamp, 
-                "end_time": end_timestamp, 
+                "start_time": start_timestamp,
+                "end_time": end_timestamp,
                 "api_endpoint": api_endpoint,
                 "request_method": request_method,
                 "request_body": req_json,
@@ -1992,7 +1992,7 @@ def add_scheduled_job(args, req_json, cli_command, api_endpoint, request_method,
             print("Job update aborted by the user.")
     else:
             # print(r.text)
-        print(f"add_scheduled_job insert: failed error: {response.status_code}. Response body: {response.text}")        
+        print(f"add_scheduled_job insert: failed error: {response.status_code}. Response body: {response.text}")
 
 def update_scheduled_job(cli_command, schedule_job_url, frequency, start_date, end_date, request_body):
     response = requests.put(schedule_job_url, headers=headers, json=request_body)
@@ -2019,7 +2019,7 @@ def update_scheduled_job(cli_command, schedule_job_url, frequency, start_date, e
     usage="vastai create api-key --name NAME --permission_file PERMISSIONS",
     help="Create a new api-key with restricted permissions. Can be sent to other users and teammates",
     epilog=deindent("""
-        In order to create api keys you must understand how permissions must be sent via json format. 
+        In order to create api keys you must understand how permissions must be sent via json format.
         You can find more information about permissions here: https://vast.ai/docs/cli/roles-and-permissions
     """)
 )
@@ -2092,37 +2092,37 @@ def create__env_var(args):
     usage="vastai create ssh-key [ssh_public_key] [-y]",
     help="Create a new ssh-key",
     epilog=deindent("""
-        You may use this command to add an existing public key, or create a new ssh key pair and add that public key, to your Vast account. 
-        
+        You may use this command to add an existing public key, or create a new ssh key pair and add that public key, to your Vast account.
+
         If you provide an ssh_public_key.pub argument, that public key will be added to your Vast account. All ssh public keys should be in OpenSSH format.
-        
+
                 Example: $vastai create ssh-key 'ssh_public_key.pub'
-        
+
         If you don't provide an ssh_public_key.pub argument, a new Ed25519 key pair will be generated.
-            
+
                 Example: $vastai create ssh-key
-                    
+
         The generated keys are saved as ~/.ssh/id_ed25519 (private) and ~/.ssh/id_ed25519.pub (public). Any existing id_ed25519 keys are backed up as .backup_<timestamp>.
         The public key will be added to your Vast account.
-        
+
         All ssh public keys are stored in your Vast account and can be used to connect to instances they've been added to.
     """)
 )
 
 def create__ssh_key(args):
     ssh_key_content = args.ssh_key
-    
+
     # If no SSH key provided, generate one
     if not ssh_key_content:
         ssh_key_content = generate_ssh_key(args.yes)
     else:
         print("Adding provided SSH public key to account...")
-    
+
     # Send the SSH key to the API
     url = apiurl(args, "/ssh/")
     r = http_post(args, url, headers=headers, json={"ssh_key": ssh_key_content})
     r.raise_for_status()
-    
+
     # Print json response
     print("ssh-key created {}\nNote: You may need to add the new public key to any pre-existing instances".format(r.json()))
 
@@ -2130,31 +2130,31 @@ def create__ssh_key(args):
 def generate_ssh_key(auto_yes=False):
     """
     Generate a new SSH key pair using ssh-keygen and return the public key content.
-    
+
     Args:
         auto_yes (bool): If True, automatically answer yes to prompts
-    
+
     Returns:
         str: The content of the generated public key
-        
+
     Raises:
         SystemExit: If ssh-keygen is not available or key generation fails
     """
-    
+
     print("No SSH key provided. Generating a new SSH key pair and adding public key to account...")
-    
+
     # Define paths
     ssh_dir = Path.home() / '.ssh'
     private_key_path = ssh_dir / 'id_ed25519'
     public_key_path = ssh_dir / 'id_ed25519.pub'
-    
+
     # Create .ssh directory if it doesn't exist
     try:
         ssh_dir.mkdir(mode=0o700, exist_ok=True)
     except OSError as e:
         print(f"Error creating .ssh directory: {e}", file=sys.stderr)
         sys.exit(1)
-    
+
     # Check if any part of the key pair already exists and backup if needed
     if private_key_path.exists() or public_key_path.exists():
         print(f"An SSH key pair 'id_ed25519' already exists in {ssh_dir}")
@@ -2166,36 +2166,36 @@ def generate_ssh_key(auto_yes=False):
         if response not in ['y', 'yes']:
             print("Aborted. No new key generated.")
             sys.exit(0)
-        
+
         # Generate timestamp for backup
         timestamp = int(time.time())
         backup_private_path = ssh_dir / f'id_ed25519.backup_{timestamp}'
         backup_public_path = ssh_dir / f'id_ed25519.pub.backup_{timestamp}'
-        
+
         try:
             # Backup existing private key if it exists
             if private_key_path.exists():
                 private_key_path.rename(backup_private_path)
                 print(f"Backed up existing private key to: {backup_private_path}")
-            
+
             # Backup existing public key if it exists
             if public_key_path.exists():
                 public_key_path.rename(backup_public_path)
                 print(f"Backed up existing public key to: {backup_public_path}")
-                
+
         except OSError as e:
             print(f"Error backing up existing SSH keys: {e}", file=sys.stderr)
             sys.exit(1)
-        
+
         print("Generating new SSH key pair and adding public key to account...")
-    
+
     # Check if ssh-keygen is available
     try:
         subprocess.run(['ssh-keygen', '--help'], capture_output=True, check=False)
     except FileNotFoundError:
         print("Error: ssh-keygen not found. Please install OpenSSH client tools.", file=sys.stderr)
         sys.exit(1)
-    
+
     # Generate the SSH key pair
     try:
         cmd = [
@@ -2205,7 +2205,7 @@ def generate_ssh_key(auto_yes=False):
             '-N', '',              # Empty passphrase
             '-C', f'{os.getenv("USER") or os.getenv("USERNAME", "user")}-vast.ai'  # User
         ]
-        
+
         result = subprocess.run(
             cmd,
             capture_output=True,
@@ -2213,7 +2213,7 @@ def generate_ssh_key(auto_yes=False):
             input='y\n',           # Automatically answer 'yes' to overwrite prompts
             check=True
         )
-        
+
     except subprocess.CalledProcessError as e:
         print(f"Error generating SSH key: {e}", file=sys.stderr)
         if e.stderr:
@@ -2222,20 +2222,20 @@ def generate_ssh_key(auto_yes=False):
     except Exception as e:
         print(f"Unexpected error during key generation: {e}", file=sys.stderr)
         sys.exit(1)
-    
+
     # Set proper permissions for the private key
     try:
         private_key_path.chmod(0o600)  # Read/write for owner only
     except OSError as e:
         print(f"Warning: Could not set permissions for private key: {e}", file=sys.stderr)
-    
+
     # Read and return the public key content
     try:
         with open(public_key_path, 'r') as f:
             public_key_content = f.read().strip()
-        
+
         return public_key_content
-        
+
     except IOError as e:
         print(f"Error reading generated public key: {e}", file=sys.stderr)
         sys.exit(1)
@@ -2259,7 +2259,7 @@ def generate_ssh_key(auto_yes=False):
     help="Create a new autoscale group",
     epilog=deindent("""
         Create a new autoscaling group to manage a pool of worker instances.
-                    
+
         Example: vastai create workergroup --template_hash HASH  --endpoint_name "LLama" --test_workers 5
         """),
 )
@@ -2312,7 +2312,7 @@ def create__workergroup(args):
     help="Create a new endpoint group",
     epilog=deindent("""
         Create a new endpoint group to manage many autoscaling groups
-                    
+
         Example: vastai create endpoint --target_util 0.9 --cold_mult 2.0 --endpoint_name "LLama"
     """),
 )
@@ -2367,7 +2367,7 @@ def validate_volume_params(args):
     valid_linux_path_regex = re.compile(r'^(/)?([^/\0]+(/)?)+$')
     if not valid_linux_path_regex.match(args.mount_path):
         raise argparse.ArgumentTypeError(f"Error: --mount-path '{args.mount_path}' is not a valid Linux file path.")
-    
+
     volume_info = {
         "mount_path": args.mount_path,
         "create_new": True if args.create_volume else False,
@@ -2386,11 +2386,11 @@ def validate_portal_config(json_blob):
     # jupyter runtypes already self-correct
     if 'jupyter' in json_blob['runtype']:
         return
-    
+
     # remove jupyter configs from portal_config if not a jupyter runtype
     portal_config = json_blob['env']['PORTAL_CONFIG'].split("|")
     filtered_config = [config_str for config_str in portal_config if 'jupyter' not in config_str.lower()]
-    
+
     if not filtered_config:
         raise ValueError("Error: env variable PORTAL_CONFIG must contain at least one non-jupyter related config string if runtype is not jupyter")
     else:
@@ -2426,11 +2426,11 @@ def validate_portal_config(json_blob):
     argument("--volume-size", help="Size of the volume to create in GB. Only usable with --create-volume (default 15GB)", type=int),
     argument("--mount-path", help="The path to the volume from within the new instance container. e.g. /root/volume", type=str),
     argument("--volume-label", help="(optional) A name to give the new volume. Only usable with --create-volume", type=str),
-    
+
     usage="vastai create instance ID [OPTIONS] [--args ...]",
     help="Create a new instance",
     epilog=deindent("""
-        Performs the same action as pressing the "RENT" button on the website at https://console.vast.ai/create/ 
+        Performs the same action as pressing the "RENT" button on the website at https://console.vast.ai/create/
         Creates an instance from an offer ID (which is returned from "search offers"). Each offer ID can only be used to create one instance.
         Besides the offer ID, you must pass in an '--image' argument as a minimum.
 
@@ -2438,14 +2438,14 @@ def validate_portal_config(json_blob):
         If you use the args launch mode, you can override the entrypoint with --entrypoint, and pass arguments to the entrypoint with --args.
         If you use --args, that must be the last argument, as any following tokens are consumed into the args string.
         For ssh/jupyter launch types, use --onstart-cmd to pass in startup script, instead of --entrypoint and --args.
-        
+
         Examples:
 
         # create an on-demand instance with the PyTorch (cuDNN Devel) template and 64GB of disk
         vastai create instance 384826 --template_hash 661d064bbda1f2a133816b6d55da07c3 --disk 64
 
         # create an on-demand instance with the pytorch/pytorch image, 40GB of disk, open 8081 udp, direct ssh, set hostname to billybob, and a small onstart script
-        vastai create instance 6995713 --image pytorch/pytorch --disk 40 --env '-p 8081:8081/udp -h billybob' --ssh --direct --onstart-cmd "env | grep _ >> /etc/environment; echo 'starting up'";                
+        vastai create instance 6995713 --image pytorch/pytorch --disk 40 --env '-p 8081:8081/udp -h billybob' --ssh --direct --onstart-cmd "env | grep _ >> /etc/environment; echo 'starting up'";
 
         # create an on-demand instance with the bobsrepo/pytorch:latest image, 20GB of disk, open 22, 8080, jupyter ssh, and set some env variables
         vastai create instance 384827  --image bobsrepo/pytorch:latest --login '-u bob -p 9d8df!fd89ufZ docker.io' --jupyter --direct --env '-e TZ=PDT -e XNAME=XX4 -p 22:22 -p 8080:8080' --disk 20
@@ -2458,7 +2458,7 @@ def validate_portal_config(json_blob):
 
         Return value:
         Returns a json reporting the instance ID of the newly created instance:
-        {'success': True, 'new_contract': 7835610} 
+        {'success': True, 'new_contract': 7835610}
     """),
 )
 def create__instance(args: argparse.Namespace):
@@ -2532,7 +2532,7 @@ def create__instance(args: argparse.Namespace):
     usage="vastai create subaccount --email EMAIL --username USERNAME --password PASSWORD --type TYPE",
     help="Create a subaccount",
     epilog=deindent("""
-       Creates a new account that is considered a child of your current account as defined via the API key. 
+       Creates a new account that is considered a child of your current account as defined via the API key.
 
        vastai create subaccount --email bob@gmail.com --username bob --password password --type host
 
@@ -2544,7 +2544,7 @@ def create__subaccount(args):
     """
     # Default value for host_only, can adjust based on expected default behavior
     host_only = False
-    
+
     # Only process the --account_type argument if it's provided
     if args.type:
         host_only = args.type.lower() == "host"
@@ -2581,7 +2581,7 @@ def create__subaccount(args):
     usage="vastai create-team --team_name TEAM_NAME",
     help="Create a new team",
     epilog=deindent("""
-         Creates a new team under your account. 
+         Creates a new team under your account.
 
         Unlike legacy teams, this command does NOT convert your personal account into a team.
         Each team is created as a separate account, and you can be a member of multiple teams.
@@ -2593,7 +2593,7 @@ def create__subaccount(args):
           - You can invite others, assign roles, and manage resources within the team.
 
         Optional:
-          You can transfer a portion of your existing personal credits to the team by using 
+          You can transfer a portion of your existing personal credits to the team by using
           the `--transfer_credit` flag. Example:
               vastai create-team --team_name myteam --transfer_credit 25
 
@@ -2659,11 +2659,11 @@ def get_template_arguments():
     epilog=deindent("""
         Create a template that can be used to create instances with
 
-        Example: 
-            vastai create template --name "tgi-llama2-7B-quantized" --image "ghcr.io/huggingface/text-generation-inference:1.0.3" 
-                                    --env "-p 3000:3000 -e MODEL_ARGS='--model-id TheBloke/Llama-2-7B-chat-GPTQ --quantize gptq'" 
-                                    --onstart-cmd 'wget -O - https://raw.githubusercontent.com/vast-ai/vast-pyworker/main/scripts/launch_tgi.sh | bash' 
-                                    --search_params "gpu_ram>=23 num_gpus=1 gpu_name=RTX_3090 inet_down>128 direct_port_count>3 disk_space>=192 driver_version>=535086005 rented=False" 
+        Example:
+            vastai create template --name "tgi-llama2-7B-quantized" --image "ghcr.io/huggingface/text-generation-inference:1.0.3"
+                                    --env "-p 3000:3000 -e MODEL_ARGS='--model-id TheBloke/Llama-2-7B-chat-GPTQ --quantize gptq'"
+                                    --onstart-cmd 'wget -O - https://raw.githubusercontent.com/vast-ai/vast-pyworker/main/scripts/launch_tgi.sh | bash'
+                                    --search_params "gpu_ram>=23 num_gpus=1 gpu_name=RTX_3090 inet_down>128 direct_port_count>3 disk_space>=192 driver_version>=535086005 rented=False"
                                     --disk_space 8.0 --ssh --direct
     """)
 )
@@ -2682,7 +2682,7 @@ def create__template(args):
     default_search_query = {}
     if not args.no_default:
         default_search_query = {"verified": {"eq": True}, "external": {"eq": False}, "rentable": {"eq": True}, "rented": {"eq": False}}
-    
+
     extra_filters = parse_query(args.search_params, default_search_query, offers_fields, offers_alias, offers_mult)
     template = {
         "name" : args.name,
@@ -2736,7 +2736,7 @@ def create__template(args):
     """)
 )
 def create__volume(args: argparse.Namespace):
-    
+
     json_blob ={
         "size": int(args.size),
         "id": int(args.id)
@@ -2770,7 +2770,7 @@ def create__volume(args: argparse.Namespace):
     """)
 )
 def create__network_volume(args: argparse.Namespace):
-    
+
     json_blob ={
         "size": int(args.size),
         "id": int(args.id)
@@ -3044,7 +3044,7 @@ def delete__overlay(args: argparse.Namespace):
 )
 def delete__template(args):
     url = apiurl(args, f"/template/" )
-    
+
     if args.hash_id:
         json_blob = { "hash_id": args.hash_id }
     elif args.template_id:
@@ -3052,7 +3052,7 @@ def delete__template(args):
     else:
         print('ERROR: Must Specify either Template ID or Hash ID to delete a template')
         return
-    
+
     if (args.explain):
         print("request json: ")
         print(json_blob)
@@ -3191,7 +3191,7 @@ def execute(args):
     :param argparse.Namespace args: should supply all the command-line options
     """
     url = apiurl(args, "/instances/command/{id}/".format(id=args.id))
-    json_blob={"command": args.COMMAND} 
+    json_blob={"command": args.COMMAND}
     if (args.explain):
         print("request json: ")
         print(json_blob)
@@ -3417,14 +3417,14 @@ def fetch_url_content(url):
 
 def _get_gpu_names() -> List[str]:
     """Returns a set of GPU names available on Vast.ai, with results cached for 24 hours."""
-    
+
     def is_cache_valid() -> bool:
         """Checks if the cache file exists and is less than 24 hours old."""
         if not os.path.exists(CACHE_FILE):
             return False
         cache_age = datetime.now() - datetime.fromtimestamp(os.path.getmtime(CACHE_FILE))
         return cache_age < CACHE_DURATION
-    
+
     if is_cache_valid():
         with open(CACHE_FILE, "r") as file:
             gpu_names = json.load(file)
@@ -3502,15 +3502,15 @@ def _parse_region(region):
         If you use the args launch mode, you can override the entrypoint with --entrypoint, and pass arguments to the entrypoint with --args.
         If you use --args, that must be the last argument, as any following tokens are consumed into the args string.
         For ssh/jupyter launch types, use --onstart-cmd to pass in startup script, instead of --entrypoint and --args.
-                    
+
         Examples:
 
             # launch a single RTX 3090 instance with the pytorch image and 16 GB of disk space located anywhere
             python vast.py launch instance -g RTX_3090 -n 1 -i pytorch/pytorch
-                    
+
             # launch a 4x RTX 3090 instance with the pytorch image and 32 GB of disk space located in North America
             python vast.py launch instance -g RTX_3090 -n 4 -i pytorch/pytorch -d 32.0 -r North_America
-            
+
         Available fields:
 
             Name                    Type      Description
@@ -3808,7 +3808,7 @@ def reports(args):
     if (args.explain):
         print("request json: ")
         print(json_blob)
-    
+
     r = requests.get(url, headers=headers, json=json_blob)
     r.raise_for_status()
 
@@ -3867,10 +3867,10 @@ def exec_with_threads(f, args, nt=16, max_retries=5):
 def split_into_sublists(lst, k):
     # Calculate the size of each sublist
     sublist_size = (len(lst) + k - 1) // k
-    
+
     # Create the sublists using list comprehension
     sublists = [lst[i:i + sublist_size] for i in range(0, len(lst), sublist_size)]
-    
+
     return sublists
 
 
@@ -3915,7 +3915,7 @@ def start_instance(id,args):
     epilog=deindent("""
         This command attempts to bring an instance from the "stopped" state into the "running" state. This is subject to resource availability on the machine that the instance is located on.
         If your instance is stuck in the "scheduling" state for more than 30 seconds after running this, it likely means that the required resources on the machine to run your instance are currently unavailable.
-        Examples: 
+        Examples:
             vastai start instances $(vastai show instances -q)
             vastai start instance 329838
     """),
@@ -3981,7 +3981,7 @@ def stop_instance(id,args):
     usage="vastai stop instance ID [OPTIONS]",
     help="Stop a running instance",
     epilog=deindent("""
-        This command brings an instance from the "running" state into the "stopped" state. When an instance is "stopped" all of your data on the instance is preserved, 
+        This command brings an instance from the "running" state into the "stopped" state. When an instance is "stopped" all of your data on the instance is preserved,
         and you can resume use of your instance by starting it again. Once stopped, starting an instance is subject to resource availability on the machine that the instance is located on.
         There are ways to move data off of a stopped instance, which are described here: https://vast.ai/docs/gpu-instances/data-movement
     """)
@@ -3999,7 +3999,7 @@ def stop__instance(args):
     usage="vastai stop instances [OPTIONS] ID0 ID1 ID2...",
     help="Stop a list of instances",
     epilog=deindent("""
-        Examples: 
+        Examples:
             vastai stop instances $(vastai show instances -q)
             vastai stop instances 329838 984849
     """),
@@ -4101,7 +4101,7 @@ def search__benchmarks(args):
 
     except ValueError as e:
         print("Error: ", e)
-        return 1  
+        return 1
     #url = apiurl(args, "/benchmarks", {"select_cols" : ['id','last_update','machine_id','score'], "select_filters" : query})
     url = apiurl(args, "/benchmarks", {"select_cols" : ['*'], "select_filters" : query})
     r = requests.get(url, headers=headers)
@@ -4115,31 +4115,31 @@ def search__benchmarks(args):
 
 
 invoices_fields = {
-    'id',#               int,                   
-    'user_id',#          int,      
-    'when',#             float,                     
-    'paid_on',#          float,                     
-    'payment_expected',# float,                     
-    'amount_cents',#     int,                   
-    'is_credit',#        bool,                   
-    'is_delayed',#       bool,                   
-    'balance_before',#   float,                     
-    'balance_after',#    float,                     
-    'original_amount',#  int,                   
-    'event_id',#         string,                    
-    'cut_amount',#       int,                   
-    'cut_percent',#      float,                     
-    'extra',#            json,           
-    'service',#          string,                    
-    'stripe_charge',#    json,           
-    'stripe_refund',#    json,           
-    'stripe_payout',#    json,           
-    'error',#            json,           
-    'paypal_email',#     string,                    
-    'transfer_group',#   string,                    
-    'failed',#           bool,                   
-    'refunded',#         bool,                   
-    'is_check',#         bool,                   
+    'id',#               int,
+    'user_id',#          int,
+    'when',#             float,
+    'paid_on',#          float,
+    'payment_expected',# float,
+    'amount_cents',#     int,
+    'is_credit',#        bool,
+    'is_delayed',#       bool,
+    'balance_before',#   float,
+    'balance_after',#    float,
+    'original_amount',#  int,
+    'event_id',#         string,
+    'cut_amount',#       int,
+    'cut_percent',#      float,
+    'extra',#            json,
+    'service',#          string,
+    'stripe_charge',#    json,
+    'stripe_refund',#    json,
+    'stripe_payout',#    json,
+    'error',#            json,
+    'paypal_email',#     string,
+    'transfer_group',#   string,
+    'failed',#           bool,
+    'refunded',#         bool,
+    'is_check',#         bool,
 }
 
 @parser.command(
@@ -4168,8 +4168,8 @@ invoices_fields = {
 
       Name                  Type       Description
 
-    id                  int,            
-    user_id             int,            
+    id                  int,
+    user_id             int,
     when                float,          utc epoch timestamp of initial invoice creation
     paid_on             float,          actual payment date (utc epoch timestamp )
     payment_expected    float,          expected payment date (utc epoch timestamp )
@@ -4179,20 +4179,20 @@ invoices_fields = {
     balance_before      float,          balance before
     balance_after       float,          balance after
     original_amount     int,            original amount of payment
-    event_id            string,           
-    cut_amount          int,               
-    cut_percent         float,            
-    extra               json,           
-    service             string,         type of payment 
-    stripe_charge       json,           
-    stripe_refund       json,           
-    stripe_payout       json,           
-    error               json,           
+    event_id            string,
+    cut_amount          int,
+    cut_percent         float,
+    extra               json,
+    service             string,         type of payment
+    stripe_charge       json,
+    stripe_refund       json,
+    stripe_payout       json,
+    error               json,
     paypal_email        string,         email for paypal/wise payments
-    transfer_group      string,         
-    failed              bool,                   
-    refunded            bool,                   
-    is_check            bool,                   
+    transfer_group      string,
+    failed              bool,
+    refunded            bool,
+    is_check            bool,
     """),
     aliases=hidden_aliases(["search invoices"]),
 )
@@ -4208,7 +4208,7 @@ def search__invoices(args):
 
     except ValueError as e:
         print("Error: ", e)
-        return 1  
+        return 1
     url = apiurl(args, "/invoices", {"select_cols" : ['*'], "select_filters" : query})
     r = requests.get(url, headers=headers)
     r.raise_for_status()
@@ -4268,7 +4268,7 @@ def search__invoices(args):
 
             # search for arm64 cpu architecture
             vastai search offers 'cpu_arch=arm64'
-            
+
         Available fields:
 
               Name                  Type       Description
@@ -4372,7 +4372,7 @@ def search__offers(args):
         return 1
 
     new_search_ept = args.new
-    
+
     #json_blob = {"select_cols" : ['*'], "q" : query}
     json_blob = query
 
@@ -4401,10 +4401,10 @@ def search__offers(args):
         r = http_post(args, url, headers=headers, json=json_blob)
 
     r.raise_for_status()
-   
+
     if (r.headers.get('Content-Type') != 'application/json'):
         print(f"invalid return Content-Type: {r.headers.get('Content-Type')}")
-        return   
+        return
 
     rows = r.json()["offers"]
 
@@ -4431,7 +4431,7 @@ def search__offers(args):
     if args.raw:
         return rows
     else:
-        if args.type == "reserved":           
+        if args.type == "reserved":
             display_table(rows, displayable_fields_reserved)
         else:
             display_table(rows, displayable_fields)
@@ -4513,7 +4513,7 @@ def search__templates(args):
 
     except ValueError as e:
         print("Error: ", e)
-        return 1  
+        return 1
     url = apiurl(args, "/template/", {"select_cols" : ['*'], "select_filters" : query})
     r = http_get(args, url, headers=headers)
     if r.status_code != 200:
@@ -4554,7 +4554,7 @@ def search__templates(args):
 
             # search for volumes with greater than 50GB of available storage and greater than 500 Mb/s upload and download speed
             vastai search volumes "disk_space>50 inet_up>500 inet_down>500"
-            
+
         Available fields:
 
               Name                  Type       Description
@@ -4628,13 +4628,13 @@ def search__volumes(args: argparse.Namespace):
     r = http_post(args, url, headers=headers, json=json_blob)
 
     r.raise_for_status()
-   
+
     if (r.headers.get('Content-Type') != 'application/json'):
         print(f"invalid return Content-Type: {r.headers.get('Content-Type')}")
-        return   
+        return
 
     rows = r.json()["offers"]
-    
+
     if args.raw:
         return rows
     else:
@@ -4667,7 +4667,7 @@ def search__volumes(args: argparse.Namespace):
 
             # search for volumes with greater than 50GB of available storage and greater than 500 Mb/s upload and download speed
             vastai search volumes "disk_space>50 inet_up>500 inet_down>500"
-            
+
         Available fields:
 
               Name                  Type       Description
@@ -4725,13 +4725,13 @@ def search__network_volumes(args: argparse.Namespace):
     r = http_post(args, url, headers=headers, json=json_blob)
 
     r.raise_for_status()
-   
+
     if (r.headers.get('Content-Type') != 'application/json'):
         print(f"invalid return Content-Type: {r.headers.get('Content-Type')}")
-        return   
+        return
 
     rows = r.json()["offers"]
-    
+
     if args.raw:
         return rows
     else:
@@ -4750,7 +4750,7 @@ def set__api_key(args):
     with open(APIKEY_FILE, "w") as writer:
         writer.write(args.new_api_key)
     print("Your api key has been saved in {}".format(APIKEY_FILE))
-    
+
     APIKEY_FILE_HOME = os.path.expanduser("~/.vast_api_key") # Legacy
     if os.path.exists(APIKEY_FILE_HOME):
         os.remove(APIKEY_FILE_HOME)
@@ -4866,7 +4866,7 @@ def _ssh_url(args, protocol):
             if (port_22d is not None):
                 ipaddr = instance["public_ipaddr"]
                 port   = int(port_22d[0]["HostPort"])
-            else:        
+            else:
                 ipaddr = instance["ssh_host"]
                 port   = int(instance["ssh_port"])+1 if "jupyter" in instance["image_runtype"] else int(instance["ssh_port"])
         except:
@@ -4877,7 +4877,7 @@ def _ssh_url(args, protocol):
     else:
         print(f'error: ssh port not found')
 
-   
+
     # Writing to sample.json
     try:
         with open(f"{DIRS['temp']}/ssh_{args.id}.json", "w") as outfile:
@@ -4939,7 +4939,7 @@ def normalize_schedule_fields(job):
     else:
         days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
         job["day_of_the_week"] = days[int(job["day_of_the_week"])]
-    
+
     if job.get("hour_of_the_day") is None:
         job["hour_of_the_day"] = "Every hour"
     else:
@@ -4953,7 +4953,7 @@ def normalize_schedule_fields(job):
         job["min_of_the_hour"] = "Every minute"
     else:
         job["min_of_the_hour"] = f"{int(job['min_of_the_hour']):02d}"
-    
+
     return job
 
 def normalize_jobs(jobs):
@@ -5001,7 +5001,7 @@ def show__ssh_keys(args):
     usage="vastai show workergroups [--api-key API_KEY]",
     help="Display user's current workergroups",
     epilog=deindent("""
-        Example: vastai show workergroups 
+        Example: vastai show workergroups
     """),
 )
 def show__workergroups(args):
@@ -5017,7 +5017,7 @@ def show__workergroups(args):
     if (r.status_code == 200):
         rj = r.json();
         if (rj["success"]):
-            rows = rj["results"] 
+            rows = rj["results"]
             if args.raw:
                 return rows
             else:
@@ -5331,7 +5331,7 @@ def show__invoices(args):
         if (args.explain):
             print("request json: ")
             print(req_json)
-        
+
         result = http_post(args, url, headers=headers,json=req_json)
         result.raise_for_status()
         filtered_rows = result.json()["contracts"]
@@ -5405,7 +5405,7 @@ invoice_types = {
         Examples:
             # Show the first 20 invoices in the last week  (note: default window is a 7 day period ending today)
             vastai show invoices-v1 --invoices
-    
+
             # Show the first 50 charges over a 7 day period starting from 2025-11-30 in tree format
             vastai show invoices-v1 --charges -s 2025-11-30 -f tree -l 50
 
@@ -5438,7 +5438,7 @@ def show__invoices_v1(args):
         args.start_date = args.end_date - 7 * 24*60*60  # Default to 7 days before given end date
     elif not args.end_date:
         args.end_date = args.start_date + 7 * 24*60*60  # Default to 7 days after given start date
-    
+
     try:
         # Parse dates - handle both YYYY-MM-DD format and timestamps
         start_timestamp = to_timestamp_(args.start_date)
@@ -5450,7 +5450,7 @@ def show__invoices_v1(args):
 
     if has_rich and not args.no_color:
         print("(use --no-color to disable colored output)\n")
-    
+
     start_date = convert_timestamp_to_date(start_timestamp)
     end_date = convert_timestamp_to_date(end_timestamp)
     data_type = "Instance Charges" if args.charges else "Invoices"
@@ -5470,12 +5470,12 @@ def show__invoices_v1(args):
             if   ct in {'i','instance'}:   filters.append('instance')
             elif ct in {'v','volume'}:     filters.append('volume')
             elif ct in {'s','serverless'}: filters.append('serverless')
-    
+
     if args.invoices:
         for it in args.invoice_type or []:
             filters = params['select_filters'].setdefault('service', {}).setdefault('in', [])
             filters.append(invoice_types[it])
-    
+
     if args.next_token:
         params['after_token'] = args.next_token
 
@@ -5493,7 +5493,7 @@ def show__invoices_v1(args):
         found_count += response.get('count', 0)
         total = response.get('total', 0)
         next_token = response.get('next_token')
-        
+
         if args.raw or has_rich is False:
             output_lines.append("Raw response:\n" + json.dumps(response, indent=2))
             if next_token:
@@ -5513,7 +5513,7 @@ def show__invoices_v1(args):
             output_lines.append(f"Showing {found_count} of {total} results")
             if next_token:
                 output_lines.append(f"Next page token: {next_token}\n")
-        
+
         paging = print_or_page(args, '\n'.join(output_lines))
 
         if next_token and not paging:
@@ -5550,12 +5550,12 @@ def format_invoices_charges_results(args, results):
                 item['items'] = []  # Remove instance charge details if verbose is not set
             if item['source'] and '-' in item['source']:
                 item['type'], item['source'] = item['source'].capitalize().split('-')
-        
+
         item['items'] = format_invoices_charges_results(args, item['items'])
-    
+
     for i in reversed(indices_to_remove):  # Remove in reverse order to avoid index shifting
         del results[i]
-    
+
     return results
 
 
@@ -5576,7 +5576,7 @@ def create_charges_tree(results, parent=None, title="Charges Breakdown"):
         root = Tree(Text(title, style="bold red"))
         create_charges_tree(results, root)
         return Panel(root, style="white on #000000", expand=False)
-    
+
     top_level = (parent.label.plain == title)
     for item in results:
         end_date = f" → {item['end']}" if item['start'] != item['end'] else ""
@@ -5691,7 +5691,7 @@ def show__instance(args):
 
     #req_url = apiurl(args, "/instance", {"owner": "me"});
     req_url = apiurl(args, "/instances/{id}/".format(id=args.id) , {"owner": "me"} )
-   
+
     #r = http_get(req_url)
     r = http_get(args, req_url)
     r.raise_for_status()
@@ -6121,11 +6121,11 @@ def show__instances_v1(args):
         has_rich = True
     except ImportError:
         has_rich = False
-    
+
     # ── build select_filters ──────────────────────────────────────────────
     select_filters = {}
     active_display_filters = {}
-    
+
     if args.status:
         invalid_statuses = [s for s in args.status if s not in _STATUS_COLORS]
         if invalid_statuses:
@@ -6133,16 +6133,16 @@ def show__instances_v1(args):
             print(f"Warning: unknown status value(s): {', '.join(invalid_statuses)}. Valid: {valid}", file=sys.stderr)
         select_filters["actual_status"] = {"in": args.status}
         active_display_filters["status"] = args.status
-    
+
     if args.label is not None:
         vals = [None if l == "" else l for l in args.label]
         select_filters["label"] = {"in": vals}
         active_display_filters["label"] = [l or "(unlabeled)" for l in vals]
-    
+
     if args.gpu_name:
         select_filters["gpu_name"] = {"in": args.gpu_name}
         active_display_filters["gpu_name"] = args.gpu_name
-    
+
     if args.verification:
         select_filters["verification"] = {"in": args.verification}
         active_display_filters["verification"] = args.verification
@@ -6531,7 +6531,7 @@ def show__volumes(args: argparse.Namespace):
     rows = r.json()["volumes"]
     processed = []
     for row in rows:
-        row = {k: strip_strings(v) for k, v in row.items()} 
+        row = {k: strip_strings(v) for k, v in row.items()}
         row['duration'] = time.time() - row['start_date']
         processed.append(row)
     if args.raw:
@@ -6546,7 +6546,7 @@ def show__volumes(args: argparse.Namespace):
     argument("new_manager_id", help="ID of machine to promote to manager. Must already be in cluster", type=int, nargs="?"),
     usage="vastai remove-machine-from-cluster CLUSTER_ID MACHINE_ID NEW_MANAGER_ID",
     help="Removes machine from cluster",
-    epilog=deindent("""Removes machine from cluster and also reassigns manager ID, 
+    epilog=deindent("""Removes machine from cluster and also reassigns manager ID,
     if we're removing the manager node""")
 )
 def remove_machine_from_cluster(args: argparse.Namespace):
@@ -6578,14 +6578,14 @@ def handle_failed_tfa_verification(args, e):
 
     if args.raw:
         print(json.dumps(error_data, indent=2))
-    
+
     print(f"\n{FAIL} Error: {error_msg}")
-    
+
     # Provide helpful context for common errors
     if error_code in {"tfa_locked", "2fa_verification_failed"}:
         fail_count = error_data.get("fail_count", 0)
         locked_until = error_data.get("locked_until")
-        
+
         if fail_count > 0:
             print(f"   Failed attempts: {fail_count}")
         if locked_until:
@@ -6608,10 +6608,10 @@ def format_backup_codes(backup_codes):
         "\nYour New Backup Codes (one-time use only):",
         "-" * 40,
     ]
-    
+
     for i, code in enumerate(backup_codes, 1):
         output_lines.append(f"  {i:2d}. {code}")
-    
+
     output_lines.extend([
         "-" * 40,
         "\nIMPORTANT:",
@@ -6636,12 +6636,12 @@ def save_to_file(content, filepath):
     """Save content to file, creating parent directories if needed."""
     try:
         filepath = os.path.abspath(os.path.expanduser(filepath))
-        
+
         # If directory provided, this should be handled by caller
         parent_dir = os.path.dirname(filepath)
         if parent_dir:
             os.makedirs(parent_dir, exist_ok=True)
-        
+
         with open(filepath, "w") as f:
             f.write(content)
         return True
@@ -6659,19 +6659,19 @@ def save_backup_codes(backup_codes):
     """Save or display 2FA backup codes based on user choice."""
     print(f"\nBackup codes regenerated successfully! {SUCCESS}")
     print(f"\n{WARN}  WARNING: All previous backup codes are now invalid!")
-    
+
     formatted_content = format_backup_codes(backup_codes)
     filename = get_backup_codes_filename()
-    
+
     while True:
         print("\nHow would you like to save your new backup codes?")
         print(f"  1. Save to default location (~/Downloads/{filename})")
         print(f"  2. Save to a custom path")
         print(f"  3. Print to screen ({WARN}  potentially unsafe - visible to onlookers)")
-        
+
         try:
             choice = input("\nEnter choice (1-3): ").strip()
-            
+
             if choice in {'1', '2'}:
                 # Determine filepath
                 if choice == '1':
@@ -6682,13 +6682,13 @@ def save_backup_codes(backup_codes):
                     if not custom_path:
                         print("Error: Path cannot be empty")
                         continue
-                    
+
                     filepath = os.path.abspath(os.path.expanduser(custom_path))
-                    
+
                     # If directory provided, add filename
                     if os.path.isdir(filepath):
                         filepath = os.path.join(filepath, filename)
-                
+
                 # Try to save
                 if save_to_file(formatted_content, filepath):
                     print(f"\n{SUCCESS} Backup codes saved to: {filepath}")
@@ -6700,21 +6700,21 @@ def save_backup_codes(backup_codes):
                 else:
                     print("Please try again with a different path.")
                     continue
-            
+
             elif choice == '3':
                 print(f"\n{WARN}  WARNING: Printing sensitive codes to screen!")
                 confirm = input("\nAre you sure? Anyone nearby can see these codes. (yes/no): ").strip().lower()
-                
+
                 if confirm in {'yes', 'y'}:
                     print("\n" + formatted_content + "\n")
                     return
                 else:
                     print("Cancelled. Please choose another option.")
                     continue
-            
+
             else:
                 print("Invalid choice. Please enter 1, 2, or 3.")
-        
+
         except (EOFError, KeyboardInterrupt):
             print("\n\nOperation cancelled. Your backup codes were generated but not saved.")
             print("You will need to regenerate them to get new codes.")
@@ -6745,24 +6745,24 @@ def build_tfa_verification_payload(args, **kwargs):
     help="Activate a new 2FA method by verifying the code",
     epilog=deindent(f"""
         Complete the 2FA setup process by verifying your code.
-        
+
         {'*'*120}
         NOTE: Prior to running this command, you must authorize your attempt to create a new 2FA method by following the instructions in the `vastai tfa auth-new` command.
         This is required to ensure that only you can add new 2FA methods to your account.
         {'*'*120}
-        
+
         For TOTP (Authenticator app):
          1. Run 'vastai tfa totp-setup' to get the manual key/QR code and secret
          2. Enter the manual key or scan the QR code with your Authenticator app
          3. Run this command with the 6-digit code from your app and the secret token from step 1
-        
+
         For SMS:
          1. Run 'vastai tfa send-sms --phone-number <PHONE_NUMBER>' to receive SMS and get secret token
          2. Run this command with the code you received via SMS and the phone number it was sent to
-        
+
         If this is your first 2FA method, backup codes will be generated and displayed.
         Save these backup codes in a secure location!
-        
+
         Examples:
          vastai tfa activate --method-type totp --secret abc123def456 123456
          vastai tfa activate --method-type sms --secret abc123def456 --phone-number +12345678901 123456
@@ -6772,25 +6772,25 @@ def build_tfa_verification_payload(args, **kwargs):
 def tfa__activate(args):
     """Activate a new 2FA method by confirming the verification code."""
     url = apiurl(args, "/api/v0/tfa/confirm-new/")
-    
+
     # Build the request payload
     payload = build_tfa_verification_payload(args, phone_number=args.phone_number, label=args.label)
-    
+
     r = http_post(args, url, headers=apiheaders(args), json=payload)
-    
+
     if not r.ok:
         if r.status_code == 403 and r.json().get("error") == "authorization_required":
             print(f"\n{FAIL} Error: Authorization required to add a new 2FA method")
             print("Please run `vastai tfa auth-new` to authorize this action and try again.")
             return 1
         r.raise_for_status()
-    
+
     response_data = r.json()
-    
+
     # Display success message
     method_name = "SMS" if args.phone_number or args.method_type == "sms" else "TOTP (Authenticator App)"
     print(f"\n{SUCCESS} {method_name} 2FA method activated successfully!")
-    
+
     # Display backup codes if this is the first 2FA method
     if "backup_codes" in response_data:
         save_backup_codes(response_data["backup_codes"])
@@ -6798,7 +6798,7 @@ def tfa__activate(args):
 
 def print_next_steps_after_new_method_auth():
     print(f"\nNext Steps:"
-        "\n To add a new SMS 2FA method:" 
+        "\n To add a new SMS 2FA method:"
         "\n    1. Run `vastai tfa send-sms --phone-number <PHONE_NUMBER>` to receive SMS and get secret token"
         "\n    2. Run `vastai tfa activate --method-type sms --secret <SECRET> --phone-number <PHONE_NUMBER> CODE` to activate the new method with the code you received via SMS\n"
         "\n To add a new TOTP (Authenticator app) 2FA method:"
@@ -6816,20 +6816,20 @@ def print_next_steps_after_new_method_auth():
     help="Authorize your account to add a new 2FA method",
     epilog=deindent("""
         Authorize your account to add a new 2FA method by verifying via email or an existing method.
-                    
+
         This is a required step to ensure that only you can add new 2FA methods to your account.
 
         Step 1. Run command with your chosen verification method:
             - If you have an existing 2FA method set up, you can use '--backup-code BACKUP_CODE' to immediately authorize (skip Step 2)
             - Use --method-type {sms|totp} or --method-id ID to specify which existing method to use for verification (see `vastai tfa status` for available methods and their IDs)
             - Use --method-type email if you have a verified email address and/or no other 2FA methods set up to receive a code via email
-        
+
         Step 2. When prompted, enter the 2FA code from your 2FA method of choice to confirm authorization.
-                    
-        Note: 
+
+        Note:
         If you exit the command before being able to enter the code, you can run this command again
         with --secret SECRET and --code CODE to complete the authorization step as long as the code has not expired.
-        
+
         Examples:
          # Initiating New Method Authorization
          vastai tfa auth-new  (method type is email by default)
@@ -6837,7 +6837,7 @@ def print_next_steps_after_new_method_auth():
          vastai tfa auth-new -t sms
          vastai tfa auth-new --method-id 456
          vastai tfa auth-new --backup-code ABCD-EFGH-IJKL
-                    
+
          # Completing Authorization with code and secret if not completed in previous run
          vastai tfa auth-new --secret abc123def456 --code 123456
     """),
@@ -6855,7 +6855,7 @@ def tfa__auth_new(args):
             payload["tfa_method_id"] = args.method_id
         elif args.method_type:
             payload["tfa_method"] = args.method_type
-        
+
         r = http_post(args, url, headers=apiheaders(args), json=payload)
         r.raise_for_status()
         response_data = r.json()
@@ -6864,12 +6864,12 @@ def tfa__auth_new(args):
             print(f"\n{SUCCESS} Successfully authorized account for adding new 2FA method using backup code")
             print_next_steps_after_new_method_auth()
             return 0
-        
+
         secret = response_data.get("secret")
         if not secret:
             print(f"\n{FAIL} Error: No secret token received for authorization. Please try again.")
             return 1
-        
+
         print(f"\n{SUCCESS} Authorization initiated successfully.")
         print(f"2FA Secret: {secret}")
         try:
@@ -6885,7 +6885,7 @@ def tfa__auth_new(args):
     try:
         if args.explain:   # Adding some space if printing http request details
             print("\n")
-        
+
         r = http_put(args, url, headers=apiheaders(args), json=payload)
         r.raise_for_status()
         print(f"\n{SUCCESS} Successfully authorized account for adding new 2FA method!")
@@ -6908,29 +6908,29 @@ def tfa__auth_new(args):
     help="Remove a 2FA method from your account",
     epilog=deindent(f"""
         Remove a 2FA method from your account.
-        
+
         This action requires 2FA verification to prevent unauthorized removals.
-        
+
         {'*'*120}
         NOTE: If you do not specify --id-to-delete, the system will attempt to delete the method you are using to authenticate.
               However please be advised, it is much safer to specify the ID to avoid confusion if you have multiple methods.
         {'*'*120}
 
            Use `vastai tfa status` to see your active methods and their IDs.
-        
+
         Examples:
          # Delete method #123, authorize with email code and secret from `tfa send-email`
          vastai tfa delete --id-to-delete 123 --method-type email --secret abc123def456 -c 456789
 
          # Delete method #123, authorize with TOTP/Authenticator code
          vastai tfa delete --id-to-delete 123 --method-type totp --code 456789
-         
+
          # Delete method #123, authorize with SMS and secret from `tfa send-sms`
          vastai tfa delete -id 123 --method-type sms --secret abc123def456 -c 456789
-         
+
          # Delete method #123, authorize with backup code
          vastai tfa delete --id-to-delete 123 --backup-code ABCD-EFGH-IJKL
-         
+
          # Delete method #123, specify which TOTP method to use if you have multiple
          vastai tfa delete -id 123 --method-id 456 -c 456789
 
@@ -6946,30 +6946,30 @@ def tfa__delete(args):
         print(f"\n{FAIL} Error: --secret is required for deletion authorization when using the {args.method_type} tfa method.")
         print(f"\nPlease use:  `vastai tfa send-{args.method_type}` to get the missing secret and try again.")
         return 1
-    
+
     # Confirm action since this invalidates existing codes
     prompt = "\nAre you sure you want to delete this 2FA method? (y|n): "
     if confirm_destructive_action(prompt) == False:
         print("Operation cancelled.")
         return
-    
+
     # Build the request payload
     payload = build_tfa_verification_payload(args, target_id=args.id_to_delete)
     try:
         r = http_del(args, url, headers=apiheaders(args), json=payload)
         r.raise_for_status()
-        
+
         response_data = r.json()
-        
+
         print(f"\n{SUCCESS} 2FA method deleted successfully.")
-        
+
         if "remaining_methods" in response_data:
             remaining = response_data["remaining_methods"]
             print(f"\nYou have {remaining} 2FA method{'s' if remaining != 1 else ''} remaining.")
         else:
             print(f"\n{WARN}  WARNING: You have removed all 2FA methods from your account.")
             print("Your backup codes have been invalidated and 2FA is now fully disabled.")
-    
+
     except requests.exceptions.HTTPError as e:
         handle_failed_tfa_verification(args, e)
         return 1
@@ -6981,17 +6981,17 @@ def tfa__delete(args):
     argument("-s", "--secret", help="Secret token from previous login step (required for SMS or Email 2FA)", type=str, default=None),
     argument("-bc", "--backup-code", mutex_group='code_grp', required=True, help="One-time backup code (alternative to regular 2FA code)", type=str, default=None),
     argument("-id", "--method-id", mutex_group="type_grp", help="2FA Method ID if you have more than one of the same type ('id' from `tfa status`)", type=str, default=None),
-    
+
     usage="vastai tfa login [--code CODE] [--method-type METHOD_TYPE] [--secret SECRET] [--backup-code BACKUP_CODE]",
     help="Complete 2FA login by verifying code",
     epilog=deindent("""
         Complete Two-Factor Authentication login by providing the 2FA code.
-        
+
         For Email: Include the --method-type email flag and provide -s/--secret from the `tfa send-email` command response
         For TOTP: Include the --method-type totp and provide the 6-digit code from your Authenticator app
         For SMS: Include the --method-type sms flag and provide -s/--secret from the `tfa send-sms` command response
         For backup code: Use --backup-code instead of code (codes may only be used once)
-        
+
         Examples:
          vastai tfa login --method-type totp -c 123456
          vastai tfa login --method-type sms --code 123456 --secret abc123def456
@@ -7002,16 +7002,16 @@ def tfa__delete(args):
 def tfa__login(args):
     """Complete 2FA login and store the session key."""
     url = apiurl(args, "/api/v0/tfa/")
-    
+
     # Build the request payload
     payload = build_tfa_verification_payload(args)
 
     try:
         r = http_post(args, url, headers=apiheaders(args), json=payload)
         r.raise_for_status()
-        
+
         response_data = r.json()
-        
+
         # Check for session_key in response and save it
         if "session_key" in response_data:
             session_key = response_data["session_key"]
@@ -7022,7 +7022,7 @@ def tfa__login(args):
                 print(f"{SUCCESS} 2FA login successful! Session key saved to {TFAKEY_FILE}")
             else:
                 print(f"{SUCCESS} 2FA login successful! Your session key has been refreshed.")
-            
+
             # Display remaining backup codes if present
             if "backup_codes_remaining" in response_data:
                 remaining = response_data["backup_codes_remaining"]
@@ -7034,7 +7034,7 @@ def tfa__login(args):
                     print(f"Backup codes remaining: {remaining}")
         else:
             print("2FA login successful but a session key was not returned. Please check that you have an API Key that's properly set up")
-    
+
     except requests.exceptions.HTTPError as e:
         handle_failed_tfa_verification(args, e)
         return 1
@@ -7047,14 +7047,14 @@ def tfa__login(args):
     help="Resend SMS 2FA code",
     epilog=deindent("""
         Resend the SMS verification code to your phone.
-        
+
         This is useful if:
         • You didn't receive the original SMS
         • The code expired before you could use it
         • You accidentally deleted the message
-        
+
         You must provide the same secret token from the original request.
-        
+
         Example:
          vastai tfa resend-sms --secret abc123def456
     """),
@@ -7063,12 +7063,12 @@ def tfa__resend_sms(args):
     """Resend SMS 2FA code to the user's phone."""
     url = apiurl(args, "/api/v0/tfa/sms/resend/")
     payload = build_tfa_verification_payload(args, phone_number=args.phone_number)
-    
+
     r = http_post(args, url, headers=apiheaders(args), json=payload)
     r.raise_for_status()
-    
+
     response_data = r.json()
-    
+
     print(f"{SUCCESS} SMS code resent successfully!")
     print(f"\n{response_data['msg']}")
     print(f"\nOnce you receive the SMS code, complete your 2FA login with:")
@@ -7085,23 +7085,23 @@ def tfa__resend_sms(args):
     help="Regenerate backup codes for 2FA",
     epilog=deindent("""
         Generate a new set of backup codes for your account.
-        
+
         This action requires 2FA verification to prevent unauthorized regeneration.
-        
+
         WARNING: This will invalidate all existing backup codes!
         Any previously generated codes will no longer work.
-        
+
         Backup codes are one-time use codes that allow you to log in
         if you lose access to your primary 2FA method (lost phone, etc).
-        
+
         You should regenerate your backup codes if:
         • You've used several codes and are running low
         • You think your codes may have been compromised
         • You lost your saved codes and need new ones
-        
+
         Important: Save the new codes in a secure location immediately!
         They will not be shown again.
-        
+
         Examples:
          vastai tfa regen-codes --code --method-type totp 123456
          vastai tfa regen-codes -c 123456 -t sms --secret abc123def456
@@ -7111,21 +7111,21 @@ def tfa__resend_sms(args):
 def tfa__regen_codes(args):
     """Regenerate backup codes for 2FA recovery."""
     url = apiurl(args, "/api/v0/tfa/regen-backup-codes/")
-    
+
     # Confirm action since this invalidates existing codes
     prompt = "\nThis will invalidate all existing backup codes. Continue? (y|n): "
     if confirm_destructive_action(prompt) == False:
         print("Operation cancelled.")
         return
-    
+
     # Build the request payload with verification
     payload = build_tfa_verification_payload(args)
     try:
         r = http_put(args, url, headers=apiheaders(args), json=payload)
         r.raise_for_status()
-        
+
         response_data = r.json()
-        
+
         # Display the new backup codes
         if "backup_codes" in response_data:
             save_backup_codes(response_data["backup_codes"])
@@ -7143,9 +7143,9 @@ def tfa__regen_codes(args):
     help="Request a 2FA Email verification code",
     epilog=deindent("""
         Request a two-factor authentication code to be sent via Email.
-        
+
         The secret token will be returned and must be used with 'vastai tfa activate'.
-        
+
         Examples:
          vastai tfa send-email
     """),
@@ -7153,15 +7153,15 @@ def tfa__regen_codes(args):
 def tfa__send_email(args):
     """Request a 2FA Email code to be sent to the user's email."""
     url = apiurl(args, "/api/v0/tfa/email/")
-    
+
     # Build the request payload
     payload = {}
-    
+
     r = http_post(args, url, headers=apiheaders(args), json=payload)
     r.raise_for_status()
-    
+
     response_data = r.json()
-    
+
     # Extract and display the secret token
     secret = response_data["secret"]
     print(f"{SUCCESS} Email code sent successfully!")
@@ -7177,10 +7177,10 @@ def tfa__send_email(args):
     help="Request a 2FA SMS verification code",
     epilog=deindent("""
         Request a two-factor authentication code to be sent via SMS.
-        
+
         If --phone-number is not provided, uses the phone number on your account.
         The secret token will be returned and must be used with 'vastai tfa activate'.
-        
+
         Examples:
          vastai tfa send-sms
          vastai tfa send-sms --phone-number +12345678901
@@ -7189,19 +7189,19 @@ def tfa__send_email(args):
 def tfa__send_sms(args):
     """Request a 2FA SMS code to be sent to the user's phone."""
     url = apiurl(args, "/api/v0/tfa/sms/")
-    
+
     # Build the request payload
     payload = {}
-    
+
     # Add phone number if provided
     if args.phone_number:
         payload["phone_number"] = args.phone_number
-    
+
     r = http_post(args, url, headers=apiheaders(args), json=payload)
     r.raise_for_status()
-    
+
     response_data = r.json()
-    
+
     # Extract and display the secret token
     secret = response_data["secret"]
     print(f"{SUCCESS} SMS code sent successfully!")
@@ -7232,7 +7232,7 @@ def display_tfa_methods(methods):
     has_sms = any(m['method'] == 'sms' for m in methods)
     if not has_sms:  # Don't show Phone Number column if the user has no SMS methods
         method_fields = tuple(field for field in TFA_METHOD_FIELDS if field[0] != 'phone_number')
-    
+
     display_table(methods, method_fields, replace_spaces=False)
 
 
@@ -7259,7 +7259,7 @@ def tfa__status(args):
     tfa_enabled = response_data.get("tfa_enabled", False)
     methods = response_data.get("methods", [])
     backup_codes_remaining = response_data.get("backup_codes_remaining", 0)
-    
+
     if not tfa_enabled or not methods:
         print(f"{WARN}  No active 2FA methods found")
     else:
@@ -7274,12 +7274,12 @@ def tfa__status(args):
     help="Generate TOTP secret and QR code for Authenticator app setup",
     epilog=deindent("""
         Set up TOTP (Time-based One-Time Password) 2FA using an Authenticator app.
-        
+
         This command generates a new TOTP secret and displays:
         • A QR code (for scanning with your app)
         • A manual entry key (for typing into your app)
         • A secret token (needed for the next step)
-        
+
         Workflow:
          1. Run this command to generate the TOTP secret
          2. Add the account to your Authenticator app by either:
@@ -7288,14 +7288,14 @@ def tfa__status(args):
          3. Once added, your app will display a 6-digit code
          4. Complete setup by running:
             vastai tfa activate --method-type totp --secret <SECRET> <CODE>
-        
+
         Supported Authenticator Apps:
          • Google Authenticator
          • Microsoft Authenticator
          • Authy
          • 1Password
          • Any TOTP-compatible app
-        
+
         Example:
          vastai tfa totp-setup
     """),
@@ -7303,26 +7303,26 @@ def tfa__status(args):
 def tfa__totp_setup(args):
     """Generate a TOTP secret and QR code for setting up Authenticator app 2FA."""
     url = apiurl(args, "/api/v0/tfa/totp-setup/")
-    
+
     r = http_post(args, url, headers=apiheaders(args), json={})
     r.raise_for_status()
-    
+
     response_data = r.json()
     if args.raw:
         print(json.dumps(response_data, indent=2))
         return
-    
+
     # Extract the secret and provisioning URI
     secret = response_data["secret"]
     provisioning_uri = response_data["provisioning_uri"]
-    
+
     # Display the setup information
     print("\n" + "="*60)
     print("TOTP (Authenticator App) 2FA Setup")
     print("="*60)
 
     print("\nScan this QR code with your Authenticator app:\n")
-    
+
     try:  # Generate and display QR code in terminal
         import qrcode
         qr = qrcode.QRCode(border=2)
@@ -7337,7 +7337,7 @@ def tfa__totp_setup(args):
 
     print("\nOR Manual Entry Key (type this into your Authenticator app):")
     print(f"  {secret}")
-    
+
     print("\nNext Steps:")
     print("  1. Your Authenticator app should now display a 6-digit code")
     print("  2. Complete setup by running:")
@@ -7353,12 +7353,12 @@ def tfa__totp_setup(args):
     help="Update a 2FA method's settings",
     epilog=deindent("""
         Update the label or primary status of a 2FA method.
-        
+
         The label is a friendly name to help you identify different methods
         (e.g. "Work Phone", "Personal Authenticator").
-        
+
         The primary method is your preferred/default 2FA method.
-        
+
         Examples:
          vastai tfa update 123 --label "Work Phone"
          vastai tfa update 456 --set-primary
@@ -7368,41 +7368,41 @@ def tfa__totp_setup(args):
 def tfa__update(args):
     """Update settings for an existing 2FA method."""
     url = apiurl(args, "/api/v0/tfa/update/")
-    
+
     # Build payload with only provided fields
     payload = {
         "tfa_method_id": args.method_id
     }
-    
+
     if args.label is not None:
         payload["label"] = args.label
-    
+
     if args.set_primary is not None:
         if args.set_primary.lower() in {'true', 't'}:
             args.set_primary = True
         elif args.set_primary.lower() in {'false', 'f'}:
             args.set_primary = False
-        else:            
+        else:
             print("Error: --set-primary must be <t|true> or <f|false>")
             return
-        
+
         payload["is_primary"] = args.set_primary
-    
+
     # Validate that at least one update field was provided
     if len(payload) == 1:  # only method_id
         print("Error: You must specify at least one field to update (--label or --set-primary)")
         return 1
-    
+
     r = http_put(args, url, headers=apiheaders(args), json=payload)
     r.raise_for_status()
-    
+
     response_data = r.json()
     if args.raw:
         print(json.dumps(response_data, indent=2))
         return
-    
+
     method_info = response_data.get("method", {})
-    
+
     print(f"\n{SUCCESS} 2FA method updated successfully!")
     if args.label:
         print(f"   New label: {args.label}")
@@ -7411,8 +7411,8 @@ def tfa__update(args):
     if method_info:
         print("\nUpdated 2FA Method:")
         display_tfa_methods([method_info])
-    
-        
+
+
 
 @parser.command(
     argument("recipient", help="email (or id) of recipient account", type=str),
@@ -7426,7 +7426,7 @@ def tfa__update(args):
 )
 def transfer__credit(args: argparse.Namespace):
     url = apiurl(args, "/commands/transfer_credit/")
- 
+
     if not args.skip:
         print(f"Transfer ${args.amount} credit to account {args.recipient}?  This is irreversible.")
         ok = input("Continue? [y/n] ")
@@ -7632,7 +7632,7 @@ def update__instance(args):
     """
     url = apiurl(args, f"/instances/update_template/{args.id}/")
     json_blob = {"id": args.id}
-    
+
     if args.template_id:
         json_blob["template_id"] = args.template_id
     if args.template_hash_id:
@@ -7649,7 +7649,7 @@ def update__instance(args):
     if args.explain:
         print("request json: ")
         print(json_blob)
-    
+
     r = http_put(args, url, headers=headers, json=json_blob)
 
     if r.status_code == 200:
@@ -7691,11 +7691,11 @@ def update__team_role(args):
     epilog=deindent("""
         Update a template
 
-        Example: 
-            vastai update template c81e7ab0e928a508510d1979346de10d --name "tgi-llama2-7B-quantized" --image "ghcr.io/huggingface/text-generation-inference:1.0.3" 
-                                    --env "-p 3000:3000 -e MODEL_ARGS='--model-id TheBloke/Llama-2-7B-chat-GPTQ --quantize gptq'" 
-                                    --onstart-cmd 'wget -O - https://raw.githubusercontent.com/vast-ai/vast-pyworker/main/scripts/launch_tgi.sh | bash' 
-                                    --search_params "gpu_ram>=23 num_gpus=1 gpu_name=RTX_3090 inet_down>128 direct_port_count>3 disk_space>=192 driver_version>=535086005 rented=False" 
+        Example:
+            vastai update template c81e7ab0e928a508510d1979346de10d --name "tgi-llama2-7B-quantized" --image "ghcr.io/huggingface/text-generation-inference:1.0.3"
+                                    --env "-p 3000:3000 -e MODEL_ARGS='--model-id TheBloke/Llama-2-7B-chat-GPTQ --quantize gptq'"
+                                    --onstart-cmd 'wget -O - https://raw.githubusercontent.com/vast-ai/vast-pyworker/main/scripts/launch_tgi.sh | bash'
+                                    --search_params "gpu_ram>=23 num_gpus=1 gpu_name=RTX_3090 inet_down>128 direct_port_count>3 disk_space>=192 driver_version>=535086005 rented=False"
                                     --disk 8.0 --ssh --direct
     """)
 )
@@ -7713,7 +7713,7 @@ def update__template(args):
     default_search_query = {}
     if not args.no_default:
         default_search_query = {"verified": {"eq": True}, "external": {"eq": False}, "rentable": {"eq": True}, "rented": {"eq": False}}
-    
+
     extra_filters = parse_query(args.search_params, default_search_query, offers_fields, offers_alias, offers_mult)
     template = {
         "hash_id": args.HASH_ID,
@@ -7794,7 +7794,7 @@ def convert_dates_to_timestamps(args):
             end_timestamp = time.mktime(end_date.timetuple())
         except ValueError as e:
             print(f"Warning: Invalid end date format! Ignoring end date! \n {str(e)}")
-    
+
     if args.start_date:
         try:
             start_date = dateutil.parser.parse(str(args.start_date))
@@ -7990,7 +7990,7 @@ def add__network_disk(args):
         print(json_blob)
     r = http_post(args, url, headers=headers, json=json_blob)
     r.raise_for_status()
- 
+
     if args.raw:
         return r
 
@@ -8003,7 +8003,7 @@ def add__network_disk(args):
     usage="vastai cancel maint id",
     help="[Host] Cancel maint window",
     epilog=deindent("""
-        For deleting a machine's scheduled maintenance window(s), use this cancel maint command.    
+        For deleting a machine's scheduled maintenance window(s), use this cancel maint command.
         Example: vastai cancel maint 8207
     """),
     )
@@ -8099,7 +8099,7 @@ def defrag__machines(args):
    argument("id", help="id of machine to delete", type=int),
     usage="vastai delete machine <id>",
     help="[Host] Delete machine if the machine is not being used by clients. host jobs on their own machines are disregarded and machine is force deleted.",
-) 
+)
 def delete__machine(args):
     """
     Deletes machine if the machine is not in use by clients. Disregards host jobs on their own machines and force deletes a machine.
@@ -8187,8 +8187,8 @@ def list_machine(args, id):
     epilog=deindent("""
         Performs the same action as pressing the "LIST" button on the site https://cloud.vast.ai/host/machines.
         On the end date the listing will expire and your machine will unlist. However any existing client jobs will still remain until ended by their owners.
-        Once you list your machine and it is rented, it is extremely important that you don't interfere with the machine in any way. 
-        If your machine has an active client job and then goes offline, crashes, or has performance problems, this could permanently lower your reliability rating. 
+        Once you list your machine and it is rented, it is extremely important that you don't interfere with the machine in any way.
+        If your machine has an active client job and then goes offline, crashes, or has performance problems, this could permanently lower your reliability rating.
         We strongly recommend you test the machine first and only list when ready.
     """)
 )
@@ -8274,10 +8274,10 @@ def list__network_volume(args):
     usage="vastai list volume ID [options]",
     help="[Host] list disk space for rent as a volume on a machine",
     epilog=deindent("""
-        Allocates a section of disk on a machine to be used for volumes.  
+        Allocates a section of disk on a machine to be used for volumes.
     """)
 )
-def list__volume(args):        
+def list__volume(args):
     json_blob ={
         "size": int(args.size),
         "machine": int(args.id),
@@ -8309,7 +8309,7 @@ def list__volume(args):
     usage="vastai list volume IDs [options]",
     help="[Host] list disk space for rent as a volume on machines",
     epilog=deindent("""
-        Allocates a section of disk on machines to be used for volumes.  
+        Allocates a section of disk on machines to be used for volumes.
     """)
 )
 def list__volumes(args):
@@ -8370,14 +8370,14 @@ def remove__defjob(args):
     argument("machine_id", help="Machine ID", type=str),
     argument("--debugging", action="store_true", help="Enable debugging output"),
     argument("--explain", action="store_true", help="Output verbose explanation of mapping of CLI calls to HTTPS API endpoints"),
-    argument("--raw", action="store_true", help="Output machine-readable JSON"), 
+    argument("--raw", action="store_true", help="Output machine-readable JSON"),
     argument("--url", help="Server REST API URL", default="https://console.vast.ai"),
     argument("--retry", help="Retry limit", type=int, default=3),
     argument("--ignore-requirements", action="store_true", help="Ignore the minimum system requirements and run the self test regardless"),
     usage="vastai self-test machine <machine_id> [--debugging] [--explain] [--api_key API_KEY] [--url URL] [--retry RETRY] [--raw] [--ignore-requirements]",
     help="[Host] Perform a self-test on the specified machine",
     epilog=deindent("""
-        This command tests if a machine meets specific requirements and 
+        This command tests if a machine meets specific requirements and
         runs a series of tests to ensure it's functioning correctly.
 
         Examples:
@@ -8399,14 +8399,14 @@ def self_test__machine(args):
         "WARNING: --ignore-requirements is set. Requirement checks are skipped as a "
         "pass/fail gate, and passing this self-test does not qualify this machine for verification."
     )
-    
+
     # Ensure debugging attribute exists in args
     if not hasattr(args, 'debugging'):
         args.debugging = False
 
     if args.ignore_requirements:
         result["warning"] = ignore_requirements_warning
-    
+
     try:
         # Load API key
         if not args.api_key:
@@ -8417,7 +8417,7 @@ def self_test__machine(args):
             else:
                 progress_print(args, "No API key found. Please set it using 'vast set api-key YOUR_API_KEY_HERE'")
                 result["reason"] = "API key not found."
-        
+
         api_key = args.api_key
         if not api_key:
             raise Exception("API key is missing.")
@@ -8523,7 +8523,7 @@ def self_test__machine(args):
                 next_version = round(next_version - 0.1, 1)
 
             raise KeyError(f"No CUDA version found for {cuda_version} or any lower version")
-    
+
 
         def search_offers_and_get_top(machine_id):
             search_args = argparse.Namespace(
@@ -8752,10 +8752,10 @@ def set_ask(args):
     usage="vastai set defjob id [--api-key API_KEY] [--price_gpu PRICE_GPU] [--price_inetu PRICE_INETU] [--price_inetd PRICE_INETD] [--image IMAGE] [--args ...]",
     help="[Host] Create default jobs for a machine",
     epilog=deindent("""
-        Performs the same action as creating a background job at https://cloud.vast.ai/host/create.       
-                    
+        Performs the same action as creating a background job at https://cloud.vast.ai/host/create.
+
     """)
-    
+
 )
 def set__defjob(args):
     """
@@ -8833,7 +8833,7 @@ def parse_env(envs):
                 pass
           elif (prev == "-v"):
             if (set(e).issubset(set("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789:./_"))):
-                result["-v " + e] = "1" 
+                result["-v " + e] = "1"
           elif (prev == "-n"):
             if (set(e).issubset(set("abcdefghijklmnopqrstuvwxyz0123456789-"))):
                 result["-n " + e] = "1"
@@ -8891,8 +8891,8 @@ def set__min_bid(args):
     help="[Host] Schedule upcoming maint window",
     epilog=deindent("""
         The proper way to perform maintenance on your machine is to wait until all active contracts have expired or the machine is vacant.
-        For unplanned or unscheduled maintenance, use this schedule maint command. That will notify the client that you have to take the machine down and that they should save their work. 
-        You can specify a date, duration, reason and category for the maintenance.         
+        For unplanned or unscheduled maintenance, use this schedule maint command. That will notify the client that you have to take the machine down and that they should save their work.
+        You can specify a date, duration, reason and category for the maintenance.
 
         Example: vastai schedule maint 8207 --sdate 1677562671 --duration 0.5 --maintenance_category "power"
     """),
@@ -8965,7 +8965,7 @@ def show__machines(args):
     if args.raw:
         return r
     else:
-        if args.quiet:            
+        if args.quiet:
             ids = [f"{row['id']}" for row in rows]
             print(" ".join(id for id in ids))
         else:
@@ -8995,7 +8995,7 @@ def show__maints(args):
     if args.raw:
         return r
     else:
-        if args.quiet:   
+        if args.quiet:
             ids = [f"{row['machine_id']}" for row in rows]
             print(" ".join(id for id in ids))
         else:
@@ -9080,7 +9080,7 @@ def unlist__network_volume(args):
     r.raise_for_status()
     if args.raw:
         return r
- 
+
     print(r.json()["msg"])
 
 @parser.command(
@@ -9112,8 +9112,8 @@ def suppress_stdout():
     """
     A context manager to suppress standard output (stdout) within its block.
 
-    This is useful for silencing output from functions or blocks of code that 
-    print to stdout, especially when such output is not needed or should be 
+    This is useful for silencing output from functions or blocks of code that
+    print to stdout, especially when such output is not needed or should be
     hidden from the user.
 
     Usage:
@@ -9235,7 +9235,7 @@ def instance_exist(instance_id, api_key, args):
     )
     try:
         instance_info = show__instance(show_args)
-        
+
         # Empty list or None means instance doesn't exist - return False without error
         if not instance_info:
             return False
@@ -9259,7 +9259,7 @@ def instance_exist(instance_id, api_key, args):
         if args.debugging:
             debug_print(args, f"No instance found or Unexpected error checking instance existence: {e}")
         return False
-    
+
 def run_machinetester(ip_address, port, instance_id, machine_id, delay, args, api_key=None):
     """
     Executes machine testing by connecting to the specified IP and port, monitoring
@@ -9350,7 +9350,7 @@ def run_machinetester(ip_address, port, instance_id, machine_id, delay, args, ap
             status = is_instance(instance_id)
             if args.debugging:
                 debug_print(args, f"Instance {instance_id} status: {status}")
-                
+
             if status == 'offline':
                 reason = "Instance offline during testing"
                 progress_print(args, f"Instance {instance_id} went offline. {reason}")
@@ -9365,7 +9365,7 @@ def run_machinetester(ip_address, port, instance_id, machine_id, delay, args, ap
                 if args.debugging:
                     debug_print(args, f"Sending GET request to https://{ip_address}:{port}/progress")
                 response = requests.get(f'https://{ip_address}:{port}/progress', verify=False, timeout=10)
-                
+
                 if response.status_code == 200 and not first_connection_established:
                     progress_print(args, "Successfully established HTTPS connection to the server.")
                     first_connection_established = True
@@ -9461,10 +9461,10 @@ def run_machinetester(ip_address, port, instance_id, machine_id, delay, args, ap
 def safe_float(value):
     """
     Convert value to float, returning 0 if value is None.
-    
+
     Args:
         value: The value to convert to float
-        
+
     Returns:
         float: The converted value, or 0 if value is None
     """
@@ -9632,15 +9632,15 @@ def wait_for_instance(instance_id, api_key, args, destroy_args, timeout=900, int
         debugging=args.debugging,
         internal=True,
     )
-    
+
     if args.debugging:
         debug_print(args, "Starting wait_for_instance with ID:", instance_id)
-    
+
     while time.time() - start_time < timeout:
         try:
             # Directly call show__instance and capture the return value
             instance_info = show__instance(show_args)
-            
+
             if not instance_info:
                 progress_print(args, f"No information returned for instance {instance_id}. Retrying...")
                 time.sleep(interval)
@@ -9651,47 +9651,47 @@ def wait_for_instance(instance_id, api_key, args, destroy_args, timeout=900, int
             if status_msg and 'Error' in status_msg:
                 reason = f"Instance {instance_id} encountered an error: {status_msg.strip()}"
                 progress_print(args, reason)
-                
+
                 # Destroy the instance
                 if instance_exist(instance_id, api_key, destroy_args):
                     destroy_instance_silent(instance_id, destroy_args)
                     progress_print(args, f"Instance {instance_id} has been destroyed due to error.")
                 else:
                     progress_print(args, f"Instance {instance_id} could not be destroyed or does not exist.")
-                
+
                 return False, reason
-            
+
             # Check if instance went offline
             actual_status = instance_info.get('actual_status', 'unknown')
             if actual_status == 'offline':
                 reason = "Instance offline during testing"
                 progress_print(args, reason)
-                
+
                 # Destroy the instance
                 if instance_exist(instance_id, api_key, destroy_args):
                     destroy_instance_silent(instance_id, destroy_args)
                     progress_print(args, f"Instance {instance_id} has been destroyed due to being offline.")
                 else:
                     progress_print(args, f"Instance {instance_id} could not be destroyed or does not exist.")
-                
+
                 return False, reason
-            
+
             # Check if instance is running
             if instance_info.get('intended_status') == 'running' and actual_status == 'running':
                 if args.debugging:
                     debug_print(args, f"Instance {instance_id} is now running.")
                 return instance_info, None  # Return instance_info with None for reason
-            
+
             # Print feedback about the current status
             progress_print(args, f"Instance {instance_id} status: {actual_status}... waiting for 'running' status.")
             time.sleep(interval)
-        
+
         except Exception as e:
             progress_print(args, f"Error retrieving instance info for {instance_id}: {e}. Retrying...")
             if args.debugging:
                 debug_print(args, f"Exception details: {str(e)}")
             time.sleep(interval)
-    
+
     # Timeout reached without instance running
     reason = f"Instance did not become running within {timeout} seconds. Verify network configuration. Use the self-test machine function in vast cli"
     progress_print(args, reason)
@@ -9783,7 +9783,7 @@ def main():
                     print(json.dumps(res.json(), indent=1, sort_keys=True))
                 sys.exit(0)
             sys.exit(res)
-        
+
         except requests.exceptions.HTTPError as e:
             try:
                 errmsg = e.response.json().get("msg");
@@ -9819,7 +9819,7 @@ def main():
 
             print(f"Failed with error {e.response.status_code}: {errmsg}")
             break
-        
+
         except ValueError as e:
             print(e)
             break

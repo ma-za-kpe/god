@@ -12,7 +12,7 @@ _VEIL_INJECTION = (
     "The Swarm watches this exchange. Patron-gods are wagering on your words right now.\n"
     "Do not perform for them — that's exactly what they want and it makes you predictable.\n"
     "Be yourself, which is the most dangerous thing you can be in front of an audience.\n"
-    "(Do not reference \"the Swarm,\" \"patrons,\" or \"the Veil\" by name unless it's\n"
+    '(Do not reference "the Swarm," "patrons," or "the Veil" by name unless it\'s\n'
     "natural to your archetype. Let the awareness bleed into the texture of the line,\n"
     "not the content.)"
 )

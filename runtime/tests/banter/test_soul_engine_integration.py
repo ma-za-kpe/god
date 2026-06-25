@@ -21,11 +21,9 @@ for _p in (_src_path, "/app/src"):
 
 from unittest.mock import AsyncMock, MagicMock
 
-import pytest
 
-from banter.engine import BanterEngine, SOUL_BUDGET_TOKENS, _SOUL_BUDGET_CHARS
-from banter.quality_judge import evaluate_enhanced, get_pass_threshold
-from banter.soul_types import SoulEngineConfig, SubtextInstruction
+from banter.engine import BanterEngine
+from banter.soul_types import SoulEngineConfig
 
 
 # ---------------------------------------------------------------------------
@@ -171,13 +169,15 @@ class TestGenerateBeatWithSoulModulesActive:
             emotional_primer=_make_working_emotional_primer(),
         )
 
-        result = _run(engine.generate_beat(
-            elder="elder_alpha",
-            archetype="keeper",
-            opponent="elder_beta",
-            arc_theme="survival",
-            conv_thread=[],
-        ))
+        result = _run(
+            engine.generate_beat(
+                elder="elder_alpha",
+                archetype="keeper",
+                opponent="elder_beta",
+                arc_theme="survival",
+                conv_thread=[],
+            )
+        )
 
         assert isinstance(result, BeatResult)
         assert isinstance(result.line, str)
@@ -191,13 +191,15 @@ class TestGenerateBeatWithSoulModulesActive:
             emotional_primer=_make_working_emotional_primer(),
         )
 
-        result = _run(engine.generate_beat(
-            elder="elder_alpha",
-            archetype="keeper",
-            opponent="elder_beta",
-            arc_theme="survival",
-            conv_thread=[],
-        ))
+        result = _run(
+            engine.generate_beat(
+                elder="elder_alpha",
+                archetype="keeper",
+                opponent="elder_beta",
+                arc_theme="survival",
+                conv_thread=[],
+            )
+        )
 
         assert "soul" in result.metadata
         assert isinstance(result.metadata["soul"], dict)
@@ -210,13 +212,15 @@ class TestGenerateBeatWithSoulModulesActive:
             emotional_primer=_make_working_emotional_primer(),
         )
 
-        result = _run(engine.generate_beat(
-            elder="elder_alpha",
-            archetype="herald",
-            opponent="elder_beta",
-            arc_theme="change",
-            conv_thread=[],
-        ))
+        result = _run(
+            engine.generate_beat(
+                elder="elder_alpha",
+                archetype="herald",
+                opponent="elder_beta",
+                arc_theme="change",
+                conv_thread=[],
+            )
+        )
 
         soul_meta = result.metadata["soul"]
         assert soul_meta.get("voice_dna") is True
@@ -226,13 +230,15 @@ class TestGenerateBeatWithSoulModulesActive:
         """BeatResult includes pacing values from PacingController."""
         engine = _make_base_engine(soul_config=SoulEngineConfig())
 
-        result = _run(engine.generate_beat(
-            elder="elder_alpha",
-            archetype="shadow",
-            opponent=None,
-            arc_theme="secrets",
-            conv_thread=[],
-        ))
+        result = _run(
+            engine.generate_beat(
+                elder="elder_alpha",
+                archetype="shadow",
+                opponent=None,
+                arc_theme="secrets",
+                conv_thread=[],
+            )
+        )
 
         assert result.delay_s == 0.5
         assert result.pre_pause_s == 0.1
@@ -254,13 +260,15 @@ class TestGenerateBeatModuleFaultIsolation:
             emotional_primer=_make_working_emotional_primer(),
         )
 
-        result = _run(engine.generate_beat(
-            elder="elder_a",
-            archetype="martyr",
-            opponent="elder_b",
-            arc_theme="sacrifice",
-            conv_thread=[],
-        ))
+        result = _run(
+            engine.generate_beat(
+                elder="elder_a",
+                archetype="martyr",
+                opponent="elder_b",
+                arc_theme="sacrifice",
+                conv_thread=[],
+            )
+        )
 
         assert isinstance(result.line, str) and result.line
         assert result.metadata["soul"].get("voice_dna") is False
@@ -274,13 +282,15 @@ class TestGenerateBeatModuleFaultIsolation:
             emotional_primer=_make_broken_emotional_primer(),
         )
 
-        result = _run(engine.generate_beat(
-            elder="elder_a",
-            archetype="sovereign",
-            opponent="elder_b",
-            arc_theme="power",
-            conv_thread=[],
-        ))
+        result = _run(
+            engine.generate_beat(
+                elder="elder_a",
+                archetype="sovereign",
+                opponent="elder_b",
+                arc_theme="power",
+                conv_thread=[],
+            )
+        )
 
         assert isinstance(result.line, str) and result.line
         assert result.metadata["soul"].get("emotional_primer") is False
@@ -294,13 +304,15 @@ class TestGenerateBeatModuleFaultIsolation:
             emotional_primer=_make_broken_emotional_primer(),
         )
 
-        result = _run(engine.generate_beat(
-            elder="elder_a",
-            archetype="parasite",
-            opponent="elder_b",
-            arc_theme="corruption",
-            conv_thread=[],
-        ))
+        result = _run(
+            engine.generate_beat(
+                elder="elder_a",
+                archetype="parasite",
+                opponent="elder_b",
+                arc_theme="corruption",
+                conv_thread=[],
+            )
+        )
 
         assert isinstance(result.line, str) and result.line
         soul_meta = result.metadata["soul"]
@@ -327,13 +339,15 @@ class TestSoulEngineDisabledBehaviour:
             emotional_primer=mock_ep,
         )
 
-        _run(engine.generate_beat(
-            elder="elder_a",
-            archetype="trickster",
-            opponent=None,
-            arc_theme="deception",
-            conv_thread=[],
-        ))
+        _run(
+            engine.generate_beat(
+                elder="elder_a",
+                archetype="trickster",
+                opponent=None,
+                arc_theme="deception",
+                conv_thread=[],
+            )
+        )
 
         mock_vdna.get_prompt_injection.assert_not_called()
         mock_ep.generate_emotional_context.assert_not_called()
@@ -347,13 +361,15 @@ class TestSoulEngineDisabledBehaviour:
             voice_dna=mock_vdna,
         )
 
-        _run(engine.generate_beat(
-            elder="elder_a",
-            archetype="herald",
-            opponent=None,
-            arc_theme="change",
-            conv_thread=[],
-        ))
+        _run(
+            engine.generate_beat(
+                elder="elder_a",
+                archetype="herald",
+                opponent=None,
+                arc_theme="change",
+                conv_thread=[],
+            )
+        )
 
         mock_vdna.get_prompt_injection.assert_not_called()
 
@@ -364,13 +380,15 @@ class TestSoulEngineDisabledBehaviour:
             voice_dna=_make_working_voice_dna(),
         )
 
-        result = _run(engine.generate_beat(
-            elder="elder_a",
-            archetype="prophet",
-            opponent=None,
-            arc_theme="truth",
-            conv_thread=[],
-        ))
+        result = _run(
+            engine.generate_beat(
+                elder="elder_a",
+                archetype="prophet",
+                opponent=None,
+                arc_theme="truth",
+                conv_thread=[],
+            )
+        )
 
         assert result.metadata["soul"] == {}
 
@@ -383,13 +401,15 @@ class TestSoulEngineDisabledBehaviour:
             generated_line="A line that barely passes base threshold.",
         )
 
-        result = _run(engine_disabled.generate_beat(
-            elder="elder_a",
-            archetype="keeper",
-            opponent=None,
-            arc_theme="survival",
-            conv_thread=[],
-        ))
+        result = _run(
+            engine_disabled.generate_beat(
+                elder="elder_a",
+                archetype="keeper",
+                opponent=None,
+                arc_theme="survival",
+                conv_thread=[],
+            )
+        )
 
         # With disabled soul, threshold is 8, score 9 ≥ 8 → should pass
         assert result.source != "fallback" or result.quality_score == 0

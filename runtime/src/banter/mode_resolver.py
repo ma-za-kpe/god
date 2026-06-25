@@ -167,7 +167,4 @@ class ModeResolver:
         if self._chaos_fired_last_beat.get(elder, False):
             return False
 
-        return (
-            pair_state.tension_level >= 8
-            or pair_state.consecutive_escalations >= 4
-        )
+        return pair_state.tension_level >= 8 or pair_state.consecutive_escalations >= 4

@@ -6,18 +6,24 @@ Property tests (Property 1) and unit tests for the 5-dimension scoring system.
 import asyncio
 import os
 import sys
-from unittest.mock import patch, AsyncMock
+from unittest.mock import patch
 
 import pytest
-import pytest_asyncio
 from hypothesis import given, settings
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "src"))
 
-from banter.quality_judge import evaluate, _score_sharpness, _score_emotional_texture, _score_rhythm, _score_thematic_relevance, _score_shareability
+from banter.quality_judge import (
+    evaluate,
+    _score_sharpness,
+    _score_emotional_texture,
+    _score_rhythm,
+    _score_thematic_relevance,
+    _score_shareability,
+)
 from banter.types import QualityJudgeError, QualityScore
 
-from conftest import st_candidate_line, st_archetype, st_move, ARCHETYPES, MOVE_TYPES
+from conftest import st_candidate_line, st_archetype, st_move
 
 
 # ---------------------------------------------------------------------------
@@ -48,8 +54,11 @@ def test_property_1_output_invariants(candidate: str, archetype: str, move: str)
         d = score.as_dict()
         assert len(d) == 5, f"Expected 5 dimensions, got {len(d)}"
         assert set(d.keys()) == {
-            "sharpness", "emotional_texture", "rhythm",
-            "thematic_relevance", "shareability",
+            "sharpness",
+            "emotional_texture",
+            "rhythm",
+            "thematic_relevance",
+            "shareability",
         }
 
         # Each must be int in [0, 3]
@@ -127,15 +136,13 @@ class TestThematicRelevance:
 
     def test_high_overlap_scores_high(self):
         score = _score_thematic_relevance(
-            "The weak should be protected by the strong.",
-            "Should the weak be protected?"
+            "The weak should be protected by the strong.", "Should the weak be protected?"
         )
         assert score >= 2
 
     def test_no_overlap_scores_zero(self):
         score = _score_thematic_relevance(
-            "Purple elephants dance at midnight.",
-            "Should the weak be protected?"
+            "Purple elephants dance at midnight.", "Should the weak be protected?"
         )
         assert score == 0
 
@@ -345,11 +352,15 @@ class TestTimeoutBehavior:
     @pytest.mark.asyncio
     async def test_slow_evaluation_triggers_timeout(self):
         """Mock _evaluate_impl to be slow and verify timeout fires."""
+
         async def slow_impl(*args, **kwargs):
             await asyncio.sleep(10)  # way longer than timeout
             return QualityScore(
-                sharpness=2, emotional_texture=2, rhythm=2,
-                thematic_relevance=2, shareability=2,
+                sharpness=2,
+                emotional_texture=2,
+                rhythm=2,
+                thematic_relevance=2,
+                shareability=2,
             )
 
         with patch("banter.quality_judge._evaluate_impl", side_effect=slow_impl):
@@ -366,6 +377,7 @@ class TestTimeoutBehavior:
     async def test_exception_during_evaluation_raises_quality_judge_error(self):
         """If an unexpected exception occurs during evaluation, it should
         be wrapped in QualityJudgeError."""
+
         async def exploding_impl(*args, **kwargs):
             raise RuntimeError("Unexpected failure in scoring")
 

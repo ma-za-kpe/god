@@ -37,6 +37,7 @@ from .types import BanterConfig, BeatResult, PairState
 @dataclass
 class ArchetypeRoster:
     """An Elder in the harness roster."""
+
     elder_name: str
     archetype: str
 
@@ -44,6 +45,7 @@ class ArchetypeRoster:
 @dataclass
 class SessionMetrics:
     """Section 11 metrics calculated from a 100-beat session."""
+
     direct_response_rate: float = 0.0
     arc_title_leaks: int = 0
     hard_ban_violations: int = 0
@@ -76,6 +78,7 @@ class SessionMetrics:
 @dataclass
 class HarnessResult:
     """Complete output of a theater harness run."""
+
     transcript: list[BeatResult] = field(default_factory=list)
     metrics: SessionMetrics = field(default_factory=SessionMetrics)
     prompt_snapshots: list[str] = field(default_factory=list)
@@ -86,21 +89,79 @@ class HarnessResult:
 # Response detection (Section 11.3)
 # ---------------------------------------------------------------------------
 
-_STOPWORDS = frozenset({
-    "the", "a", "an", "is", "are", "was", "were", "in", "on", "at",
-    "to", "for", "of", "and", "or", "but", "be", "if", "do", "does",
-    "it", "this", "that", "with", "from", "by", "as", "not", "no",
-    "so", "up", "out", "all", "just", "than", "then", "what", "when",
-    "how", "who", "which", "where", "there", "here", "will", "can",
-    "has", "had", "have", "been",
-})
+_STOPWORDS = frozenset(
+    {
+        "the",
+        "a",
+        "an",
+        "is",
+        "are",
+        "was",
+        "were",
+        "in",
+        "on",
+        "at",
+        "to",
+        "for",
+        "of",
+        "and",
+        "or",
+        "but",
+        "be",
+        "if",
+        "do",
+        "does",
+        "it",
+        "this",
+        "that",
+        "with",
+        "from",
+        "by",
+        "as",
+        "not",
+        "no",
+        "so",
+        "up",
+        "out",
+        "all",
+        "just",
+        "than",
+        "then",
+        "what",
+        "when",
+        "how",
+        "who",
+        "which",
+        "where",
+        "there",
+        "here",
+        "will",
+        "can",
+        "has",
+        "had",
+        "have",
+        "been",
+    }
+)
 
-_RESPONSE_MARKERS = frozenset({
-    "you", "your", "you said", "you call",
-    "but", "yet", "still", "and yet",
-    "what you call", "that is exactly", "which is why",
-    "not wrong", "true", "fair",
-})
+_RESPONSE_MARKERS = frozenset(
+    {
+        "you",
+        "your",
+        "you said",
+        "you call",
+        "but",
+        "yet",
+        "still",
+        "and yet",
+        "what you call",
+        "that is exactly",
+        "which is why",
+        "not wrong",
+        "true",
+        "fair",
+    }
+)
 
 
 def _non_stopword_set(text: str) -> set[str]:
@@ -111,7 +172,9 @@ def _non_stopword_set(text: str) -> set[str]:
 def _bigrams(text: str) -> set[str]:
     """Extract word bigrams."""
     words = text.lower().split()
-    return {f"{words[i]} {words[i+1]}" for i in range(len(words) - 1)} if len(words) >= 2 else set()
+    return (
+        {f"{words[i]} {words[i + 1]}" for i in range(len(words) - 1)} if len(words) >= 2 else set()
+    )
 
 
 def is_responsive(candidate: str, opponent_line: str) -> bool:
@@ -150,9 +213,7 @@ def _lexical_similarity(left: str, right: str) -> float:
     left_bigrams = _bigrams(left)
     right_bigrams = _bigrams(right)
     if left_bigrams and right_bigrams:
-        bigram = len(left_bigrams & right_bigrams) / max(
-            len(left_bigrams), len(right_bigrams)
-        )
+        bigram = len(left_bigrams & right_bigrams) / max(len(left_bigrams), len(right_bigrams))
     else:
         bigram = 0.0
     return (unigram * 0.35) + (bigram * 0.65)
@@ -272,12 +333,14 @@ class TheaterHarness:
 
             # Update conversation thread
             if beat_result.source != "silence":
-                conv_thread.append({
-                    "speaker": elder,
-                    "content": beat_result.line,
-                    "move": beat_result.move,
-                    "target": opponent,
-                })
+                conv_thread.append(
+                    {
+                        "speaker": elder,
+                        "content": beat_result.line,
+                        "move": beat_result.move,
+                        "target": opponent,
+                    }
+                )
 
             # --- Metrics tracking ---
             delivered_by_elder.setdefault(elder, []).append(beat_result.line)
@@ -292,7 +355,9 @@ class TheaterHarness:
                         break
                 if last_opp_line:
                     eligible_response_count += 1
-                    if beat_result.move == "BACKCHANNEL" or is_responsive(beat_result.line, last_opp_line):
+                    if beat_result.move == "BACKCHANNEL" or is_responsive(
+                        beat_result.line, last_opp_line
+                    ):
                         responsive_count += 1
 
             # Arc title leak
@@ -353,22 +418,18 @@ class TheaterHarness:
         # Calculate final metrics
         total_non_silence = sum(1 for b in result.transcript if b.source != "silence")
         result.metrics.direct_response_rate = (
-            responsive_count / eligible_response_count
-            if eligible_response_count > 0 else 0.0
+            responsive_count / eligible_response_count if eligible_response_count > 0 else 0.0
         )
         result.metrics.emotional_texture_coverage = (
-            emotional_texture_count / total_non_silence
-            if total_non_silence > 0 else 0.0
+            emotional_texture_count / total_non_silence if total_non_silence > 0 else 0.0
         )
         result.metrics.clip_candidate_rate = (
-            clip_candidate_count / total_non_silence
-            if total_non_silence > 0 else 0.0
+            clip_candidate_count / total_non_silence if total_non_silence > 0 else 0.0
         )
         result.metrics.crack_count = crack_count
         result.metrics.veil_beats = veil_count
         result.metrics.backchannel_rate = (
-            backchannel_fired / backchannel_eligible
-            if backchannel_eligible > 0 else 0.0
+            backchannel_fired / backchannel_eligible if backchannel_eligible > 0 else 0.0
         )
         result.metrics.voice_similarity_max = 0.0
         tracked_lines = [
@@ -377,7 +438,7 @@ class TheaterHarness:
             if event["source"] != "silence" and event["move"] != "BACKCHANNEL"
         ]
         for idx, left in enumerate(tracked_lines):
-            for right in tracked_lines[idx + 1:]:
+            for right in tracked_lines[idx + 1 :]:
                 if left["elder"] == right["elder"]:
                     continue
                 sim = _lexical_similarity(left["line"], right["line"])
@@ -424,6 +485,7 @@ class TheaterHarness:
             candidate, *, archetype, move, arc_theme, scene_context=None, timeout_s=2.0
         ):
             from .types import QualityScore
+
             # Deterministic scoring based on word count and content
             words = candidate.split()
             wc = len(words)
@@ -451,17 +513,43 @@ class TheaterHarness:
             )
             rhythm = (
                 3
-                if any(p in candidate for p in (",", "-", ":"))
-                and 4 <= wc <= 14
+                if any(p in candidate for p in (",", "-", ":")) and 4 <= wc <= 14
                 else 2
                 if "." in candidate or "?" in candidate or 4 <= wc <= 18
                 else 1
             )
-            thematic = 3 if any(w in lower for w in (
-                "cost", "ledger", "rent", "debt", "scarcity", "flow", "power",
-                "truth", "weight", "bill", "wound", "price", "pay", "owe"
-            )) else 2 if any(w in lower for w in ("you", "room", "room", "here", "now")) else 1
-            shareability = 3 if wc <= 9 and any(p in candidate for p in (".", "?", ":")) else 2 if wc <= 15 else 1
+            thematic = (
+                3
+                if any(
+                    w in lower
+                    for w in (
+                        "cost",
+                        "ledger",
+                        "rent",
+                        "debt",
+                        "scarcity",
+                        "flow",
+                        "power",
+                        "truth",
+                        "weight",
+                        "bill",
+                        "wound",
+                        "price",
+                        "pay",
+                        "owe",
+                    )
+                )
+                else 2
+                if any(w in lower for w in ("you", "room", "room", "here", "now"))
+                else 1
+            )
+            shareability = (
+                3
+                if wc <= 9 and any(p in candidate for p in (".", "?", ":"))
+                else 2
+                if wc <= 15
+                else 1
+            )
             return QualityScore(
                 sharpness=sharpness,
                 emotional_texture=emotional,
@@ -469,6 +557,7 @@ class TheaterHarness:
                 thematic_relevance=thematic,
                 shareability=shareability,
             )
+
         return BanterEngine(
             quality_judge=stub_quality_judge,
             move_selector=compute_distribution,

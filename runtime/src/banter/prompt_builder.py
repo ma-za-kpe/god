@@ -152,32 +152,22 @@ class SacredPromptBuilder:
 
         # 2. [ARCHETYPE] — skip for CRACK mode
         if policy.mode != BeatMode.CRACK:
-            blocks.append(
-                PromptBlock(marker="[ARCHETYPE]", text=archetype, max_tokens=220)
-            )
+            blocks.append(PromptBlock(marker="[ARCHETYPE]", text=archetype, max_tokens=220))
 
         # 3. Always: [ARC]
         blocks.append(PromptBlock(marker="[ARC]", text=arc_pressure, max_tokens=80))
 
         # 4. [REACT] — only when opponent has prior line
         if react_block is not None:
-            blocks.append(
-                PromptBlock(marker="[REACT]", text=react_block, max_tokens=80)
-            )
+            blocks.append(PromptBlock(marker="[REACT]", text=react_block, max_tokens=80))
 
         # 5. [EMOTIONAL] — only when available
         if emotional_block is not None:
-            blocks.append(
-                PromptBlock(
-                    marker="[EMOTIONAL]", text=emotional_block, max_tokens=150
-                )
-            )
+            blocks.append(PromptBlock(marker="[EMOTIONAL]", text=emotional_block, max_tokens=150))
 
         # 6. [CALLBACK] — only when available
         if callback_block is not None:
-            blocks.append(
-                PromptBlock(marker="[CALLBACK]", text=callback_block, max_tokens=100)
-            )
+            blocks.append(PromptBlock(marker="[CALLBACK]", text=callback_block, max_tokens=100))
 
         # 7. Always: [SCENE]
         blocks.append(PromptBlock(marker="[SCENE]", text=scene_block, max_tokens=80))
@@ -186,15 +176,11 @@ class SacredPromptBuilder:
         blocks.append(PromptBlock(marker="[MOVE]", text=move_block, max_tokens=80))
 
         # 9. Always: [BANNED]
-        blocks.append(
-            PromptBlock(marker="[BANNED]", text=banned_block, max_tokens=40)
-        )
+        blocks.append(PromptBlock(marker="[BANNED]", text=banned_block, max_tokens=40))
 
         # 10. [RHYTHM] — only when applicable
         if rhythm_block is not None:
-            blocks.append(
-                PromptBlock(marker="[RHYTHM]", text=rhythm_block, max_tokens=30)
-            )
+            blocks.append(PromptBlock(marker="[RHYTHM]", text=rhythm_block, max_tokens=30))
 
         # Validate and enforce contract
         self.validate_order(blocks)
@@ -230,9 +216,7 @@ class SacredPromptBuilder:
                 )
 
         # Verify canonical subsequence ordering
-        canonical_indices = {
-            marker: idx for idx, marker in enumerate(self.CANONICAL_ORDER)
-        }
+        canonical_indices = {marker: idx for idx, marker in enumerate(self.CANONICAL_ORDER)}
 
         prev_index = -1
         prev_marker = None

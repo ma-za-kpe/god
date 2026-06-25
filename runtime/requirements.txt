@@ -31,6 +31,12 @@ python-dotenv>=1.0.0
 httpx>=0.27.0
 tenacity>=8.0.0
 
+# Twitch EventSub WebSocket
+websockets>=12.0
+
+# OBS WebSocket v5
+obsws-python>=1.7.0
+
 # Testing
 pytest>=8.0.0
 pytest-asyncio>=0.23.0

@@ -120,7 +120,9 @@ def normalize_twitch_event(event_type: str, payload: dict[str, Any]) -> TwitchEv
     if not channel_name:
         return None
     user_name = str(payload.get("user_name") or payload.get("chatter_name") or "").strip()
-    message = str(payload.get("message") or payload.get("text") or payload.get("content") or "").strip()
+    message = str(
+        payload.get("message") or payload.get("text") or payload.get("content") or ""
+    ).strip()
     metadata = dict(payload.get("metadata") or {})
     metadata.setdefault("source", "twitch")
     metadata.setdefault("transport", os.getenv("TWITCH_EVENTSUB_TRANSPORT", "dry-run"))
@@ -168,7 +170,7 @@ class TwitchAdapter:
         return json_safe(world_event)
 
     async def send_chat(self, message: TwitchChatMessage) -> TwitchOutgoingChat:
-        """Send or dry-run a chat message."""
+        """Send or dry-run a chat message via Helix POST /chat/messages."""
         if not message.message.strip():
             return TwitchOutgoingChat(
                 ok=False,
@@ -191,13 +193,19 @@ class TwitchAdapter:
                 },
             )
 
-        # Real Helix sending will land here in a later phase.
+        from .helix import send_chat_message  # avoid circular at module level
+
+        result = await send_chat_message(
+            message=message.message,
+            reply_to_message_id=message.reply_to_message_id,
+        )
         return TwitchOutgoingChat(
-            ok=False,
+            ok=result.get("ok", False),
             dry_run=False,
             channel_name=message.channel_name,
             message=message.message,
-            reason="helix_not_implemented",
+            reason=result.get("reason", "") or ("sent" if result.get("ok") else "helix_error"),
+            metadata={**message.metadata, **{k: v for k, v in result.items() if k not in ("ok",)}},
         )
 
     def status(self) -> dict[str, Any]:
@@ -220,7 +228,11 @@ class TwitchAdapter:
         if twitch_event.event_type == "channel.follow":
             return f"{twitch_event.user_name or twitch_event.user_id} followed the channel."
         if twitch_event.event_type == "channel.raid":
-            viewers = twitch_event.metadata.get("viewer_count") or twitch_event.metadata.get("viewers") or 0
+            viewers = (
+                twitch_event.metadata.get("viewer_count")
+                or twitch_event.metadata.get("viewers")
+                or 0
+            )
             return f"Raid arrives from {twitch_event.user_name or twitch_event.user_id} with {viewers} viewers."
         if twitch_event.event_type == "channel.subscribe":
             return f"{twitch_event.user_name or twitch_event.user_id} subscribed to the channel."

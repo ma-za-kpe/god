@@ -14,7 +14,6 @@ import time
 import pytest
 
 from banter.model_router import ModelRouter
-from banter.types import CircuitBreakerState, ModelRouterError, RouteDecision
 
 
 # ---------------------------------------------------------------------------
@@ -483,8 +482,6 @@ class TestProperty16CircuitBreakerActivation:
         async def _fail(prompt: str) -> str:
             raise ConnectionError("fail")
 
-        import asyncio
-
         router = ModelRouter(remote_model=_succeed, local_model=_succeed)
 
         # Track whether trip conditions were met at any point during processing
@@ -508,11 +505,11 @@ class TestProperty16CircuitBreakerActivation:
 
         if should_have_tripped:
             assert router._cb.tripped is True, (
-                f"CB should be tripped: conditions were met during sequence"
+                "CB should be tripped: conditions were met during sequence"
             )
         else:
             assert router._cb.tripped is False, (
-                f"CB should NOT be tripped: conditions never met during sequence"
+                "CB should NOT be tripped: conditions never met during sequence"
             )
 
     @given(
@@ -566,9 +563,7 @@ class TestProperty17ResponseValidation:
         has_newline = "\n" in text.strip()
 
         if has_content and not has_newline:
-            assert router.validate_response(text) is True, (
-                f"Should accept valid text: {repr(text)}"
-            )
+            assert router.validate_response(text) is True, f"Should accept valid text: {repr(text)}"
 
     @given(
         text=st.text(min_size=0, max_size=100),
@@ -592,7 +587,7 @@ class TestProperty17ResponseValidation:
             assert "\n" not in stripped, "Accepted multi-line text"
             for ch in text:
                 code = ord(ch)
-                assert code >= 0x20 or ch == '\n', (
+                assert code >= 0x20 or ch == "\n", (
                     f"Accepted control char {repr(ch)} (0x{code:02x})"
                 )
 
@@ -603,7 +598,7 @@ class TestProperty17ResponseValidation:
             alphabet=st.characters(whitelist_categories=("L", "N", "P", "S")),
         ).filter(lambda t: len(t.strip()) > 0),
         control_char=st.sampled_from(
-            [chr(i) for i in range(0x00, 0x20) if chr(i) not in ('\n', ' ')]
+            [chr(i) for i in range(0x00, 0x20) if chr(i) not in ("\n", " ")]
         ),
     )
     @settings(max_examples=100)
@@ -615,7 +610,7 @@ class TestProperty17ResponseValidation:
 
         router = ModelRouter(remote_model=_noop, local_model=_noop)
         # Insert control char in the middle
-        injected = base[:len(base)//2] + control_char + base[len(base)//2:]
+        injected = base[: len(base) // 2] + control_char + base[len(base) // 2 :]
         assert router.validate_response(injected) is False, (
             f"Should reject text with control char {repr(control_char)}: {repr(injected)}"
         )
