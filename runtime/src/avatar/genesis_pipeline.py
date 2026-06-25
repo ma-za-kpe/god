@@ -266,9 +266,14 @@ class GenesisPipeline:
                 break
             await asyncio.sleep(15)
         if voice_ready:
-            voice_result = await voice_cloner.clone_voice(
-                style_config.seed_utterance_path, archetype
-            )
+            try:
+                voice_result = await voice_cloner.clone_voice(
+                    style_config.seed_utterance_path, archetype
+                )
+            except Exception as voice_exc:
+                voice_result = None
+                self._record_failure(result, "voice_embedding", f"clone_exception: {voice_exc}")
+                self._log_step(correlation_id, soul_id, "voice_embedding", False, {"error": str(voice_exc)})
             if voice_result:
                 voice_pin = await pin_bytes(
                     voice_result.embedding_bytes, filename=f"{soul_id}-voice.bin"
