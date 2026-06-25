@@ -55,7 +55,7 @@ def _snapshot() -> dict:
 
 
 def test_broadcast_surface_builds_scene_and_caption():
-    state = BroadcastSurface().compose(_snapshot())
+    state = BroadcastSurface(enabled=True).compose(_snapshot())
 
     assert state.enabled is True
     assert state.dry_run is True
