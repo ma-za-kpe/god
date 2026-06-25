@@ -26,89 +26,89 @@ export function AgentAvatar({ agent, avatarState, selected, speaking, runtimeBas
   );
 
   useFrame(() => {
-    if (!groupRef.current) return;
-    const targetY = isActiveSpeaker ? Math.sin(Date.now() / 1000 * 4) * 0.18 : 0;
-    groupRef.current.position.y += (targetY - groupRef.current.position.y) * 0.12;
-
     if (haloRef.current) {
-      const pulse = isActiveSpeaker ? 1.0 + Math.sin(Date.now() / 1000 * 5) * 0.12 : (selected ? 1.05 : 1.0);
+      const pulse = isActiveSpeaker ? 1.0 + Math.sin(Date.now() / 1000 * 5) * 0.1 : (selected ? 1.04 : 1.0);
       haloRef.current.scale.setScalar(pulse);
-      haloRef.current.material.opacity = isActiveSpeaker ? 0.9 : (selected ? 0.55 : 0.2);
+      haloRef.current.material.opacity = isActiveSpeaker ? 0.95 : (selected ? 0.5 : 0.18);
     }
   });
 
   return (
     <group ref={groupRef} position={position}>
-      {/* Halo ring behind portrait */}
+      {/* Halo ring — pulses when speaking */}
       <Billboard>
-        <mesh ref={haloRef} position={[0, 1.0, -0.05]}>
-          <ringGeometry args={[1.05, 1.22, 48]} />
-          <meshBasicMaterial color={color} transparent opacity={0.2} />
+        <mesh ref={haloRef} position={[0, 1.1, -0.08]}>
+          <ringGeometry args={[1.08, 1.28, 48]} />
+          <meshBasicMaterial color={isActiveSpeaker ? '#f4c95d' : color} transparent opacity={0.18} />
         </mesh>
       </Billboard>
 
-      {/* Portrait card rendered as real HTML img — bypasses WebGL texture issues */}
+      {/* Portrait card via real HTML img — no WebGL texture issues */}
       <Html
         center
-        position={[0, 1.0, 0]}
-        style={{
-          width: '160px',
-          height: '200px',
-          pointerEvents: 'none',
-          userSelect: 'none',
-        }}
+        position={[0, 1.1, 0]}
+        style={{ width: '170px', height: '210px', pointerEvents: 'none', userSelect: 'none' }}
         occlude={false}
       >
-        <div style={{
-          width: '160px',
-          height: '200px',
-          border: `2.5px solid ${isActiveSpeaker ? '#f4c95d' : (selected ? '#ffffff' : color)}`,
-          boxShadow: isActiveSpeaker
-            ? `0 0 22px ${color}, 0 0 8px #f4c95d`
-            : (selected ? `0 0 12px ${color}` : `0 0 6px ${color}55`),
-          borderRadius: '6px',
-          overflow: 'hidden',
-          background: '#0d1020',
-          transition: 'box-shadow 0.2s, border-color 0.2s',
-        }}>
-          {portraitUrl ? (
-            <img
-              src={portraitUrl}
-              alt={agent.current_name || 'agent'}
-              style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
-              crossOrigin="anonymous"
-            />
-          ) : (
-            <div style={{
-              width: '100%',
-              height: '100%',
-              background: `radial-gradient(circle at 50% 40%, ${color}44, #0d1020)`,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: '40px',
-              color,
-            }}>
-              ◈
-            </div>
-          )}
+        <div
+          className={isActiveSpeaker ? 'speaking-avatar' : ''}
+          style={{
+            width: '170px',
+            height: '210px',
+            position: 'relative',
+            '--glow-color': color,
+          }}
+        >
+          {/* Portrait image */}
+          <div style={{
+            width: '170px',
+            height: '210px',
+            border: `2.5px solid ${isActiveSpeaker ? '#f4c95d' : (selected ? '#fff' : color)}`,
+            boxShadow: isActiveSpeaker
+              ? `0 0 24px ${color}, 0 0 10px #f4c95d`
+              : (selected ? `0 0 14px ${color}` : `0 0 6px ${color}55`),
+            borderRadius: '7px',
+            overflow: 'hidden',
+            background: '#0d1020',
+            animation: isActiveSpeaker ? 'portrait-glow 0.8s ease-in-out infinite' : 'none',
+          }}>
+            {portraitUrl ? (
+              <img
+                src={portraitUrl}
+                alt={agent.current_name || 'agent'}
+                style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                crossOrigin="anonymous"
+              />
+            ) : (
+              <div style={{
+                width: '100%', height: '100%',
+                background: `radial-gradient(circle at 50% 40%, ${color}44, #0d1020)`,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: '48px', color,
+              }}>
+                ◈
+              </div>
+            )}
+          </div>
+
+          {/* Speaking equalizer bars */}
           {isActiveSpeaker && (
             <div style={{
               position: 'absolute',
-              bottom: '6px',
+              bottom: '-18px',
               left: '50%',
               transform: 'translateX(-50%)',
               display: 'flex',
+              alignItems: 'flex-end',
               gap: '3px',
+              height: '22px',
             }}>
-              {[0, 1, 2, 3].map(i => (
-                <div key={i} style={{
-                  width: '4px',
-                  height: `${8 + Math.sin((Date.now() / 1000 * 6) + i * 1.2) * 6}px`,
-                  background: '#f4c95d',
-                  borderRadius: '2px',
-                  transition: 'height 0.05s',
-                }} />
+              {[1, 2, 3, 4, 5].map((i) => (
+                <span
+                  key={i}
+                  className="speaking-bar"
+                  style={{ animationDelay: `${(i - 1) * 0.1}s` }}
+                />
               ))}
             </div>
           )}
@@ -117,7 +117,7 @@ export function AgentAvatar({ agent, avatarState, selected, speaking, runtimeBas
 
       {/* Name label */}
       {!minimal && (
-        <Billboard position={[0, 2.5, 0]}>
+        <Billboard position={[0, 2.65, 0]}>
           <Text
             fontSize={0.28}
             color={isActiveSpeaker ? '#f4c95d' : (selected ? '#ffffff' : '#d6dcff')}
