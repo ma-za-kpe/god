@@ -528,6 +528,16 @@ user_pref("browser.shell.checkDefaultBrowser", false);
 user_pref("datareporting.policy.firstRunURL", "");
 user_pref("app.update.auto", false);
 user_pref("trailhead.firstrun.branches", "nofirstrun");
+user_pref("browser.terms.accepted", true);
+user_pref("browser.aboutwelcome.enabled", false);
+user_pref("browser.newtabpage.enabled", false);
+user_pref("toolkit.telemetry.reportingpolicy.firstRun", false);
+user_pref("datareporting.healthreport.uploadEnabled", false);
+user_pref("datareporting.policy.dataSubmissionEnabled", false);
+user_pref("datareporting.policy.dataSubmissionPolicyAcceptedVersion", 2);
+user_pref("browser.uitour.enabled", false);
+user_pref("browser.rights.3.shown", true);
+user_pref("browser.rights.override", true);
 JS
   chown stream:stream /tmp/firefox-profile/user.js 2>/dev/null || true
 
