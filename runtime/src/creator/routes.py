@@ -27,6 +27,7 @@ DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://god:localdev@localhost:54
 def _world_id() -> str:
     return os.getenv("WORLD_ID", "local-dev-world-1")
 
+
 VALID_PETITION_TYPES = {
     "domain",
     "llc",
@@ -89,16 +90,22 @@ async def submit_petition(
     try:
         proposed_fee = float(body["proposed_creator_fee_usdc"])
     except (TypeError, ValueError):
-        return JSONResponse(status_code=422, content={"error": "proposed_creator_fee_usdc must be numeric"})
+        return JSONResponse(
+            status_code=422, content={"error": "proposed_creator_fee_usdc must be numeric"}
+        )
     if proposed_fee < 0:
-        return JSONResponse(status_code=422, content={"error": "proposed_creator_fee_usdc must be non-negative"})
+        return JSONResponse(
+            status_code=422, content={"error": "proposed_creator_fee_usdc must be non-negative"}
+        )
 
     try:
         external_cost = float(body.get("external_cost_usdc", 0.0))
         if isinstance(body.get("external_cost_breakdown"), dict):
             external_cost = sum(float(v) for v in body["external_cost_breakdown"].values())
     except (TypeError, ValueError):
-        return JSONResponse(status_code=422, content={"error": "external_cost values must be numeric"})
+        return JSONResponse(
+            status_code=422, content={"error": "external_cost values must be numeric"}
+        )
 
     # Verify agent exists and has sufficient balance
     conn = _db()
@@ -209,12 +216,12 @@ async def list_petitions(status: str | None = None):
         cur.execute(
             "SELECT * FROM creator_petitions WHERE world_id = %s AND status = %s "
             "ORDER BY created_at DESC LIMIT 100",
-            (WORLD_ID, status),
+            (_world_id(), status),
         )
     else:
         cur.execute(
             "SELECT * FROM creator_petitions WHERE world_id = %s ORDER BY created_at DESC LIMIT 100",
-            (WORLD_ID,),
+            (_world_id(),),
         )
     petitions = [dict(r) for r in cur.fetchall()]
     cur.close()

@@ -351,7 +351,9 @@ class GenesisPipeline:
         vrm_avatar_url: str = "",
         voice_model_cid: str = "",
     ) -> None:
-        database_url = os.getenv("DATABASE_URL", "postgresql://god:localdev@localhost:5432/god_world")
+        database_url = os.getenv(
+            "DATABASE_URL", "postgresql://god:localdev@localhost:5432/god_world"
+        )
         try:
             import psycopg2
 

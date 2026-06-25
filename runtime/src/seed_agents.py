@@ -25,6 +25,8 @@ IPFS_API = os.getenv("IPFS_API", "http://localhost:5001")
 
 def _world_id() -> str:
     return os.getenv("WORLD_ID", "local-dev-world-1")
+
+
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://god:localdev@localhost:5432/god_world")
 AVATAR_GENESIS_ENABLED = os.getenv("AVATAR_GENESIS_ENABLED", "true").lower() in (
     "1",
