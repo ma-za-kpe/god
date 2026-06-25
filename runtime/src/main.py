@@ -778,6 +778,29 @@ async def voice_audio(utterance_id: str):
     })
 
 
+@app.get("/ipfs/{cid}")
+async def ipfs_proxy(cid: str):
+    """Proxy IPFS content by CID so the observer can fetch portraits without a local gateway."""
+    from fastapi.responses import Response as FastResponse
+
+    ipfs_api = (os.getenv("IPFS_API") or "http://localhost:5001").rstrip("/")
+    try:
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            r = await client.post(f"{ipfs_api}/api/v0/cat", params={"arg": cid})
+            if r.status_code == 405:
+                r = await client.get(f"{ipfs_api}/api/v0/cat", params={"arg": cid})
+            if r.status_code != 200 or not r.content:
+                return FastResponse(status_code=404, content=b"")
+            content_type = "image/png" if r.content[:4] == b"\x89PNG" else "application/octet-stream"
+            return FastResponse(content=r.content, media_type=content_type, headers={
+                "Cache-Control": "public, max-age=3600",
+                "Access-Control-Allow-Origin": "*",
+            })
+    except Exception as exc:
+        log.warning("ipfs_proxy cid=%s error=%s", cid, exc)
+        return FastResponse(status_code=502, content=b"")
+
+
 @app.get("/avatar/status")
 async def avatar_status():
     """Current avatar stack configuration and health."""
