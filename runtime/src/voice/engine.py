@@ -573,29 +573,24 @@ class VoiceSurface:
 
         reference_audio = _reference_audio_for_agent(agent)
         if reference_audio is None:
-            synth_url = f"{endpoint.rstrip('/')}/speak"
-            payload = {
-                "text": plan.line,
-                "voice": plan.voice_name,
-                "model": plan.voice_model,
-                "speed": plan.speed,
-                "pitch": plan.pitch,
-                "sample_rate": plan.sample_rate,
-                "format": "wav",
-            }
-        else:
-            synth_url = f"{endpoint.rstrip('/')}/v1/tts"
-            payload = {
-                "text": plan.line,
-                "references": [
-                    {
-                        "audio": base64.b64encode(reference_audio).decode(),
-                        "text": "",
-                    }
-                ],
-                "format": "wav",
-                "streaming": False,
-            }
+            # fish-speech 2.0 has no /speak endpoint; fall back to philosopher seed
+            _fallback = Path(__file__).resolve().parents[3] / "runtime/seed_utterances/philosopher.wav"
+            if _fallback.is_file():
+                reference_audio = _fallback.read_bytes() or None
+        if reference_audio is None:
+            return {"ok": False, "reason": "no_reference_audio"}
+        synth_url = f"{endpoint.rstrip('/')}/v1/tts"
+        payload = {
+            "text": plan.line,
+            "references": [
+                {
+                    "audio": base64.b64encode(reference_audio).decode(),
+                    "text": "",
+                }
+            ],
+            "format": "wav",
+            "streaming": False,
+        }
 
         try:
             response = httpx.post(synth_url, json=payload, timeout=20.0)
