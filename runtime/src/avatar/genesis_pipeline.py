@@ -177,6 +177,10 @@ class GenesisPipeline:
         expression_bytes: dict[str, bytes] = {}
         voice_result = None
 
+        # Unload Ollama model from GPU so ComfyUI has VRAM headroom for SDXL generation.
+        # Ollama reloads automatically on the next inference call.
+        await self._unload_ollama_from_gpu()
+
         if await portrait_generator.health_check():
             portrait_bytes = await portrait_generator.generate_portrait(
                 archetype, style_config, seed=random.randint(0, 2_147_483_647)
@@ -400,6 +404,22 @@ class GenesisPipeline:
                     )
         except Exception as exc:
             log.warning("postgres_update_failed soul_id=%s error=%s", soul_id, exc)
+
+    async def _unload_ollama_from_gpu(self) -> None:
+        """Ask Ollama to immediately unload its model from GPU, freeing VRAM for ComfyUI."""
+        ollama_url = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434").rstrip("/")
+        model = os.getenv("LLM_MODEL", "llama3.1:8b")
+        try:
+            import httpx as _httpx
+            async with _httpx.AsyncClient(timeout=10.0) as client:
+                await client.post(
+                    f"{ollama_url}/api/generate",
+                    json={"model": model, "keep_alive": 0},
+                )
+            log.info("ollama gpu unloaded before comfyui genesis")
+            await asyncio.sleep(2)  # brief pause for VRAM to release
+        except Exception as exc:
+            log.warning("ollama unload skipped: %s", exc)
 
     def _record_failure(self, result: PipelineResult, step: str, message: str) -> None:
         result.errors.append({"step": step, "message": message})
