@@ -592,30 +592,73 @@ from pathlib import Path
 import json
 import os
 
-scene_path = Path("/root/.config/obs-studio/basic/scenes/Untitled.json")
-data = json.loads(scene_path.read_text(encoding="utf-8"))
+SOURCE_NAME = os.getenv("OBS_CAPTURE_SOURCE_NAME", "god-browser")
+SOURCE_KIND = os.getenv("OBS_CAPTURE_SOURCE_KIND", "xshm_input")
 window_id = os.environ["OBS_CAPTURE_WINDOW_ID"]
-for source in data.get("sources", []):
-    if source.get("name") == os.getenv("OBS_CAPTURE_SOURCE_NAME", "god-browser"):
-        source["id"] = os.getenv("OBS_CAPTURE_SOURCE_KIND", "xshm_input")
-        source["versioned_id"] = os.getenv("OBS_CAPTURE_SOURCE_KIND", "xshm_input")
-        source["settings"] = {
-            "capture_window": window_id,
-            "CaptureCursor": 0,
-            "include_border": 0,
-            "exclude_alpha": 0,
-            "lock_x": 0,
-            "swap_redblue": 0,
-            "AdvancedSettings": 0,
-            "CropTop": 0,
-            "CropLeft": 0,
-            "CropRight": 0,
-            "CropBottom": 0,
-        }
-        break
+
+capture_settings = {
+    "capture_window": window_id,
+    "CaptureCursor": 0,
+    "include_border": 0,
+    "exclude_alpha": 0,
+    "lock_x": 0,
+    "swap_redblue": 0,
+    "AdvancedSettings": 0,
+    "CropTop": 0,
+    "CropLeft": 0,
+    "CropRight": 0,
+    "CropBottom": 0,
+}
+
+scene_path = Path("/root/.config/obs-studio/basic/scenes/Untitled.json")
+scene_path.parent.mkdir(parents=True, exist_ok=True)
+
+if scene_path.exists():
+    data = json.loads(scene_path.read_text(encoding="utf-8"))
+    for source in data.get("sources", []):
+        if source.get("name") == SOURCE_NAME:
+            source["id"] = SOURCE_KIND
+            source["versioned_id"] = SOURCE_KIND
+            source["settings"] = capture_settings
+            break
+    else:
+        data.setdefault("sources", []).append({
+            "id": SOURCE_KIND, "versioned_id": SOURCE_KIND,
+            "name": SOURCE_NAME, "settings": capture_settings,
+            "mixers": 0, "sync": 0, "flags": 0,
+            "volume": 1.0, "enabled": True, "muted": False,
+        })
 else:
-    raise SystemExit("god-browser source not found")
+    data = {
+        "name": "Untitled",
+        "current_scene": "Scene",
+        "current_program_scene": "Scene",
+        "scene_order": [{"name": "Scene"}],
+        "transitions": [],
+        "sources": [{
+            "id": SOURCE_KIND, "versioned_id": SOURCE_KIND,
+            "name": SOURCE_NAME, "settings": capture_settings,
+            "mixers": 0, "sync": 0, "flags": 0,
+            "volume": 1.0, "enabled": True, "muted": False,
+        }],
+        "scenes": [{
+            "name": "Scene", "id": "scene",
+            "settings": {"items": [{
+                "name": SOURCE_NAME, "visible": True, "locked": False,
+                "pos": {"x": 0.0, "y": 0.0},
+                "bounds": {"x": 1920.0, "y": 1080.0},
+                "id": 0, "group_id": 0, "bounds_align": 0,
+                "crop_top": 0, "crop_right": 0, "crop_left": 0, "crop_bottom": 0,
+                "scale_filter": "OBS_SCALE_DISABLE",
+                "blend_type": "OBS_BLEND_NORMAL",
+                "bounds_type": "OBS_BOUNDS_SCALE_INNER",
+                "rot": 0.0,
+            }]},
+        }],
+    }
+
 scene_path.write_text(json.dumps(data, separators=(",", ":"), ensure_ascii=False), encoding="utf-8")
+print(f"OBS scene written: {SOURCE_NAME} -> window {window_id}")
 PY
 }
 
