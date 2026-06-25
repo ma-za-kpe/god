@@ -210,7 +210,6 @@ class TestHasTheRoom:
 
     def test_tie_broken_by_most_recent_above_8(self):
         """When tied on average, most recent beat >8 wins."""
-        sc = _fresh_scene_context()
         # Both speakers have avg=9 across 1 beat each, but we need ≥2
         # Let's make a scenario where they tie with ≥2 beats
         # Actually with maxlen=3, only one speaker can have 2 beats

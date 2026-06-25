@@ -122,9 +122,7 @@ async def test_send_chat_defaults_to_dry_run():
 @pytest.mark.asyncio
 async def test_send_chat_rejects_empty_message():
     adapter = YouTubeAdapter(channel_id="UC123", dry_run=True)
-    result = await adapter.send_chat(
-        YouTubeChatMessage(message="   ", live_chat_id="lc_abc")
-    )
+    result = await adapter.send_chat(YouTubeChatMessage(message="   ", live_chat_id="lc_abc"))
 
     assert not result.ok
     assert result.reason == "empty_message"

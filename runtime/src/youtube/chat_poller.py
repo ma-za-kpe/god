@@ -130,7 +130,9 @@ class ChatPoller:
                 if live_chat_id:
                     log.info("YouTube active liveChatId: %s", live_chat_id)
                 else:
-                    log.debug("No active YouTube broadcast — will retry in %ds", _CHAT_DISCOVER_INTERVAL_S)
+                    log.debug(
+                        "No active YouTube broadcast — will retry in %ds", _CHAT_DISCOVER_INTERVAL_S
+                    )
                     await asyncio.sleep(_CHAT_DISCOVER_INTERVAL_S)
                     continue
 

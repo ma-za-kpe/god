@@ -5,11 +5,13 @@ Entry point. FastAPI server + background daemons for rent collection and agent e
 
 import asyncio
 import base64
+import http.client
+import json
 import logging
 import os
 import pathlib
-from urllib.parse import urlparse
 from contextlib import asynccontextmanager
+from urllib.parse import urlparse
 
 import httpx
 import uvicorn
@@ -95,7 +97,8 @@ async def _twitch_chat_relay_daemon():
             snap = await build_world_snapshot_async(events_limit=20)
             events = snap.get("events") or []
             msg_events = [
-                ev for ev in events
+                ev
+                for ev in events
                 if str(ev.get("event_type", "")).endswith("message_sent")
                 and ev.get("event_id") not in seen_ids
             ]
@@ -106,6 +109,7 @@ async def _twitch_chat_relay_daemon():
                 payload = ev.get("payload") or {}
                 if isinstance(payload, str):
                     import json as _json
+
                     try:
                         payload = _json.loads(payload)
                     except Exception:
@@ -263,7 +267,9 @@ async def proxy_ipfs(cid: str):
             r = await client.post(f"{ipfs_api}/api/v0/cat?arg={cid}")
             if r.status_code != 200:
                 return Response(status_code=502)
-            content_type = "image/png" if r.content[:4] == b"\x89PNG" else "application/octet-stream"
+            content_type = (
+                "image/png" if r.content[:4] == b"\x89PNG" else "application/octet-stream"
+            )
             return Response(content=r.content, media_type=content_type)
     except Exception:
         return Response(status_code=502)
@@ -384,7 +390,9 @@ async def _fish_synthesis_ready() -> dict:
 @app.get("/ready")
 async def ready():
     streaming_mode = os.getenv("STREAMING_MODE", "auto").lower()
-    obs_required = streaming_mode in ("1", "true", "yes", "on") or os.getenv("OBS_REQUIRED", "").lower() in ("1", "true", "yes", "on")
+    obs_required = streaming_mode in ("1", "true", "yes", "on") or os.getenv(
+        "OBS_REQUIRED", ""
+    ).lower() in ("1", "true", "yes", "on")
     voice_enabled = os.getenv("VOICE_ENABLED", "true").lower() in ("1", "true", "yes", "on")
     checks = {
         "postgres": _db_ready(),

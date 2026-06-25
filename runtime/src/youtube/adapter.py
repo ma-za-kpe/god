@@ -59,10 +59,7 @@ def normalize_youtube_event(event_type: str, payload: dict[str, Any]) -> YouTube
         return None
     payload = payload or {}
 
-    channel_id = str(
-        payload.get("channel_id")
-        or os.getenv("YOUTUBE_CHANNEL_ID", "")
-    ).strip()
+    channel_id = str(payload.get("channel_id") or os.getenv("YOUTUBE_CHANNEL_ID", "")).strip()
     if not channel_id:
         return None
 

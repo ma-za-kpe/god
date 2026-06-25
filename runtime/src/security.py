@@ -29,7 +29,9 @@ def verify_creator_token(header_token: str | None) -> bool:
     Local tokenless mode is available only when explicitly opted in. This keeps
     production and accidentally exposed Docker stacks deny-by-default.
     """
-    expected = os.getenv("CREATOR_GENESIS_TOKEN", "").strip() or os.getenv("CREATOR_TOKEN", "").strip()
+    expected = (
+        os.getenv("CREATOR_GENESIS_TOKEN", "").strip() or os.getenv("CREATOR_TOKEN", "").strip()
+    )
     if not expected:
         return local_dev_mode() and _truthy("ALLOW_TOKENLESS_CREATOR", "false")
     return bool(header_token) and hmac.compare_digest(header_token.strip(), expected)

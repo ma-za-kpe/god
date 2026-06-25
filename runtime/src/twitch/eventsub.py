@@ -96,7 +96,9 @@ def _extract_twitch_payload(notification: dict[str, Any]) -> tuple[str, dict[str
     if "broadcaster_user_login" in payload:
         payload.setdefault("channel_name", payload["broadcaster_user_login"])
     if "broadcaster_user_name" in payload:
-        payload.setdefault("channel_name", payload.get("channel_name") or payload["broadcaster_user_name"])
+        payload.setdefault(
+            "channel_name", payload.get("channel_name") or payload["broadcaster_user_name"]
+        )
 
     # chatter_user_name / user_login → user_name
     if "chatter_user_name" in payload:

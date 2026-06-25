@@ -140,7 +140,9 @@ class BroadcastSurface:
                     results.append({"action": "set_scene", "scene": scene_id, "ok": True})
                     log.info("OBS scene → %s", scene_id)
                 except Exception as exc:
-                    results.append({"action": "set_scene", "scene": scene_id, "ok": False, "error": str(exc)})
+                    results.append(
+                        {"action": "set_scene", "scene": scene_id, "ok": False, "error": str(exc)}
+                    )
                     log.warning("OBS set_scene failed: %s", exc)
 
             # Caption / ticker text source update
@@ -159,12 +161,23 @@ class BroadcastSurface:
                         )
                         results.append({"action": "set_text", "source": source_name, "ok": True})
                     except Exception as exc:
-                        results.append({"action": "set_text", "source": source_name, "ok": False, "error": str(exc)})
+                        results.append(
+                            {
+                                "action": "set_text",
+                                "source": source_name,
+                                "ok": False,
+                                "error": str(exc),
+                            }
+                        )
                         log.debug("OBS set_input_settings %s: %s", source_name, exc)
 
             # Browser mode updates a browser source URL. Window-capture mode
             # leaves the X11 source alone because the startup script owns it.
-            if self.obs_capture_mode == "browser" and self.obs_browser_source and self.obs_browser_url:
+            if (
+                self.obs_capture_mode == "browser"
+                and self.obs_browser_source
+                and self.obs_browser_url
+            ):
                 try:
                     cl.set_input_settings(
                         name=self.obs_browser_source,
@@ -274,9 +287,7 @@ class BroadcastSurface:
             return
 
         scene_names = [
-            profile["scene_id"]
-            for profile in SCENE_MAP.values()
-            if profile.get("scene_id")
+            profile["scene_id"] for profile in SCENE_MAP.values() if profile.get("scene_id")
         ]
         if not scene_names:
             return
@@ -290,7 +301,9 @@ class BroadcastSurface:
         existing_inputs: set[str] = set()
         try:
             input_list = cl.get_input_list()
-            inputs = input_list.inputs if hasattr(input_list, "inputs") else input_list.get("inputs", [])
+            inputs = (
+                input_list.inputs if hasattr(input_list, "inputs") else input_list.get("inputs", [])
+            )
             for item in inputs:
                 if isinstance(item, dict):
                     name = item.get("inputName") or item.get("input_name") or item.get("name")

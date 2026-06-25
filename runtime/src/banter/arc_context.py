@@ -115,11 +115,7 @@ def _derive_theme_noun(theme: str) -> str:
 
 def _theme_terms(theme: str) -> list[str]:
     readable = _normalize_theme(theme).replace("_", " ")
-    return [
-        term
-        for term in readable.split()
-        if len(term) >= 4 and term not in _THEME_STOP_WORDS
-    ]
+    return [term for term in readable.split() if len(term) >= 4 and term not in _THEME_STOP_WORDS]
 
 
 def _scrub_theme_terms(text: str, theme: str) -> str:

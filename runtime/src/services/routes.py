@@ -75,7 +75,9 @@ async def register_agent_service(
     try:
         price_usdc = float(body["price_usdc"])
         if price_usdc < 0:
-            return JSONResponse(status_code=422, content={"error": "price_usdc must be non-negative"})
+            return JSONResponse(
+                status_code=422, content={"error": "price_usdc must be non-negative"}
+            )
 
         listing = await register_service(
             soul_id=body["soul_id"],
