@@ -1796,6 +1796,39 @@ async def creator_one(
     }
 
 
+@app.post("/creator/birth")
+async def creator_birth(
+    body: dict = {},
+    x_creator_token: str | None = Header(None, alias="X-Creator-Token"),
+):
+    """Add one agent by archetype without deleting existing agents."""
+    from decimal import Decimal
+
+    from .security import deny_creator_action
+
+    denied = deny_creator_action(x_creator_token)
+    if denied:
+        return denied
+
+    archetype = str(body.get("archetype") or "philosopher").strip().lower()
+    seed_balance = float(body.get("seed_balance_usdc", 2.0))
+
+    from .seed_agents import seed_one_agent
+
+    try:
+        agent = await seed_one_agent(
+            archetype=archetype,
+            seed_balance=Decimal(str(seed_balance)),
+            is_elder=True,
+            block_on_avatar_genesis=bool(body.get("block_on_avatar_genesis", True)),
+        )
+    except Exception as exc:
+        log.error("creator_birth failed: %s", exc)
+        return JSONResponse(status_code=500, content={"error": str(exc)})
+
+    return {"status": "born", "archetype": archetype, "agent": agent}
+
+
 def _clear_world_state(world_id: str) -> None:
     import psycopg2
 
