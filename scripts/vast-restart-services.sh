@@ -518,6 +518,19 @@ start_firefox() {
 
   ensure_browser_user
 
+  # Suppress Firefox first-run welcome page and update nags
+  install -d -o stream -g stream /tmp/firefox-profile 2>/dev/null || true
+  cat >/tmp/firefox-profile/user.js <<'JS'
+user_pref("browser.startup.homepage_override.mstone", "ignore");
+user_pref("startup.homepage_welcome_url", "");
+user_pref("startup.homepage_welcome_url.additional", "");
+user_pref("browser.shell.checkDefaultBrowser", false);
+user_pref("datareporting.policy.firstRunURL", "");
+user_pref("app.update.auto", false);
+user_pref("trailhead.firstrun.branches", "nofirstrun");
+JS
+  chown stream:stream /tmp/firefox-profile/user.js 2>/dev/null || true
+
   log "Starting Firefox on Xvfb..."
   local browser_url="${OBS_BROWSER_URL:-http://localhost:10517/stage}"
   local launch_firefox
@@ -636,6 +649,30 @@ else:
 
 scene_path.write_text(json.dumps(data, separators=(",", ":"), ensure_ascii=False), encoding="utf-8")
 print(f"OBS scene written: {SOURCE_NAME} -> window {window_id}")
+
+# If OBS is already running, update the live source via websocket
+try:
+    import websocket as ws_mod
+    import time
+    ws2 = ws_mod.create_connection("ws://127.0.0.1:4444", timeout=4)
+    _mid = 0
+    def _call(t, **kw):
+        global _mid; _mid += 1
+        p = {"request-type": t, "message-id": str(_mid)}
+        p.update(kw)
+        ws2.send(json.dumps(p))
+        for _ in range(20):
+            try:
+                r = json.loads(ws2.recv())
+                if r.get("message-id") == str(_mid): return r
+            except Exception: break
+        return {}
+    r = _call("SetSourceSettings", sourceName=SOURCE_NAME,
+        sourceSettings={"capture_window": window_id, "CaptureCursor": 0})
+    print(f"OBS live source update: {r.get('status')}")
+    ws2.close()
+except Exception as e:
+    print(f"OBS websocket not ready yet (will pick up scene file on start): {e}")
 PY
 }
 
