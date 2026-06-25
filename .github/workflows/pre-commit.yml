@@ -42,4 +42,6 @@ jobs:
         env:
           PYTHONPATH: runtime/src
           VOICE_SYNTHESIS_ENABLED: "false"
-        run: python -m pytest runtime/tests
+        run: |
+          rm -f runtime/tests/banter/__init__.py
+          python -m pytest runtime/tests
