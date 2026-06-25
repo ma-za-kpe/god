@@ -648,12 +648,43 @@ class VoiceSurface:
                 _synthesis_cache[plan.utterance_id] = synthesis
                 if response.content:
                     _audio_cache[plan.utterance_id] = response.content
+                    _play_to_pulse_sink_async(response.content)
                 return synthesis
             except Exception as exc:
                 _log.warning("voice synthesis failed: %s", exc)
                 return {"ok": False, "endpoint": synth_url, "error": str(exc)}
         finally:
             _synthesis_lock.release()
+
+
+def _play_to_pulse_sink_async(audio_bytes: bytes) -> None:
+    sink = os.getenv("VOICE_PULSE_SINK", "")
+    if not sink:
+        return
+
+    def _play() -> None:
+        import subprocess
+        try:
+            env = {
+                **os.environ,
+                "HOME": "/home/stream",
+                "XDG_RUNTIME_DIR": "/tmp/runtime-stream",
+                "PULSE_SERVER": "unix:/tmp/runtime-stream/pulse/native",
+            }
+            proc = subprocess.Popen(
+                ["paplay", "-d", sink],
+                stdin=subprocess.PIPE,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                env=env,
+            )
+            proc.stdin.write(audio_bytes)
+            proc.stdin.close()
+            proc.wait(timeout=60)
+        except Exception as exc:
+            _log.debug("pulse sink play failed: %s", exc)
+
+    threading.Thread(target=_play, daemon=True).start()
 
 
 _voice_surface_singleton: VoiceSurface | None = None

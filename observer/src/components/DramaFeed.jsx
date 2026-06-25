@@ -6,8 +6,20 @@ function clean(text) {
 
 export function DramaFeed() {
   const events = useObserverStore((s) => s.events);
+  // Prefer narrative.story events; deduplicate by narrative text so the
+  // original event and its companion don't both appear.
+  const seen = new Set();
   const recent = events
-    .filter((ev) => String(ev.event_type || '').startsWith('social.') || String(ev.event_type || '').startsWith('narrative.'))
+    .filter((ev) => {
+      const t = String(ev.event_type || '');
+      return t.startsWith('social.') || t.startsWith('narrative.');
+    })
+    .filter((ev) => {
+      const key = clean(ev.narrative || ev.payload?.content || ev.payload?.body);
+      if (!key || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
     .slice(0, 8);
 
   return (
