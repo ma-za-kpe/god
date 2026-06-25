@@ -623,10 +623,14 @@ class VoiceSurface:
                 synthesis["audio_present"] = True
             if len(_synthesis_cache) >= _SYNTHESIS_CACHE_MAX:
                 try:
-                    _synthesis_cache.pop(next(iter(_synthesis_cache)))
+                    oldest = next(iter(_synthesis_cache))
+                    _synthesis_cache.pop(oldest)
+                    _audio_cache.pop(oldest, None)
                 except StopIteration:
                     pass
             _synthesis_cache[plan.utterance_id] = synthesis
+            if response.content:
+                _audio_cache[plan.utterance_id] = response.content
             return synthesis
         except Exception as exc:
             _log.warning("voice synthesis failed: %s", exc)
@@ -635,6 +639,7 @@ class VoiceSurface:
 
 _voice_surface_singleton: VoiceSurface | None = None
 _synthesis_cache: dict[str, dict[str, Any]] = {}
+_audio_cache: dict[str, bytes] = {}
 _SYNTHESIS_CACHE_MAX = 32
 
 
@@ -679,6 +684,10 @@ def build_voice_state(snapshot: dict[str, Any]) -> dict[str, Any]:
             "plan": None,
             "synthesis": {"ok": False, "reason": "compose_failed"},
         }
+
+
+def get_cached_audio(utterance_id: str) -> bytes | None:
+    return _audio_cache.get(utterance_id)
 
 
 def build_voice_status_surface() -> dict[str, Any]:

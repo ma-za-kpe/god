@@ -11,6 +11,8 @@ function defaultRuntimeUrl() {
 
 export const API_BASE = window.RUNTIME_URL || import.meta.env.VITE_RUNTIME_URL || defaultRuntimeUrl();
 
+let _lastPlayedUtteranceId = '';
+
 export function useWorld() {
   const setAgents = useObserverStore((s) => s.setAgents);
   const setEvents = useObserverStore((s) => s.setEvents);
@@ -57,7 +59,28 @@ export function useWorld() {
         }
 
         if (snapshotRes.status === 'fulfilled' && snapshotRes.value.ok) {
-          setSnapshot(await snapshotRes.value.json());
+          const snap = await snapshotRes.value.json();
+          setSnapshot(snap);
+          // Play synthesized voice audio when a new utterance arrives
+          const uid = snap?.voice?.plan?.utterance_id;
+          const synthOk = snap?.voice?.synthesis?.ok;
+          if (uid && synthOk && uid !== _lastPlayedUtteranceId) {
+            _lastPlayedUtteranceId = uid;
+            fetch(`${API_BASE}/voice/audio/${uid}`)
+              .then((r) => r.ok ? r.arrayBuffer() : null)
+              .then((buf) => {
+                if (!buf) return;
+                const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                ctx.decodeAudioData(buf, (decoded) => {
+                  const src = ctx.createBufferSource();
+                  src.buffer = decoded;
+                  src.connect(ctx.destination);
+                  src.start(0);
+                  src.onended = () => ctx.close();
+                });
+              })
+              .catch(() => {});
+          }
         } else {
           ok = false;
           lastError = lastError || `snapshot:${snapshotRes.status === 'fulfilled' ? snapshotRes.value.status : 'fetch'}`;

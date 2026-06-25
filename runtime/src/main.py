@@ -763,6 +763,21 @@ async def voice_state(events_limit: int = 50, messages_limit: int = 80):
         return {"error": str(e), "world_id": os.getenv("WORLD_ID", "local-dev-world-1")}
 
 
+@app.get("/voice/audio/{utterance_id}")
+async def voice_audio(utterance_id: str):
+    """Return synthesized WAV bytes for a given utterance_id (cached from last TTS call)."""
+    from fastapi.responses import Response as FastResponse
+    from .voice.engine import get_cached_audio
+
+    audio = get_cached_audio(utterance_id)
+    if audio is None:
+        return FastResponse(status_code=404, content=b"")
+    return FastResponse(content=audio, media_type="audio/wav", headers={
+        "Cache-Control": "public, max-age=60",
+        "Access-Control-Allow-Origin": "*",
+    })
+
+
 @app.get("/avatar/status")
 async def avatar_status():
     """Current avatar stack configuration and health."""
