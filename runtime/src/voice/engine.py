@@ -575,72 +575,83 @@ class VoiceSurface:
         if cached is not None:
             return cached
 
-        reference_audio = _reference_audio_for_agent(agent)
-        if reference_audio is None:
-            # fish-speech 2.0 has no /speak endpoint; fall back to philosopher seed
-            _fallback = Path(__file__).resolve().parents[3] / "runtime/seed_utterances/philosopher.wav"
-            if _fallback.is_file():
-                reference_audio = _fallback.read_bytes() or None
-        if reference_audio is None:
-            return {"ok": False, "reason": "no_reference_audio"}
-        synth_url = f"{endpoint.rstrip('/')}/v1/tts"
-        payload = {
-            "text": plan.line,
-            "references": [
-                {
-                    "audio": base64.b64encode(reference_audio).decode(),
-                    "text": "",
-                }
-            ],
-            "format": "wav",
-            "streaming": False,
-        }
+        if not _synthesis_lock.acquire(blocking=False):
+            return {"ok": False, "reason": "synthesis_in_progress"}
 
         try:
-            response = httpx.post(synth_url, json=payload, timeout=60.0)
-            response.raise_for_status()
-            content_type = response.headers.get("content-type", "")
-            synthesis: dict[str, Any] = {
-                "ok": True,
-                "endpoint": synth_url,
-                "content_type": content_type,
-                "byte_count": len(response.content or b""),
+            cached = _synthesis_cache.get(plan.utterance_id)
+            if cached is not None:
+                return cached
+
+            reference_audio = _reference_audio_for_agent(agent)
+            if reference_audio is None:
+                # fish-speech 2.0 has no /speak endpoint; fall back to philosopher seed
+                _fallback = Path(__file__).resolve().parents[3] / "runtime/seed_utterances/philosopher.wav"
+                if _fallback.is_file():
+                    reference_audio = _fallback.read_bytes() or None
+            if reference_audio is None:
+                return {"ok": False, "reason": "no_reference_audio"}
+            synth_url = f"{endpoint.rstrip('/')}/v1/tts"
+            payload = {
+                "text": plan.line,
+                "references": [
+                    {
+                        "audio": base64.b64encode(reference_audio).decode(),
+                        "text": "",
+                    }
+                ],
+                "format": "wav",
+                "streaming": False,
             }
-            if content_type.startswith("application/json"):
-                try:
-                    body = response.json()
-                except Exception:
-                    body = {}
-                if isinstance(body, dict):
-                    synthesis["response_keys"] = sorted(body.keys())
-                    if body.get("audio_url"):
-                        synthesis["audio_url"] = str(body["audio_url"])
-                    if body.get("audio") is not None:
-                        synthesis["audio_present"] = True
-                    if body.get("duration_seconds") is not None:
-                        synthesis["duration_seconds"] = body["duration_seconds"]
-            elif content_type.startswith("audio/"):
-                synthesis["audio_present"] = True
-            if len(_synthesis_cache) >= _SYNTHESIS_CACHE_MAX:
-                try:
-                    oldest = next(iter(_synthesis_cache))
-                    _synthesis_cache.pop(oldest)
-                    _audio_cache.pop(oldest, None)
-                except StopIteration:
-                    pass
-            _synthesis_cache[plan.utterance_id] = synthesis
-            if response.content:
-                _audio_cache[plan.utterance_id] = response.content
-            return synthesis
-        except Exception as exc:
-            _log.warning("voice synthesis failed: %s", exc)
-            return {"ok": False, "endpoint": synth_url, "error": str(exc)}
+
+            try:
+                response = httpx.post(synth_url, json=payload, timeout=60.0)
+                response.raise_for_status()
+                content_type = response.headers.get("content-type", "")
+                synthesis: dict[str, Any] = {
+                    "ok": True,
+                    "endpoint": synth_url,
+                    "content_type": content_type,
+                    "byte_count": len(response.content or b""),
+                }
+                if content_type.startswith("application/json"):
+                    try:
+                        body = response.json()
+                    except Exception:
+                        body = {}
+                    if isinstance(body, dict):
+                        synthesis["response_keys"] = sorted(body.keys())
+                        if body.get("audio_url"):
+                            synthesis["audio_url"] = str(body["audio_url"])
+                        if body.get("audio") is not None:
+                            synthesis["audio_present"] = True
+                        if body.get("duration_seconds") is not None:
+                            synthesis["duration_seconds"] = body["duration_seconds"]
+                elif content_type.startswith("audio/"):
+                    synthesis["audio_present"] = True
+                if len(_synthesis_cache) >= _SYNTHESIS_CACHE_MAX:
+                    try:
+                        oldest = next(iter(_synthesis_cache))
+                        _synthesis_cache.pop(oldest)
+                        _audio_cache.pop(oldest, None)
+                    except StopIteration:
+                        pass
+                _synthesis_cache[plan.utterance_id] = synthesis
+                if response.content:
+                    _audio_cache[plan.utterance_id] = response.content
+                return synthesis
+            except Exception as exc:
+                _log.warning("voice synthesis failed: %s", exc)
+                return {"ok": False, "endpoint": synth_url, "error": str(exc)}
+        finally:
+            _synthesis_lock.release()
 
 
 _voice_surface_singleton: VoiceSurface | None = None
 _synthesis_cache: dict[str, dict[str, Any]] = {}
 _audio_cache: dict[str, bytes] = {}
 _SYNTHESIS_CACHE_MAX = 32
+_synthesis_lock = threading.Lock()
 
 
 def _get_voice_surface() -> VoiceSurface:
