@@ -571,6 +571,10 @@ class VoiceSurface:
         if not health.get("ok"):
             return {"ok": False, "reason": "unhealthy_endpoint", "endpoint": endpoint}
 
+        cached = _synthesis_cache.get(plan.utterance_id)
+        if cached is not None:
+            return cached
+
         reference_audio = _reference_audio_for_agent(agent)
         if reference_audio is None:
             # fish-speech 2.0 has no /speak endpoint; fall back to philosopher seed
@@ -617,15 +621,33 @@ class VoiceSurface:
                         synthesis["duration_seconds"] = body["duration_seconds"]
             elif content_type.startswith("audio/"):
                 synthesis["audio_present"] = True
+            if len(_synthesis_cache) >= _SYNTHESIS_CACHE_MAX:
+                try:
+                    _synthesis_cache.pop(next(iter(_synthesis_cache)))
+                except StopIteration:
+                    pass
+            _synthesis_cache[plan.utterance_id] = synthesis
             return synthesis
         except Exception as exc:
             _log.warning("voice synthesis failed: %s", exc)
             return {"ok": False, "endpoint": synth_url, "error": str(exc)}
 
 
+_voice_surface_singleton: VoiceSurface | None = None
+_synthesis_cache: dict[str, dict[str, Any]] = {}
+_SYNTHESIS_CACHE_MAX = 32
+
+
+def _get_voice_surface() -> VoiceSurface:
+    global _voice_surface_singleton
+    if _voice_surface_singleton is None:
+        _voice_surface_singleton = VoiceSurface()
+    return _voice_surface_singleton
+
+
 def build_voice_state(snapshot: dict[str, Any]) -> dict[str, Any]:
     try:
-        result = VoiceSurface().compose(snapshot)
+        result = _get_voice_surface().compose(snapshot)
         state = result.to_dict()
         # Log warning if health probe failed (exception swallowed in background thread)
         health = state.get("health") or {}
