@@ -12,45 +12,34 @@ function defaultRuntimeUrl() {
 export const API_BASE = window.RUNTIME_URL || import.meta.env.VITE_RUNTIME_URL || defaultRuntimeUrl();
 
 let _lastPlayedUtteranceId = '';
-// Singleton AudioContext that stays unlocked after first user gesture
-let _audioCtx = null;
+let _audioUnlocked = false;
+let _pendingUrl = null;
 
-function _getAudioCtx() {
-  if (!_audioCtx || _audioCtx.state === 'closed') {
-    _audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-  }
-  return _audioCtx;
-}
-
-// Unlock AudioContext on first user interaction (required by Firefox autoplay policy)
-function _unlockAudio() {
-  const ctx = _getAudioCtx();
-  if (ctx.state === 'suspended') {
-    ctx.resume().catch(() => {});
-  }
-  document.removeEventListener('click', _unlockAudio);
-  document.removeEventListener('keydown', _unlockAudio);
-  document.removeEventListener('touchstart', _unlockAudio);
-}
-document.addEventListener('click', _unlockAudio, { once: true });
-document.addEventListener('keydown', _unlockAudio, { once: true });
-document.addEventListener('touchstart', _unlockAudio, { once: true });
-
-function _playAudioBuffer(buf) {
-  if (!buf) return;
-  const ctx = _getAudioCtx();
-  const resume = ctx.state === 'suspended' ? ctx.resume() : Promise.resolve();
-  resume.then(() => {
-    ctx.decodeAudioData(buf.slice(0), (decoded) => {
-      const src = ctx.createBufferSource();
-      src.buffer = decoded;
-      src.connect(ctx.destination);
-      src.start(0);
-    }, (err) => {
-      // WAV decode failed — ignore silently
+function _playAudioUrl(url) {
+  const audio = new Audio(url);
+  audio.volume = 1.0;
+  const p = audio.play();
+  if (p && p.catch) {
+    p.catch((err) => {
+      console.warn('[god-audio] autoplay blocked:', err.message, '— click page to enable audio');
+      _pendingUrl = url;
+      useObserverStore.getState().setAudioBlocked(true);
     });
-  }).catch(() => {});
+  }
 }
+
+function _unlockAndPlay() {
+  _audioUnlocked = true;
+  useObserverStore.getState().setAudioBlocked(false);
+  if (_pendingUrl) {
+    const url = _pendingUrl;
+    _pendingUrl = null;
+    _playAudioUrl(url);
+  }
+}
+
+document.addEventListener('click', _unlockAndPlay, { once: true });
+document.addEventListener('keydown', _unlockAndPlay, { once: true });
 
 export function useWorld() {
   const setAgents = useObserverStore((s) => s.setAgents);
@@ -105,10 +94,7 @@ export function useWorld() {
           const synthOk = snap?.voice?.synthesis?.ok;
           if (uid && synthOk && uid !== _lastPlayedUtteranceId) {
             _lastPlayedUtteranceId = uid;
-            fetch(`${API_BASE}/voice/audio/${uid}`)
-              .then((r) => r.ok ? r.arrayBuffer() : null)
-              .then((buf) => _playAudioBuffer(buf))
-              .catch(() => {});
+            _playAudioUrl(`${API_BASE}/voice/audio/${uid}`);
           }
         } else {
           ok = false;

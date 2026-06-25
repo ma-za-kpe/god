@@ -446,6 +446,39 @@ body {
   letter-spacing: 0.08em;
 }
 
+.audio-unlock-badge {
+  position: fixed;
+  z-index: 100;
+  bottom: 18px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: grid;
+  gap: 2px;
+  padding: 10px 20px;
+  border: 1px solid rgba(244, 201, 93, 0.55);
+  border-radius: 999px;
+  background: rgba(5, 7, 18, 0.92);
+  backdrop-filter: blur(8px);
+  cursor: pointer;
+  animation: audioNudge 1.6s ease-in-out infinite;
+  text-align: center;
+}
+.audio-unlock-badge span:first-child {
+  color: var(--gold);
+  font-size: 0.62rem;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  font-weight: 700;
+}
+.audio-unlock-badge span:last-child {
+  color: var(--muted);
+  font-size: 0.7rem;
+}
+@keyframes audioNudge {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(244, 201, 93, 0); }
+  50% { box-shadow: 0 0 0 6px rgba(244, 201, 93, 0.12); }
+}
+
 .muted { color: var(--muted); }
 
 .status-strip {

@@ -51,6 +51,7 @@ export default function App() {
   const agents = useObserverStore((s) => s.agents);
   const selectedSoulId = useObserverStore((s) => s.selectedSoulId);
   const observerHealth = useObserverStore((s) => s.observerHealth);
+  const audioBlocked = useObserverStore((s) => s.audioBlocked);
   const ageMs = observerHealth.lastPollAt ? Date.now() - observerHealth.lastPollAt : Infinity;
   const live = observerHealth.ok && ageMs < 7000;
   const label = live ? 'observer live' : 'observer stale';
@@ -101,6 +102,12 @@ export default function App() {
         <span>{label}</span>
         <span>{observerHealth.lastError || (live ? 'runtime healthy' : 'waiting for runtime')}</span>
       </div>
+      {audioBlocked && (
+        <div className="audio-unlock-badge" onClick={() => useObserverStore.getState().setAudioBlocked(false)}>
+          <span>AUDIO MUTED</span>
+          <span>Click anywhere to enable voice</span>
+        </div>
+      )}
       <main className="observer-main">
         <ObserverErrorBoundary>
           <Suspense

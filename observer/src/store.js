@@ -7,10 +7,12 @@ export const useObserverStore = create((set) => ({
   snapshot: null,
   observerHealth: { ok: false, lastPollAt: 0, lastError: '' },
   selectedSoulId: null,
+  audioBlocked: false,
   setAgents: (agents) => set({ agents }),
   setEvents: (events) => set({ events }),
   setStats: (stats) => set({ stats }),
   setSnapshot: (snapshot) => set({ snapshot }),
   setObserverHealth: (observerHealth) => set({ observerHealth }),
   selectAgent: (selectedSoulId) => set({ selectedSoulId }),
+  setAudioBlocked: (audioBlocked) => set({ audioBlocked }),
 }));
