@@ -12,25 +12,56 @@ function defaultRuntimeUrl() {
 export const API_BASE = window.RUNTIME_URL || import.meta.env.VITE_RUNTIME_URL || defaultRuntimeUrl();
 
 let _lastPlayedUtteranceId = '';
-let _audioUnlocked = false;
 let _pendingUrl = null;
 
+// Singleton AudioContext — pre-unlocked in OBS CEF, unlockable in Firefox
+let _audioCtx = null;
+function _getCtx() {
+  if (!_audioCtx || _audioCtx.state === 'closed') {
+    _audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 48000 });
+  }
+  return _audioCtx;
+}
+
 function _playAudioUrl(url) {
+  // Strategy 1: HTMLAudioElement (works when user has interacted or in OBS CEF)
   const audio = new Audio(url);
   audio.volume = 1.0;
   const p = audio.play();
   if (p && p.catch) {
-    p.catch((err) => {
-      console.warn('[god-audio] autoplay blocked:', err.message, '— click page to enable audio');
-      _pendingUrl = url;
-      useObserverStore.getState().setAudioBlocked(true);
+    p.catch(() => {
+      // Strategy 2: AudioContext fetch+decode (OBS CEF has pre-unlocked AudioContext)
+      const ctx = _getCtx();
+      const resume = ctx.state === 'suspended' ? ctx.resume() : Promise.resolve();
+      resume.then(() => {
+        fetch(url)
+          .then((r) => r.ok ? r.arrayBuffer() : null)
+          .then((buf) => {
+            if (!buf) return;
+            ctx.decodeAudioData(buf, (decoded) => {
+              const src = ctx.createBufferSource();
+              src.buffer = decoded;
+              src.connect(ctx.destination);
+              src.start(0);
+              useObserverStore.getState().setAudioBlocked(false);
+            }, () => {});
+          })
+          .catch(() => {
+            _pendingUrl = url;
+            useObserverStore.getState().setAudioBlocked(true);
+          });
+      }).catch(() => {
+        _pendingUrl = url;
+        useObserverStore.getState().setAudioBlocked(true);
+      });
     });
   }
 }
 
 function _unlockAndPlay() {
-  _audioUnlocked = true;
   useObserverStore.getState().setAudioBlocked(false);
+  const ctx = _getCtx();
+  if (ctx.state === 'suspended') ctx.resume().catch(() => {});
   if (_pendingUrl) {
     const url = _pendingUrl;
     _pendingUrl = null;
