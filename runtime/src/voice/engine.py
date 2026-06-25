@@ -593,7 +593,7 @@ class VoiceSurface:
         }
 
         try:
-            response = httpx.post(synth_url, json=payload, timeout=20.0)
+            response = httpx.post(synth_url, json=payload, timeout=60.0)
             response.raise_for_status()
             content_type = response.headers.get("content-type", "")
             synthesis: dict[str, Any] = {
