@@ -604,8 +604,17 @@ class VoiceSurface:
                 "streaming": False,
             }
 
+            # Unload Ollama from GPU so fish-speech has full VRAM bandwidth
             try:
-                response = httpx.post(synth_url, json=payload, timeout=60.0)
+                _ollama = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434").rstrip("/")
+                _model = os.getenv("LLM_MODEL", "llama3.1:8b")
+                httpx.post(f"{_ollama}/api/generate", json={"model": _model, "keep_alive": 0}, timeout=8.0)
+                import time as _time; _time.sleep(1)
+            except Exception:
+                pass
+
+            try:
+                response = httpx.post(synth_url, json=payload, timeout=120.0)
                 response.raise_for_status()
                 content_type = response.headers.get("content-type", "")
                 synthesis: dict[str, Any] = {
