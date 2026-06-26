@@ -286,6 +286,13 @@ class TestProperty4ArcPressure:
         assert readable not in pressure.pressure.lower()
         assert readable not in pressure.world_stakes.lower()
 
+    def test_stopword_theme_does_not_trip_contract_assertion(self):
+        """Stop-word-only themes still produce a safe generic pressure."""
+        pressure = ArcContextBuilder().get_pressure("how")
+
+        assert pressure.pressure
+        assert pressure.world_stakes
+
     @given(
         theme=st.text(
             min_size=3, max_size=30, alphabet=st.sampled_from("abcdefghijklmnopqrstuvwxyz ")

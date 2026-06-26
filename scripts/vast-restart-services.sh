@@ -1034,6 +1034,49 @@ PY
   fi
 }
 
+youtube_go_live() {
+  if ! streaming_launch_requested; then
+    return 0
+  fi
+
+  case "${YOUTUBE_AUTO_GO_LIVE:-false}" in
+    1|true|TRUE|yes|YES|on|ON) ;;
+    *)
+      log "YouTube auto go-live disabled; OBS is streaming RTMP but YouTube may still need manual Go Live/Auto-start"
+      return 0
+      ;;
+  esac
+
+  if [ -z "${YOUTUBE_BROADCAST_ID:-}" ]; then
+    die "YOUTUBE_AUTO_GO_LIVE=true but YOUTUBE_BROADCAST_ID is not set"
+  fi
+
+  cd "$REPO_DIR/runtime"
+  source /opt/god-venv/bin/activate
+  local result=""
+  if result="$(python3 - <<'PY'
+import asyncio
+import json
+
+from src.youtube.api import ensure_broadcast_live
+
+
+async def main() -> int:
+    result = await ensure_broadcast_live()
+    print(json.dumps(result, sort_keys=True))
+    return 0 if result.get("ok") else 1
+
+
+raise SystemExit(asyncio.run(main()))
+PY
+  )"; then
+    log "YouTube go-live transition completed: ${result}"
+  else
+    die "YouTube go-live transition failed: ${result:-<no details>}"
+  fi
+  cd "$REPO_DIR"
+}
+
 start_runtime() {
   log "Starting runtime..."
   UVICORN_PIDS=$(pgrep -f "uvicorn src.main" 2>/dev/null || true)
@@ -1087,6 +1130,7 @@ run_streaming_stage() {
 run_runtime_stage() {
   start_runtime
   start_obs_stream
+  youtube_go_live
 }
 
 main() {

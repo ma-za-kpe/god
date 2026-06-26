@@ -77,9 +77,16 @@ _THEME_STOP_WORDS = {
     "into",
     "over",
     "under",
+    "for",
     "when",
     "what",
     "where",
+    "who",
+    "why",
+    "how",
+    "you",
+    "your",
+    "our",
     "while",
     "their",
 }
@@ -169,14 +176,15 @@ class ArcContextBuilder:
         )
 
         # Hard contract assertion: result must never contain the raw title
-        readable_title = normalized.replace("_", " ")
-        title_pattern = re.compile(rf"\b{re.escape(readable_title)}\b", re.IGNORECASE)
-        assert not title_pattern.search(result.pressure), (
-            f"CONTRACT VIOLATION: theme title '{readable_title}' leaked into pressure"
-        )
-        assert not title_pattern.search(result.world_stakes), (
-            f"CONTRACT VIOLATION: theme title '{readable_title}' leaked into world_stakes"
-        )
+        if _theme_terms(theme):
+            readable_title = normalized.replace("_", " ")
+            title_pattern = re.compile(rf"\b{re.escape(readable_title)}\b", re.IGNORECASE)
+            assert not title_pattern.search(result.pressure), (
+                f"CONTRACT VIOLATION: theme title '{readable_title}' leaked into pressure"
+            )
+            assert not title_pattern.search(result.world_stakes), (
+                f"CONTRACT VIOLATION: theme title '{readable_title}' leaked into world_stakes"
+            )
 
         return result
 

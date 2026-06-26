@@ -158,6 +158,8 @@ class YouTubeAdapter:
             "dry_run": self.dry_run,
             "channel_id": self.channel_id,
             "transport": self.transport,
+            "auto_go_live": _env_bool("YOUTUBE_AUTO_GO_LIVE", "false"),
+            "broadcast_id_configured": bool(os.getenv("YOUTUBE_BROADCAST_ID", "").strip()),
             "health": health,
             "supported_event_types": sorted(SUPPORTED_EVENT_TYPES),
         }
