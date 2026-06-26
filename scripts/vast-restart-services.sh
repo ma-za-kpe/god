@@ -523,21 +523,45 @@ start_firefox() {
     if [ "${1:-}" = "clean" ]; then
       rm -rf /tmp/firefox-profile
     fi
+    install -d /opt/firefox/distribution 2>/dev/null || true
+    cat >/opt/firefox/distribution/policies.json <<'JSON'
+{
+  "policies": {
+    "DisableFirefoxStudies": true,
+    "DisableTelemetry": true,
+    "DontCheckDefaultBrowser": true,
+    "NoDefaultBookmarks": true,
+    "OverrideFirstRunPage": "",
+    "OverridePostUpdatePage": "",
+    "UserMessaging": {
+      "ExtensionRecommendations": false,
+      "FeatureRecommendations": false,
+      "MoreFromMozilla": false,
+      "SkipOnboarding": true,
+      "UrlbarInterventions": false,
+      "WhatsNew": false
+    }
+  }
+}
+JSON
     install -d -o stream -g stream /tmp/firefox-profile 2>/dev/null || true
     cat >/tmp/firefox-profile/user.js <<'JS'
 user_pref("browser.startup.homepage_override.mstone", "ignore");
+user_pref("browser.startup.homepage_override.buildID", "ignore");
 user_pref("startup.homepage_welcome_url", "");
 user_pref("startup.homepage_welcome_url.additional", "");
 user_pref("browser.shell.checkDefaultBrowser", false);
 user_pref("datareporting.policy.firstRunURL", "");
 user_pref("app.update.auto", false);
 user_pref("trailhead.firstrun.branches", "nofirstrun");
+user_pref("trailhead.firstrun.didSeeAboutWelcome", true);
 user_pref("browser.terms.accepted", true);
 user_pref("browser.aboutwelcome.enabled", false);
 user_pref("browser.newtabpage.enabled", false);
 user_pref("toolkit.telemetry.reportingpolicy.firstRun", false);
 user_pref("datareporting.healthreport.uploadEnabled", false);
 user_pref("datareporting.policy.dataSubmissionEnabled", false);
+user_pref("datareporting.policy.dataSubmissionPolicyBypassNotification", true);
 user_pref("datareporting.policy.dataSubmissionPolicyAcceptedVersion", 2);
 user_pref("browser.uitour.enabled", false);
 user_pref("browser.rights.3.shown", true);
@@ -632,6 +656,7 @@ PY
 
   export OBS_CAPTURE_WINDOW_ID="$window_id"
   log "Firefox window id: ${OBS_CAPTURE_WINDOW_ID}"
+  timeout 5s env DISPLAY=:99 xdotool windowfocus "$window_id" key Return 2>/dev/null || true
 
   python3 - <<'PY'
 from pathlib import Path
