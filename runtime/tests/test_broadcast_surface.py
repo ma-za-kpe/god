@@ -82,3 +82,17 @@ def test_broadcast_status_reports_dry_run():
 
     assert status["dry_run"] is True
     assert status["transport"] == "dry-run"
+
+
+def test_broadcast_status_probes_obs_websocket_with_tcp(monkeypatch):
+    def _fake_probe_tcp(host: str, port: int, timeout: float = 1.5):
+        return {"ok": True, "probe": "tcp", "host": host, "port": port, "timeout": timeout}
+
+    monkeypatch.setenv("OBS_WEBSOCKET_URL", "ws://127.0.0.1:4444")
+    monkeypatch.setattr("broadcast.obs.probe_tcp", _fake_probe_tcp)
+
+    status = build_broadcast_status()
+
+    assert status["health"]["ok"] is True
+    assert status["health"]["probe"] == "websocket_tcp"
+    assert status["health"]["url"] == "ws://127.0.0.1:4444"

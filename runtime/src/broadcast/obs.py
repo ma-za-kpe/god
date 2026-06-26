@@ -6,13 +6,14 @@ import logging
 import os
 from dataclasses import asdict, dataclass, field
 from typing import Any
+from urllib.parse import urlparse
 
 log = logging.getLogger("god.broadcast.obs")
 
 try:  # pragma: no cover - runtime package import path
-    from ..health_checks import probe_url
+    from ..health_checks import probe_tcp, probe_url
 except ImportError:  # pragma: no cover - flat test path
-    from health_checks import probe_url
+    from health_checks import probe_tcp, probe_url
 
 try:  # pragma: no cover - runtime package import path
     from .captions import build_caption
@@ -28,6 +29,17 @@ except ImportError:  # pragma: no cover - flat test path
 
 def _env_bool(name: str, default: str = "true") -> bool:
     return os.getenv(name, default).lower() in ("1", "true", "yes", "on")
+
+
+def _probe_obs_health(url: str | None) -> dict[str, Any]:
+    parsed = urlparse(url or "")
+    if parsed.scheme in {"ws", "wss"} and parsed.hostname:
+        port = parsed.port or (443 if parsed.scheme == "wss" else 80)
+        result = probe_tcp(parsed.hostname, port, timeout=1.5)
+        result["probe"] = "websocket_tcp"
+        result["url"] = url
+        return result
+    return probe_url(url, timeout=1.5)
 
 
 @dataclass(frozen=True)
@@ -227,7 +239,7 @@ class BroadcastSurface:
         return {"dry_run": False, "ok": True, "summary": state.summary, "results": results}
 
     def status(self) -> dict[str, Any]:
-        health = probe_url(os.getenv("OBS_WEBSOCKET_URL"), timeout=1.5)
+        health = _probe_obs_health(os.getenv("OBS_WEBSOCKET_URL"))
         return {
             "enabled": self.enabled,
             "dry_run": self.dry_run,
