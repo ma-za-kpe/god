@@ -345,6 +345,10 @@ async def _fish_synthesis_ready() -> dict:
     endpoint = os.getenv("VOICE_HEALTH_URL") or os.getenv("TTS_ENDPOINT")
     if not endpoint:
         return {"ok": False, "probe": "skipped", "reason": "not_configured"}
+    try:
+        timeout_seconds = max(1.0, float(os.getenv("VOICE_HEALTH_TIMEOUT_SECONDS", "90")))
+    except ValueError:
+        timeout_seconds = 90.0
     seed_path = pathlib.Path(__file__).resolve().parents[1] / "seed_utterances" / "philosopher.wav"
     if not seed_path.is_file():
         return {"ok": False, "probe": "tts", "reason": "seed_utterance_missing"}
@@ -360,7 +364,7 @@ async def _fish_synthesis_ready() -> dict:
             "format": "wav",
             "streaming": False,
         }
-        async with httpx.AsyncClient(timeout=20.0) as client:
+        async with httpx.AsyncClient(timeout=timeout_seconds) as client:
             response = await client.post(f"{endpoint.rstrip('/')}/v1/tts", json=payload)
             if not 200 <= response.status_code < 300:
                 return {
@@ -375,13 +379,15 @@ async def _fish_synthesis_ready() -> dict:
                 "probe": "tts",
                 "endpoint": f"{endpoint.rstrip('/')}/v1/tts",
                 "byte_count": len(response.content or b""),
+                "timeout_seconds": timeout_seconds,
             }
     except Exception as exc:
         return {
             "ok": False,
             "probe": "tts",
             "endpoint": f"{endpoint.rstrip('/')}/v1/tts",
-            "reason": str(exc),
+            "reason": str(exc) or exc.__class__.__name__,
+            "timeout_seconds": timeout_seconds,
         }
 
 
