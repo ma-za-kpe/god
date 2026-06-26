@@ -147,12 +147,48 @@ Confirmed:
 - Vast restart script starts Fish in the voice stage: `scripts/vast-restart-services.sh:982-984`.
 - Vast restart script unloads Ollama models before starting Fish: `scripts/vast-restart-services.sh:393-402`.
 
+### Current Vast.ai Operator Config
+
+Confirmed from operator command supplied on 2026-06-26:
+
+```bash
+ssh -p 18516 root@209.137.198.14 -L 8080:localhost:8080
+```
+
+- SSH target: `root@209.137.198.14`.
+- SSH port: `18516`.
+- Local tunnel: local `localhost:8080` forwards to Vast host `localhost:8080`.
+- Operator browser/API entrypoint after connecting: `http://localhost:8080`.
+- Vast host-network compose config keeps runtime-side service URLs on host-local endpoints: `docker-compose.vast-hostnet.yml:17-29`.
+
+Inference:
+
+- This is an operator-access tunnel, not the service-to-service runtime config.
+- Runtime-side service URLs on the Vast host should stay host-local when using host networking:
+  - `COMFYUI_ENDPOINT=http://localhost:8188`
+  - `TTS_ENDPOINT=http://localhost:7860`
+  - `VOICE_HEALTH_URL=http://localhost:7860`
+  - `AVATAR_HEALTH_URL=http://localhost:8188`
+  - `OLLAMA_BASE_URL=http://localhost:11434`
+  - `NATS_URL=nats://localhost:4222`
+  - `REDIS_URL=redis://localhost:6379`
+  - `IPFS_API=http://localhost:5001`
+  - `DATABASE_URL=postgresql://god:${POSTGRES_PASSWORD}@localhost:5432/god`
+
+Operational notes:
+
+- The tunnel only exposes remote port `8080` locally. It does not directly expose runtime `8888`, ComfyUI `8188`, Fish `7860`, Ollama `11434`, Postgres `5432`, Redis `6379`, NATS `4222`, or IPFS API `5001`.
+- If port `8080` is an nginx/operator gateway, it should proxy only the surfaces intended for remote operation and leave GPU, model, database, and queue services bound to remote localhost.
+- Do not publish `8188`, `7860`, `11434`, `5432`, `6379`, `4222`, or `5001` directly on the public Vast interface.
+- For direct diagnostics, use additional short-lived SSH tunnels instead of opening host firewall ports.
+
 Risks:
 
 - Local Docker and Vast deployment disagree on Fish device mode: Compose uses CPU, Vast requires CUDA.
 - Local host port for Fish is `8090`, but several runtime defaults and checks use `7860`.
 - `POST /creator/genesis` hardcodes ComfyUI `localhost:8188` and Fish `localhost:7860` instead of using configured endpoints: `runtime/src/main.py:1611-1624`.
 - Runtime `/ready` also hardcodes ComfyUI localhost probe and nginx probes: `runtime/src/main.py:395-407`.
+- Non-host-network Vast Compose publishes Ollama as `11434:11434`: `docker-compose.vast.yml:23`. If the Vast firewall exposes that port, the Ollama API could be reachable publicly.
 
 ## Readiness / Health Checks
 
