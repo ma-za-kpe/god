@@ -15,6 +15,7 @@ import httpx
 log = logging.getLogger("god.services.client")
 
 RUNTIME_BASE_URL = os.getenv("RUNTIME_BASE_URL", "http://localhost:8888")
+MOCK_PAYMENT_PREFIX = "mock-x402:"
 
 
 @dataclass(frozen=True)
@@ -24,6 +25,16 @@ class InvokeResult:
     body: dict | None = None
     tx_hash: str = ""
     error: str = ""
+
+
+def _mock_payments_enabled() -> bool:
+    return os.getenv("MOCK_X402_PAYMENTS", "false").lower() in {"1", "true", "yes", "on"}
+
+
+def _payment_authorization_header(payer_wallet: str) -> str:
+    if _mock_payments_enabled():
+        return f"{MOCK_PAYMENT_PREFIX}{payer_wallet}"
+    return os.getenv("X402_PAYMENT_AUTHORIZATION", "").strip()
 
 
 async def invoke_x402_service(
@@ -40,8 +51,6 @@ async def invoke_x402_service(
     if not payer_wallet:
         return InvokeResult(ok=False, error="missing_payer_wallet")
 
-    headers = {"X-Payment-Authorization": payer_wallet}
-
     try:
         async with httpx.AsyncClient(timeout=timeout_s) as client:
             first = await client.get(resource_url)
@@ -53,6 +62,14 @@ async def invoke_x402_service(
                 )
 
             if first.status_code == 402:
+                payment_header = _payment_authorization_header(payer_wallet)
+                if not payment_header:
+                    return InvokeResult(
+                        ok=False,
+                        status_code=402,
+                        error="x402_payment_signer_unavailable",
+                    )
+                headers = {"X-Payment-Authorization": payment_header}
                 paid = await client.get(resource_url, headers=headers)
                 if paid.status_code != 200:
                     return InvokeResult(

@@ -7,11 +7,23 @@ import mimetypes
 import os
 from pathlib import Path
 from http.server import HTTPServer, SimpleHTTPRequestHandler
+from urllib.parse import unquote, urlsplit
 
 _ROOT = os.path.dirname(os.path.abspath(__file__))
 _DIST = Path(_ROOT) / "dist"
 _SOURCE = Path(_ROOT)
+_DIST_ROOT = _DIST.resolve()
+_SOURCE_ROOT = _SOURCE.resolve()
 _ALLOW_ORIGIN = os.getenv("OBSERVER_ALLOW_ORIGIN", "").strip()
+
+
+def _contained_path(root: Path, request_path: str) -> Path | None:
+    try:
+        candidate = (root / request_path.lstrip("/")).resolve()
+        candidate.relative_to(root)
+    except (OSError, ValueError):
+        return None
+    return candidate
 
 
 class ObserverHandler(SimpleHTTPRequestHandler):
@@ -37,7 +49,10 @@ class ObserverHandler(SimpleHTTPRequestHandler):
         self.wfile.write(data)
 
     def do_GET(self) -> None:
-        path = self.path.split("?", 1)[0].rstrip("/") or "/"
+        path = unquote(urlsplit(self.path).path).rstrip("/") or "/"
+        if "\x00" in path:
+            self.send_error(400, "Invalid path")
+            return
 
         if path in ("/maku", "/classic"):
             return self._serve_file(_SOURCE / "maku.html" if path == "/maku" else _SOURCE / "stage.html")
@@ -46,15 +61,19 @@ class ObserverHandler(SimpleHTTPRequestHandler):
                 return self._serve_file(_DIST / "index.html")
             return self._serve_file(_SOURCE / "index.html")
         if path.startswith("/assets/"):
-            dist_asset = _DIST / path.lstrip("/")
-            if dist_asset.exists():
+            dist_asset = _contained_path(_DIST_ROOT, path)
+            if dist_asset and dist_asset.exists():
                 return self._serve_file(dist_asset)
-            return self._serve_file(_SOURCE / path.lstrip("/"))
-        candidate = _DIST / path.lstrip("/")
-        if candidate.exists():
+            source_asset = _contained_path(_SOURCE_ROOT, path)
+            if source_asset:
+                return self._serve_file(source_asset)
+            self.send_error(404, "File not found")
+            return
+        candidate = _contained_path(_DIST_ROOT, path)
+        if candidate and candidate.exists():
             return self._serve_file(candidate)
-        candidate = _SOURCE / path.lstrip("/")
-        if candidate.exists():
+        candidate = _contained_path(_SOURCE_ROOT, path)
+        if candidate and candidate.exists():
             return self._serve_file(candidate)
         if (_DIST / "index.html").exists():
             return self._serve_file(_DIST / "index.html")

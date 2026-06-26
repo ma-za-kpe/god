@@ -22,7 +22,13 @@ from fastapi.responses import JSONResponse
 
 from ..event_emitter import get_emitter
 from ..security import deny_creator_action
-from .payment import MOCK_PAYMENTS, build_payment_required_response, verify_payment
+from .payment import (
+    MOCK_PAYMENTS,
+    NETWORK,
+    build_payment_required_response,
+    required_usdc_asset,
+    verify_payment,
+)
 from .registry import (
     deregister_service,
     get_agent_wallet,
@@ -153,6 +159,8 @@ async def call_service(
         "maxAmountRequired": str(int(price * 1_000_000)),
         "payTo": wallet,
         "resource": f"{BASE_URL}/services/{soul_id}/{service_name}",
+        "network": NETWORK,
+        "asset": required_usdc_asset(),
     }
 
     # Step 1: no payment header → return 402
@@ -231,7 +239,13 @@ async def call_service(
 def _payer_from_header(header: str | None) -> str | None:
     if not header:
         return None
-    # Mock/local headers may be plain addresses; production x402 carries structured proof.
+    # Mock/local headers are explicit; production x402 carries structured proof.
+    if header.startswith("mock-x402:"):
+        mock_payer = header.split(":", 1)[1].strip()
+        if mock_payer.startswith("0x") and len(mock_payer) >= 10:
+            return mock_payer[:42]
+        return f"mock:{mock_payer[:24]}"
+    # Legacy local headers may be plain addresses, but verification no longer accepts them.
     if header.startswith("0x") and len(header) >= 10:
         return header[:42]
     return f"x402:{header[:24]}"
@@ -248,11 +262,19 @@ def _payment_matches_requirement(result, payment_config: dict) -> bool:
         return False
 
     expected_resource = str(payment_config.get("resource") or "")
-    if result.resource and result.resource != expected_resource:
+    if not result.resource or result.resource != expected_resource:
         return False
 
     expected_pay_to = str(payment_config.get("payTo") or "").lower()
-    if result.pay_to and result.pay_to.lower() != expected_pay_to:
+    if not result.pay_to or result.pay_to.lower() != expected_pay_to:
+        return False
+
+    expected_network = str(payment_config.get("network") or "")
+    if not result.network or result.network != expected_network:
+        return False
+
+    expected_asset = str(payment_config.get("asset") or "").lower()
+    if not result.asset or result.asset.lower() != expected_asset:
         return False
 
     return True

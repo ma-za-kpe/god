@@ -230,7 +230,7 @@ configure_streaming_mode() {
     export OBS_CAPTURE_MODE=window
   fi
   if [ -z "${OBS_CAPTURE_SOURCE_KIND:-}" ]; then
-    export OBS_CAPTURE_SOURCE_KIND=xshm_input
+    export OBS_CAPTURE_SOURCE_KIND=xcomposite_input
   fi
   if [ -z "${OBS_CAPTURE_WINDOW_CLASS:-}" ]; then
     export OBS_CAPTURE_WINDOW_CLASS=Firefox
@@ -518,9 +518,13 @@ start_firefox() {
 
   ensure_browser_user
 
-  # Suppress Firefox first-run welcome page and update nags
-  install -d -o stream -g stream /tmp/firefox-profile 2>/dev/null || true
-  cat >/tmp/firefox-profile/user.js <<'JS'
+  # Suppress Firefox first-run welcome page and update nags.
+  prepare_firefox_profile() {
+    if [ "${1:-}" = "clean" ]; then
+      rm -rf /tmp/firefox-profile
+    fi
+    install -d -o stream -g stream /tmp/firefox-profile 2>/dev/null || true
+    cat >/tmp/firefox-profile/user.js <<'JS'
 user_pref("browser.startup.homepage_override.mstone", "ignore");
 user_pref("startup.homepage_welcome_url", "");
 user_pref("startup.homepage_welcome_url.additional", "");
@@ -539,7 +543,8 @@ user_pref("browser.uitour.enabled", false);
 user_pref("browser.rights.3.shown", true);
 user_pref("browser.rights.override", true);
 JS
-  chown stream:stream /tmp/firefox-profile/user.js 2>/dev/null || true
+    chown stream:stream /tmp/firefox-profile/user.js 2>/dev/null || true
+  }
 
   log "Starting Firefox on Xvfb..."
   local browser_url="${OBS_BROWSER_URL:-http://localhost:10517/stage}"
@@ -550,15 +555,55 @@ JS
       XDG_RUNTIME_DIR=/tmp/runtime-stream \
       MOZ_DISABLE_CONTENT_SANDBOX=1 \
       MOZ_WEBRENDER=0 \
-      /opt/firefox/firefox --new-instance --profile /tmp/firefox-profile --kiosk "$browser_url" \
+      /opt/firefox/firefox --new-instance --no-remote --profile /tmp/firefox-profile --width 1920 --height 1080 "$browser_url" \
       >"$LOG_DIR/firefox.log" 2>&1 &
+  }
+
+  select_firefox_window() {
+    timeout 5s env DISPLAY=:99 python3 - <<'PY'
+import subprocess
+
+def run(args):
+    try:
+        return subprocess.check_output(args, text=True, stderr=subprocess.DEVNULL).strip()
+    except Exception:
+        return ""
+
+best_id = ""
+best_area = 0
+ids = run(["xdotool", "search", "--class", "Firefox"]).split()
+for window_id in ids:
+    name = run(["xdotool", "getwindowname", window_id])
+    if name.lower().startswith("close firefox"):
+        continue
+    geom = run(["xdotool", "getwindowgeometry", "--shell", window_id])
+    values = {}
+    for line in geom.splitlines():
+        if "=" in line:
+            key, value = line.split("=", 1)
+            values[key] = value
+    try:
+        width = int(values.get("WIDTH", "0"))
+        height = int(values.get("HEIGHT", "0"))
+    except ValueError:
+        continue
+    area = width * height
+    if width < 640 or height < 360:
+        continue
+    if area > best_area:
+        best_id = window_id
+        best_area = area
+
+print(best_id)
+PY
   }
 
   if ! ensure_xvfb_display; then
     die "Xvfb display :99 not ready"
   fi
 
-  if ! pgrep -u stream -f '/opt/firefox/firefox --new-instance --profile /tmp/firefox-profile --kiosk' >/dev/null 2>&1; then
+  if ! pgrep -u stream -f '/opt/firefox/firefox' >/dev/null 2>&1; then
+    prepare_firefox_profile clean
     launch_firefox
   else
     log "Firefox already running"
@@ -567,15 +612,16 @@ JS
   local window_id=""
   local tried_restart=0
   for _ in $(seq 1 30); do
-    window_id="$(timeout 3s env DISPLAY=:99 xdotool search --all --class Firefox 2>/dev/null | head -1 || true)"
+    window_id="$(select_firefox_window || true)"
     if [ -n "${window_id:-}" ]; then
       break
     fi
     if [ "$tried_restart" -eq 0 ]; then
       tried_restart=1
-      log "Firefox window not found; relaunching browser once"
-      pkill -9 -u stream -f '/opt/firefox/firefox --new-instance --profile /tmp/firefox-profile --kiosk' 2>/dev/null || true
+      log "Firefox content window not found; relaunching browser once"
+      pkill -9 -u stream -f '/opt/firefox/firefox' 2>/dev/null || true
       sleep 2
+      prepare_firefox_profile clean
       launch_firefox
     fi
     sleep 2
@@ -677,9 +723,18 @@ try:
                 if r.get("message-id") == str(_mid): return r
             except Exception: break
         return {}
-    r = _call("SetSourceSettings", sourceName=SOURCE_NAME,
-        sourceSettings={"capture_window": window_id, "CaptureCursor": 0})
-    print(f"OBS live source update: {r.get('status')}")
+    current = _call("GetSourceSettings", sourceName=SOURCE_NAME)
+    current_type = current.get("sourceType") or current.get("type") or ""
+    if current_type and current_type != SOURCE_KIND:
+        Path("/tmp/god-obs-restart-required").write_text(
+            f"{SOURCE_NAME}: {current_type} -> {SOURCE_KIND}\n",
+            encoding="utf-8",
+        )
+        print(f"OBS source type mismatch: {current_type} -> {SOURCE_KIND}; restart required")
+    else:
+        r = _call("SetSourceSettings", sourceName=SOURCE_NAME,
+            sourceSettings={"capture_window": window_id, "CaptureCursor": 0})
+        print(f"OBS live source update: {r.get('status')}")
     ws2.close()
 except Exception as e:
     print(f"OBS websocket not ready yet (will pick up scene file on start): {e}")
@@ -830,7 +885,13 @@ PY
   force_obs_keyframes
 
   if pgrep -x obs >/dev/null 2>&1; then
-    if obs_websocket_ready; then
+    if [ -f /tmp/god-obs-restart-required ]; then
+      log "OBS source type changed; restarting OBS"
+      rm -f /tmp/god-obs-restart-required
+      pkill -9 -x obs 2>/dev/null || true
+      fuser -k 4444/tcp 2>/dev/null || true
+      sleep 5
+    elif obs_websocket_ready; then
       log "OBS already running and websocket responsive"
       return 0
     fi

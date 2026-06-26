@@ -18,7 +18,8 @@ class _FakeResponse:
 
 
 @pytest.mark.asyncio
-async def test_invoke_completes_402_flow():
+async def test_invoke_completes_402_flow(monkeypatch):
+    monkeypatch.setenv("MOCK_X402_PAYMENTS", "true")
     responses = [
         _FakeResponse(402, {"error": "Payment Required"}),
         _FakeResponse(200, {"service": "world_stats", "status": "ok"}),
@@ -35,6 +36,27 @@ async def test_invoke_completes_402_flow():
     assert result.status_code == 200
     assert result.body["service"] == "world_stats"
     assert mock_client.get.call_count == 2
+    assert mock_client.get.call_args_list[1].kwargs["headers"] == {
+        "X-Payment-Authorization": "mock-x402:0xabc"
+    }
+
+
+@pytest.mark.asyncio
+async def test_invoke_rejects_402_without_signer(monkeypatch):
+    monkeypatch.delenv("MOCK_X402_PAYMENTS", raising=False)
+    monkeypatch.delenv("X402_PAYMENT_AUTHORIZATION", raising=False)
+    mock_client = AsyncMock()
+    mock_client.get = AsyncMock(return_value=_FakeResponse(402, {"error": "Payment Required"}))
+    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+    mock_client.__aexit__ = AsyncMock(return_value=False)
+
+    with patch("services.client.httpx.AsyncClient", return_value=mock_client):
+        result = await invoke_x402_service("http://localhost:8888/services/s1/world_stats", "0xabc")
+
+    assert not result.ok
+    assert result.status_code == 402
+    assert result.error == "x402_payment_signer_unavailable"
+    assert mock_client.get.call_count == 1
 
 
 @pytest.mark.asyncio

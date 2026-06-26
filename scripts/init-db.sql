@@ -453,12 +453,23 @@ CREATE TABLE IF NOT EXISTS agent_registered_tools (
     description     TEXT NOT NULL DEFAULT '',
     handler_type    TEXT NOT NULL DEFAULT 'local',
     input_schema    JSONB NOT NULL DEFAULT '{}',
-    cost_usdc       NUMERIC(18,6) NOT NULL DEFAULT 0.001,
+    cost_usdc       NUMERIC(18,6) NOT NULL DEFAULT 0.001 CHECK (cost_usdc > 0),
     calls_served    BIGINT NOT NULL DEFAULT 0,
     is_active       BOOLEAN NOT NULL DEFAULT true,
     created_at      BIGINT NOT NULL,
     world_id        TEXT NOT NULL DEFAULT 'local-dev-world-1'
 );
+
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint
+        WHERE conname = 'agent_registered_tools_cost_positive'
+    ) THEN
+        ALTER TABLE agent_registered_tools
+          ADD CONSTRAINT agent_registered_tools_cost_positive CHECK (cost_usdc > 0);
+    END IF;
+END $$;
 
 CREATE TABLE IF NOT EXISTS agent_graph_mutations (
     mutation_id     TEXT PRIMARY KEY,

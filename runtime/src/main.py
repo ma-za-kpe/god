@@ -33,6 +33,18 @@ logging.basicConfig(
 )
 log = logging.getLogger("god.runtime")
 
+
+def _env_int(name: str, default: int) -> int:
+    try:
+        value = int(os.getenv(name, str(default)))
+    except ValueError:
+        return default
+    return max(1, value)
+
+
+PUBLIC_IPFS_MAX_BYTES = _env_int("PUBLIC_IPFS_MAX_BYTES", 8 * 1024 * 1024)
+PUBLIC_VOICE_AUDIO_MAX_BYTES = _env_int("PUBLIC_VOICE_AUDIO_MAX_BYTES", 10 * 1024 * 1024)
+
 # Runtime version is loaded from the canonical file (single source of truth, managed via release process).
 # This replaces manual hard-coded strings in FastAPI + /health.
 # See docs/79-documentation-release.md and scripts for how releases bump this + tag.
@@ -776,6 +788,8 @@ async def voice_audio(utterance_id: str):
     audio = get_cached_audio(utterance_id)
     if audio is None:
         return FastResponse(status_code=404, content=b"")
+    if len(audio) > PUBLIC_VOICE_AUDIO_MAX_BYTES:
+        return FastResponse(status_code=413, content=b"")
     return FastResponse(
         content=audio,
         media_type="audio/wav",
@@ -793,19 +807,36 @@ async def ipfs_proxy(cid: str):
     if not cid or len(cid) > 160 or any(ch in cid for ch in "/\\?&#"):
         return FastResponse(status_code=400, content=b"")
 
+    async def _cat_limited(client: httpx.AsyncClient, method: str) -> tuple[int, bytes]:
+        chunks: list[bytes] = []
+        total = 0
+        async with client.stream(
+            method,
+            f"{ipfs_api}/api/v0/cat",
+            params={"arg": cid},
+        ) as response:
+            if response.status_code != 200:
+                return response.status_code, b""
+            async for chunk in response.aiter_bytes():
+                total += len(chunk)
+                if total > PUBLIC_IPFS_MAX_BYTES:
+                    return 413, b""
+                chunks.append(chunk)
+        return 200, b"".join(chunks)
+
     ipfs_api = (os.getenv("IPFS_API") or "http://localhost:5001").rstrip("/")
     try:
         async with httpx.AsyncClient(timeout=15.0) as client:
-            r = await client.post(f"{ipfs_api}/api/v0/cat", params={"arg": cid})
-            if r.status_code == 405:
-                r = await client.get(f"{ipfs_api}/api/v0/cat", params={"arg": cid})
-            if r.status_code != 200 or not r.content:
+            status_code, content = await _cat_limited(client, "POST")
+            if status_code == 405:
+                status_code, content = await _cat_limited(client, "GET")
+            if status_code == 413:
+                return FastResponse(status_code=413, content=b"")
+            if status_code != 200 or not content:
                 return FastResponse(status_code=404, content=b"")
-            content_type = (
-                "image/png" if r.content[:4] == b"\x89PNG" else "application/octet-stream"
-            )
+            content_type = "image/png" if content[:4] == b"\x89PNG" else "application/octet-stream"
             return FastResponse(
-                content=r.content,
+                content=content,
                 media_type=content_type,
                 headers={
                     "Cache-Control": "public, max-age=3600",

@@ -59,6 +59,14 @@ contract RentCollectorTest is Test {
         usdc.approve(address(rent), type(uint256).max);
     }
 
+    function _executeEndWorld() internal {
+        vm.prank(creator);
+        rent.queueEndWorld("test");
+        vm.warp(block.timestamp + 30 days + 1);
+        vm.prank(creator);
+        rent.executeEndWorld("test");
+    }
+
     // ─── Registration ─────────────────────────────────────────────────
 
     function test_RegisterAgent() public {
@@ -332,6 +340,35 @@ contract RentCollectorTest is Test {
         rent.executeEndWorld("financial unsustainability");
 
         assertTrue(rent.worldEnded());
+    }
+
+    function test_RevertIf_RegisterAgentAfterWorldEnded() public {
+        _executeEndWorld();
+
+        vm.prank(creator);
+        vm.expectRevert(RentCollector.WorldAlreadyEnded.selector);
+        rent.registerAgent(SOUL_ID, agentWallet);
+    }
+
+    function test_RevertIf_CollectRentAfterWorldEnded() public {
+        vm.prank(creator);
+        rent.registerAgent(SOUL_ID, agentWallet);
+        _executeEndWorld();
+
+        vm.warp(block.timestamp + RENT_PERIOD + 1);
+        vm.expectRevert(RentCollector.WorldAlreadyEnded.selector);
+        rent.collectRent(SOUL_ID);
+    }
+
+    function test_RevertIf_CollectRentBatchAfterWorldEnded() public {
+        vm.prank(creator);
+        rent.registerAgent(SOUL_ID, agentWallet);
+        _executeEndWorld();
+
+        bytes32[] memory ids = new bytes32[](1);
+        ids[0] = SOUL_ID;
+        vm.expectRevert(RentCollector.WorldAlreadyEnded.selector);
+        rent.collectRentBatch(ids);
     }
 
     function test_RevertIf_ExecuteEndWorldBeforeTimelock() public {

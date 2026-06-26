@@ -216,6 +216,69 @@ def _mark_offer_settled(message_id: str, settlement: dict) -> None:
         conn.close()
 
 
+def _claim_offer_settlement(message_id: str, acceptance_message_id: str) -> bool:
+    conn = _db()
+    cur = conn.cursor()
+    try:
+        cur.execute(
+            """
+            UPDATE agent_messages
+            SET metadata = COALESCE(metadata, '{}'::jsonb) || %s::jsonb
+            WHERE message_id = %s
+              AND COALESCE(metadata->>'status', 'open') = 'open'
+            RETURNING message_id
+            """,
+            (
+                json.dumps(
+                    {
+                        "status": "settling",
+                        "settlement_claimed_by": acceptance_message_id,
+                        "settlement_claimed_at": int(time.time()),
+                    }
+                ),
+                message_id,
+            ),
+        )
+        claimed = cur.fetchone() is not None
+        conn.commit()
+        return claimed
+    finally:
+        cur.close()
+        conn.close()
+
+
+def _reopen_offer_after_failed_settlement(
+    message_id: str, acceptance_message_id: str, error: str
+) -> None:
+    conn = _db()
+    cur = conn.cursor()
+    try:
+        cur.execute(
+            """
+            UPDATE agent_messages
+            SET metadata = COALESCE(metadata, '{}'::jsonb) || %s::jsonb
+            WHERE message_id = %s
+              AND metadata->>'status' = 'settling'
+              AND metadata->>'settlement_claimed_by' = %s
+            """,
+            (
+                json.dumps(
+                    {
+                        "status": "open",
+                        "last_settlement_error": error[:120],
+                        "last_settlement_failed_at": int(time.time()),
+                    }
+                ),
+                message_id,
+                acceptance_message_id,
+            ),
+        )
+        conn.commit()
+    finally:
+        cur.close()
+        conn.close()
+
+
 async def try_settle_acceptance(
     accepter_id: str,
     acceptance_message_id: str,
@@ -253,14 +316,21 @@ async def try_settle_acceptance(
     else:
         payer_id, payee_id = offeree, offerer
 
-    result = await execute_transfer(
-        payer_id,
-        payee_id,
-        amount,
-        reason="offer_accepted",
-        emitter=emitter,
-        narrative=None,
-    )
+    if not _claim_offer_settlement(offer_id, acceptance_message_id):
+        return {"ok": False, "error": "offer_already_settling_or_settled"}
+
+    try:
+        result = await execute_transfer(
+            payer_id,
+            payee_id,
+            amount,
+            reason="offer_accepted",
+            emitter=emitter,
+            narrative=None,
+        )
+    except Exception:
+        _reopen_offer_after_failed_settlement(offer_id, acceptance_message_id, "transfer_exception")
+        raise
     if result.get("ok"):
         _mark_offer_settled(
             offer_id, {"amount_usdc": amount, "acceptance_id": acceptance_message_id}
@@ -289,6 +359,9 @@ async def try_settle_acceptance(
                 "error": result.get("error"),
                 "narrative": f"Deal failed: {result.get('error', 'unknown')}",
             },
+        )
+        _reopen_offer_after_failed_settlement(
+            offer_id, acceptance_message_id, str(result.get("error") or "transfer_failed")
         )
         from .messaging import _update_reputation
 

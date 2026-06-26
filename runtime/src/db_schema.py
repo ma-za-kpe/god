@@ -65,7 +65,7 @@ _MIGRATIONS: list[str] = [
         description     TEXT NOT NULL DEFAULT '',
         handler_type    TEXT NOT NULL DEFAULT 'local',
         input_schema    JSONB NOT NULL DEFAULT '{}',
-        cost_usdc       NUMERIC(18,6) NOT NULL DEFAULT 0.001,
+        cost_usdc       NUMERIC(18,6) NOT NULL DEFAULT 0.001 CHECK (cost_usdc > 0),
         calls_served    BIGINT NOT NULL DEFAULT 0,
         is_active       BOOLEAN NOT NULL DEFAULT true,
         created_at      BIGINT NOT NULL,
@@ -117,6 +117,18 @@ _MIGRATIONS: list[str] = [
     "CREATE INDEX IF NOT EXISTS idx_events_agent_type_ts ON events(agent_id, event_type, timestamp DESC)",
     "CREATE INDEX IF NOT EXISTS idx_agents_world_alive_birth ON agents(world_id, is_alive, birth_timestamp)",
     "CREATE INDEX IF NOT EXISTS idx_messages_world_sent_at ON agent_messages(world_id, sent_at DESC)",
+    """
+    DO $$
+    BEGIN
+        IF NOT EXISTS (
+            SELECT 1 FROM pg_constraint
+            WHERE conname = 'agent_registered_tools_cost_positive'
+        ) THEN
+            ALTER TABLE agent_registered_tools
+              ADD CONSTRAINT agent_registered_tools_cost_positive CHECK (cost_usdc > 0);
+        END IF;
+    END $$;
+    """,
     """
     CREATE UNIQUE INDEX IF NOT EXISTS idx_ext_payments_x402_tx
         ON external_payments(tx_hash)

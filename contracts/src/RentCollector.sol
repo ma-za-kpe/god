@@ -134,6 +134,11 @@ contract RentCollector is ReentrancyGuard {
         _;
     }
 
+    modifier whenWorldActive() {
+        if (worldEnded) revert WorldAlreadyEnded();
+        _;
+    }
+
     // ─── Constructor ──────────────────────────────────────────────────
 
     /**
@@ -173,7 +178,7 @@ contract RentCollector is ReentrancyGuard {
      *         Mints a SoulNFT to the agent's wallet — the NFT IS the agent's identity.
      * @dev Only creator can register agents (runtime uses creator key).
      */
-    function registerAgent(bytes32 soulId, address agentWallet) external onlyCreator {
+    function registerAgent(bytes32 soulId, address agentWallet) external onlyCreator whenWorldActive {
         if (agentWallet == address(0)) revert ZeroAddress();
         if (leases[soulId].active) revert AgentAlreadyRegistered();
         if (address(soulNft) == address(0)) revert SoulNFTNotSet();
@@ -197,7 +202,7 @@ contract RentCollector is ReentrancyGuard {
      * @notice Collect rent from an agent. Anyone can call this.
      *         If the agent can pay, great. If not, increment missed count.
      */
-    function collectRent(bytes32 soulId) external nonReentrant {
+    function collectRent(bytes32 soulId) external nonReentrant whenWorldActive {
         AgentLease storage lease = leases[soulId];
         if (!lease.active) revert AgentNotActive();
         if (block.timestamp < lease.lastPaid + rentPeriod) revert RentNotDueYet();
@@ -237,7 +242,7 @@ contract RentCollector is ReentrancyGuard {
     /**
      * @notice Batch collect rent for multiple agents in one tx (gas efficient).
      */
-    function collectRentBatch(bytes32[] calldata soulIds) external nonReentrant {
+    function collectRentBatch(bytes32[] calldata soulIds) external nonReentrant whenWorldActive {
         for (uint256 i = 0; i < soulIds.length; i++) {
             AgentLease storage lease = leases[soulIds[i]];
             if (!lease.active) continue;

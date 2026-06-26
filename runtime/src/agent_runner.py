@@ -1002,9 +1002,14 @@ async def _execute_action(agent: dict, action: dict, emitter) -> None:
 
             tname = str(action.get("tool_name") or action.get("service_name") or "tool")
             tdesc = str(action.get("tool_description") or action.get("service_description") or "")
-            cost = float(action.get("tool_cost_usdc") or 0.001)
-            result = register_agent_tool(soul_id, tname, tdesc, cost)
-            log_action(soul_id, act_type, action, result)
+            try:
+                cost = float(action.get("tool_cost_usdc") or 0.001)
+                result = register_agent_tool(soul_id, tname, tdesc, cost)
+            except (TypeError, ValueError) as exc:
+                result = {"error": str(exc), "tool_name": tname}
+            log_action(soul_id, act_type, action, result, success="error" not in result)
+            if "error" in result:
+                return
             await emitter.emit(
                 "economy",
                 "tool.registered",

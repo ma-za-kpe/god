@@ -25,12 +25,34 @@ def test_mock_mode_is_off_by_default(monkeypatch):
 @pytest.mark.asyncio
 async def test_mock_mode_accepts_payment(monkeypatch):
     payment = _reload_payment(monkeypatch, mock_env="true")
-    result = await payment.verify_payment("header", {"maxAmountRequired": "123"})
+    result = await payment.verify_payment(
+        "mock-x402:0xabc",
+        {
+            "maxAmountRequired": "123",
+            "resource": "http://runtime/services/s1/world_stats",
+            "payTo": "0xpayee",
+            "network": "base-sepolia",
+            "asset": payment.USDC_BASE_SEPOLIA,
+        },
+    )
 
     assert result.is_valid is True
     assert result.transaction_hash == "0x" + "0" * 64
     assert result.amount_paid == "123"
+    assert result.resource == "http://runtime/services/s1/world_stats"
+    assert result.pay_to == "0xpayee"
+    assert result.network == "base-sepolia"
+    assert result.asset == payment.USDC_BASE_SEPOLIA
     assert result.error == ""
+
+
+@pytest.mark.asyncio
+async def test_mock_mode_rejects_plain_wallet_header(monkeypatch):
+    payment = _reload_payment(monkeypatch, mock_env="true")
+    result = await payment.verify_payment("0xabc", {"maxAmountRequired": "123"})
+
+    assert result.is_valid is False
+    assert result.error == "mock x402 payments require a mock-x402 header"
 
 
 @pytest.mark.asyncio

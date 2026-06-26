@@ -13,6 +13,7 @@ from dataclasses import dataclass
 log = logging.getLogger("god.services.payment")
 
 MOCK_PAYMENTS = os.getenv("MOCK_X402_PAYMENTS", "false").lower() in {"1", "true", "yes", "on"}
+MOCK_PAYMENT_PREFIX = "mock-x402:"
 USDC_BASE_SEPOLIA = "0x036CbD53842c5426634e7929541eC2318f3dCF7e"
 USDC_BASE_MAINNET = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"
 NETWORK = os.getenv("CHAIN_NETWORK", "base-sepolia")
@@ -46,6 +47,16 @@ def _load_sdk_verifier():
     return sdk_verify
 
 
+def required_usdc_asset() -> str:
+    return USDC_BASE_MAINNET if NETWORK == "base" else USDC_BASE_SEPOLIA
+
+
+def _mock_payment_header_valid(payment_header: str) -> bool:
+    return payment_header.startswith(MOCK_PAYMENT_PREFIX) and bool(
+        payment_header[len(MOCK_PAYMENT_PREFIX) :].strip()
+    )
+
+
 async def verify_payment(payment_header: str, payment_config: dict) -> PaymentResult:
     """
     Verify an x402 payment header.
@@ -60,6 +71,13 @@ async def verify_payment(payment_header: str, payment_config: dict) -> PaymentRe
         )
 
     if MOCK_PAYMENTS:
+        if not _mock_payment_header_valid(payment_header):
+            return PaymentResult(
+                is_valid=False,
+                transaction_hash="",
+                amount_paid="0",
+                error="mock x402 payments require a mock-x402 header",
+            )
         log.warning("Mock x402 payment accepted because MOCK_X402_PAYMENTS is enabled")
         return PaymentResult(
             is_valid=True,
@@ -116,7 +134,7 @@ def build_payment_required_response(
     """Build the 402 response body telling the caller what payment is required."""
     # Convert USDC float to 6-decimal integer string (USDC has 6 decimals)
     amount_atomic = str(int(price_usdc * 1_000_000))
-    asset = USDC_BASE_MAINNET if NETWORK == "base" else USDC_BASE_SEPOLIA
+    asset = required_usdc_asset()
 
     return {
         "x402Version": 1,
