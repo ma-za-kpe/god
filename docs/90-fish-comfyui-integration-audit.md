@@ -182,6 +182,73 @@ Operational notes:
 - Do not publish `8188`, `7860`, `11434`, `5432`, `6379`, `4222`, or `5001` directly on the public Vast interface.
 - For direct diagnostics, use additional short-lived SSH tunnels instead of opening host firewall ports.
 
+### Vast.ai Instance Profile Decision
+
+Date added: 2026-06-26
+
+Confirmed from repo:
+
+- `scripts/vast-provision.sh` defaults to `VAST_GPU=RTX_4090`, `VAST_MIN_RAM=32`, `VAST_MIN_DISK=120`, and `VAST_DISK=120`: `scripts/vast-provision.sh:15-18`.
+- The script comments say RTX 4090 has 24 GB VRAM and fits fish-speech plus SDXL: `scripts/vast-provision.sh:15`.
+- If no RTX 4090 offer is found, the provision script falls back to RTX 4080: `scripts/vast-provision.sh:53-57`.
+- `docker-compose.vast.yml` states Fish is forced to CUDA and RTX 4090 handles Fish Speech easily: `docker-compose.vast.yml:4-7`.
+- `docker-compose.vast.yml` sets SDXL templates for runtime avatar genesis, not Flux/LTX/Wan templates: `docker-compose.vast.yml:58-59`.
+- ComfyUI-LTXVideo upstream lists 32 GB+ VRAM and 100 GB+ free disk as prerequisites; this exceeds the current RTX 4090 24 GB baseline for comfortable LTX-2.3 use.
+- Wan2.1 upstream documents T2V-1.3B at 8.19 GB VRAM and about 4 minutes for a 5-second 480P clip on RTX 4090 without optimization.
+
+Decision:
+
+- Do not upgrade the Vast instance just to begin the immediate avatar-life work.
+- The current RTX 4090-class profile is acceptable for:
+  - YouTube-first live proof;
+  - Fish voice;
+  - procedural life signals;
+  - OBS/browser observer work;
+  - SDXL portrait generation;
+  - manual one-off LivePortrait/MuseTalk feasibility tests if run serially.
+- Upgrade before claiming production LTX/Wan background generation, because the current profile is below the documented comfortable LTX-2.3 VRAM recommendation and lacks queue protection today.
+
+Recommended Vast profiles:
+
+| Phase | Suggested Vast class | Minimum target | Why |
+| --- | --- | --- | --- |
+| Foundation / YouTube proof | RTX 4090-class, 1 GPU | 24 GB VRAM, 64 GB RAM preferred, 200 GB disk preferred | Fish + procedural life + observer + SDXL; no live LTX/Wan |
+| Real-time embodiment eval | RTX 4090/5090-class, 1 GPU | 24-32 GB VRAM, 64 GB RAM, 200 GB disk | Benchmark LivePortrait/MuseTalk/Wav2Lip sidecar candidates serially |
+| LTX asset factory | 48 GB VRAM class preferred | 48 GB VRAM, 64-128 GB RAM, 300 GB disk | LTX-2.3 docs recommend 32 GB+ VRAM; headroom avoids starving Fish |
+| Wan cinematic/offline | 48-80 GB VRAM class preferred | 48 GB+ VRAM, 128 GB RAM, 300-500 GB disk | Quality clips are offline/background and can use larger models safely |
+
+Upgrade triggers:
+
+- Fish live synthesis success falls below 99% during background generation tests.
+- GPU queue wait for `live_voice` is non-zero during stream tests.
+- `nvidia-smi` shows less than 4-6 GB free VRAM before Fish synthesis.
+- LTX/MuseTalk/LivePortrait/Wan workflow OOMs or forces unsafe model unloading during live mode.
+- Disk usage exceeds 70% after model downloads and first video-loop experiments.
+- Observer cannot preload loops from local cache without stutter because assets are too large or remote retrieval is too slow.
+
+Queue policy on current Vast instance:
+
+- One heavy GPU consumer at a time.
+- During live YouTube tests, allowed GPU work:
+  - Fish live synthesis;
+  - current LLM call when needed;
+  - procedural observer rendering.
+- During live YouTube tests, disallowed unless explicitly idle/offline:
+  - LTX generation;
+  - Wan generation;
+  - long Comfy video workflows;
+  - full lipsynced highlight renders.
+- Background video jobs must be cancellable/preemptible before they are enabled on the live host.
+
+Deployment notes:
+
+- Keep YouTube live proof and avatar-life validation on the current host until metrics say otherwise.
+- Use short-lived SSH tunnels for diagnostics instead of opening public ports.
+- Treat `8080` as operator gateway only.
+- Keep Fish, ComfyUI, Ollama, Postgres, Redis, NATS, IPFS, and future GPU queue endpoints bound to host-local addresses.
+- If upgrading Vast, prefer more VRAM/disk over more CPU first; the bottleneck is GPU memory and model/asset storage.
+- Update `scripts/vast-provision.sh` only after the chosen model tier is proven. A premature default upgrade raises cost without proving avatar-life value.
+
 Risks:
 
 - Local Docker and Vast deployment disagree on Fish device mode: Compose uses CPU, Vast requires CUDA.
