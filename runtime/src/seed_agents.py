@@ -116,7 +116,6 @@ async def seed_one_agent(
         "soul_id": soul_id,
         "graph_cid": cid,
         "wallet_address": wallet_address,
-        "private_key": private_key,  # NEVER log this in production
         "archetype": archetype,
         "name": graph.identity.current_name,
         "is_elder": is_elder,

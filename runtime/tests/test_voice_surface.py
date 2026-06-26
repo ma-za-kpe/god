@@ -94,5 +94,5 @@ def test_voice_surface_synthesizes_when_tts_is_available(monkeypatch):
     state = surface.compose(snapshot)
 
     assert state.synthesis["ok"] is True
-    assert state.synthesis["endpoint"].endswith("/speak")
+    assert state.synthesis["endpoint"].endswith("/v1/tts")
     assert state.synthesis["audio_url"] == "http://tts/audio.wav"

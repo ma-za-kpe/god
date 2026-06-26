@@ -641,17 +641,41 @@ async def _execute_action(agent: dict, action: dict, emitter) -> None:
                 conn.close()
                 return
             cur.execute(
-                "UPDATE agents SET balance_usdc = balance_usdc - %s WHERE soul_id = %s",
-                (amount, soul_id),
+                """
+                UPDATE agents
+                SET balance_usdc = COALESCE(balance_usdc, 0) - %s
+                WHERE soul_id = %s
+                  AND is_alive = true
+                  AND COALESCE(balance_usdc, 0) >= %s
+                RETURNING balance_usdc
+                """,
+                (amount, soul_id, amount),
             )
+            debit = cur.fetchone()
+            if not debit:
+                conn.rollback()
+                cur.close()
+                conn.close()
+                log.debug(f"  {name}: insufficient balance for transfer")
+                return
+            sender_bal = float(debit["balance_usdc"] or 0)
             cur.execute(
-                "UPDATE agents SET balance_usdc = balance_usdc + %s WHERE soul_id = %s",
+                """
+                UPDATE agents
+                SET balance_usdc = COALESCE(balance_usdc, 0) + %s
+                WHERE soul_id = %s AND is_alive = true
+                RETURNING balance_usdc
+                """,
                 (amount, to_full),
             )
-            cur.execute("SELECT balance_usdc FROM agents WHERE soul_id = %s", (soul_id,))
-            sender_bal = float(cur.fetchone()["balance_usdc"] or 0)
-            cur.execute("SELECT balance_usdc FROM agents WHERE soul_id = %s", (to_full,))
-            recipient_bal = float(cur.fetchone()["balance_usdc"] or 0)
+            credit = cur.fetchone()
+            if not credit:
+                conn.rollback()
+                cur.close()
+                conn.close()
+                log.debug(f"  {name}: transfer target '{to_id[:8]}' is no longer alive")
+                return
+            recipient_bal = float(credit["balance_usdc"] or 0)
             conn.commit()
             cur.close()
             conn.close()
@@ -796,9 +820,20 @@ async def _execute_action(agent: dict, action: dict, emitter) -> None:
             escrow = max(0.01, float(action.get("amount") or 0.05))
             conn = _db()
             cur = conn.cursor()
-            cur.execute("SELECT balance_usdc FROM agents WHERE soul_id = %s", (soul_id,))
+            cur.execute(
+                """
+                UPDATE agents
+                SET balance_usdc = COALESCE(balance_usdc, 0) - %s
+                WHERE soul_id = %s
+                  AND is_alive = true
+                  AND COALESCE(balance_usdc, 0) >= %s
+                RETURNING balance_usdc
+                """,
+                (escrow, soul_id, escrow),
+            )
             row = cur.fetchone()
-            if not row or float(row["balance_usdc"] or 0) < escrow:
+            if not row:
+                conn.rollback()
                 cur.close()
                 conn.close()
                 log.debug(f"  {name}: insufficient balance for petition")
@@ -809,10 +844,6 @@ async def _execute_action(agent: dict, action: dict, emitter) -> None:
                 "description, escrowed_amount_usdc, proposed_creator_fee_usdc, status, world_id, created_at) "
                 "VALUES (%s, %s, 'general', %s, %s, %s, 0, 'pending', %s, %s)",
                 (petition_id, soul_id, request[:80], request, escrow, WORLD_ID, int(time.time())),
-            )
-            cur.execute(
-                "UPDATE agents SET balance_usdc = balance_usdc - %s WHERE soul_id = %s",
-                (escrow, soul_id),
             )
             conn.commit()
             cur.close()

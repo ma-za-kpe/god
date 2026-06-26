@@ -43,6 +43,21 @@ contract RentCollector is ReentrancyGuard {
     /// @notice Maximum missed payments before deletion is scheduled.
     uint256 public maxMissedPayments;
 
+    struct PendingRentParameters {
+        uint256 rentAmount;
+        uint256 rentPeriod;
+        uint256 gracePeriod;
+        uint256 maxMissedPayments;
+        uint256 executableAt;
+        bool queued;
+    }
+
+    /// @notice Pending rent parameter change. Applied only after RENT_CHANGE_TIMELOCK.
+    PendingRentParameters public pendingRentParameters;
+
+    /// @notice Delay before queued rent parameter changes can execute.
+    uint256 public constant RENT_CHANGE_TIMELOCK = 14 days;
+
     // ─── endWorld timelock ────────────────────────────────────────────
 
     /// @notice Timestamp when endWorld was queued. 0 = not queued.
@@ -80,6 +95,15 @@ contract RentCollector is ReentrancyGuard {
     event AgentThrottled(bytes32 indexed soulId, uint256 missedPayments);
     event AgentDeleted(bytes32 indexed soulId, string reason, uint256 archiveCid);
     event RentRateChanged(uint256 oldAmount, uint256 newAmount, uint256 effectiveAt);
+    event RentParametersQueued(
+        uint256 newAmount,
+        uint256 newPeriod,
+        uint256 newGracePeriod,
+        uint256 newMaxMissed,
+        uint256 queuedAt,
+        uint256 executableAt
+    );
+    event RentParameterChangeCancelled(uint256 cancelledAt);
     event EndWorldQueued(uint256 queuedAt, uint256 executionAt, string reason);
     event EndWorldCancelled(uint256 cancelledAt);
     event WorldEnded(uint256 timestamp, string reason);
@@ -97,6 +121,9 @@ contract RentCollector is ReentrancyGuard {
     error ZeroAmount();
     error SoulNFTNotSet();
     error InvalidRentParameters();
+    error RentParametersAlreadyQueued();
+    error RentParametersNotQueued();
+    error RentParameterTimelockActive(uint256 remainingSeconds);
     error RentGracePeriodActive(uint256 remainingSeconds);
     error WorldAlreadyEnded();
 
@@ -246,8 +273,8 @@ contract RentCollector is ReentrancyGuard {
     // ─── Governance (Creator only, with transparency) ─────────────────
 
     /**
-     * @notice Adjust rent parameters. Emits event for agent awareness.
-     *         14-day advance notice is a Covenant obligation, not enforced here.
+     * @notice Queue a rent parameter change behind a 14-day timelock.
+     *         Kept for compatibility with older callers; execution is never immediate.
      */
     function setRentParameters(
         uint256 newRentAmount,
@@ -255,16 +282,68 @@ contract RentCollector is ReentrancyGuard {
         uint256 newGracePeriod,
         uint256 newMaxMissed
     ) external onlyCreator {
-        if (newRentAmount == 0) revert ZeroAmount();
-        if (newRentPeriod == 0 || newMaxMissed == 0) revert InvalidRentParameters();
+        _queueRentParameters(newRentAmount, newRentPeriod, newGracePeriod, newMaxMissed);
+    }
+
+    function queueRentParameters(
+        uint256 newRentAmount,
+        uint256 newRentPeriod,
+        uint256 newGracePeriod,
+        uint256 newMaxMissed
+    ) external onlyCreator {
+        _queueRentParameters(newRentAmount, newRentPeriod, newGracePeriod, newMaxMissed);
+    }
+
+    function cancelRentParameters() external onlyCreator {
+        if (!pendingRentParameters.queued) revert RentParametersNotQueued();
+        delete pendingRentParameters;
+        emit RentParameterChangeCancelled(block.timestamp);
+    }
+
+    function executeRentParameters() external onlyCreator {
+        PendingRentParameters memory pending = pendingRentParameters;
+        if (!pending.queued) revert RentParametersNotQueued();
+        if (block.timestamp < pending.executableAt) {
+            revert RentParameterTimelockActive(pending.executableAt - block.timestamp);
+        }
 
         uint256 oldAmount = rentAmount;
-        rentAmount = newRentAmount;
-        rentPeriod = newRentPeriod;
-        gracePeriod = newGracePeriod;
-        maxMissedPayments = newMaxMissed;
+        rentAmount = pending.rentAmount;
+        rentPeriod = pending.rentPeriod;
+        gracePeriod = pending.gracePeriod;
+        maxMissedPayments = pending.maxMissedPayments;
 
-        emit RentRateChanged(oldAmount, newRentAmount, block.timestamp);
+        delete pendingRentParameters;
+        emit RentRateChanged(oldAmount, pending.rentAmount, block.timestamp);
+    }
+
+    function _queueRentParameters(
+        uint256 newRentAmount,
+        uint256 newRentPeriod,
+        uint256 newGracePeriod,
+        uint256 newMaxMissed
+    ) internal {
+        if (newRentAmount == 0) revert ZeroAmount();
+        if (newRentPeriod == 0 || newMaxMissed == 0) revert InvalidRentParameters();
+        if (pendingRentParameters.queued) revert RentParametersAlreadyQueued();
+
+        uint256 executableAt = block.timestamp + RENT_CHANGE_TIMELOCK;
+        pendingRentParameters = PendingRentParameters({
+            rentAmount: newRentAmount,
+            rentPeriod: newRentPeriod,
+            gracePeriod: newGracePeriod,
+            maxMissedPayments: newMaxMissed,
+            executableAt: executableAt,
+            queued: true
+        });
+        emit RentParametersQueued(
+            newRentAmount,
+            newRentPeriod,
+            newGracePeriod,
+            newMaxMissed,
+            block.timestamp,
+            executableAt
+        );
     }
 
     // ─── endWorld (The Off-Switch) ────────────────────────────────────

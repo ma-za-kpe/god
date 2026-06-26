@@ -299,17 +299,22 @@ async def _run_cycle_local(emitter):
         if now < last_paid + RENT_PERIOD_S:
             continue
 
-        cur.execute("SELECT balance_usdc FROM agents WHERE soul_id = %s", (soul_id,))
-        bal_row = cur.fetchone()
-        current_balance = float(bal_row["balance_usdc"] or 0) if bal_row else 0
         rent_due = float(RENT_AMOUNT_USDC)
-        pay_success = current_balance >= rent_due
+        cur.execute(
+            """
+            UPDATE agents
+            SET balance_usdc = COALESCE(balance_usdc, 0) - %s
+            WHERE soul_id = %s
+              AND is_alive = true
+              AND COALESCE(balance_usdc, 0) >= %s
+            RETURNING balance_usdc
+            """,
+            (rent_due, soul_id, rent_due),
+        )
+        paid_row = cur.fetchone()
 
-        if pay_success:
-            cur.execute(
-                "UPDATE agents SET balance_usdc = balance_usdc - %s WHERE soul_id = %s",
-                (rent_due, soul_id),
-            )
+        if paid_row:
+            balance_after = float(paid_row["balance_usdc"] or 0)
             cur.execute(
                 "INSERT INTO rent_payments (soul_id, amount_usdc, paid_at, missed) VALUES (%s, %s, %s, false)",
                 (soul_id, rent_due, now),
@@ -322,11 +327,11 @@ async def _run_cycle_local(emitter):
                     "agent_id": soul_id,
                     "name": name,
                     "amount_usdc": rent_due,
-                    "balance_after": round(current_balance - rent_due, 6),
-                    "narrative": f"{name} paid rent (${rent_due:.4f}). Balance: ${current_balance - rent_due:.4f}",
+                    "balance_after": round(balance_after, 6),
+                    "narrative": f"{name} paid rent (${rent_due:.4f}). Balance: ${balance_after:.4f}",
                 },
             )
-            log.info(f"  ✓ {name}: rent paid (bal ${current_balance - rent_due:.4f})")
+            log.info(f"  ✓ {name}: rent paid (bal ${balance_after:.4f})")
         else:
             cur.execute(
                 "INSERT INTO rent_payments (soul_id, amount_usdc, paid_at, missed) VALUES (%s, 0, %s, true)",

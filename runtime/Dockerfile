@@ -16,6 +16,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy source (overridden by volume mount in dev)
 COPY src/ ./src/
 COPY agents/ ./agents/
+COPY seed_utterances/ ./seed_utterances/
 
 # Health check endpoint
 HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \

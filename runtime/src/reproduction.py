@@ -661,12 +661,20 @@ def _deduct_and_set_cooldown(soul_id: str, amount: float):
     cur.execute(
         """
         UPDATE agents
-        SET balance_usdc       = balance_usdc - %s,
+        SET balance_usdc       = COALESCE(balance_usdc, 0) - %s,
             last_reproduced_at = %s
         WHERE soul_id = %s
+          AND is_alive = true
+          AND COALESCE(balance_usdc, 0) >= %s
+        RETURNING balance_usdc
         """,
-        (amount, int(time.time()), soul_id),
+        (amount, int(time.time()), soul_id, amount),
     )
+    if not cur.fetchone():
+        conn.rollback()
+        cur.close()
+        conn.close()
+        raise ValueError(f"insufficient balance to reproduce ({amount:.4f} USDC required)")
     conn.commit()
     cur.close()
     conn.close()

@@ -1304,6 +1304,11 @@
       return value === undefined || value === null || value === '' ? fallback : escapeHtml(value);
     }
 
+    function ipfsUrl(cid) {
+      const value = String(cid || '').trim();
+      return value ? `${RUNTIME}/ipfs/${encodeURIComponent(value)}` : '';
+    }
+
     function kindFor(eventType = '') {
       if (eventType.includes('subscribe') || eventType.includes('gift') || eventType.includes('cheer')) return 'patronage';
       if (eventType.includes('raid')) return 'raid';
@@ -1755,9 +1760,9 @@
         const isSecondary = !isActive && agent.soul_id === secondaryId;
         const isSpeaking = agent.soul_id === speakingId;
         const isListening = agent.soul_id === listeningId;
-        const avatarSrc = agent.avatar_cid ? `${RUNTIME}/ipfs/${agent.avatar_cid}` : '';
+        const avatarSrc = ipfsUrl(agent.avatar_cid);
         const riggedSrc = agent.rigged_avatar_cid || avatarState.rigged_avatar_cid || agent.avatar_cid || '';
-        const riggedUrl = riggedSrc ? `${RUNTIME}/ipfs/${riggedSrc}` : '';
+        const riggedUrl = ipfsUrl(riggedSrc);
         const avatarExpression = String(avatarState.expression || 'neutral');
         const avatarPose = String(avatarState.pose || 'lead');
         const avatarMotion = String(avatarState.motion || 'live-reactive');
@@ -1777,8 +1782,8 @@
             <div
               class="avatar-orb${isActive ? ' rigged-host' : ''}"
               data-rigged-avatar-host="${isActive ? '1' : '0'}"
-              data-avatar-src="${avatarSrc}"
-              data-rigged-avatar-src="${riggedUrl}"
+              data-avatar-src="${fmt(avatarSrc)}"
+              data-rigged-avatar-src="${fmt(riggedUrl)}"
               data-avatar-expression="${avatarExpression}"
               data-avatar-pose="${avatarPose}"
               data-avatar-motion="${avatarMotion}"
@@ -1786,7 +1791,7 @@
               data-avatar-lip-sync="${lipSyncSource}"
               style="background:${agent.soul_id?.startsWith('empty-') ? 'radial-gradient(circle at center, rgba(255,255,255,0.08), rgba(255,255,255,0.02))' : `radial-gradient(circle at 35% 30%, rgba(255,255,255,0.72), rgba(255,255,255,0.18) 15%, transparent 17%), radial-gradient(circle at center, ${AGENT_COLORS[index % AGENT_COLORS.length]}, rgba(84,200,255,0.52) 36%, rgba(5,8,16,0.15) 74%)`}; opacity:${agent.soul_id?.startsWith('empty-') ? 0.35 : 1}"
             >
-              ${agent.avatar_cid ? `<img class="avatar-portrait" src="${RUNTIME}/ipfs/${agent.avatar_cid}" loading="lazy" onerror="this.style.display='none'">` : ''}
+              ${avatarSrc ? `<img class="avatar-portrait" src="${fmt(avatarSrc)}" loading="lazy" onerror="this.style.display='none'">` : ''}
               ${isActive ? '<canvas class="rigged-avatar-canvas" data-rigged-avatar-canvas></canvas>' : ''}
               <div class="voice-rings" aria-hidden="true"><span></span><span></span><span></span></div>
             </div>

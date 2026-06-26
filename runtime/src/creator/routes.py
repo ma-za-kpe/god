@@ -107,39 +107,43 @@ async def submit_petition(
             status_code=422, content={"error": "external_cost values must be numeric"}
         )
 
-    # Verify agent exists and has sufficient balance
+    # Escrow the fee with a conditional debit so concurrent petitions cannot overspend.
     conn = _db()
     cur = conn.cursor()
     cur.execute(
-        "SELECT current_name, balance_usdc FROM agents WHERE soul_id = %s AND is_alive = true",
-        (soul_id,),
+        """
+        UPDATE agents
+        SET balance_usdc = COALESCE(balance_usdc, 0) - %s
+        WHERE soul_id = %s
+          AND is_alive = true
+          AND COALESCE(balance_usdc, 0) >= %s
+        RETURNING current_name, balance_usdc + %s AS previous_balance
+        """,
+        (proposed_fee, soul_id, proposed_fee, proposed_fee),
     )
     agent = cur.fetchone()
     if not agent:
-        cur.close()
-        conn.close()
-        return JSONResponse(status_code=404, content={"error": "agent not found or not alive"})
-
-    if float(agent["balance_usdc"]) < proposed_fee:
-        cur.close()
-        conn.close()
-        return JSONResponse(
-            status_code=400,
-            content={
-                "error": "insufficient balance for proposed fee",
-                "balance": float(agent["balance_usdc"]),
-                "proposed_fee": proposed_fee,
-            },
+        cur.execute(
+            "SELECT current_name, COALESCE(balance_usdc, 0) AS balance_usdc "
+            "FROM agents WHERE soul_id = %s AND is_alive = true",
+            (soul_id,),
         )
+        existing = cur.fetchone()
+        cur.close()
+        conn.close()
+        if existing:
+            return JSONResponse(
+                status_code=400,
+                content={
+                    "error": "insufficient balance for proposed fee",
+                    "balance": float(existing["balance_usdc"]),
+                    "proposed_fee": proposed_fee,
+                },
+            )
+        return JSONResponse(status_code=404, content={"error": "agent not found or not alive"})
 
     petition_id = str(uuid.uuid4())
     now = int(time.time())
-
-    # Escrow the fee: deduct from agent balance
-    cur.execute(
-        "UPDATE agents SET balance_usdc = balance_usdc - %s WHERE soul_id = %s",
-        (proposed_fee, soul_id),
-    )
 
     cur.execute(
         """
@@ -208,8 +212,15 @@ async def submit_petition(
 
 
 @router.get("/petitions")
-async def list_petitions(status: str | None = None):
+async def list_petitions(
+    status: str | None = None,
+    x_creator_token: str | None = Header(None, alias="X-Creator-Token"),
+):
     """List Creator petitions. Filter by status: pending | approved | rejected | countered."""
+    denied = deny_creator_action(x_creator_token)
+    if denied:
+        return denied
+
     conn = _db()
     cur = conn.cursor()
     if status:
@@ -230,8 +241,15 @@ async def list_petitions(status: str | None = None):
 
 
 @router.get("/petitions/{petition_id}")
-async def get_petition(petition_id: str):
+async def get_petition(
+    petition_id: str,
+    x_creator_token: str | None = Header(None, alias="X-Creator-Token"),
+):
     """Get a specific petition by ID."""
+    denied = deny_creator_action(x_creator_token)
+    if denied:
+        return denied
+
     conn = _db()
     cur = conn.cursor()
     cur.execute("SELECT * FROM creator_petitions WHERE petition_id = %s", (petition_id,))

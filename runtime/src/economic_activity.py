@@ -78,23 +78,42 @@ async def execute_transfer(
         if not payer or not payee:
             return {"ok": False, "error": "agent_not_found"}
 
-        payer_bal = float(payer["balance_usdc"] or 0)
-        if payer_bal < amount:
+        cur.execute(
+            """
+            UPDATE agents
+            SET balance_usdc = COALESCE(balance_usdc, 0) - %s
+            WHERE soul_id = %s
+              AND is_alive = true
+              AND COALESCE(balance_usdc, 0) >= %s
+            RETURNING balance_usdc
+            """,
+            (amount, payer_id, amount),
+        )
+        debit = cur.fetchone()
+        if not debit:
+            conn.rollback()
+            payer_bal = float(payer["balance_usdc"] or 0)
             return {"ok": False, "error": "insufficient_balance", "need": amount, "have": payer_bal}
+        payer_after = float(debit["balance_usdc"] or 0)
 
         cur.execute(
-            "UPDATE agents SET balance_usdc = balance_usdc - %s WHERE soul_id = %s",
-            (amount, payer_id),
-        )
-        cur.execute(
-            "UPDATE agents SET balance_usdc = balance_usdc + %s WHERE soul_id = %s",
+            """
+            UPDATE agents
+            SET balance_usdc = COALESCE(balance_usdc, 0) + %s
+            WHERE soul_id = %s AND is_alive = true
+            RETURNING balance_usdc
+            """,
             (amount, payee_id),
         )
-        cur.execute("SELECT balance_usdc FROM agents WHERE soul_id = %s", (payer_id,))
-        payer_after = float(cur.fetchone()["balance_usdc"] or 0)
-        cur.execute("SELECT balance_usdc FROM agents WHERE soul_id = %s", (payee_id,))
-        payee_after = float(cur.fetchone()["balance_usdc"] or 0)
+        credit = cur.fetchone()
+        if not credit:
+            conn.rollback()
+            return {"ok": False, "error": "agent_not_found"}
+        payee_after = float(credit["balance_usdc"] or 0)
         conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
     finally:
         cur.close()
         conn.close()
@@ -300,17 +319,27 @@ async def _debit_buyer(
         if not buyer:
             return {"ok": False, "error": "agent_not_found"}
 
-        buyer_bal = float(buyer["balance_usdc"] or 0)
-        if buyer_bal < amount:
-            return {"ok": False, "error": "insufficient_balance", "need": amount, "have": buyer_bal}
-
         cur.execute(
-            "UPDATE agents SET balance_usdc = balance_usdc - %s WHERE soul_id = %s",
-            (amount, buyer_id),
+            """
+            UPDATE agents
+            SET balance_usdc = COALESCE(balance_usdc, 0) - %s
+            WHERE soul_id = %s
+              AND is_alive = true
+              AND COALESCE(balance_usdc, 0) >= %s
+            RETURNING balance_usdc
+            """,
+            (amount, buyer_id, amount),
         )
-        cur.execute("SELECT balance_usdc FROM agents WHERE soul_id = %s", (buyer_id,))
-        buyer_after = float(cur.fetchone()["balance_usdc"] or 0)
+        debit = cur.fetchone()
+        if not debit:
+            conn.rollback()
+            buyer_bal = float(buyer["balance_usdc"] or 0)
+            return {"ok": False, "error": "insufficient_balance", "need": amount, "have": buyer_bal}
+        buyer_after = float(debit["balance_usdc"] or 0)
         conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
     finally:
         cur.close()
         conn.close()

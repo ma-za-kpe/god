@@ -11,6 +11,7 @@ from http.server import HTTPServer, SimpleHTTPRequestHandler
 _ROOT = os.path.dirname(os.path.abspath(__file__))
 _DIST = Path(_ROOT) / "dist"
 _SOURCE = Path(_ROOT)
+_ALLOW_ORIGIN = os.getenv("OBSERVER_ALLOW_ORIGIN", "").strip()
 
 
 class ObserverHandler(SimpleHTTPRequestHandler):
@@ -20,7 +21,8 @@ class ObserverHandler(SimpleHTTPRequestHandler):
         # fetch to the runtime at :8888 without requiring CORP headers there.
         self.send_header("Cross-Origin-Opener-Policy", "same-origin")
         self.send_header("Cross-Origin-Embedder-Policy", "credentialless")
-        self.send_header("Access-Control-Allow-Origin", "*")
+        if _ALLOW_ORIGIN:
+            self.send_header("Access-Control-Allow-Origin", _ALLOW_ORIGIN)
 
     def _serve_file(self, file_path: Path) -> None:
         if not file_path.exists() or not file_path.is_file():
@@ -62,9 +64,10 @@ class ObserverHandler(SimpleHTTPRequestHandler):
 def main() -> None:
     os.chdir(_ROOT)
     port = int(os.getenv("OBSERVER_PORT", "3000"))
-    server = HTTPServer(("0.0.0.0", port), ObserverHandler)
+    host = os.getenv("OBSERVER_HOST", "127.0.0.1")
+    server = HTTPServer((host, port), ObserverHandler)
     print(
-        f"observer listening on :{port}  (/stage and /one → React app, /classic → stage.html, /maku → maku.html)",
+        f"observer listening on {host}:{port}  (/stage and /one -> React app, /classic -> stage.html, /maku -> maku.html)",
         flush=True,
     )
     server.serve_forever()

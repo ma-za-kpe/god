@@ -124,22 +124,36 @@ async def invoke_tool(caller_soul_id: str, tool_id: str, params: dict | None = N
 
     if caller_soul_id != owner:
         cur.execute(
-            "SELECT balance_usdc FROM agents WHERE soul_id = %s AND is_alive = true",
-            (caller_soul_id,),
+            """
+            UPDATE agents
+            SET balance_usdc = COALESCE(balance_usdc, 0) - %s
+            WHERE soul_id = %s
+              AND is_alive = true
+              AND COALESCE(balance_usdc, 0) >= %s
+            RETURNING balance_usdc
+            """,
+            (cost, caller_soul_id, cost),
         )
-        caller = cur.fetchone()
-        if not caller or float(caller["balance_usdc"]) < cost:
+        debit = cur.fetchone()
+        if not debit:
+            conn.rollback()
             cur.close()
             conn.close()
             return {"error": "insufficient balance", "cost_usdc": cost}
         cur.execute(
-            "UPDATE agents SET balance_usdc = balance_usdc - %s WHERE soul_id = %s",
-            (cost, caller_soul_id),
-        )
-        cur.execute(
-            "UPDATE agents SET balance_usdc = balance_usdc + %s WHERE soul_id = %s",
+            """
+            UPDATE agents
+            SET balance_usdc = COALESCE(balance_usdc, 0) + %s
+            WHERE soul_id = %s AND is_alive = true
+            RETURNING balance_usdc
+            """,
             (cost * 0.9, owner),
         )
+        if not cur.fetchone():
+            conn.rollback()
+            cur.close()
+            conn.close()
+            return {"error": "tool owner not found"}
 
     cur.execute(
         "UPDATE agent_registered_tools SET calls_served = calls_served + 1 WHERE tool_id = %s",

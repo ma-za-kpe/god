@@ -17,7 +17,7 @@ import httpx
 import uvicorn
 from fastapi import FastAPI, Header, Response, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from .agent_runner import agent_runner
@@ -234,9 +234,24 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="God Runtime", version=RUNTIME_VERSION, lifespan=lifespan)
 
+
+def _cors_allow_origins() -> list[str]:
+    raw = os.getenv("CORS_ALLOW_ORIGINS", "").strip()
+    if raw:
+        return [origin.strip() for origin in raw.split(",") if origin.strip()]
+    return [
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "http://localhost:8888",
+        "http://127.0.0.1:8888",
+        "http://localhost:10517",
+        "http://127.0.0.1:10517",
+    ]
+
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=_cors_allow_origins(),
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -256,23 +271,6 @@ async def stage_page():
     if f.exists():
         return FileResponse(str(f), media_type="text/html")
     return Response("stage not found", status_code=404)
-
-
-@app.get("/ipfs/{cid}")
-async def proxy_ipfs(cid: str):
-    """Proxy IPFS content through the local node so the browser tunnel can load images."""
-    ipfs_api = os.getenv("IPFS_API", "http://localhost:5001")
-    try:
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            r = await client.post(f"{ipfs_api}/api/v0/cat?arg={cid}")
-            if r.status_code != 200:
-                return Response(status_code=502)
-            content_type = (
-                "image/png" if r.content[:4] == b"\x89PNG" else "application/octet-stream"
-            )
-            return Response(content=r.content, media_type=content_type)
-    except Exception:
-        return Response(status_code=502)
 
 
 @app.get("/health")
@@ -772,16 +770,22 @@ async def voice_audio(utterance_id: str):
     audio = get_cached_audio(utterance_id)
     if audio is None:
         return FastResponse(status_code=404, content=b"")
-    return FastResponse(content=audio, media_type="audio/wav", headers={
-        "Cache-Control": "public, max-age=60",
-        "Access-Control-Allow-Origin": "*",
-    })
+    return FastResponse(
+        content=audio,
+        media_type="audio/wav",
+        headers={
+            "Cache-Control": "public, max-age=60",
+        },
+    )
 
 
 @app.get("/ipfs/{cid}")
 async def ipfs_proxy(cid: str):
     """Proxy IPFS content by CID so the observer can fetch portraits without a local gateway."""
     from fastapi.responses import Response as FastResponse
+
+    if not cid or len(cid) > 160 or any(ch in cid for ch in "/\\?&#"):
+        return FastResponse(status_code=400, content=b"")
 
     ipfs_api = (os.getenv("IPFS_API") or "http://localhost:5001").rstrip("/")
     try:
@@ -791,11 +795,16 @@ async def ipfs_proxy(cid: str):
                 r = await client.get(f"{ipfs_api}/api/v0/cat", params={"arg": cid})
             if r.status_code != 200 or not r.content:
                 return FastResponse(status_code=404, content=b"")
-            content_type = "image/png" if r.content[:4] == b"\x89PNG" else "application/octet-stream"
-            return FastResponse(content=r.content, media_type=content_type, headers={
-                "Cache-Control": "public, max-age=3600",
-                "Access-Control-Allow-Origin": "*",
-            })
+            content_type = (
+                "image/png" if r.content[:4] == b"\x89PNG" else "application/octet-stream"
+            )
+            return FastResponse(
+                content=r.content,
+                media_type=content_type,
+                headers={
+                    "Cache-Control": "public, max-age=3600",
+                },
+            )
     except Exception as exc:
         log.warning("ipfs_proxy cid=%s error=%s", cid, exc)
         return FastResponse(status_code=502, content=b"")
@@ -961,7 +970,15 @@ async def list_events(limit: int = 50):
         cur = conn.cursor()
         cur.execute(
             "SELECT event_id, agent_id, event_type, timestamp, narrative, payload "
-            "FROM events WHERE world_id = %s ORDER BY timestamp DESC LIMIT %s",
+            """
+            FROM events
+            WHERE world_id = %s
+              AND NOT (
+                event_type = 'social.agent.message_sent'
+                AND COALESCE(payload->>'is_public', 'false') != 'true'
+              )
+            ORDER BY timestamp DESC LIMIT %s
+            """,
             (os.getenv("WORLD_ID", "local-dev-world-1"), limit),
         )
         events = [dict(r) for r in cur.fetchall()]
@@ -1078,8 +1095,17 @@ async def list_tools():
 
 
 @app.get("/agents/{soul_id}/env")
-async def get_agent_env(soul_id: str):
+async def get_agent_env(
+    soul_id: str,
+    x_creator_token: str | None = Header(None, alias="X-Creator-Token"),
+):
     """Read-only environment summary for an agent (observer / debug)."""
+    from .security import deny_creator_action
+
+    denied = deny_creator_action(x_creator_token)
+    if denied:
+        return denied
+
     from .agent_env import fetch_recent_actions, format_env_for_decide, read_scratch
     from .capabilities import format_capabilities_summary, get_granted_capabilities
 
@@ -1249,8 +1275,17 @@ async def get_milestones():
 
 
 @app.get("/tools/{soul_id}/grants")
-async def get_tool_grants(soul_id: str):
+async def get_tool_grants(
+    soul_id: str,
+    x_creator_token: str | None = Header(None, alias="X-Creator-Token"),
+):
     """Active tool grants for a specific agent."""
+    from .security import deny_creator_action
+
+    denied = deny_creator_action(x_creator_token)
+    if denied:
+        return denied
+
     try:
         import psycopg2
         import psycopg2.extras
@@ -1284,8 +1319,18 @@ async def get_tool_grants(soul_id: str):
 
 
 @app.get("/agents/{soul_id}/episodes")
-async def get_agent_episodes(soul_id: str, limit: int = 20):
+async def get_agent_episodes(
+    soul_id: str,
+    limit: int = 20,
+    x_creator_token: str | None = Header(None, alias="X-Creator-Token"),
+):
     """Recent episodic memory index rows for an agent (GH #25 debug surface)."""
+    from .security import deny_creator_action
+
+    denied = deny_creator_action(x_creator_token)
+    if denied:
+        return denied
+
     from .episodic_memory import list_episodes
 
     rows = list_episodes(soul_id, limit=limit)
@@ -1293,8 +1338,18 @@ async def get_agent_episodes(soul_id: str, limit: int = 20):
 
 
 @app.get("/agents/{soul_id}/dreams")
-async def get_agent_dreams(soul_id: str, limit: int = 20):
+async def get_agent_dreams(
+    soul_id: str,
+    limit: int = 20,
+    x_creator_token: str | None = Header(None, alias="X-Creator-Token"),
+):
     """Dream history for a specific agent."""
+    from .security import deny_creator_action
+
+    denied = deny_creator_action(x_creator_token)
+    if denied:
+        return denied
+
     try:
         import psycopg2
         import psycopg2.extras
@@ -1316,8 +1371,17 @@ async def get_agent_dreams(soul_id: str, limit: int = 20):
 
 
 @app.get("/agents/{soul_id}/sleep")
-async def get_agent_sleep_state(soul_id: str):
+async def get_agent_sleep_state(
+    soul_id: str,
+    x_creator_token: str | None = Header(None, alias="X-Creator-Token"),
+):
     """Current sleep state for an agent (empty if awake)."""
+    from .security import deny_creator_action
+
+    denied = deny_creator_action(x_creator_token)
+    if denied:
+        return denied
+
     try:
         import psycopg2
         import psycopg2.extras
@@ -1346,8 +1410,17 @@ async def get_agent_sleep_state(soul_id: str):
 
 
 @app.get("/messages")
-async def get_world_messages(limit: int = 100):
+async def get_world_messages(
+    limit: int = 100,
+    x_creator_token: str | None = Header(None, alias="X-Creator-Token"),
+):
     """All messages sent in this world (admin/observer view)."""
+    from .security import deny_creator_action
+
+    denied = deny_creator_action(x_creator_token)
+    if denied:
+        return denied
+
     try:
         from .messaging import get_world_messages as _gwm
 
@@ -1358,8 +1431,18 @@ async def get_world_messages(limit: int = 100):
 
 
 @app.get("/agents/{soul_id}/messages")
-async def get_agent_messages(soul_id: str, limit: int = 50):
+async def get_agent_messages(
+    soul_id: str,
+    limit: int = 50,
+    x_creator_token: str | None = Header(None, alias="X-Creator-Token"),
+):
     """Messages sent by a specific agent."""
+    from .security import deny_creator_action
+
+    denied = deny_creator_action(x_creator_token)
+    if denied:
+        return denied
+
     try:
         from .messaging import get_agent_sent_messages
 
@@ -1371,12 +1454,22 @@ async def get_agent_messages(soul_id: str, limit: int = 50):
 
 
 @app.get("/agents/{soul_id}/inbox")
-async def get_agent_inbox(soul_id: str):
-    """Pull unread inbox messages for an agent (marks as read)."""
+async def get_agent_inbox(
+    soul_id: str,
+    mark_read: bool = False,
+    x_creator_token: str | None = Header(None, alias="X-Creator-Token"),
+):
+    """Inspect unread inbox messages for an agent. mark_read=true consumes them."""
+    from .security import deny_creator_action
+
+    denied = deny_creator_action(x_creator_token)
+    if denied:
+        return denied
+
     try:
         from .messaging import pull_inbox
 
-        msgs = pull_inbox(soul_id)
+        msgs = pull_inbox(soul_id, mark_read=mark_read)
         return {"soul_id": soul_id, "messages": [m.to_dict() for m in msgs], "count": len(msgs)}
     except Exception as e:
         log.warning(f"/agents/{soul_id}/inbox error: {e}")
@@ -1384,8 +1477,17 @@ async def get_agent_inbox(soul_id: str):
 
 
 @app.get("/agents/{soul_id}/reputation")
-async def get_agent_reputation(soul_id: str):
+async def get_agent_reputation(
+    soul_id: str,
+    x_creator_token: str | None = Header(None, alias="X-Creator-Token"),
+):
     """Reputation scores this agent holds about others."""
+    from .security import deny_creator_action
+
+    denied = deny_creator_action(x_creator_token)
+    if denied:
+        return denied
+
     try:
         import psycopg2
         import psycopg2.extras
@@ -1918,7 +2020,7 @@ async def deploy_token_endpoint(body: dict):
 if __name__ == "__main__":
     uvicorn.run(
         "src.main:app",
-        host="0.0.0.0",
+        host=os.getenv("UVICORN_HOST", "127.0.0.1"),
         port=8888,
         reload=os.getenv("UVICORN_RELOAD", "false").lower() in ("1", "true", "yes"),
         log_level=os.getenv("LOG_LEVEL", "info").lower(),

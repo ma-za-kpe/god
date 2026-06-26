@@ -585,10 +585,14 @@ class VoiceSurface:
 
             reference_audio = _reference_audio_for_agent(agent)
             if reference_audio is None:
-                # fish-speech 2.0 has no /speak endpoint; fall back to philosopher seed
-                _fallback = Path(__file__).resolve().parents[3] / "runtime/seed_utterances/philosopher.wav"
-                if _fallback.is_file():
-                    reference_audio = _fallback.read_bytes() or None
+                # fish-speech 2.0 uses /v1/tts with inline references.
+                for _fallback in (
+                    Path(__file__).resolve().parents[2] / "seed_utterances/philosopher.wav",
+                    Path(__file__).resolve().parents[3] / "runtime/seed_utterances/philosopher.wav",
+                ):
+                    if _fallback.is_file():
+                        reference_audio = _fallback.read_bytes() or None
+                        break
             if reference_audio is None:
                 return {"ok": False, "reason": "no_reference_audio"}
             synth_url = f"{endpoint.rstrip('/')}/v1/tts"
@@ -608,8 +612,12 @@ class VoiceSurface:
             try:
                 _ollama = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434").rstrip("/")
                 _model = os.getenv("LLM_MODEL", "llama3.1:8b")
-                httpx.post(f"{_ollama}/api/generate", json={"model": _model, "keep_alive": 0}, timeout=8.0)
-                import time as _time; _time.sleep(1)
+                httpx.post(
+                    f"{_ollama}/api/generate", json={"model": _model, "keep_alive": 0}, timeout=8.0
+                )
+                import time as _time
+
+                _time.sleep(1)
             except Exception:
                 pass
 
@@ -664,12 +672,18 @@ def _play_to_pulse_sink_async(audio_bytes: bytes) -> None:
 
     def _play() -> None:
         import subprocess
+        import tempfile
+
         try:
+            runtime_dir = os.getenv(
+                "VOICE_XDG_RUNTIME_DIR",
+                os.path.join(tempfile.gettempdir(), "runtime-stream"),
+            )
             env = {
                 **os.environ,
                 "HOME": "/home/stream",
-                "XDG_RUNTIME_DIR": "/tmp/runtime-stream",
-                "PULSE_SERVER": "unix:/tmp/runtime-stream/pulse/native",
+                "XDG_RUNTIME_DIR": runtime_dir,
+                "PULSE_SERVER": f"unix:{runtime_dir}/pulse/native",
             }
             proc = subprocess.Popen(
                 ["paplay", "-d", sink],

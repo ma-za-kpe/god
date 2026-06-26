@@ -284,6 +284,7 @@ services:
     volumes:
       - ./runtime/src:/app/src
       - ./runtime/agents:/app/agents
+      - ./runtime/seed_utterances:/app/seed_utterances:ro
       - ./runtime/workflows:/app/workflows:ro
     ports:
       - "127.0.0.1:8888:8888"
@@ -374,6 +375,7 @@ services:
     environment:
       - NEXT_PUBLIC_RUNTIME_URL=http://localhost:8888
       - VITE_RUNTIME_URL=http://localhost:8888
+      - OBSERVER_HOST=0.0.0.0
       - NEXT_PUBLIC_NATS_WS_URL=ws://localhost:4222
       - NEXT_PUBLIC_IPFS_GATEWAY=http://localhost:8080
       - NEXT_PUBLIC_CHAIN_ID=84532

@@ -24,6 +24,10 @@ class PaymentResult:
     transaction_hash: str
     amount_paid: str
     error: str = ""
+    resource: str = ""
+    pay_to: str = ""
+    network: str = ""
+    asset: str = ""
 
 
 def _result_value(result: object, key: str, default: str = "") -> str:
@@ -61,6 +65,10 @@ async def verify_payment(payment_header: str, payment_config: dict) -> PaymentRe
             is_valid=True,
             transaction_hash="0x" + "0" * 64,
             amount_paid=payment_config.get("maxAmountRequired", "0"),
+            resource=payment_config.get("resource", ""),
+            pay_to=payment_config.get("payTo", ""),
+            network=payment_config.get("network", ""),
+            asset=payment_config.get("asset", ""),
         )
 
     # Production path — requires x402 SDK
@@ -78,6 +86,10 @@ async def verify_payment(payment_header: str, payment_config: dict) -> PaymentRe
                 or _result_value(result, "tx_hash", "")
             ),
             amount_paid=_result_value(result, "amount_paid", "0"),
+            resource=_result_value(result, "resource", ""),
+            pay_to=(_result_value(result, "pay_to", "") or _result_value(result, "payTo", "")),
+            network=_result_value(result, "network", ""),
+            asset=_result_value(result, "asset", ""),
         )
     except ImportError:
         log.error(

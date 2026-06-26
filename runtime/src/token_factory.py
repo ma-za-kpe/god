@@ -104,14 +104,19 @@ async def deploy_token(
     bytecode, abi = _load_artifact()
     log.debug(f"  [{soul_id[:8]}] artifact loaded, bytecode length={len(bytecode)}")
 
-    # 4. Deploy
-    log.debug(f"  [{soul_id[:8]}] connecting to chain at {ANVIL_RPC}")
-    w3 = _get_web3()
-    chain_id = w3.eth.chain_id
-    block = w3.eth.block_number
-    log.debug(f"  [{soul_id[:8]}] chain_id={chain_id} block={block}")
+    # 4. Reserve deployment fee before the external chain side effect.
+    _deduct_balance(soul_id, TOKEN_DEPLOY_FEE_USDC)
+    fee_reserved = True
+    log.debug(f"  [{soul_id[:8]}] fee reserved: -{TOKEN_DEPLOY_FEE_USDC} USDC")
 
     try:
+        # 5. Deploy
+        log.debug(f"  [{soul_id[:8]}] connecting to chain at {ANVIL_RPC}")
+        w3 = _get_web3()
+        chain_id = w3.eth.chain_id
+        block = w3.eth.block_number
+        log.debug(f"  [{soul_id[:8]}] chain_id={chain_id} block={block}")
+
         account = w3.eth.account.from_key(wallet_private_key)
         log.debug(f"  [{soul_id[:8]}] deploying from {account.address}")
 
@@ -161,15 +166,14 @@ async def deploy_token(
         )
 
     except Exception as e:
+        if fee_reserved:
+            _refund_balance(soul_id, TOKEN_DEPLOY_FEE_USDC)
+            fee_reserved = False
         log.error(
             f"TOKEN DEPLOY FAILED: soul={soul_id[:8]} name={name!r}: {e}",
             exc_info=True,
         )
         raise
-
-    # 5. Deduct fee
-    _deduct_balance(soul_id, TOKEN_DEPLOY_FEE_USDC)
-    log.debug(f"  [{soul_id[:8]}] fee deducted: -{TOKEN_DEPLOY_FEE_USDC} USDC")
 
     # 6. Persist
     now = int(time.time())
@@ -322,13 +326,39 @@ def _get_agent_balance(soul_id: str) -> float:
 def _deduct_balance(soul_id: str, amount: float):
     conn = psycopg2.connect(DATABASE_URL)
     cur = conn.cursor()
-    cur.execute(
-        "UPDATE agents SET balance_usdc = balance_usdc - %s WHERE soul_id = %s",
-        (amount, soul_id),
-    )
-    conn.commit()
-    cur.close()
-    conn.close()
+    try:
+        cur.execute(
+            """
+            UPDATE agents
+            SET balance_usdc = COALESCE(balance_usdc, 0) - %s
+            WHERE soul_id = %s
+              AND is_alive = true
+              AND COALESCE(balance_usdc, 0) >= %s
+            RETURNING balance_usdc
+            """,
+            (amount, soul_id, amount),
+        )
+        if not cur.fetchone():
+            conn.rollback()
+            raise ValueError(f"Insufficient balance: token deployment costs {amount:.4f} USDC.")
+        conn.commit()
+    finally:
+        cur.close()
+        conn.close()
+
+
+def _refund_balance(soul_id: str, amount: float):
+    conn = psycopg2.connect(DATABASE_URL)
+    cur = conn.cursor()
+    try:
+        cur.execute(
+            "UPDATE agents SET balance_usdc = COALESCE(balance_usdc, 0) + %s WHERE soul_id = %s",
+            (amount, soul_id),
+        )
+        conn.commit()
+    finally:
+        cur.close()
+        conn.close()
 
 
 def _persist_token(

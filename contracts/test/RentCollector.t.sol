@@ -288,6 +288,12 @@ contract RentCollectorTest is Test {
         freshSoul.setRentCollector(address(0x88));
     }
 
+    function test_RevertIf_SoulNFT_SetRentCollectorZero() public {
+        SoulNFT freshSoul = new SoulNFT();
+        vm.expectRevert(SoulNFT.ZeroAddress.selector);
+        freshSoul.setRentCollector(address(0));
+    }
+
     function test_SoulNFT_OnlyRentCollectorCanMint() public {
         vm.prank(stranger);
         vm.expectRevert(SoulNFT.NotRentCollector.selector);
@@ -350,9 +356,28 @@ contract RentCollectorTest is Test {
     function test_SetRentParameters() public {
         uint256 newAmount = 2_000;
         vm.prank(creator);
+        vm.expectEmit(false, false, false, true);
+        emit RentCollector.RentParametersQueued(
+            newAmount,
+            RENT_PERIOD,
+            GRACE_PERIOD,
+            MAX_MISSED,
+            block.timestamp,
+            block.timestamp + 14 days
+        );
+        rent.setRentParameters(newAmount, RENT_PERIOD, GRACE_PERIOD, MAX_MISSED);
+
+        assertEq(rent.rentAmount(), RENT_AMOUNT);
+
+        vm.prank(creator);
+        vm.expectRevert();
+        rent.executeRentParameters();
+
+        vm.warp(block.timestamp + 14 days + 1);
+        vm.prank(creator);
         vm.expectEmit(true, false, false, true);
         emit RentCollector.RentRateChanged(RENT_AMOUNT, newAmount, block.timestamp);
-        rent.setRentParameters(newAmount, RENT_PERIOD, GRACE_PERIOD, MAX_MISSED);
+        rent.executeRentParameters();
 
         assertEq(rent.rentAmount(), newAmount);
     }

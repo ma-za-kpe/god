@@ -13,6 +13,7 @@ Local dev: set MOCK_X402_PAYMENTS=true to skip real payment verification.
 import logging
 import os
 import time
+import uuid
 
 import psycopg2
 import psycopg2.extras
@@ -21,7 +22,7 @@ from fastapi.responses import JSONResponse
 
 from ..event_emitter import get_emitter
 from ..security import deny_creator_action
-from .payment import build_payment_required_response, verify_payment
+from .payment import MOCK_PAYMENTS, build_payment_required_response, verify_payment
 from .registry import (
     deregister_service,
     get_agent_wallet,
@@ -169,6 +170,17 @@ async def call_service(
                 "detail": result.error,
             },
         )
+    if not _payment_matches_requirement(result, payment_config):
+        return JSONResponse(
+            status_code=402,
+            content={
+                "error": "payment authorization does not match required amount/resource/payee"
+            },
+        )
+    if _x402_payment_seen(result.transaction_hash):
+        return JSONResponse(
+            status_code=409, content={"error": "payment authorization already used"}
+        )
 
     # Step 3: dispatch to the appropriate service handler
     try:
@@ -179,7 +191,10 @@ async def call_service(
 
     # Credit seller balance and record external revenue for status / leaderboard
     payer_address = _payer_from_header(x_payment_authorization) or "external:anonymous"
-    await _credit_service_payment(soul_id, price, payer_address, result.transaction_hash)
+    try:
+        await _credit_service_payment(soul_id, price, payer_address, result.transaction_hash)
+    except ValueError as exc:
+        return JSONResponse(status_code=409, content={"error": str(exc)})
 
     # Increment call counter and emit event (non-blocking)
     await increment_call_count(soul_id, service_name)
@@ -222,6 +237,50 @@ def _payer_from_header(header: str | None) -> str | None:
     return f"x402:{header[:24]}"
 
 
+def _payment_matches_requirement(result, payment_config: dict) -> bool:
+    try:
+        if int(str(result.amount_paid or "0")) < int(str(payment_config["maxAmountRequired"])):
+            return False
+    except (TypeError, ValueError):
+        return False
+
+    if not MOCK_PAYMENTS and not result.transaction_hash:
+        return False
+
+    expected_resource = str(payment_config.get("resource") or "")
+    if result.resource and result.resource != expected_resource:
+        return False
+
+    expected_pay_to = str(payment_config.get("payTo") or "").lower()
+    if result.pay_to and result.pay_to.lower() != expected_pay_to:
+        return False
+
+    return True
+
+
+def _x402_payment_seen(tx_hash: str | None) -> bool:
+    if MOCK_PAYMENTS or not tx_hash:
+        return False
+
+    conn = psycopg2.connect(DATABASE_URL)
+    cur = conn.cursor()
+    try:
+        cur.execute(
+            """
+            SELECT 1
+            FROM external_payments
+            WHERE source_type = 'x402'
+              AND tx_hash = %s
+            LIMIT 1
+            """,
+            (tx_hash,),
+        )
+        return cur.fetchone() is not None
+    finally:
+        cur.close()
+        conn.close()
+
+
 async def _credit_service_payment(
     soul_id: str,
     amount_usdc: float,
@@ -229,7 +288,7 @@ async def _credit_service_payment(
     tx_hash: str | None,
 ) -> None:
     """Credit agent wallet and ledger for verified x402 service calls."""
-    from ..status_engine import record_external_payment, refresh_agent_status
+    from ..status_engine import refresh_agent_status
 
     amount = round(float(amount_usdc), 6)
     if amount < 0.0001:
@@ -238,6 +297,40 @@ async def _credit_service_payment(
     conn = psycopg2.connect(DATABASE_URL, cursor_factory=psycopg2.extras.RealDictCursor)
     cur = conn.cursor()
     try:
+        if not MOCK_PAYMENTS and tx_hash:
+            cur.execute("SELECT pg_advisory_xact_lock(hashtext(%s))", (tx_hash,))
+            cur.execute(
+                """
+                SELECT 1
+                FROM external_payments
+                WHERE source_type = 'x402'
+                  AND tx_hash = %s
+                LIMIT 1
+                """,
+                (tx_hash,),
+            )
+            if cur.fetchone():
+                raise ValueError("payment authorization already used")
+        cur.execute(
+            """
+            INSERT INTO external_payments
+                (payment_id, soul_id, payer_address, source_type, amount_usdc,
+                 timestamp, tx_hash, is_internal, world_id)
+            VALUES (%s, %s, %s, 'x402', %s, %s, %s, false, %s)
+            ON CONFLICT DO NOTHING
+            """,
+            (
+                str(uuid.uuid4()),
+                soul_id,
+                payer_address,
+                amount,
+                int(time.time()),
+                tx_hash,
+                os.getenv("WORLD_ID", "local-dev-world-1"),
+            ),
+        )
+        if not MOCK_PAYMENTS and tx_hash and cur.rowcount == 0:
+            raise ValueError("payment authorization already used")
         cur.execute(
             "UPDATE agents SET balance_usdc = balance_usdc + %s "
             "WHERE soul_id = %s AND is_alive = true RETURNING balance_usdc",
@@ -245,20 +338,16 @@ async def _credit_service_payment(
         )
         row = cur.fetchone()
         if not row:
+            conn.rollback()
             return
         conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
     finally:
         cur.close()
         conn.close()
 
-    await record_external_payment(
-        soul_id,
-        payer_address,
-        amount,
-        source_type="x402",
-        tx_hash=tx_hash,
-        is_internal=False,
-    )
     await refresh_agent_status(soul_id)
 
 

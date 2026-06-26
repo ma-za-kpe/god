@@ -380,7 +380,7 @@ const API = window.RUNTIME_URL || defaultRuntimeUrl();
 const PAGE_SIZE = 100;
 
 function creatorHeaders(headers = {}) {
-  const token = window.CREATOR_TOKEN || localStorage.getItem('creator_token') || '';
+  const token = window.CREATOR_TOKEN || sessionStorage.getItem('creator_token') || '';
   return token ? { ...headers, 'X-Creator-Token': token } : headers;
 }
 
@@ -956,9 +956,9 @@ async function runGenesis() {
   status.style.color = 'var(--dim)';
   status.textContent = '⟳ Resetting world and spawning genesis agents…';
   try {
-    if (!window.CREATOR_TOKEN && !localStorage.getItem('creator_token')) {
+    if (!window.CREATOR_TOKEN && !sessionStorage.getItem('creator_token')) {
       const token = window.prompt('Creator token required for genesis:');
-      if (token) localStorage.setItem('creator_token', token);
+      if (token) sessionStorage.setItem('creator_token', token);
     }
     const r = await fetch(`${API}/creator/genesis`, {
       method: 'POST',

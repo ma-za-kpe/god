@@ -299,7 +299,10 @@ ALTER TABLE agents ADD COLUMN IF NOT EXISTS emotional_state TEXT NOT NULL DEFAUL
 CREATE INDEX IF NOT EXISTS idx_events_agent_id ON events(agent_id);
 CREATE INDEX IF NOT EXISTS idx_events_type ON events(event_type);
 CREATE INDEX IF NOT EXISTS idx_events_timestamp ON events(timestamp DESC);
+CREATE INDEX IF NOT EXISTS idx_events_world_timestamp ON events(world_id, timestamp DESC);
+CREATE INDEX IF NOT EXISTS idx_events_agent_type_ts ON events(agent_id, event_type, timestamp DESC);
 CREATE INDEX IF NOT EXISTS idx_agents_alive ON agents(is_alive, world_id);
+CREATE INDEX IF NOT EXISTS idx_agents_world_alive_birth ON agents(world_id, is_alive, birth_timestamp);
 CREATE INDEX IF NOT EXISTS idx_rent_soul_id ON rent_payments(soul_id);
 CREATE INDEX IF NOT EXISTS idx_signals_soul_id ON consciousness_signals(soul_id);
 CREATE INDEX IF NOT EXISTS idx_petitions_soul_id ON creator_petitions(soul_id);
@@ -311,6 +314,12 @@ CREATE INDEX IF NOT EXISTS idx_episodes_timestamp ON episodes(soul_id, timestamp
 CREATE INDEX IF NOT EXISTS idx_episodes_emotional ON episodes(soul_id, emotional_imprint DESC);
 CREATE INDEX IF NOT EXISTS idx_agent_status_tier ON agent_status(tier, world_id);
 CREATE INDEX IF NOT EXISTS idx_ext_payments_soul ON external_payments(soul_id, timestamp DESC);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_ext_payments_x402_tx
+    ON external_payments(tx_hash)
+    WHERE source_type = 'x402'
+      AND tx_hash IS NOT NULL
+      AND tx_hash != ''
+      AND tx_hash != '0x0000000000000000000000000000000000000000000000000000000000000000';
 CREATE INDEX IF NOT EXISTS idx_proposals_status ON law_proposals(status, world_id);
 CREATE INDEX IF NOT EXISTS idx_votes_proposal ON law_votes(proposal_id);
 CREATE INDEX IF NOT EXISTS idx_coalition_members ON coalition_members(coalition_id);
@@ -394,6 +403,7 @@ CREATE INDEX IF NOT EXISTS idx_dreams_soul_id      ON dreams(soul_id, dreamed_at
 CREATE INDEX IF NOT EXISTS idx_dreams_world        ON dreams(world_id, dreamed_at DESC);
 CREATE INDEX IF NOT EXISTS idx_messages_recipient  ON agent_messages(recipient_id, world_id, sent_at DESC);
 CREATE INDEX IF NOT EXISTS idx_messages_sender     ON agent_messages(sender_id, world_id, sent_at DESC);
+CREATE INDEX IF NOT EXISTS idx_messages_world_sent_at ON agent_messages(world_id, sent_at DESC);
 CREATE INDEX IF NOT EXISTS idx_messages_broadcast  ON agent_messages(recipient_id, world_id) WHERE recipient_id = 'BROADCAST';
 CREATE INDEX IF NOT EXISTS idx_reputation_observer ON reputation(observer_id, world_id);
 CREATE INDEX IF NOT EXISTS idx_tokens_owner        ON tokens(owner_soul_id, world_id);

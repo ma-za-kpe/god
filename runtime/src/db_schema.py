@@ -113,6 +113,18 @@ _MIGRATIONS: list[str] = [
     """,
     "CREATE INDEX IF NOT EXISTS idx_tokens_owner ON tokens(owner_soul_id, world_id)",
     "CREATE INDEX IF NOT EXISTS idx_tokens_world ON tokens(world_id, deployed_at DESC)",
+    "CREATE INDEX IF NOT EXISTS idx_events_world_timestamp ON events(world_id, timestamp DESC)",
+    "CREATE INDEX IF NOT EXISTS idx_events_agent_type_ts ON events(agent_id, event_type, timestamp DESC)",
+    "CREATE INDEX IF NOT EXISTS idx_agents_world_alive_birth ON agents(world_id, is_alive, birth_timestamp)",
+    "CREATE INDEX IF NOT EXISTS idx_messages_world_sent_at ON agent_messages(world_id, sent_at DESC)",
+    """
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_ext_payments_x402_tx
+        ON external_payments(tx_hash)
+        WHERE source_type = 'x402'
+          AND tx_hash IS NOT NULL
+          AND tx_hash != ''
+          AND tx_hash != '0x0000000000000000000000000000000000000000000000000000000000000000'
+    """,
     "CREATE INDEX IF NOT EXISTS idx_action_log_soul ON agent_action_log(soul_id, ts DESC)",
     "CREATE INDEX IF NOT EXISTS idx_jobs_due ON agent_scheduled_jobs(run_at, status)",
     "CREATE INDEX IF NOT EXISTS idx_jobs_soul ON agent_scheduled_jobs(soul_id, status)",

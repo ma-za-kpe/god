@@ -22,6 +22,22 @@ log = logging.getLogger("god.snapshot")
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://god:localdev@localhost:5432/god_world")
 WORLD_ID = os.getenv("WORLD_ID", "local-dev-world-1")
 MAX_AGENTS = int(os.getenv("SNAPSHOT_MAX_AGENTS", "10000"))
+_PUBLIC_MESSAGE_TYPES = (
+    "'contract'",
+    "'threat'",
+    "'broadcast'",
+    "'eulogy'",
+    "'manifesto'",
+    "'petition'",
+    "'propaganda'",
+)
+_PUBLIC_MESSAGE_TYPE_SQL = ", ".join(_PUBLIC_MESSAGE_TYPES)
+_PUBLIC_EVENT_FILTER = """
+      AND NOT (
+        event_type = 'social.agent.message_sent'
+        AND COALESCE(payload->>'is_public', 'false') != 'true'
+      )
+"""
 
 _AGENTS_SQL = """
     SELECT
@@ -294,7 +310,8 @@ def build_world_snapshot(
 
     cur.execute(
         "SELECT event_id, agent_id, event_type, timestamp, narrative, payload "
-        "FROM events WHERE world_id = %s ORDER BY timestamp DESC LIMIT %s",
+        f"FROM events WHERE world_id = %s {_PUBLIC_EVENT_FILTER} "
+        "ORDER BY timestamp DESC LIMIT %s",
         (world_id, events_limit),
     )
     events = [dict(r) for r in cur.fetchall()]
@@ -308,9 +325,13 @@ def build_world_snapshot(
         LEFT JOIN agents sa ON m.sender_id = sa.soul_id
         LEFT JOIN agents ra ON m.recipient_id = ra.soul_id
         WHERE m.world_id = %s
+          AND (
+            m.recipient_id = 'BROADCAST'
+            OR m.message_type IN ({_PUBLIC_MESSAGE_TYPE_SQL})
+          )
         ORDER BY m.sent_at DESC
         LIMIT %s
-        """,
+        """.format(_PUBLIC_MESSAGE_TYPE_SQL=_PUBLIC_MESSAGE_TYPE_SQL),
         (world_id, messages_limit),
     )
     messages = [dict(r) for r in cur.fetchall()]
@@ -347,7 +368,8 @@ async def build_world_snapshot_async(
 
     events = await fetch_all(
         "SELECT event_id, agent_id, event_type, timestamp, narrative, payload "
-        "FROM events WHERE world_id = $1 ORDER BY timestamp DESC LIMIT $2",
+        f"FROM events WHERE world_id = $1 {_PUBLIC_EVENT_FILTER} "
+        "ORDER BY timestamp DESC LIMIT $2",
         world_id,
         events_limit,
     )
@@ -361,9 +383,13 @@ async def build_world_snapshot_async(
         LEFT JOIN agents sa ON m.sender_id = sa.soul_id
         LEFT JOIN agents ra ON m.recipient_id = ra.soul_id
         WHERE m.world_id = $1
+          AND (
+            m.recipient_id = 'BROADCAST'
+            OR m.message_type IN ({_PUBLIC_MESSAGE_TYPE_SQL})
+          )
         ORDER BY m.sent_at DESC
         LIMIT $2
-        """,
+        """.format(_PUBLIC_MESSAGE_TYPE_SQL=_PUBLIC_MESSAGE_TYPE_SQL),
         world_id,
         messages_limit,
     )
