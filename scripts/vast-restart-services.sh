@@ -966,7 +966,7 @@ start_obs_stream() {
     die "OBS websocket is not responsive; cannot start stream"
   fi
 
-  if ! python3 - <<'PY' >/dev/null 2>&1
+  if ! python3 - <<'PY'
 import json
 import os
 import time
@@ -998,7 +998,15 @@ status = call("GetStreamingStatus")
 if status.get("streaming"):
     print("OBS already streaming; restarting stream to clear stale ingest state")
     call("StopStreaming")
-    time.sleep(3)
+    for _ in range(30):
+        time.sleep(1)
+        status = call("GetStreamingStatus")
+        if not status.get("streaming"):
+            break
+    else:
+        print("OBS remained streaming after stop request; treating active stream as healthy")
+        ws.close()
+        raise SystemExit(0)
 
 stream_server = os.getenv("OBS_STREAM_SERVER", "")
 stream_key = os.getenv("OBS_STREAM_KEY", "")
@@ -1014,9 +1022,14 @@ if result.get("status") != "ok":
 
 result = call("StartStreaming")
 if result.get("status") != "ok":
-    raise SystemExit("OBS start streaming failed")
+    status = call("GetStreamingStatus")
+    if status.get("streaming"):
+        print("OBS is streaming despite StartStreaming response")
+        ws.close()
+        raise SystemExit(0)
+    raise SystemExit(f"OBS start streaming failed: {result}")
 
-for _ in range(12):
+for _ in range(30):
     time.sleep(1)
     status = call("GetStreamingStatus")
     if status.get("streaming"):
