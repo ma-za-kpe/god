@@ -966,7 +966,7 @@ start_obs_stream() {
     die "OBS websocket is not responsive; cannot start stream"
   fi
 
-  if ! python3 - <<'PY'
+  if python3 - <<'PY'
 import json
 import os
 import time
