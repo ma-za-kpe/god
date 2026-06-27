@@ -45,6 +45,16 @@ def test_avatar_state_layers_from_snapshot():
     assert state["plan"]["expression"] in {"focused", "animated", "attentive", "calm", "intense"}
     assert state["plan"]["pose"] in {"lead", "debate", "presenting", "still"}
     assert state["avatar_format"] == "vrm"
+    assert set(state["life"]) >= {
+        "breathing_phase",
+        "blink_state",
+        "head_sway_x",
+        "head_sway_y",
+        "mouth_amplitude",
+        "eye_focus_x",
+        "eye_focus_y",
+    }
+    assert state["plan"]["life"] == state["life"]
 
 
 def test_avatar_surface_compose_is_stable():
@@ -53,3 +63,4 @@ def test_avatar_surface_compose_is_stable():
 
     assert state.enabled is True
     assert state.plan.speaker == "Beta"
+    assert 0.0 <= state.life["breathing_phase"] <= 1.0

@@ -1309,6 +1309,33 @@
       return value ? `${RUNTIME}/ipfs/${encodeURIComponent(value)}` : '';
     }
 
+    function finiteNumber(value, fallback = 0) {
+      const parsed = Number(value);
+      return Number.isFinite(parsed) ? parsed : fallback;
+    }
+
+    function clampNumber(value, lower, upper) {
+      return Math.max(lower, Math.min(upper, value));
+    }
+
+    function avatarLifeAttrs(life, avatarState, useSnapshotLife, isSpeaking) {
+      const source = useSnapshotLife && life && typeof life === 'object' ? life : {};
+      const mouthFallback = isSpeaking ? finiteNumber(avatarState.mouth_open, 0.35) : 0;
+      return {
+        breathing: clampNumber(finiteNumber(source.breathing_phase, 0.5), 0, 1).toFixed(4),
+        blink: source.blink_state ? '1' : '0',
+        headSwayX: clampNumber(finiteNumber(source.head_sway_x, 0), -0.25, 0.25).toFixed(4),
+        headSwayY: clampNumber(finiteNumber(source.head_sway_y, 0), -0.25, 0.25).toFixed(4),
+        mouthAmplitude: clampNumber(
+          finiteNumber(source.mouth_amplitude, mouthFallback),
+          0,
+          1
+        ).toFixed(4),
+        eyeFocusX: clampNumber(finiteNumber(source.eye_focus_x, 0), -0.3, 0.3).toFixed(4),
+        eyeFocusY: clampNumber(finiteNumber(source.eye_focus_y, 0), -0.3, 0.3).toFixed(4),
+      };
+    }
+
     function kindFor(eventType = '') {
       if (eventType.includes('subscribe') || eventType.includes('gift') || eventType.includes('cheer')) return 'patronage';
       if (eventType.includes('raid')) return 'raid';
@@ -1723,7 +1750,10 @@
       const activeChanged = previousActiveId !== (active?.soul_id || null);
       STATE.previousActiveId = previousActiveId;
       STATE.activeId = active?.soul_id || null;
-      const speakingId = STATE.dialogueSpeaking ? STATE.currentSpeakerId : null;
+      const avatarPlan = avatarState.plan || {};
+      const avatarLife = avatarState.life || avatarPlan.life || {};
+      const avatarSpeakerId = String(avatarState.speaker_soul_id || avatarPlan.speaker_soul_id || '');
+      const speakingId = STATE.dialogueSpeaking ? STATE.currentSpeakerId : (avatarState.speaking ? avatarSpeakerId : null);
       const listeningId = STATE.dialogueSpeaking ? STATE.currentRecipientId : null;
 
       const previousRects = new Map(
@@ -1758,7 +1788,8 @@
       ordered.slice(0, soloMode ? 1 : 8).forEach((agent, index) => {
         const isActive = agent.soul_id === STATE.activeId;
         const isSecondary = !isActive && agent.soul_id === secondaryId;
-        const isSpeaking = agent.soul_id === speakingId;
+        const isAvatarSpeaker = avatarSpeakerId && agent.soul_id === avatarSpeakerId;
+        const isSpeaking = agent.soul_id === speakingId || (isAvatarSpeaker && avatarState.speaking);
         const isListening = agent.soul_id === listeningId;
         const avatarSrc = ipfsUrl(agent.avatar_cid);
         const riggedSrc = agent.rigged_avatar_cid || avatarState.rigged_avatar_cid || agent.avatar_cid || '';
@@ -1767,6 +1798,7 @@
         const avatarPose = String(avatarState.pose || 'lead');
         const avatarMotion = String(avatarState.motion || 'live-reactive');
         const lipSyncSource = String(avatarState.lip_sync_source || 'audio');
+        const lifeAttrs = avatarLifeAttrs(avatarLife, avatarState, isActive || isAvatarSpeaker, isSpeaking);
         const tile = document.createElement('article');
         tile.className = `agent-tile${isActive ? ' active' : ''}${isSecondary ? ' secondary-speaker' : ''}${isSpeaking ? ' speaking' : ''}${isListening ? ' listening' : ''}`;
         tile.dataset.agentId = agent.soul_id;
@@ -1789,6 +1821,14 @@
               data-avatar-motion="${avatarMotion}"
               data-avatar-speaking="${isSpeaking ? '1' : '0'}"
               data-avatar-lip-sync="${lipSyncSource}"
+              data-avatar-breathing="${lifeAttrs.breathing}"
+              data-avatar-blink="${lifeAttrs.blink}"
+              data-avatar-head-sway-x="${lifeAttrs.headSwayX}"
+              data-avatar-head-sway-y="${lifeAttrs.headSwayY}"
+              data-avatar-mouth-amplitude="${lifeAttrs.mouthAmplitude}"
+              data-avatar-eye-focus-x="${lifeAttrs.eyeFocusX}"
+              data-avatar-eye-focus-y="${lifeAttrs.eyeFocusY}"
+              data-agent-id="${fmt(agent.soul_id)}"
               style="background:${agent.soul_id?.startsWith('empty-') ? 'radial-gradient(circle at center, rgba(255,255,255,0.08), rgba(255,255,255,0.02))' : `radial-gradient(circle at 35% 30%, rgba(255,255,255,0.72), rgba(255,255,255,0.18) 15%, transparent 17%), radial-gradient(circle at center, ${AGENT_COLORS[index % AGENT_COLORS.length]}, rgba(84,200,255,0.52) 36%, rgba(5,8,16,0.15) 74%)`}; opacity:${agent.soul_id?.startsWith('empty-') ? 0.35 : 1}"
             >
               ${avatarSrc ? `<img class="avatar-portrait" src="${fmt(avatarSrc)}" loading="lazy" onerror="this.style.display='none'">` : ''}

@@ -115,6 +115,8 @@ def test_avatar_surface_uses_expression_override():
     assert state.speaker_soul_id == "beta"
     assert state.speaking is True
     assert state.mouth_open > 0
+    assert state.life["mouth_amplitude"] > 0
+    assert state.plan.life == state.life
     assert state.presentation_mode == "speaking"
     assert surface._last_scene_layout is not None
     assert surface._last_scene_layout["composition_type"] == "duo"

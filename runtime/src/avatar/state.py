@@ -20,6 +20,7 @@ class AvatarPlan:
     speaker_soul_id: str = ""
     speaking: bool = False
     mouth_open: float = 0.0
+    life: dict[str, Any] = field(default_factory=dict)
     presentation_mode: str = "standard"
     notes: tuple[str, ...] = field(default_factory=tuple)
     rigged_avatar_cid: str = ""
@@ -45,6 +46,7 @@ class AvatarState:
     speaker_soul_id: str = ""
     speaking: bool = False
     mouth_open: float = 0.0
+    life: dict[str, Any] = field(default_factory=dict)
     presentation_mode: str = "standard"
     rigged_avatar_cid: str = ""
     vrm_avatar_url: str = ""

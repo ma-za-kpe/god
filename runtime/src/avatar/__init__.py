@@ -9,6 +9,7 @@ from .engine import (
 )
 from .evolution_engine import EvolutionEngine, EvolutionEvent
 from .genesis_pipeline import GenesisPipeline, PipelineResult
+from .life_signals import LifeSignals, LifeState, generate_life_state
 from .portrait_generator import PortraitGenerator
 from .scene_composer import ElderLayout, SceneComposer, SceneLayout
 from .state import AvatarPlan, AvatarState
@@ -25,6 +26,8 @@ __all__ = [
     "EvolutionEngine",
     "EvolutionEvent",
     "GenesisPipeline",
+    "LifeSignals",
+    "LifeState",
     "MOVE_EXPRESSION_MAP",
     "PipelineResult",
     "PortraitGenerator",
@@ -36,5 +39,6 @@ __all__ = [
     "build_avatar_state",
     "build_avatar_status",
     "build_avatar_status_surface",
+    "generate_life_state",
     "validate_archetype_configs",
 ]
