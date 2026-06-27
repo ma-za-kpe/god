@@ -14,6 +14,10 @@ export const API_BASE = window.RUNTIME_URL || import.meta.env.VITE_RUNTIME_URL |
 let _lastPlayedUtteranceId = '';
 let _pendingUrl = null;
 
+function streamUrl() {
+  return API_BASE.replace(/^http/i, 'ws') + '/world/stream';
+}
+
 // Singleton AudioContext — pre-unlocked in OBS CEF, unlockable in Firefox
 let _audioCtx = null;
 function _getCtx() {
@@ -81,8 +85,77 @@ export function useWorld() {
 
   useEffect(() => {
     let alive = true;
+    let pollTimer = null;
+    let reconnectTimer = null;
+    let pingTimer = null;
+    let deltaRefreshTimer = null;
+    let ws = null;
+    let wsLive = false;
+    let pollInFlight = false;
 
-    const poll = async () => {
+    const markHealth = (ok, lastError = '', transport = 'poll') => {
+      setObserverHealth({
+        ok,
+        lastPollAt: Date.now(),
+        lastError,
+        transport,
+      });
+    };
+
+    const applySnapshot = (snap, transport = 'poll') => {
+      if (!alive || !snap || snap.error) return;
+      setSnapshot(snap);
+      if (Array.isArray(snap.agents)) setAgents(snap.agents);
+      if (Array.isArray(snap.events)) setEvents(snap.events);
+      // Play synthesized voice audio when a new utterance arrives
+      const uid = snap?.voice?.plan?.utterance_id;
+      const synthOk = snap?.voice?.synthesis?.ok;
+      if (uid && synthOk && uid !== _lastPlayedUtteranceId) {
+        _lastPlayedUtteranceId = uid;
+        _playAudioUrl(`${API_BASE}/voice/audio/${uid}`);
+      }
+      markHealth(true, '', transport);
+    };
+
+    const mergeAgentPatches = (patches) => {
+      if (!Array.isArray(patches) || !patches.length) return;
+      const current = useObserverStore.getState().agents || [];
+      const byId = new Map(current.filter(Boolean).map((agent) => [agent.soul_id, agent]));
+      for (const patch of patches) {
+        const soulId = patch?.soul_id;
+        if (!soulId) continue;
+        byId.set(soulId, { ...(byId.get(soulId) || {}), ...patch });
+      }
+      setAgents(Array.from(byId.values()));
+    };
+
+    const mergeEvents = (events) => {
+      if (!Array.isArray(events) || !events.length) return;
+      const current = useObserverStore.getState().events || [];
+      const byId = new Map();
+      for (const event of [...events, ...current]) {
+        const id = event?.event_id || `${event?.event_type || 'event'}:${event?.timestamp || ''}:${byId.size}`;
+        if (!byId.has(id)) byId.set(id, event);
+      }
+      setEvents(Array.from(byId.values()).slice(0, 120));
+    };
+
+    const schedulePoll = (delayMs) => {
+      if (pollTimer) clearTimeout(pollTimer);
+      if (alive) pollTimer = setTimeout(() => poll(), delayMs);
+    };
+
+    const scheduleDeltaRefresh = () => {
+      if (deltaRefreshTimer) return;
+      deltaRefreshTimer = setTimeout(() => {
+        deltaRefreshTimer = null;
+        poll('ws-delta');
+      }, 150);
+    };
+
+    const poll = async (transport = 'poll') => {
+      if (pollInFlight) return;
+      pollInFlight = true;
       const startedAt = Date.now();
       let ok = true;
       let lastError = '';
@@ -119,14 +192,7 @@ export function useWorld() {
 
         if (snapshotRes.status === 'fulfilled' && snapshotRes.value.ok) {
           const snap = await snapshotRes.value.json();
-          setSnapshot(snap);
-          // Play synthesized voice audio when a new utterance arrives
-          const uid = snap?.voice?.plan?.utterance_id;
-          const synthOk = snap?.voice?.synthesis?.ok;
-          if (uid && synthOk && uid !== _lastPlayedUtteranceId) {
-            _lastPlayedUtteranceId = uid;
-            _playAudioUrl(`${API_BASE}/voice/audio/${uid}`);
-          }
+          applySnapshot(snap, transport);
         } else {
           ok = false;
           lastError = lastError || `snapshot:${snapshotRes.status === 'fulfilled' ? snapshotRes.value.status : 'fetch'}`;
@@ -135,17 +201,74 @@ export function useWorld() {
         ok = false;
         lastError = err instanceof Error ? err.message : String(err);
       }
-      setObserverHealth({
-        ok,
-        lastPollAt: startedAt,
-        lastError,
-      });
-      if (alive) setTimeout(poll, 3000);
+      pollInFlight = false;
+      if (!ok) {
+        setObserverHealth({
+          ok,
+          lastPollAt: startedAt,
+          lastError,
+          transport,
+        });
+      }
+      schedulePoll(wsLive ? 8000 : 3000);
+    };
+
+    const connectStream = () => {
+      if (!alive || typeof WebSocket === 'undefined') return;
+      try {
+        ws = new WebSocket(streamUrl());
+        ws.onopen = () => {
+          wsLive = true;
+          markHealth(true, '', 'ws');
+          pingTimer = setInterval(() => {
+            if (ws?.readyState === WebSocket.OPEN) ws.send('ping');
+          }, 20000);
+        };
+        ws.onmessage = (event) => {
+          try {
+            const msg = JSON.parse(event.data);
+            if (msg.type === 'snapshot') {
+              applySnapshot(msg, 'ws');
+              return;
+            }
+            if (msg.type === 'delta') {
+              mergeEvents(msg.events);
+              mergeAgentPatches(msg.agents);
+              markHealth(true, '', 'ws-delta');
+              scheduleDeltaRefresh();
+            }
+          } catch (err) {
+            markHealth(false, err instanceof Error ? err.message : String(err), 'ws');
+          }
+        };
+        ws.onclose = () => {
+          wsLive = false;
+          if (pingTimer) clearInterval(pingTimer);
+          pingTimer = null;
+          if (alive) reconnectTimer = setTimeout(connectStream, 4000);
+        };
+        ws.onerror = () => {
+          wsLive = false;
+          markHealth(false, 'world-stream:error', 'ws');
+        };
+      } catch (err) {
+        wsLive = false;
+        markHealth(false, err instanceof Error ? err.message : String(err), 'ws');
+        if (alive) reconnectTimer = setTimeout(connectStream, 4000);
+      }
     };
 
     poll();
+    connectStream();
     return () => {
       alive = false;
+      if (pollTimer) clearTimeout(pollTimer);
+      if (reconnectTimer) clearTimeout(reconnectTimer);
+      if (pingTimer) clearInterval(pingTimer);
+      if (deltaRefreshTimer) clearTimeout(deltaRefreshTimer);
+      if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) {
+        ws.close();
+      }
     };
-  }, [setAgents, setEvents, setSnapshot, setStats]);
+  }, [setAgents, setEvents, setObserverHealth, setSnapshot, setStats]);
 }

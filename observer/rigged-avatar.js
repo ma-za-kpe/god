@@ -19,6 +19,11 @@ function clamp(v, lo, hi) {
   return Math.max(lo, Math.min(hi, v));
 }
 
+function numberAttr(value, fallback = NaN) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
 function hostState(host) {
   return {
     speaking: host.dataset.avatarSpeaking === "1",
@@ -28,6 +33,15 @@ function hostState(host) {
     lipSyncSource: (host.dataset.avatarLipSync || "audio").toLowerCase(),
     portraitSrc: host.dataset.avatarSrc || "",
     riggedSrc: host.dataset.riggedAvatarSrc || "",
+    life: {
+      breathingPhase: numberAttr(host.dataset.avatarBreathing),
+      blinkState: host.dataset.avatarBlink === "1",
+      headSwayX: numberAttr(host.dataset.avatarHeadSwayX),
+      headSwayY: numberAttr(host.dataset.avatarHeadSwayY),
+      mouthAmplitude: numberAttr(host.dataset.avatarMouthAmplitude),
+      eyeFocusX: numberAttr(host.dataset.avatarEyeFocusX),
+      eyeFocusY: numberAttr(host.dataset.avatarEyeFocusY),
+    },
   };
 }
 
@@ -224,21 +238,39 @@ function createController(host) {
     const state = updateFromHost();
     const profile = EXPR[state.expression] || EXPR.neutral;
     const speaking = state.speaking;
-    const speechWave = speaking ? (0.34 + 0.24 * Math.abs(Math.sin(t * 11.0)) + 0.08 * Math.sin(t * 23.0)) : 0.0;
+    const localBreath = 0.5 + 0.5 * Math.sin(t * 2.1 + (host.dataset.agentId?.length || 0));
+    const breathingPhase = Number.isFinite(state.life.breathingPhase)
+      ? clamp(state.life.breathingPhase * 0.7 + localBreath * 0.3, 0.0, 1.0)
+      : localBreath;
+    const lifeMouth = Number.isFinite(state.life.mouthAmplitude)
+      ? clamp(state.life.mouthAmplitude, 0.0, 1.0)
+      : 0.0;
+    const speechWave = speaking
+      ? (lifeMouth > 0.0
+        ? lifeMouth * (0.86 + 0.14 * Math.abs(Math.sin(t * 12.0)))
+        : (0.34 + 0.24 * Math.abs(Math.sin(t * 11.0)) + 0.08 * Math.sin(t * 23.0)))
+      : 0.0;
     const mouthOpen = clamp(profile.mouth + speechWave, 0.0, 0.95);
     const blink = 0.5 + 0.5 * Math.sin((t + (host.dataset.agentId?.length || 0)) * 0.62);
-    const blinkMask = clamp(Math.pow(Math.max(0, blink - 0.91) * 18, 2), 0, 1);
+    const blinkMask = state.life.blinkState
+      ? 1.0
+      : clamp(Math.pow(Math.max(0, blink - 0.91) * 18, 2), 0, 1);
 
     const motion = state.motion === "idle" ? 0.35 : 1.0;
     const poseBias = state.pose === "presenting" ? -0.08 : state.pose === "debate" ? 0.06 : state.pose === "still" ? 0.0 : -0.02;
-    const sway = Math.sin(t * motion * 1.5) * 0.06;
-    const bob = Math.sin(t * motion * 2.1) * 0.045;
+    const sway = Number.isFinite(state.life.headSwayX)
+      ? state.life.headSwayX + Math.sin(t * motion * 1.5) * 0.018
+      : Math.sin(t * motion * 1.5) * 0.06;
+    const verticalSway = Number.isFinite(state.life.headSwayY)
+      ? state.life.headSwayY
+      : Math.cos(t * motion * 1.2) * 0.03;
+    const bob = (breathingPhase - 0.5) * 0.12 + Math.sin(t * motion * 2.1) * 0.018;
 
     root.rotation.y = sway + (state.expression === "angry" ? 0.08 : state.expression === "playful" ? -0.05 : 0);
-    root.rotation.x = -0.06 + poseBias + Math.sin(t * 0.65) * 0.015;
+    root.rotation.x = -0.06 + poseBias + verticalSway * 0.28 + Math.sin(t * 0.65) * 0.015;
     root.position.y = bob;
 
-    head.rotation.y = Math.sin(t * 1.1) * 0.05 + (state.speaking ? 0.025 : 0);
+    head.rotation.y = sway * 0.55 + Math.sin(t * 1.1) * 0.025 + (state.speaking ? 0.025 : 0);
     head.rotation.x = profile.brow * 0.35;
     head.rotation.z = state.expression === "vulnerable" ? -0.03 : 0;
 
@@ -256,8 +288,12 @@ function createController(host) {
     rightEye.scale.y = clamp(profile.eyeOpen - blinkMask * 0.85, 0.08, 1);
     leftEye.rotation.z = profile.brow * -0.24;
     rightEye.rotation.z = profile.brow * 0.24;
-    leftPupil.position.x = clamp(Math.sin(t * 0.7) * 0.02, -0.04, 0.04);
-    rightPupil.position.x = clamp(Math.sin(t * 0.7 + 0.5) * 0.02, -0.04, 0.04);
+    const focusX = Number.isFinite(state.life.eyeFocusX) ? state.life.eyeFocusX * 0.18 : Math.sin(t * 0.7) * 0.02;
+    const focusY = Number.isFinite(state.life.eyeFocusY) ? state.life.eyeFocusY * 0.14 : Math.cos(t * 0.9) * 0.01;
+    leftPupil.position.x = clamp(focusX, -0.04, 0.04);
+    rightPupil.position.x = clamp(focusX + Math.sin(t * 0.7 + 0.5) * 0.004, -0.04, 0.04);
+    leftPupil.position.y = clamp(focusY, -0.025, 0.025);
+    rightPupil.position.y = clamp(focusY, -0.025, 0.025);
 
     jaw.rotation.x = -0.05 - mouthOpen * 0.42;
     mouth.scale.y = clamp(0.5 + mouthOpen * 4.2, 0.45, 4.8);
@@ -328,5 +364,19 @@ new MutationObserver(() => scheduleScan()).observe(document.documentElement, {
   childList: true,
   subtree: true,
   attributes: true,
-  attributeFilter: ["data-rigged-avatar-host", "data-avatar-src", "data-avatar-expression", "data-avatar-speaking", "data-avatar-motion", "data-avatar-pose"],
+  attributeFilter: [
+    "data-rigged-avatar-host",
+    "data-avatar-src",
+    "data-avatar-expression",
+    "data-avatar-speaking",
+    "data-avatar-motion",
+    "data-avatar-pose",
+    "data-avatar-breathing",
+    "data-avatar-blink",
+    "data-avatar-head-sway-x",
+    "data-avatar-head-sway-y",
+    "data-avatar-mouth-amplitude",
+    "data-avatar-eye-focus-x",
+    "data-avatar-eye-focus-y",
+  ],
 });

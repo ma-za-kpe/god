@@ -19,10 +19,12 @@ except ImportError:  # pragma: no cover - flat test path
     from banter.types import Beat, PairState, SceneContextData
 
 try:  # pragma: no cover - runtime package import path
+    from .life_signals import LifeSignals
     from .scene_composer import SceneComposer
     from .state import AvatarPlan, AvatarState
     from .visual_reactor import VisualReactor
 except ImportError:  # pragma: no cover - flat test path
+    from avatar.life_signals import LifeSignals
     from avatar.scene_composer import SceneComposer
     from avatar.state import AvatarPlan, AvatarState
     from avatar.visual_reactor import VisualReactor
@@ -132,6 +134,38 @@ def _voice_snapshot(snapshot: dict[str, Any]) -> dict[str, Any]:
     return voice if isinstance(voice, dict) else {}
 
 
+def _float_field(container: dict[str, Any], *names: str) -> float:
+    for name in names:
+        try:
+            value = container.get(name)
+        except AttributeError:
+            continue
+        if value is None or value == "":
+            continue
+        try:
+            return max(0.0, min(1.0, float(value)))
+        except (TypeError, ValueError):
+            continue
+    return 0.0
+
+
+def _voice_audio_rms(voice_state: dict[str, Any], mouth_open: float) -> float:
+    plan = voice_state.get("plan") if isinstance(voice_state, dict) else {}
+    synthesis = voice_state.get("synthesis") if isinstance(voice_state, dict) else {}
+    for source in (plan, synthesis, voice_state):
+        if isinstance(source, dict):
+            rms = _float_field(
+                source,
+                "audio_rms",
+                "rms",
+                "mouth_amplitude",
+                "mouth_open",
+            )
+            if rms > 0.0:
+                return rms
+    return max(0.0, min(1.0, float(mouth_open or 0.0)))
+
+
 class AvatarSurface:
     """Compose an avatar render plan from the live world snapshot."""
 
@@ -143,6 +177,7 @@ class AvatarSurface:
         self.transport = os.getenv("AVATAR_TRANSPORT", "local-avatar")
         self._visual_reactor = VisualReactor()
         self._scene_composer = SceneComposer()
+        self._life_signals = LifeSignals()
         self._last_scene_layout: dict[str, Any] | None = None
 
     def compose(self, snapshot: dict[str, Any]) -> AvatarState:
@@ -269,6 +304,18 @@ class AvatarSurface:
         mouth_open = float(voice_plan.get("mouth_open") or 0.0)
         if speaking and mouth_open <= 0.0:
             mouth_open = 0.42 if expression not in {"calm", "neutral"} else 0.28
+        life = self._life_signals.update(
+            is_speaking=speaking,
+            audio_rms=_voice_audio_rms(voice_state, mouth_open),
+            now=float(snapshot.get("epoch") or time.time()),
+            identity_key=agent_id or active_name,
+        )
+        life_payload = life.to_dict()
+        if speaking:
+            mouth_open = max(mouth_open, float(life_payload.get("mouth_amplitude") or 0.0))
+        visual_state["speaking"] = speaking
+        visual_state["mouth_open"] = mouth_open
+        visual_state["life"] = life_payload
         presentation_mode = "speaking" if speaking else "listening"
         plan = AvatarPlan(
             speaker=active_name,
@@ -285,6 +332,7 @@ class AvatarSurface:
             speaker_soul_id=agent_id,
             speaking=speaking,
             mouth_open=mouth_open,
+            life=life_payload,
             presentation_mode=presentation_mode,
             rigged_avatar_cid=rigged_avatar_cid,
             vrm_avatar_url=vrm_avatar_url,
@@ -318,6 +366,7 @@ class AvatarSurface:
             speaker_soul_id=agent_id,
             speaking=speaking,
             mouth_open=mouth_open,
+            life=life_payload,
             presentation_mode=presentation_mode,
             rigged_avatar_cid=rigged_avatar_cid,
             vrm_avatar_url=vrm_avatar_url,
