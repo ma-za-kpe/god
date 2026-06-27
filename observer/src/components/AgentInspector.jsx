@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useObserverStore } from '../store';
+import { selectAvatarSource, sourceStatusText } from '../avatarSource';
 
 function defaultRuntimeUrl() {
   const { hostname, port, origin } = window.location;
@@ -13,6 +14,7 @@ const API_BASE = window.RUNTIME_URL || import.meta.env.VITE_RUNTIME_URL || defau
 
 export function AgentInspector() {
   const agents = useObserverStore((s) => s.agents);
+  const snapshot = useObserverStore((s) => s.snapshot) || {};
   const selectedSoulId = useObserverStore((s) => s.selectedSoulId);
   const selectAgent = useObserverStore((s) => s.selectAgent);
   const [status, setStatus] = useState(null);
@@ -20,6 +22,14 @@ export function AgentInspector() {
   const agent = useMemo(
     () => agents.find((item) => item?.soul_id === selectedSoulId) || agents[0] || null,
     [agents, selectedSoulId]
+  );
+  const avatarState = snapshot.avatar || {};
+  const isSpeaking = Boolean(
+    avatarState?.speaker_soul_id && agent?.soul_id === avatarState.speaker_soul_id && avatarState?.speaking
+  );
+  const avatarSource = useMemo(
+    () => selectAvatarSource({ agent, avatarState, runtimeBaseUrl: API_BASE, speaking: isSpeaking }),
+    [agent, avatarState, isSpeaking]
   );
 
   useEffect(() => {
@@ -55,6 +65,8 @@ export function AgentInspector() {
         <div><span>avatar</span><strong>{agent.avatar_cid ? 'yes' : 'no'}</strong></div>
         <div><span>voice</span><strong>{agent.voice_model_cid ? 'yes' : 'no'}</strong></div>
         <div><span>vrm</span><strong>{agent.vrm_avatar_url ? 'url' : 'fallback'}</strong></div>
+        <div><span>visual</span><strong>{sourceStatusText(avatarSource)}</strong></div>
+        <div><span>fallback</span><strong>{avatarSource.fallbackKind}</strong></div>
         <div><span>state</span><strong>{status?.tier_name || status?.tier || 'live'}</strong></div>
       </div>
     </aside>

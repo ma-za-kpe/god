@@ -1,16 +1,7 @@
-import { useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Billboard, Html, Text } from '@react-three/drei';
 import { useFrame } from '@react-three/fiber';
-
-function resolveAvatarCid(agent, avatarState) {
-  return (
-    agent?.rigged_avatar_cid ||
-    agent?.avatar_cid ||
-    avatarState?.avatar_asset ||
-    avatarState?.rigged_avatar_cid ||
-    ''
-  );
-}
+import { selectAvatarSource, sourceStatusText } from '../avatarSource';
 
 function clamp(value, lower, upper) {
   return Math.max(lower, Math.min(upper, value));
@@ -30,24 +21,60 @@ function stablePhase(value) {
   return (Math.abs(hash) % 6283) / 1000;
 }
 
+function nowMs() {
+  return typeof performance !== 'undefined' ? performance.now() : Date.now();
+}
+
 export function AgentAvatar({ agent, avatarState, selected, speaking, runtimeBaseUrl, position, color, minimal = false }) {
   const groupRef = useRef();
   const haloRef = useRef();
   const blinkRef = useRef();
   const mouthRef = useRef();
+  const sourceSwitchStartedAt = useRef(nowMs());
+  const [videoReady, setVideoReady] = useState(false);
+  const [videoFailed, setVideoFailed] = useState(false);
+  const [switchMs, setSwitchMs] = useState(0);
   const phase = useMemo(() => stablePhase(agent?.soul_id || agent?.current_name), [agent?.current_name, agent?.soul_id]);
-
-  const portraitCid = resolveAvatarCid(agent, avatarState);
-  const portraitUrl = portraitCid
-    ? `${String(runtimeBaseUrl || '').replace(/\/+$/, '')}/ipfs/${portraitCid}`
-    : '';
 
   const isActiveSpeaker = Boolean(
     speaking || (avatarState?.speaker_soul_id && agent?.soul_id === avatarState.speaker_soul_id && avatarState?.speaking)
   );
+  const avatarSource = useMemo(
+    () => selectAvatarSource({ agent, avatarState, runtimeBaseUrl, speaking: isActiveSpeaker }),
+    [agent, avatarState, runtimeBaseUrl, isActiveSpeaker]
+  );
+  const portraitUrl = avatarSource.fallback?.url || '';
+  const videoUrl = avatarSource.video?.url || '';
+  const fallbackInitial = avatarSource.fallback?.initial || (agent?.current_name || agent?.soul_id || '?').slice(0, 1).toUpperCase();
+  const sourceLabel = sourceStatusText(avatarSource);
+  const sourceStatus = videoFailed
+    ? 'video-error-fallback'
+    : (videoUrl ? `${sourceLabel}-${videoReady ? 'ready' : 'preloading'}` : avatarSource.status);
+  const showVideo = Boolean(videoUrl && videoReady && !videoFailed);
   const usesSnapshotLife = Boolean(!avatarState?.speaker_soul_id || agent?.soul_id === avatarState.speaker_soul_id || selected);
   const life = avatarState?.life || {};
   const basePosition = position || [0, 0, 0];
+
+  useEffect(() => {
+    sourceSwitchStartedAt.current = nowMs();
+    setVideoReady(false);
+    setVideoFailed(false);
+    setSwitchMs(0);
+  }, [videoUrl]);
+
+  const markVideoReady = (event) => {
+    setVideoFailed(false);
+    setVideoReady(true);
+    setSwitchMs(Math.max(0, Math.round(nowMs() - sourceSwitchStartedAt.current)));
+    const play = event?.currentTarget?.play?.();
+    if (play?.catch) play.catch(() => {});
+  };
+
+  const markVideoFailed = () => {
+    setVideoReady(false);
+    setVideoFailed(true);
+    setSwitchMs(Math.max(0, Math.round(nowMs() - sourceSwitchStartedAt.current)));
+  };
 
   useFrame(({ clock }) => {
     const t = clock.getElapsedTime();
@@ -115,6 +142,11 @@ export function AgentAvatar({ agent, avatarState, selected, speaking, runtimeBas
       >
         <div
           className={isActiveSpeaker ? 'speaking-avatar' : ''}
+          data-avatar-source-kind={avatarSource.activeKind}
+          data-avatar-source-status={sourceStatus}
+          data-avatar-fallback-kind={avatarSource.fallbackKind}
+          data-avatar-source-switch-ms={switchMs}
+          data-avatar-black-frame-ms="0"
           style={{
             width: '170px',
             height: '210px',
@@ -139,23 +171,64 @@ export function AgentAvatar({ agent, avatarState, selected, speaking, runtimeBas
               <img
                 src={portraitUrl}
                 alt={agent.current_name || 'agent'}
-                style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                style={{
+                  position: 'absolute',
+                  inset: 0,
+                  zIndex: 1,
+                  width: '100%',
+                  height: '100%',
+                  objectFit: 'cover',
+                  display: 'block',
+                }}
                 crossOrigin="anonymous"
               />
             ) : (
               <div style={{
+                position: 'absolute',
+                inset: 0,
+                zIndex: 1,
                 width: '100%', height: '100%',
                 background: `radial-gradient(circle at 50% 40%, ${color}44, #0d1020)`,
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 fontSize: '48px', color,
               }}>
-                ◈
+                {fallbackInitial}
               </div>
+            )}
+            {videoUrl && !videoFailed && (
+              <video
+                src={videoUrl}
+                muted
+                autoPlay
+                loop={avatarSource.video?.kind !== 'cinematic'}
+                playsInline
+                preload="auto"
+                crossOrigin="anonymous"
+                onLoadedData={markVideoReady}
+                onCanPlay={markVideoReady}
+                onPlaying={markVideoReady}
+                onError={markVideoFailed}
+                onEnded={() => {
+                  if (avatarSource.video?.kind === 'cinematic') setVideoReady(false);
+                }}
+                style={{
+                  position: 'absolute',
+                  inset: 0,
+                  zIndex: 2,
+                  width: '100%',
+                  height: '100%',
+                  objectFit: 'cover',
+                  opacity: showVideo ? 1 : 0,
+                  transition: 'opacity 220ms ease',
+                  background: 'transparent',
+                }}
+              />
             )}
             <div
               ref={blinkRef}
               style={{
                 position: 'absolute',
+                zIndex: 3,
                 left: '24%',
                 right: '24%',
                 top: '32%',
@@ -174,6 +247,7 @@ export function AgentAvatar({ agent, avatarState, selected, speaking, runtimeBas
               ref={mouthRef}
               style={{
                 position: 'absolute',
+                zIndex: 3,
                 left: '50%',
                 bottom: '22%',
                 width: '46px',

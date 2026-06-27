@@ -548,11 +548,49 @@
     }
 
     .avatar-orb img.avatar-portrait {
+      position: absolute;
+      inset: 0;
       width: 100%;
       height: 100%;
       object-fit: cover;
       border-radius: 50%;
       display: block;
+      transition: opacity 0.22s ease, filter 0.22s ease;
+    }
+
+    .avatar-orb .avatar-fallback-initial {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      border-radius: 50%;
+      color: rgba(246,248,255,0.9);
+      font-family: "Cinzel", serif;
+      font-size: clamp(1.1rem, 3.4vw, 2.8rem);
+      background: radial-gradient(circle at 50% 40%, color-mix(in srgb, var(--accent, var(--cyan)) 42%, transparent), rgba(5,8,16,0.28));
+    }
+
+    .avatar-orb .avatar-video-layer {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      border-radius: 50%;
+      opacity: 0;
+      pointer-events: none;
+      background: transparent;
+      transition: opacity 0.24s ease;
+    }
+
+    .avatar-orb[data-avatar-video-ready="1"] .avatar-video-layer {
+      opacity: 1;
+    }
+
+    .avatar-orb[data-avatar-video-ready="1"] img.avatar-portrait,
+    .avatar-orb[data-avatar-video-ready="1"] .avatar-fallback-initial {
+      opacity: 0.08;
+      filter: saturate(0.8) brightness(0.82);
     }
 
     .avatar-orb .rigged-avatar-canvas {
@@ -571,7 +609,12 @@
       opacity: 1;
     }
 
-    .agent-tile.active .avatar-orb img.avatar-portrait {
+    .avatar-orb[data-avatar-source-kind="loop"] .rigged-avatar-canvas,
+    .avatar-orb[data-avatar-source-kind="cinematic"] .rigged-avatar-canvas {
+      opacity: 0;
+    }
+
+    .agent-tile.active .avatar-orb:not([data-avatar-video-ready="1"]) img.avatar-portrait {
       opacity: 0.18;
       filter: saturate(0.85) brightness(0.85);
     }
@@ -862,6 +905,8 @@
       width: min(56%, 320px);
       aspect-ratio: 3 / 4;
       border-radius: 40px;
+      position: relative;
+      overflow: hidden;
       background:
         radial-gradient(circle at 36% 28%, rgba(255,255,255,0.8), rgba(255,255,255,0.14) 12%, transparent 14%),
         radial-gradient(circle at center, var(--accent), color-mix(in srgb, var(--accent) 48%, transparent) 38%, rgba(5,8,16,0.1) 75%),
@@ -871,6 +916,48 @@
         0 0 40px color-mix(in srgb, var(--accent) 28%, transparent),
         0 0 88px rgba(244,201,93,0.1);
       animation: float 4.8s ease-in-out infinite;
+    }
+
+    .focus-orb img.avatar-portrait,
+    .focus-orb .avatar-video-layer,
+    .focus-orb .avatar-fallback-initial {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      border-radius: inherit;
+    }
+
+    .focus-orb img.avatar-portrait {
+      object-fit: cover;
+      transition: opacity 0.24s ease, filter 0.24s ease;
+    }
+
+    .focus-orb .avatar-fallback-initial {
+      display: grid;
+      place-items: center;
+      color: rgba(246,248,255,0.92);
+      font-family: "Cinzel", serif;
+      font-size: clamp(2.4rem, 8vw, 6.2rem);
+      background: radial-gradient(circle at 50% 40%, color-mix(in srgb, var(--accent, var(--cyan)) 45%, transparent), rgba(5,8,16,0.22));
+    }
+
+    .focus-orb .avatar-video-layer {
+      object-fit: cover;
+      opacity: 0;
+      pointer-events: none;
+      background: transparent;
+      transition: opacity 0.28s ease;
+    }
+
+    .focus-orb[data-avatar-video-ready="1"] .avatar-video-layer {
+      opacity: 1;
+    }
+
+    .focus-orb[data-avatar-video-ready="1"] img.avatar-portrait,
+    .focus-orb[data-avatar-video-ready="1"] .avatar-fallback-initial {
+      opacity: 0.1;
+      filter: saturate(0.82) brightness(0.82);
     }
 
     @keyframes float {
@@ -1282,6 +1369,35 @@
       currentRecipientId: null
     };
     const AGENT_COLORS = ['#4effb5', '#54c8ff', '#f4c95d', '#cc86ff', '#ff6b88', '#87a7ff', '#7df2e3', '#ffc66b'];
+    const AVATAR_CID_FIELDS = ['cid', 'ipfs_cid', 'ipfsCid', 'asset_cid', 'assetCid', 'hash'];
+    const AVATAR_URL_FIELDS = ['url', 'src', 'href', 'uri', 'path'];
+    const AVATAR_PORTRAIT_PATHS = [
+      ['portrait'], ['static'], ['static_fallback'], ['fallback'], ['avatar'],
+      ['assets', 'portrait'], ['assets', 'static'], ['assets', 'fallback'],
+      ['images', 'portrait'], ['sources', 'portrait']
+    ];
+    const AVATAR_LOOP_PATHS = [
+      ['speaking_loop'], ['talking_loop'], ['loop_speaking'], ['assets', 'speaking_loop'],
+      ['loops', 'speaking'], ['videos', 'speaking'], ['sources', 'speaking'],
+      ['loop'], ['idle_loop'], ['listening_loop'], ['video_loop'], ['assets', 'loop'],
+      ['assets', 'idle_loop'], ['loops', 'idle'], ['loops', 'default'], ['videos', 'loop'],
+      ['video', 'loop'], ['sources', 'loop']
+    ];
+    const AVATAR_CINEMATIC_PATHS = [
+      ['cinematic_clip'], ['cinematic'], ['generated_clip'], ['clip'],
+      ['assets', 'cinematic'], ['assets', 'clip'], ['videos', 'cinematic'],
+      ['video', 'cinematic'], ['sources', 'cinematic']
+    ];
+    const DIRECT_PORTRAIT_FIELDS = ['avatar_cid', 'avatar_asset', 'portrait_cid', 'portrait_url', 'rigged_avatar_cid'];
+    const DIRECT_LOOP_FIELDS = [
+      'avatar_loop_url', 'avatar_loop_cid', 'video_loop_url', 'video_loop_cid',
+      'loop_url', 'loop_cid', 'idle_loop_url', 'idle_loop_cid',
+      'speaking_loop_url', 'speaking_loop_cid'
+    ];
+    const DIRECT_CINEMATIC_FIELDS = [
+      'cinematic_clip_url', 'cinematic_clip_cid', 'cinematic_url',
+      'cinematic_cid', 'generated_clip_url', 'generated_clip_cid'
+    ];
 
     function wsUrl() {
       return RUNTIME.replace(/^http/, 'ws') + '/world/stream';
@@ -1306,8 +1422,187 @@
 
     function ipfsUrl(cid) {
       const value = String(cid || '').trim();
-      return value ? `${RUNTIME}/ipfs/${encodeURIComponent(value)}` : '';
+      if (!value) return '';
+      if (/^(https?:|blob:|data:|\/|\.\/|\.\.\/)/i.test(value)) return value;
+      const stripped = value.replace(/^ipfs:\/\//i, '');
+      return `${RUNTIME}/ipfs/${stripped.split('/').filter(Boolean).map(encodeURIComponent).join('/')}`;
     }
+
+    function asAvatarObject(value) {
+      return value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+    }
+
+    function firstAvatarEntry(value) {
+      if (Array.isArray(value)) {
+        return value.find(entry => entry !== undefined && entry !== null && entry !== '') || null;
+      }
+      const obj = asAvatarObject(value);
+      if (Array.isArray(obj.sources)) return firstAvatarEntry(obj.sources);
+      if (obj.sources && typeof obj.sources === 'object') return firstAvatarEntry(Object.values(obj.sources));
+      return value;
+    }
+
+    function avatarValueAt(root, path) {
+      let cursor = root;
+      for (const key of path) {
+        if (!cursor || typeof cursor !== 'object') return undefined;
+        cursor = cursor[key];
+      }
+      return cursor;
+    }
+
+    function avatarAssetFromRef(value, kind, label) {
+      const source = firstAvatarEntry(value);
+      if (typeof source === 'string' && source.trim()) {
+        const url = ipfsUrl(source);
+        return { kind, label, url, cid: /^(https?:|blob:|data:|\/|\.\/|\.\.\/)/i.test(source) ? '' : source.replace(/^ipfs:\/\//i, '') };
+      }
+      const obj = asAvatarObject(source);
+      for (const field of AVATAR_URL_FIELDS) {
+        const url = String(obj[field] || '').trim();
+        if (url) return { kind, label, url, cid: '', mimeType: String(obj.mime_type || obj.mimeType || obj.type || '') };
+      }
+      for (const field of AVATAR_CID_FIELDS) {
+        const cid = String(obj[field] || '').trim();
+        if (cid) return { kind, label, url: ipfsUrl(cid), cid: cid.replace(/^ipfs:\/\//i, ''), mimeType: String(obj.mime_type || obj.mimeType || obj.type || '') };
+      }
+      return null;
+    }
+
+    function avatarManifests(agent, avatarState) {
+      return [
+        ['avatar.avatar_manifest', avatarState.avatar_manifest],
+        ['avatar.video_manifest', avatarState.video_manifest],
+        ['avatar.manifest', avatarState.manifest],
+        ['avatar.plan.avatar_manifest', avatarState.plan?.avatar_manifest],
+        ['avatar.plan.video_manifest', avatarState.plan?.video_manifest],
+        ['avatar.plan.manifest', avatarState.plan?.manifest],
+        ['agent.avatar_manifest', agent.avatar_manifest],
+        ['agent.video_manifest', agent.video_manifest],
+        ['agent.manifest', agent.manifest],
+      ].filter(([, manifest]) => manifest && typeof manifest === 'object' && !Array.isArray(manifest));
+    }
+
+    function pickAvatarFromManifests(manifests, paths, kind) {
+      for (const [label, manifest] of manifests) {
+        for (const path of paths) {
+          const value = avatarValueAt(manifest, path);
+          if (value === undefined || value === null || value === '') continue;
+          const asset = avatarAssetFromRef(value, kind, `${label}.${path.join('.')}`);
+          if (asset?.url) return asset;
+        }
+      }
+      return null;
+    }
+
+    function pickDirectAvatar(containers, fields, kind) {
+      for (const [label, source] of containers) {
+        const obj = asAvatarObject(source);
+        for (const field of fields) {
+          if (obj[field] === undefined || obj[field] === null || obj[field] === '') continue;
+          const asset = avatarAssetFromRef(obj[field], kind, `${label}.${field}`);
+          if (asset?.url) return asset;
+        }
+      }
+      return null;
+    }
+
+    function selectAvatarSource(agent, avatarState, isSpeaking) {
+      const manifests = avatarManifests(agent, avatarState);
+      const containers = [['avatar', avatarState], ['avatar.plan', avatarState.plan], ['agent', agent]];
+      const portrait =
+        pickAvatarFromManifests(manifests, AVATAR_PORTRAIT_PATHS, 'portrait') ||
+        pickDirectAvatar(containers, DIRECT_PORTRAIT_FIELDS, 'portrait');
+      const cinematic = isSpeaking
+        ? (
+          pickAvatarFromManifests(manifests, AVATAR_CINEMATIC_PATHS, 'cinematic') ||
+          pickDirectAvatar(containers, DIRECT_CINEMATIC_FIELDS, 'cinematic')
+        )
+        : null;
+      const loop =
+        pickAvatarFromManifests(manifests, AVATAR_LOOP_PATHS, 'loop') ||
+        pickDirectAvatar(containers, DIRECT_LOOP_FIELDS, 'loop');
+      const video = cinematic || loop;
+      const initial = String(agent.current_name || agent.soul_id || '?').slice(0, 1).toUpperCase() || '?';
+      const fallback = portrait || { kind: 'static-fallback', label: 'generated-fallback', url: '', initial };
+      return {
+        activeKind: (video || fallback).kind,
+        fallback,
+        fallbackKind: fallback.kind,
+        manifestAware: manifests.length > 0,
+        status: video ? `${video.kind}-selected` : (portrait ? 'portrait-fallback' : 'generated-fallback'),
+        video,
+      };
+    }
+
+    function sourceStatusText(source) {
+      if (source.video?.kind === 'cinematic') return 'cinematic';
+      if (source.video?.kind === 'loop') return 'loop';
+      if (source.fallback?.kind === 'portrait') return 'portrait';
+      return 'static';
+    }
+
+    function avatarFallbackMarkup(source, agent) {
+      if (source.fallback?.url) {
+        return `<img class="avatar-portrait" src="${fmt(source.fallback.url)}" loading="lazy" onerror="this.style.display='none'">`;
+      }
+      const initial = source.fallback?.initial || String(agent.current_name || agent.soul_id || '?').slice(0, 1).toUpperCase() || '?';
+      return `<div class="avatar-fallback-initial">${fmt(initial)}</div>`;
+    }
+
+    function avatarVideoMarkup(source) {
+      if (!source.video?.url) return '';
+      const loopAttr = source.video.kind === 'cinematic' ? '' : ' loop';
+      return `<video class="avatar-video-layer" src="${fmt(source.video.url)}" muted autoplay${loopAttr} playsinline preload="auto" onloadeddata="window.GodAvatarVideo.ready(this)" oncanplay="window.GodAvatarVideo.ready(this)" onplaying="window.GodAvatarVideo.ready(this)" onerror="window.GodAvatarVideo.error(this)" onended="window.GodAvatarVideo.ended(this)"></video>`;
+    }
+
+    function applyAvatarSourceToHost(host, source, agent) {
+      if (!host) return;
+      const key = `${source.activeKind}:${source.video?.url || ''}:${source.fallback?.url || source.fallback?.initial || ''}`;
+      host.dataset.avatarSourceKind = source.activeKind;
+      host.dataset.avatarSourceStatus = source.status;
+      host.dataset.avatarFallbackKind = source.fallbackKind;
+      host.dataset.avatarManifestAware = source.manifestAware ? '1' : '0';
+      host.dataset.avatarBlackFrameMs = '0';
+      if (host.dataset.avatarVisualKey !== key) {
+        host.dataset.avatarVisualKey = key;
+        host.dataset.avatarVideoReady = '0';
+        host.dataset.avatarSourceSwitchStartedAt = String(Date.now());
+        host.dataset.avatarSourceSwitchMs = '0';
+        host.innerHTML = `${avatarFallbackMarkup(source, agent)}${avatarVideoMarkup(source)}`;
+      }
+    }
+
+    function setAvatarVideoStatus(video, ready, status) {
+      const host = video?.closest?.('.avatar-orb, .focus-orb');
+      if (!host) return;
+      const started = Number(host.dataset.avatarSourceSwitchStartedAt || Date.now());
+      host.dataset.avatarVideoReady = ready ? '1' : '0';
+      host.dataset.avatarSourceStatus = status;
+      host.dataset.avatarSourceSwitchMs = String(Math.max(0, Date.now() - started));
+      host.dataset.avatarBlackFrameMs = '0';
+      if (ready) {
+        const play = video.play?.();
+        if (play?.catch) play.catch(() => {});
+      }
+    }
+
+    window.GodAvatarVideo = {
+      ready(video) {
+        const kind = video?.closest?.('.avatar-orb, .focus-orb')?.dataset.avatarSourceKind || 'video';
+        setAvatarVideoStatus(video, true, `${kind}-ready`);
+      },
+      error(video) {
+        setAvatarVideoStatus(video, false, 'video-error-fallback');
+        if (video) video.style.display = 'none';
+      },
+      ended(video) {
+        const host = video?.closest?.('.avatar-orb, .focus-orb');
+        if (host?.dataset.avatarSourceKind === 'cinematic') {
+          setAvatarVideoStatus(video, false, 'cinematic-ended-fallback');
+        }
+      }
+    };
 
     function finiteNumber(value, fallback = 0) {
       const parsed = Number(value);
@@ -1791,7 +2086,8 @@
         const isAvatarSpeaker = avatarSpeakerId && agent.soul_id === avatarSpeakerId;
         const isSpeaking = agent.soul_id === speakingId || (isAvatarSpeaker && avatarState.speaking);
         const isListening = agent.soul_id === listeningId;
-        const avatarSrc = ipfsUrl(agent.avatar_cid);
+        const avatarSource = selectAvatarSource(agent, avatarState, isSpeaking);
+        const avatarSrc = avatarSource.fallback?.url || '';
         const riggedSrc = agent.rigged_avatar_cid || avatarState.rigged_avatar_cid || agent.avatar_cid || '';
         const riggedUrl = ipfsUrl(riggedSrc);
         const avatarExpression = String(avatarState.expression || 'neutral');
@@ -1799,12 +2095,13 @@
         const avatarMotion = String(avatarState.motion || 'live-reactive');
         const lipSyncSource = String(avatarState.lip_sync_source || 'audio');
         const lifeAttrs = avatarLifeAttrs(avatarLife, avatarState, isActive || isAvatarSpeaker, isSpeaking);
+        const visualTag = `visual:${sourceStatusText(avatarSource)}`;
         const tile = document.createElement('article');
         tile.className = `agent-tile${isActive ? ' active' : ''}${isSecondary ? ' secondary-speaker' : ''}${isSpeaking ? ' speaking' : ''}${isListening ? ' listening' : ''}`;
         tile.dataset.agentId = agent.soul_id;
         tile.style.setProperty('--accent', accentFor(agent, index));
         const state = isActive ? 'LEAD' : (isSecondary ? 'RESPONDING' : (agent.is_sleeping ? 'SLEEPING' : 'SUPPORT'));
-        const tags = agentTags(agent, snap, isActive || isSecondary);
+        const tags = [visualTag, ...agentTags(agent, snap, isActive || isSecondary)];
         tile.innerHTML = `
           <div class="agent-head">
             <div class="agent-name">${fmt(agent.current_name || agent.soul_id)}</div>
@@ -1816,6 +2113,14 @@
               data-rigged-avatar-host="${isActive ? '1' : '0'}"
               data-avatar-src="${fmt(avatarSrc)}"
               data-rigged-avatar-src="${fmt(riggedUrl)}"
+              data-avatar-source-kind="${fmt(avatarSource.activeKind)}"
+              data-avatar-source-status="${fmt(avatarSource.status)}"
+              data-avatar-fallback-kind="${fmt(avatarSource.fallbackKind)}"
+              data-avatar-manifest-aware="${avatarSource.manifestAware ? '1' : '0'}"
+              data-avatar-video-ready="0"
+              data-avatar-source-switch-started-at="${Date.now()}"
+              data-avatar-source-switch-ms="0"
+              data-avatar-black-frame-ms="0"
               data-avatar-expression="${avatarExpression}"
               data-avatar-pose="${avatarPose}"
               data-avatar-motion="${avatarMotion}"
@@ -1831,7 +2136,8 @@
               data-agent-id="${fmt(agent.soul_id)}"
               style="background:${agent.soul_id?.startsWith('empty-') ? 'radial-gradient(circle at center, rgba(255,255,255,0.08), rgba(255,255,255,0.02))' : `radial-gradient(circle at 35% 30%, rgba(255,255,255,0.72), rgba(255,255,255,0.18) 15%, transparent 17%), radial-gradient(circle at center, ${AGENT_COLORS[index % AGENT_COLORS.length]}, rgba(84,200,255,0.52) 36%, rgba(5,8,16,0.15) 74%)`}; opacity:${agent.soul_id?.startsWith('empty-') ? 0.35 : 1}"
             >
-              ${avatarSrc ? `<img class="avatar-portrait" src="${fmt(avatarSrc)}" loading="lazy" onerror="this.style.display='none'">` : ''}
+              ${avatarFallbackMarkup(avatarSource, agent)}
+              ${avatarVideoMarkup(avatarSource)}
               ${isActive ? '<canvas class="rigged-avatar-canvas" data-rigged-avatar-canvas></canvas>' : ''}
               <div class="voice-rings" aria-hidden="true"><span></span><span></span><span></span></div>
             </div>
@@ -1892,6 +2198,7 @@
 
     function renderFocus(snap) {
       const showrunner = snap.showrunner || {};
+      const avatarState = snap.avatar || {};
       const active = pickActiveAgent(snap);
       const pair = pickConversationPair(snap);
       const secondary = pair.secondary && pair.secondary.soul_id !== active?.soul_id ? pair.secondary : null;
@@ -1917,6 +2224,11 @@
           const accentB = accentFor(secondary, (STATE.agents || []).findIndex(a => a.soul_id === secondary.soul_id));
           focusOrbB.style.setProperty('--accent', accentB);
           focusOrbB.style.display = '';
+          applyAvatarSourceToHost(
+            focusOrbB,
+            selectAvatarSource(secondary, avatarState, STATE.dialogueSpeaking && STATE.currentSpeakerId === secondary.soul_id),
+            secondary
+          );
         }
         if (focusAvatar) focusAvatar.classList.add('dual');
       } else {
@@ -1933,6 +2245,18 @@
         ? accentFor(active, (STATE.agents || []).findIndex(a => a.soul_id === active.soul_id))
         : 'rgba(84,200,255,0.85)';
       focusOrb.style.setProperty('--accent', accent);
+      if (active) {
+        applyAvatarSourceToHost(
+          focusOrb,
+          selectAvatarSource(
+            active,
+            avatarState,
+            (STATE.dialogueSpeaking && STATE.currentSpeakerId === active.soul_id) ||
+              (avatarState.speaking && avatarState.speaker_soul_id === active.soul_id)
+          ),
+          active
+        );
+      }
       focusOrb.parentElement.style.borderColor = active ? 'rgba(244,201,93,0.16)' : 'rgba(255,255,255,0.06)';
 
       const focusPanel = document.querySelector('.focus');
