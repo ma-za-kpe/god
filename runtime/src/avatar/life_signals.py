@@ -39,10 +39,14 @@ class LifeSignals:
         self._blink_until = 0.0
         self._next_blink_at = time.time() + random.uniform(*self.blink_interval_range)
 
-    def update(self, *, is_speaking: bool, audio_rms: float = 0.0, now: float | None = None) -> LifeState:
+    def update(
+        self, *, is_speaking: bool, audio_rms: float = 0.0, now: float | None = None
+    ) -> LifeState:
         now = now if now is not None else time.time()
 
-        self.state.breathing_phase = (math.sin((now / self.breath_speed_seconds) * math.tau) + 1.0) / 2.0
+        self.state.breathing_phase = (
+            math.sin((now / self.breath_speed_seconds) * math.tau) + 1.0
+        ) / 2.0
 
         if now >= self._next_blink_at:
             self._blink_until = now + random.uniform(*self.blink_duration_range)

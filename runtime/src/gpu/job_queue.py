@@ -57,7 +57,9 @@ class GPUJobQueue:
         self._stats = GPUJobStats()
 
     @asynccontextmanager
-    async def acquire(self, priority: JobPriority, *, job_name: str | None = None) -> AsyncIterator[None]:
+    async def acquire(
+        self, priority: JobPriority, *, job_name: str | None = None
+    ) -> AsyncIterator[None]:
         requested_at = time.time()
         async with self._lock:
             started_at = time.time()

@@ -277,7 +277,9 @@ class GenesisPipeline:
             except Exception as voice_exc:
                 voice_result = None
                 self._record_failure(result, "voice_embedding", f"clone_exception: {voice_exc}")
-                self._log_step(correlation_id, soul_id, "voice_embedding", False, {"error": str(voice_exc)})
+                self._log_step(
+                    correlation_id, soul_id, "voice_embedding", False, {"error": str(voice_exc)}
+                )
             if voice_result:
                 voice_pin = await pin_bytes(
                     voice_result.embedding_bytes, filename=f"{soul_id}-voice.bin"
@@ -411,6 +413,7 @@ class GenesisPipeline:
         model = os.getenv("LLM_MODEL", "llama3.1:8b")
         try:
             import httpx as _httpx
+
             async with _httpx.AsyncClient(timeout=10.0) as client:
                 await client.post(
                     f"{ollama_url}/api/generate",

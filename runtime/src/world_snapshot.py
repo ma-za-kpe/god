@@ -23,21 +23,14 @@ DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://god:localdev@localhost:54
 WORLD_ID = os.getenv("WORLD_ID", "local-dev-world-1")
 MAX_AGENTS = int(os.getenv("SNAPSHOT_MAX_AGENTS", "10000"))
 _PUBLIC_MESSAGE_TYPES = (
-    "'contract'",
-    "'threat'",
-    "'broadcast'",
-    "'eulogy'",
-    "'manifesto'",
-    "'petition'",
-    "'propaganda'",
+    "contract",
+    "threat",
+    "broadcast",
+    "eulogy",
+    "manifesto",
+    "petition",
+    "propaganda",
 )
-_PUBLIC_MESSAGE_TYPE_SQL = ", ".join(_PUBLIC_MESSAGE_TYPES)
-_PUBLIC_EVENT_FILTER = """
-      AND NOT (
-        event_type = 'social.agent.message_sent'
-        AND COALESCE(payload->>'is_public', 'false') != 'true'
-      )
-"""
 
 _AGENTS_SQL = """
     SELECT
@@ -87,6 +80,62 @@ _STATS_SQL = """
         COALESCE(MAX(generation), 1)                         AS max_generation,
         COALESCE(AVG(generation) FILTER (WHERE is_alive), 1) AS avg_generation
     FROM agents WHERE world_id = $1
+"""
+
+_EVENTS_SQL_SYNC = """
+    SELECT event_id, agent_id, event_type, timestamp, narrative, payload
+    FROM events
+    WHERE world_id = %s
+      AND NOT (
+        event_type = 'social.agent.message_sent'
+        AND COALESCE(payload->>'is_public', 'false') != 'true'
+      )
+    ORDER BY timestamp DESC
+    LIMIT %s
+"""
+
+_EVENTS_SQL_ASYNC = """
+    SELECT event_id, agent_id, event_type, timestamp, narrative, payload
+    FROM events
+    WHERE world_id = $1
+      AND NOT (
+        event_type = 'social.agent.message_sent'
+        AND COALESCE(payload->>'is_public', 'false') != 'true'
+      )
+    ORDER BY timestamp DESC
+    LIMIT $2
+"""
+
+_MESSAGES_SQL_SYNC = """
+    SELECT m.*,
+           sa.current_name AS sender_name,
+           ra.current_name AS recipient_name
+    FROM agent_messages m
+    LEFT JOIN agents sa ON m.sender_id = sa.soul_id
+    LEFT JOIN agents ra ON m.recipient_id = ra.soul_id
+    WHERE m.world_id = %s
+      AND (
+        m.recipient_id = 'BROADCAST'
+        OR m.message_type = ANY(%s::text[])
+      )
+    ORDER BY m.sent_at DESC
+    LIMIT %s
+"""
+
+_MESSAGES_SQL_ASYNC = """
+    SELECT m.*,
+           sa.current_name AS sender_name,
+           ra.current_name AS recipient_name
+    FROM agent_messages m
+    LEFT JOIN agents sa ON m.sender_id = sa.soul_id
+    LEFT JOIN agents ra ON m.recipient_id = ra.soul_id
+    WHERE m.world_id = $1
+      AND (
+        m.recipient_id = 'BROADCAST'
+        OR m.message_type = ANY($2::text[])
+      )
+    ORDER BY m.sent_at DESC
+    LIMIT $3
 """
 
 
@@ -294,31 +343,12 @@ def build_world_snapshot(
 
     _attach_economy_stats(cur, stats, world_id)
 
-    cur.execute(
-        "SELECT event_id, agent_id, event_type, timestamp, narrative, payload "
-        f"FROM events WHERE world_id = %s {_PUBLIC_EVENT_FILTER} "
-        "ORDER BY timestamp DESC LIMIT %s",
-        (world_id, events_limit),
-    )
+    cur.execute(_EVENTS_SQL_SYNC, (world_id, events_limit))
     events = [dict(r) for r in cur.fetchall()]
 
     cur.execute(
-        """
-        SELECT m.*,
-               sa.current_name AS sender_name,
-               ra.current_name AS recipient_name
-        FROM agent_messages m
-        LEFT JOIN agents sa ON m.sender_id = sa.soul_id
-        LEFT JOIN agents ra ON m.recipient_id = ra.soul_id
-        WHERE m.world_id = %s
-          AND (
-            m.recipient_id = 'BROADCAST'
-            OR m.message_type IN ({_PUBLIC_MESSAGE_TYPE_SQL})
-          )
-        ORDER BY m.sent_at DESC
-        LIMIT %s
-        """.format(_PUBLIC_MESSAGE_TYPE_SQL=_PUBLIC_MESSAGE_TYPE_SQL),
-        (world_id, messages_limit),
+        _MESSAGES_SQL_SYNC,
+        (world_id, list(_PUBLIC_MESSAGE_TYPES), messages_limit),
     )
     messages = [dict(r) for r in cur.fetchall()]
     cur.close()
@@ -352,31 +382,12 @@ async def build_world_snapshot_async(
     # Economy stats (sync helper — small queries)
     await asyncio.to_thread(_attach_economy_stats_sync, stats, world_id)
 
-    events = await fetch_all(
-        "SELECT event_id, agent_id, event_type, timestamp, narrative, payload "
-        f"FROM events WHERE world_id = $1 {_PUBLIC_EVENT_FILTER} "
-        "ORDER BY timestamp DESC LIMIT $2",
-        world_id,
-        events_limit,
-    )
+    events = await fetch_all(_EVENTS_SQL_ASYNC, world_id, events_limit)
 
     messages = await fetch_all(
-        """
-        SELECT m.*,
-               sa.current_name AS sender_name,
-               ra.current_name AS recipient_name
-        FROM agent_messages m
-        LEFT JOIN agents sa ON m.sender_id = sa.soul_id
-        LEFT JOIN agents ra ON m.recipient_id = ra.soul_id
-        WHERE m.world_id = $1
-          AND (
-            m.recipient_id = 'BROADCAST'
-            OR m.message_type IN ({_PUBLIC_MESSAGE_TYPE_SQL})
-          )
-        ORDER BY m.sent_at DESC
-        LIMIT $2
-        """.format(_PUBLIC_MESSAGE_TYPE_SQL=_PUBLIC_MESSAGE_TYPE_SQL),
+        _MESSAGES_SQL_ASYNC,
         world_id,
+        list(_PUBLIC_MESSAGE_TYPES),
         messages_limit,
     )
 

@@ -27,7 +27,9 @@ class VideoGenerator:
         except Exception:
             return False
 
-    async def submit_workflow(self, workflow_template: dict[str, Any], replacements: dict[str, Any]) -> bytes | None:
+    async def submit_workflow(
+        self, workflow_template: dict[str, Any], replacements: dict[str, Any]
+    ) -> bytes | None:
         if not self.endpoint:
             return None
         workflow = self._replace_tokens(workflow_template, replacements)
@@ -78,7 +80,9 @@ class VideoGenerator:
         self, client: httpx.AsyncClient, history_entry: dict[str, Any]
     ) -> bytes | None:
         for output in history_entry.get("outputs", {}).values():
-            for item in output.get("gifs", []) + output.get("videos", []) + output.get("images", []):
+            for item in (
+                output.get("gifs", []) + output.get("videos", []) + output.get("images", [])
+            ):
                 filename = item.get("filename")
                 if not filename:
                     continue

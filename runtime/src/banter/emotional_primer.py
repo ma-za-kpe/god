@@ -377,9 +377,12 @@ class EmotionalPrimer:
 
         sentences: list[str] = []
 
+        # Reserve one slot for the present-tense tension modifier.
+        event_sentence_cap = _MAX_SENTENCES_TOTAL - 1
+
         # Process each event from history, respecting per-event limits.
         for record in history:
-            if len(sentences) >= _MAX_SENTENCES_TOTAL:
+            if len(sentences) >= event_sentence_cap:
                 break
 
             event_type = _determine_event_type(record)
@@ -388,16 +391,15 @@ class EmotionalPrimer:
             # Respect per-event sentence cap.
             event_sentences = event_sentences[:_MAX_SENTENCES_PER_EVENT]
 
-            # Respect total sentence cap.
-            remaining = _MAX_SENTENCES_TOTAL - len(sentences)
+            # Respect total event sentence cap.
+            remaining = event_sentence_cap - len(sentences)
             event_sentences = event_sentences[:remaining]
 
             sentences.extend(event_sentences)
 
         # Add tension-aware modifier.
-        if len(sentences) < _MAX_SENTENCES_TOTAL:
-            modifier = self._tension_modifier(tension_level)
-            sentences.append(modifier)
+        modifier = self._tension_modifier(tension_level)
+        sentences.append(modifier)
 
         # Add reconciliation framing if active.
         if reconciliation_active and len(sentences) < _MAX_SENTENCES_TOTAL:
