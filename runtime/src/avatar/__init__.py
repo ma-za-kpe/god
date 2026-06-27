@@ -7,6 +7,15 @@ from .engine import (
     build_avatar_status,
     build_avatar_status_surface,
 )
+from .embodiment_benchmark import (
+    BenchmarkStatus,
+    EmbodimentBenchmarkResult,
+    EmbodimentCandidate,
+    HardwareProfile,
+    IntegrationPath,
+    build_blocked_issue96_result,
+    build_sidecar_contract,
+)
 from .evolution_engine import EvolutionEngine, EvolutionEvent
 from .genesis_pipeline import GenesisPipeline, PipelineResult
 from .life_signals import LifeSignals, LifeState, generate_life_state
@@ -22,10 +31,15 @@ __all__ = [
     "AvatarPlan",
     "AvatarState",
     "AvatarSurface",
+    "BenchmarkStatus",
     "ElderLayout",
+    "EmbodimentBenchmarkResult",
+    "EmbodimentCandidate",
     "EvolutionEngine",
     "EvolutionEvent",
     "GenesisPipeline",
+    "HardwareProfile",
+    "IntegrationPath",
     "LifeSignals",
     "LifeState",
     "MOVE_EXPRESSION_MAP",
@@ -36,9 +50,11 @@ __all__ = [
     "VisualReactor",
     "VoiceCloneResult",
     "VoiceCloner",
+    "build_blocked_issue96_result",
     "build_avatar_state",
     "build_avatar_status",
     "build_avatar_status_surface",
+    "build_sidecar_contract",
     "generate_life_state",
     "validate_archetype_configs",
 ]
