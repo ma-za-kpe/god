@@ -619,9 +619,91 @@
       filter: saturate(0.85) brightness(0.85);
     }
 
+    .avatar-life-overlay {
+      position: absolute;
+      inset: 0;
+      z-index: 4;
+      pointer-events: none;
+      opacity: 0.64;
+      transform: translateY(var(--life-bob, 0px)) rotate(var(--head-sway, 0deg));
+      transform-origin: 50% 56%;
+      animation: listenerLifeFloat 3.8s ease-in-out infinite;
+    }
+
+    .avatar-orb.rigged-host .avatar-life-overlay {
+      display: none;
+    }
+
+    .avatar-orb[data-avatar-video-ready="1"] .avatar-life-overlay {
+      opacity: 0.48;
+    }
+
+    .agent-tile.listening .avatar-life-overlay {
+      opacity: 0.78;
+      animation-duration: 3.1s;
+    }
+
+    .avatar-life-eyes {
+      position: absolute;
+      left: 24%;
+      right: 24%;
+      top: 35%;
+      display: flex;
+      justify-content: space-between;
+      gap: 12%;
+    }
+
+    .avatar-life-eye {
+      width: 42%;
+      height: 5px;
+      border-radius: 999px;
+      background: rgba(5, 8, 16, 0.72);
+      box-shadow: 0 0 8px rgba(255,255,255,0.18);
+      transform-origin: center;
+      animation: listenerBlink 5.4s ease-in-out infinite;
+    }
+
+    .avatar-orb[data-avatar-blink="1"] .avatar-life-eye {
+      animation: none;
+      transform: scaleY(0.12);
+    }
+
+    .avatar-life-mouth {
+      position: absolute;
+      left: 50%;
+      bottom: 27%;
+      width: 28%;
+      height: 5px;
+      border-radius: 999px;
+      background: rgba(34, 10, 18, 0.74);
+      box-shadow: 0 0 10px color-mix(in srgb, var(--accent, var(--cyan)) 45%, transparent);
+      transform: translateX(-50%) scaleY(var(--mouth-scale, 1));
+      transform-origin: center;
+    }
+
+    .agent-tile.speaking .avatar-life-mouth {
+      animation: listenerMouth 0.42s ease-in-out infinite alternate;
+    }
+
+    @keyframes listenerLifeFloat {
+      0%, 100% { transform: translateY(var(--life-bob, 0px)) rotate(var(--head-sway, 0deg)); }
+      50% { transform: translateY(calc(var(--life-bob, 0px) - 3px)) rotate(calc(var(--head-sway, 0deg) * -0.5)); }
+    }
+
+    @keyframes listenerBlink {
+      0%, 90%, 100% { transform: scaleY(1); }
+      94%, 96% { transform: scaleY(0.12); }
+    }
+
+    @keyframes listenerMouth {
+      from { transform: translateX(-50%) scaleY(var(--mouth-scale, 1)); }
+      to { transform: translateX(-50%) scaleY(calc(var(--mouth-scale, 1) + 1.15)); }
+    }
+
     .voice-rings {
       position: absolute;
       inset: auto 8px 6px 8px;
+      z-index: 5;
       display: flex;
       align-items: end;
       justify-content: center;
@@ -1556,6 +1638,19 @@
       return `<video class="avatar-video-layer" src="${fmt(source.video.url)}" muted autoplay${loopAttr} playsinline preload="auto" onloadeddata="window.GodAvatarVideo.ready(this)" oncanplay="window.GodAvatarVideo.ready(this)" onplaying="window.GodAvatarVideo.ready(this)" onerror="window.GodAvatarVideo.error(this)" onended="window.GodAvatarVideo.ended(this)"></video>`;
     }
 
+    function avatarLifeOverlayMarkup(lifeAttrs) {
+      const breathing = clampNumber(finiteNumber(lifeAttrs.breathing, 0.5), 0, 1);
+      const bob = ((breathing - 0.5) * 5).toFixed(2);
+      const sway = (clampNumber(finiteNumber(lifeAttrs.headSwayX, 0), -0.25, 0.25) * 24).toFixed(2);
+      const mouth = clampNumber(0.85 + finiteNumber(lifeAttrs.mouthAmplitude, 0) * 2.3, 0.65, 3.4).toFixed(2);
+      return `
+        <div class="avatar-life-overlay" aria-hidden="true" style="--life-bob:${bob}px; --head-sway:${sway}deg; --mouth-scale:${mouth}">
+          <div class="avatar-life-eyes"><span class="avatar-life-eye"></span><span class="avatar-life-eye"></span></div>
+          <div class="avatar-life-mouth"></div>
+        </div>
+      `;
+    }
+
     function applyAvatarSourceToHost(host, source, agent) {
       if (!host) return;
       const key = `${source.activeKind}:${source.video?.url || ''}:${source.fallback?.url || source.fallback?.initial || ''}`;
@@ -2139,6 +2234,7 @@
               ${avatarFallbackMarkup(avatarSource, agent)}
               ${avatarVideoMarkup(avatarSource)}
               ${isActive ? '<canvas class="rigged-avatar-canvas" data-rigged-avatar-canvas></canvas>' : ''}
+              ${avatarLifeOverlayMarkup(lifeAttrs)}
               <div class="voice-rings" aria-hidden="true"><span></span><span></span><span></span></div>
             </div>
           </div>
