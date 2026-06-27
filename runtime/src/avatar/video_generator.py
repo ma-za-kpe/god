@@ -48,6 +48,25 @@ class LTXLoopRequest:
 
 
 @dataclass(frozen=True)
+class QualityClipRequest:
+    agent_id: str
+    portrait_cid: str
+    prompt: str
+    expression: str = "cinematic"
+    motion: str = "cinematic"
+    width: int = 1280
+    height: int = 720
+    duration_ms: int = 8000
+    priority: int = 90
+    source_audio_cid: str = ""
+    expires_at: float | None = None
+    workflow_template: str = "wan_cinematic_clip.json"
+    model: str = "wan"
+    job_priority: JobPriority = JobPriority.WAN_BACKGROUND
+    variant: VideoVariant = VideoVariant.HIGH_RES_HIGHLIGHT
+
+
+@dataclass(frozen=True)
 class VideoAssetGeneration:
     result: VideoGenerationResult
     manifest: VideoManifest
@@ -197,6 +216,92 @@ class VideoGenerator:
             cid=pin_cid,
             variant=VideoVariant.LOW_RES_LIVE,
             model="ltx",
+            width=request.width,
+            height=request.height,
+            duration_ms=request.duration_ms,
+            source_image_cid=request.portrait_cid,
+            source_audio_cid=request.source_audio_cid,
+            expression=request.expression,
+            motion=request.motion,
+            priority=request.priority,
+            created_at=created_at,
+            expires_at=request.expires_at,
+            mime_type=result.content_type or "video/mp4",
+            size_bytes=len(result.video_bytes),
+        )
+        updated_manifest = VideoManifest(
+            schema_version=manifest.schema_version,
+            agent_id=manifest.agent_id or request.agent_id,
+            static_portrait_cid=manifest.static_portrait_cid or request.portrait_cid,
+            generated_at=manifest.generated_at or created_at,
+            retention=manifest.retention,
+            assets=(*manifest.assets, asset),
+        )
+        return VideoAssetGeneration(
+            result=result,
+            manifest=updated_manifest,
+            asset=asset,
+            pin_cid=pin_cid,
+        )
+
+    async def generate_quality_clip_asset(
+        self,
+        request: QualityClipRequest,
+        *,
+        manifest: VideoManifest,
+        pin_video: PinVideo,
+        queue: GPUJobQueue | None = None,
+        now: float | None = None,
+    ) -> VideoAssetGeneration:
+        queue = queue or get_gpu_job_queue()
+        try:
+            async with queue.acquire(
+                request.job_priority, job_name=f"{request.model}_quality_clip"
+            ):
+                result = await self.generate_loop_result(
+                    template_name=request.workflow_template,
+                    portrait_cid=request.portrait_cid,
+                    motion=request.motion,
+                    model=request.model,
+                    replacements={
+                        "{{PROMPT}}": request.prompt,
+                        "{{WIDTH}}": request.width,
+                        "{{HEIGHT}}": request.height,
+                        "{{DURATION_MS}}": request.duration_ms,
+                        "{{SOURCE_AUDIO_CID}}": request.source_audio_cid,
+                    },
+                )
+        except GPUJobRejected as exc:
+            result = VideoGenerationResult(ok=False, error=f"gpu_job_rejected:{exc}")
+            return VideoAssetGeneration(result=result, manifest=manifest, error=result.error)
+
+        if not result.ok:
+            return VideoAssetGeneration(result=result, manifest=manifest, error=result.error)
+
+        pin_result = await pin_video(result.video_bytes)
+        pin_ok = bool(getattr(pin_result, "ok", pin_result))
+        pin_cid = str(getattr(pin_result, "cid", "") or "")
+        if not pin_ok or not pin_cid:
+            error = "ipfs_pin_failed"
+            return VideoAssetGeneration(
+                result=VideoGenerationResult(
+                    ok=False,
+                    video_bytes=result.video_bytes,
+                    prompt_id=result.prompt_id,
+                    filename=result.filename,
+                    content_type=result.content_type,
+                    error=error,
+                ),
+                manifest=manifest,
+                error=error,
+            )
+
+        created_at = time.time() if now is None else now
+        asset = VideoAsset(
+            asset_id=f"{request.model}-{request.agent_id}-{int(created_at)}",
+            cid=pin_cid,
+            variant=request.variant,
+            model=request.model,
             width=request.width,
             height=request.height,
             duration_ms=request.duration_ms,

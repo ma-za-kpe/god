@@ -1118,6 +1118,31 @@ Current constraint:
 - Production enablement still requires a field run showing Fish synthesis is not starved while
   LTX jobs are queued or cancelled.
 
+### Issue #100 Offline Quality Layer Path
+
+Date added: 2026-06-27
+
+Implemented in this repo:
+
+- `QualityClipRequest` and `generate_quality_clip_asset()` register offline/high-quality clips
+  as `high_res_highlight` manifest assets.
+- Wan cinematic clips run through the GPU queue as `wan_background`.
+- LTX LipDub/highlight clips run through the GPU queue as `offline_highlight`.
+- Both paths use injected pin adapters and remain separate from observer playback selection.
+- Added offline-only workflow templates:
+  - `runtime/workflows/wan_cinematic_clip.json`;
+  - `runtime/workflows/ltx_lipdub_highlight.json`.
+- Mocked tests cover Wan manifest registration, LipDub audio-source registration, and
+  live-mode/background-job rejection.
+
+Current constraint:
+
+- No Wan, LTX LipDub, or equivalent quality model was loaded or run in this code-only pass.
+- No generation time, VRAM, disk, or output-quality measurements exist yet for these quality
+  workflows on the target GPU class.
+- Do not claim quality gains until a field benchmark attaches measured hardware/profile data and
+  output review notes.
+
 ### TODO Backlog
 
 Status legend: `todo`, `blocked`, `in_progress`, `done`.
@@ -1132,8 +1157,8 @@ Status legend: `todo`, `blocked`, `in_progress`, `done`.
 | blocked | Lip sync | Evaluate MuseTalk vs Wav2Lip vs LivePortrait on target hardware | #96 selected MuseTalk sidecar first; target GPU/model run is blocked because the Vast.ai instance was deleted and this pass is code-only |
 | done | Comfy video | Implement `VideoGenerator` for MP4/WebM outputs | #99 adds mocked Comfy submission, polling, fetch, timeout, and MP4/WebM validation path |
 | blocked | LTX | Run one LTX image-to-video loop workflow from avatar portrait | #99 adds workflow/template/queue/manifest path; actual LTX model run is blocked until a GPU/model window |
-| todo | LTX Lipdub | Verify Fish WAV -> LTX Lipdub/highlight workflow | Async only until measured |
-| todo | Wan | Run one Wan image/text-to-video cinematic workflow | Quality backend, not live path |
+| blocked | LTX Lipdub | Verify Fish WAV -> LTX Lipdub/highlight workflow | #100 adds offline workflow/template/manifest path; actual LipDub model run and benchmark remain blocked until GPU/model window |
+| blocked | Wan | Run one Wan image/text-to-video cinematic workflow | #100 adds offline Wan workflow/template/manifest path; actual Wan model run and benchmark remain blocked until GPU/model window |
 | done | Queue | Add GPU job priority: Fish > Ollama live > real-time render > LTX > Wan | #97 adds priority scheduling, cooperative background cancellation, live-mode background rejection, and `/diagnostics/gpu` |
 | todo | Observer | Add video loop playback and fallback selection | Current avatar runtime does not consume video CIDs |
 | in_progress | Assets | Pin generated video and store manifest CID | #98 defines durable video CIDs, source CIDs, expiry, priority, local cache status, and retention/GC policy; actual generation/pinning remains for later model issues |

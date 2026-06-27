@@ -1,0 +1,48 @@
+{
+  "_meta": {
+    "name": "wan_cinematic_clip",
+    "description": "Offline Wan cinematic image-to-video template for high-resolution highlight/cutaway clips.",
+    "model_family": "wan",
+    "required_custom_nodes": [
+      "ComfyUI-WanVideoWrapper"
+    ],
+    "output": "mp4_or_webm",
+    "live_policy": "offline_only",
+    "notes": [
+      "Runtime replaces PORTRAIT_CID, PROMPT, MOTION_PROMPT, VIDEO_MODEL, WIDTH, HEIGHT, and DURATION_MS before submission.",
+      "Never place this workflow in the blocking live speaker path."
+    ]
+  },
+  "1": {
+    "class_type": "LoadImageFromIPFS",
+    "inputs": {
+      "cid": "{{PORTRAIT_CID}}"
+    }
+  },
+  "2": {
+    "class_type": "WanImageToVideo",
+    "inputs": {
+      "image": [
+        "1",
+        0
+      ],
+      "prompt": "{{PROMPT}} {{MOTION_PROMPT}}",
+      "model": "{{VIDEO_MODEL}}",
+      "width": "{{WIDTH}}",
+      "height": "{{HEIGHT}}",
+      "duration_ms": "{{DURATION_MS}}"
+    }
+  },
+  "3": {
+    "class_type": "VHS_VideoCombine",
+    "inputs": {
+      "images": [
+        "2",
+        0
+      ],
+      "frame_rate": 24,
+      "format": "video/h264-mp4",
+      "filename_prefix": "god_wan_cinematic"
+    }
+  }
+}

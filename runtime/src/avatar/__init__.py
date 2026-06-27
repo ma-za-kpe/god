@@ -37,6 +37,7 @@ from .video_manifest import (
 )
 from .video_generator import (
     LTXLoopRequest,
+    QualityClipRequest,
     VideoAssetGeneration,
     VideoGenerationResult,
     VideoGenerator,
@@ -65,6 +66,7 @@ __all__ = [
     "MOVE_EXPRESSION_MAP",
     "PipelineResult",
     "PortraitGenerator",
+    "QualityClipRequest",
     "SceneComposer",
     "SceneLayout",
     "VIDEO_MANIFEST_SCHEMA_VERSION",
