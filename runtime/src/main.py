@@ -22,6 +22,7 @@ from fastapi.staticfiles import StaticFiles
 
 from .agent_runner import agent_runner
 from .creator.routes import router as creator_router
+from .gpu import get_gpu_job_queue
 from .health_checks import probe_tcp, probe_url
 from .rent_daemon import rent_daemon
 from .runtime_endpoints import (
@@ -465,6 +466,11 @@ async def ready():
         "version": RUNTIME_VERSION,
         "checks": checks,
     }
+
+
+@app.get("/diagnostics/gpu")
+async def gpu_diagnostics():
+    return get_gpu_job_queue().diagnostics()
 
 
 @app.get("/agents")

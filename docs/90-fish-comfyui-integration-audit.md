@@ -982,16 +982,48 @@ Minimum stats:
 
 - current job;
 - queue depth by priority;
+- active and pending jobs;
 - last start/end time;
 - last error;
 - total completed;
 - total cancelled;
+- total failed;
+- total rejected;
+- total preemption requests;
 - average wait time by priority;
 - average runtime by priority.
 
 Risk:
 
 - Without a queue, LTX/Wan jobs can monopolize VRAM and make Fish voice unreliable during live streaming.
+
+### Issue #97 GPU Queue Status
+
+Date added: 2026-06-27
+
+Implemented in this repo:
+
+- `runtime/src/gpu/job_queue.py` now provides a priority-aware `GPUJobQueue`.
+- Default policy remains one active heavy GPU consumer, matching single-GPU Vast.ai hosts.
+- Priority order is `live_voice`, `live_llm`, `observer_render`, `real_time_embodiment`,
+  `ltx_background`, `wan_background`, `offline_highlight`.
+- `async with queue.acquire(...)` now yields a `GPUJobLease` cancellation token.
+- When `live_voice` arrives during active background work, the queue requests cooperative
+  cancellation on active LTX/Wan/offline jobs.
+- Live mode can reject new LTX/Wan/offline work through `enter_live_mode()` or
+  `set_background_jobs_allowed(False)`.
+- Optional hooks exist for adapter-level unload/reload behavior without coupling the queue to
+  Fish, ComfyUI, or embodiment implementations.
+- Runtime exposes queue state at `/diagnostics/gpu`.
+
+Vast.ai policy:
+
+- Keep background LTX/Wan/offline jobs disabled during live YouTube proof runs until the jobs
+  are proven cooperative with cancellation and Fish synthesis remains reliable.
+- Keep GPU/model services host-local behind SSH/operator gateway; this queue does not require
+  opening public model ports.
+- Treat `live_voice` wait time above near-zero as a deployment blocker before enabling
+  background video generation.
 
 ### Asset Management And IPFS Realities
 
@@ -1041,7 +1073,7 @@ Status legend: `todo`, `blocked`, `in_progress`, `done`.
 | todo | LTX | Run one LTX image-to-video loop workflow from avatar portrait | First video model integration |
 | todo | LTX Lipdub | Verify Fish WAV -> LTX Lipdub/highlight workflow | Async only until measured |
 | todo | Wan | Run one Wan image/text-to-video cinematic workflow | Quality backend, not live path |
-| todo | Queue | Add GPU job priority: Fish > Ollama live > real-time render > LTX > Wan | Prevent video jobs starving live stream |
+| done | Queue | Add GPU job priority: Fish > Ollama live > real-time render > LTX > Wan | #97 adds priority scheduling, cooperative background cancellation, live-mode background rejection, and `/diagnostics/gpu` |
 | todo | Observer | Add video loop playback and fallback selection | Current avatar runtime does not consume video CIDs |
 | todo | Assets | Pin generated video and store manifest CID | Keep asset identity durable |
 | blocked | Benchmarks | Record generation time, VRAM, disk per model/workflow | #96 benchmark contract and runner added; real latency/VRAM/output evidence still requires a target GPU host |
