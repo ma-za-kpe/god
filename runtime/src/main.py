@@ -55,6 +55,7 @@ def _env_int(name: str, default: int) -> int:
 
 
 PUBLIC_IPFS_MAX_BYTES = _env_int("PUBLIC_IPFS_MAX_BYTES", 8 * 1024 * 1024)
+PUBLIC_IPFS_VIDEO_MAX_BYTES = _env_int("PUBLIC_IPFS_VIDEO_MAX_BYTES", 128 * 1024 * 1024)
 PUBLIC_VOICE_AUDIO_MAX_BYTES = _env_int("PUBLIC_VOICE_AUDIO_MAX_BYTES", 10 * 1024 * 1024)
 
 # Runtime version is loaded from the canonical file (single source of truth, managed via release process).
@@ -833,51 +834,157 @@ async def voice_audio(utterance_id: str):
     )
 
 
+def _valid_public_cid(cid: str) -> bool:
+    return bool(cid) and len(cid) <= 160 and not any(ch in cid for ch in "/\\?&#")
+
+
+async def _cat_ipfs_limited(
+    client: httpx.AsyncClient,
+    *,
+    ipfs_api: str,
+    cid: str,
+    method: str,
+    max_bytes: int,
+) -> tuple[int, bytes]:
+    chunks: list[bytes] = []
+    total = 0
+    async with client.stream(
+        method,
+        f"{ipfs_api}/api/v0/cat",
+        params={"arg": cid},
+    ) as response:
+        if response.status_code != 200:
+            return response.status_code, b""
+        async for chunk in response.aiter_bytes():
+            total += len(chunk)
+            if total > max_bytes:
+                return 413, b""
+            chunks.append(chunk)
+    return 200, b"".join(chunks)
+
+
+async def _fetch_public_ipfs(cid: str, *, max_bytes: int) -> tuple[int, bytes]:
+    ipfs_api = (ipfs_api_url() or "http://localhost:5001").rstrip("/")
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        status_code, content = await _cat_ipfs_limited(
+            client,
+            ipfs_api=ipfs_api,
+            cid=cid,
+            method="POST",
+            max_bytes=max_bytes,
+        )
+        if status_code == 405:
+            status_code, content = await _cat_ipfs_limited(
+                client,
+                ipfs_api=ipfs_api,
+                cid=cid,
+                method="GET",
+                max_bytes=max_bytes,
+            )
+        return status_code, content
+
+
+def _detect_public_media_type(content: bytes, *, prefer_video: bool = False) -> str:
+    if content[:4] == b"\x89PNG":
+        return "image/png"
+    if content[:3] == b"\xff\xd8\xff":
+        return "image/jpeg"
+    if b"ftyp" in content[:64]:
+        return "video/mp4"
+    if content.startswith(b"\x1aE\xdf\xa3"):
+        return "video/webm"
+    return "video/mp4" if prefer_video else "application/octet-stream"
+
+
+def _video_range_response(
+    content: bytes,
+    *,
+    media_type: str,
+    range_header: str | None,
+) -> Response:
+    from fastapi.responses import Response as FastResponse
+
+    headers = {
+        "Accept-Ranges": "bytes",
+        "Cache-Control": "public, max-age=3600",
+    }
+    if not range_header:
+        headers["Content-Length"] = str(len(content))
+        return FastResponse(content=content, media_type=media_type, headers=headers)
+    if not range_header.startswith("bytes=") or "," in range_header:
+        return FastResponse(status_code=416, content=b"", headers={"Accept-Ranges": "bytes"})
+    start_text, _, end_text = range_header[6:].partition("-")
+    try:
+        if start_text:
+            start = int(start_text)
+            end = int(end_text) if end_text else len(content) - 1
+        else:
+            suffix_len = int(end_text)
+            start = max(0, len(content) - suffix_len)
+            end = len(content) - 1
+    except ValueError:
+        return FastResponse(status_code=416, content=b"", headers={"Accept-Ranges": "bytes"})
+    if start < 0 or end < start or start >= len(content):
+        return FastResponse(status_code=416, content=b"", headers={"Accept-Ranges": "bytes"})
+    end = min(end, len(content) - 1)
+    body = content[start : end + 1]
+    headers.update(
+        {
+            "Content-Range": f"bytes {start}-{end}/{len(content)}",
+            "Content-Length": str(len(body)),
+        }
+    )
+    return FastResponse(status_code=206, content=body, media_type=media_type, headers=headers)
+
+
 @app.get("/ipfs/{cid}")
 async def ipfs_proxy(cid: str):
     """Proxy IPFS content by CID so the observer can fetch portraits without a local gateway."""
     from fastapi.responses import Response as FastResponse
 
-    if not cid or len(cid) > 160 or any(ch in cid for ch in "/\\?&#"):
+    if not _valid_public_cid(cid):
         return FastResponse(status_code=400, content=b"")
 
-    async def _cat_limited(client: httpx.AsyncClient, method: str) -> tuple[int, bytes]:
-        chunks: list[bytes] = []
-        total = 0
-        async with client.stream(
-            method,
-            f"{ipfs_api}/api/v0/cat",
-            params={"arg": cid},
-        ) as response:
-            if response.status_code != 200:
-                return response.status_code, b""
-            async for chunk in response.aiter_bytes():
-                total += len(chunk)
-                if total > PUBLIC_IPFS_MAX_BYTES:
-                    return 413, b""
-                chunks.append(chunk)
-        return 200, b"".join(chunks)
-
-    ipfs_api = (os.getenv("IPFS_API") or "http://localhost:5001").rstrip("/")
     try:
-        async with httpx.AsyncClient(timeout=15.0) as client:
-            status_code, content = await _cat_limited(client, "POST")
-            if status_code == 405:
-                status_code, content = await _cat_limited(client, "GET")
-            if status_code == 413:
-                return FastResponse(status_code=413, content=b"")
-            if status_code != 200 or not content:
-                return FastResponse(status_code=404, content=b"")
-            content_type = "image/png" if content[:4] == b"\x89PNG" else "application/octet-stream"
-            return FastResponse(
-                content=content,
-                media_type=content_type,
-                headers={
-                    "Cache-Control": "public, max-age=3600",
-                },
-            )
+        status_code, content = await _fetch_public_ipfs(cid, max_bytes=PUBLIC_IPFS_MAX_BYTES)
+        if status_code == 413:
+            return FastResponse(status_code=413, content=b"")
+        if status_code != 200 or not content:
+            return FastResponse(status_code=404, content=b"")
+        return FastResponse(
+            content=content,
+            media_type=_detect_public_media_type(content),
+            headers={
+                "Cache-Control": "public, max-age=3600",
+            },
+        )
     except Exception as exc:
         log.warning("ipfs_proxy cid=%s error=%s", cid, exc)
+        return FastResponse(status_code=502, content=b"")
+
+
+@app.get("/ipfs/video/{cid}")
+async def ipfs_video_proxy(
+    cid: str, range_header: str | None = Header(default=None, alias="Range")
+):
+    """Proxy generated avatar videos with a video-specific byte ceiling and range support."""
+    from fastapi.responses import Response as FastResponse
+
+    if not _valid_public_cid(cid):
+        return FastResponse(status_code=400, content=b"")
+    try:
+        status_code, content = await _fetch_public_ipfs(cid, max_bytes=PUBLIC_IPFS_VIDEO_MAX_BYTES)
+        if status_code == 413:
+            return FastResponse(status_code=413, content=b"", headers={"Accept-Ranges": "bytes"})
+        if status_code != 200 or not content:
+            return FastResponse(status_code=404, content=b"")
+        return _video_range_response(
+            content,
+            media_type=_detect_public_media_type(content, prefer_video=True),
+            range_header=range_header,
+        )
+    except Exception as exc:
+        log.warning("ipfs_video_proxy cid=%s error=%s", cid, exc)
         return FastResponse(status_code=502, content=b"")
 
 

@@ -245,7 +245,7 @@ def select_video_asset(
         return VideoSelection(
             asset=selected,
             source=source,
-            url=selected.local_cache_path or f"/ipfs/{selected.cid}",
+            url=selected.local_cache_path or f"/ipfs/video/{selected.cid}",
             fallback_reason="",
             fallback_order=fallback_order,
             cache_action="keep_hot" if selected.variant == VideoVariant.LOW_RES_LIVE else "durable",

@@ -604,9 +604,21 @@
       transition: opacity 0.25s ease;
     }
 
+    .avatar-orb.rigged-host .rigged-avatar-canvas {
+      opacity: 0.72;
+    }
+
     .agent-tile.active .avatar-orb .rigged-avatar-canvas,
     .agent-tile.speaking .avatar-orb .rigged-avatar-canvas {
       opacity: 1;
+    }
+
+    .agent-tile.listening .avatar-orb .rigged-avatar-canvas {
+      opacity: 0.86;
+    }
+
+    .agent-tile:not(.active):not(.speaking):not(.listening) .avatar-orb .rigged-avatar-canvas {
+      opacity: 0.58;
     }
 
     .avatar-orb[data-avatar-source-kind="loop"] .rigged-avatar-canvas,
@@ -1521,12 +1533,13 @@
       return value === undefined || value === null || value === '' ? fallback : escapeHtml(value);
     }
 
-    function ipfsUrl(cid) {
+    function ipfsUrl(cid, options = {}) {
       const value = String(cid || '').trim();
       if (!value) return '';
       if (/^(https?:|blob:|data:|\/|\.\/|\.\.\/)/i.test(value)) return value;
       const stripped = value.replace(/^ipfs:\/\//i, '');
-      return `${RUNTIME}/ipfs/${stripped.split('/').filter(Boolean).map(encodeURIComponent).join('/')}`;
+      const path = stripped.split('/').filter(Boolean).map(encodeURIComponent).join('/');
+      return `${RUNTIME}/ipfs/${options.video ? 'video/' : ''}${path}`;
     }
 
     function asAvatarObject(value) {
@@ -1554,8 +1567,9 @@
 
     function avatarAssetFromRef(value, kind, label) {
       const source = firstAvatarEntry(value);
+      const videoKind = kind === 'loop' || kind === 'cinematic';
       if (typeof source === 'string' && source.trim()) {
-        const url = ipfsUrl(source);
+        const url = ipfsUrl(source, { video: videoKind });
         return { kind, label, url, cid: /^(https?:|blob:|data:|\/|\.\/|\.\.\/)/i.test(source) ? '' : source.replace(/^ipfs:\/\//i, '') };
       }
       const obj = asAvatarObject(source);
@@ -1565,7 +1579,8 @@
       }
       for (const field of AVATAR_CID_FIELDS) {
         const cid = String(obj[field] || '').trim();
-        if (cid) return { kind, label, url: ipfsUrl(cid), cid: cid.replace(/^ipfs:\/\//i, ''), mimeType: String(obj.mime_type || obj.mimeType || obj.type || '') };
+        const mimeType = String(obj.mime_type || obj.mimeType || obj.type || '');
+        if (cid) return { kind, label, url: ipfsUrl(cid, { video: videoKind || mimeType.toLowerCase().startsWith('video/') }), cid: cid.replace(/^ipfs:\/\//i, ''), mimeType };
       }
       return null;
     }
@@ -2379,6 +2394,8 @@
         const isAvatarSpeaker = avatarSpeakerId && agent.soul_id === avatarSpeakerId;
         const isSpeaking = agent.soul_id === speakingId || (isAvatarSpeaker && avatarState.speaking);
         const isListening = agent.soul_id === listeningId;
+        const isPlaceholder = agent.soul_id?.startsWith('empty-');
+        const isRiggedHost = !isPlaceholder;
         const avatarSource = selectAvatarSource(agent, avatarState, isSpeaking);
         const avatarSrc = avatarSource.fallback?.url || '';
         const riggedSrc = agent.rigged_avatar_cid || avatarState.rigged_avatar_cid || agent.avatar_cid || '';
@@ -2407,8 +2424,8 @@
           </div>
           <div class="agent-body">
             <div
-              class="avatar-orb${isActive ? ' rigged-host' : ''}"
-              data-rigged-avatar-host="${isActive ? '1' : '0'}"
+              class="avatar-orb${isRiggedHost ? ' rigged-host' : ''}"
+              data-rigged-avatar-host="${isRiggedHost ? '1' : '0'}"
               data-avatar-src="${fmt(avatarSrc)}"
               data-rigged-avatar-src="${fmt(riggedUrl)}"
               data-avatar-source-kind="${fmt(avatarSource.activeKind)}"
@@ -2437,11 +2454,11 @@
               data-voice-latency-target-ms="${isVoicePlaybackSpeaker ? fmt(voicePlayback.latencyTargetMs || 300) : ''}"
               data-voice-lip-sync-source="${isVoicePlaybackSpeaker ? fmt(voicePlayback.lipSyncSource || 'audio_rms') : ''}"
               data-agent-id="${fmt(agent.soul_id)}"
-              style="background:${agent.soul_id?.startsWith('empty-') ? 'radial-gradient(circle at center, rgba(255,255,255,0.08), rgba(255,255,255,0.02))' : `radial-gradient(circle at 35% 30%, rgba(255,255,255,0.72), rgba(255,255,255,0.18) 15%, transparent 17%), radial-gradient(circle at center, ${AGENT_COLORS[index % AGENT_COLORS.length]}, rgba(84,200,255,0.52) 36%, rgba(5,8,16,0.15) 74%)`}; opacity:${agent.soul_id?.startsWith('empty-') ? 0.35 : 1}"
+              style="background:${isPlaceholder ? 'radial-gradient(circle at center, rgba(255,255,255,0.08), rgba(255,255,255,0.02))' : `radial-gradient(circle at 35% 30%, rgba(255,255,255,0.72), rgba(255,255,255,0.18) 15%, transparent 17%), radial-gradient(circle at center, ${AGENT_COLORS[index % AGENT_COLORS.length]}, rgba(84,200,255,0.52) 36%, rgba(5,8,16,0.15) 74%)`}; opacity:${isPlaceholder ? 0.35 : 1}"
             >
               ${avatarFallbackMarkup(avatarSource, agent)}
               ${avatarVideoMarkup(avatarSource)}
-              ${isActive ? '<canvas class="rigged-avatar-canvas" data-rigged-avatar-canvas></canvas>' : ''}
+              ${isRiggedHost ? '<canvas class="rigged-avatar-canvas" data-rigged-avatar-canvas></canvas>' : ''}
               ${avatarLifeOverlayMarkup(lifeAttrs)}
               <div class="voice-rings" aria-hidden="true"><span></span><span></span><span></span></div>
             </div>

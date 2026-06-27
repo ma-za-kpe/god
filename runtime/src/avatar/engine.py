@@ -243,11 +243,6 @@ class AvatarSurface:
                 if isinstance(active_agent, dict)
                 else getattr(active_agent, "rigged_avatar_cid", "")
             )
-            or (
-                active_agent.get("voice_model_cid")
-                if isinstance(active_agent, dict)
-                else getattr(active_agent, "voice_model_cid", "")
-            )
             or ""
         )
         rigged_avatar_cid = (

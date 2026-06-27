@@ -31,10 +31,11 @@ Write-Host '[validate] compose config'
 Invoke-Checked { docker compose --project-directory \$root config --quiet } 'compose config'
 Write-Host '[validate] runtime tests'
 \$testStatus = 0
-Invoke-Checked { docker exec god-runtime sh -lc 'rm -rf /tmp/god-validation && mkdir -p /tmp/god-validation/suite/src /tmp/god-validation/suite/runtime-tests' } 'prepare runtime test dir'
+Invoke-Checked { docker exec god-runtime sh -lc 'rm -rf /tmp/god-validation && mkdir -p /tmp/god-validation/suite/src /tmp/god-validation/suite/runtime-tests /tmp/god-validation/observer' } 'prepare runtime test dir'
 Invoke-Checked { docker cp \"\$root/runtime/src/.\" god-runtime:/tmp/god-validation/suite/src } 'copy runtime src'
 Invoke-Checked { docker cp \"\$root/runtime/seed_utterances\" god-runtime:/tmp/god-validation/suite/seed_utterances } 'copy seed utterances'
 Invoke-Checked { docker cp \"\$root/runtime/tests/.\" god-runtime:/tmp/god-validation/suite/runtime-tests } 'copy runtime tests'
+Invoke-Checked { docker cp \"\$root/observer/stage.html\" god-runtime:/tmp/god-validation/observer/stage.html } 'copy observer stage'
 try {
   docker exec -e PYTHONPATH=/tmp/god-validation/suite/src -e VOICE_SYNTHESIS_ENABLED=false god-runtime python -m pytest /tmp/god-validation/suite/runtime-tests
   \$testStatus = \$LASTEXITCODE

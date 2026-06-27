@@ -248,14 +248,17 @@ class GPUJobQueue:
         async with self._condition:
             self._active.pop(lease.job_id, None)
             self._record_run_locked(lease)
-            if completed:
-                self._stats.total_completed += 1
-            elif cancelled:
+            if cancelled:
                 self._stats.total_cancelled += 1
                 self._stats.last_cancel_reason = lease.cancel_reason or "task_cancelled"
             elif error is not None:
                 self._stats.total_failed += 1
                 self._stats.last_error = str(error) or error.__class__.__name__
+            elif lease.cancellation_requested:
+                self._stats.total_cancelled += 1
+                self._stats.last_cancel_reason = lease.cancel_reason or "cancel_requested"
+            elif completed:
+                self._stats.total_completed += 1
             self._stats.last_finished_at = lease.finished_at
             self._stats.current_job = (
                 next(iter(self._active.values())).job_name if self._active else None

@@ -127,6 +127,33 @@ async def test_submit_workflow_result_reports_timeout(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_submit_workflow_result_interrupts_comfy_when_cancel_requested(monkeypatch):
+    client = _FakeComfyClient(empty_history=True)
+    _patch_comfy(monkeypatch, client)
+    generator = VideoGenerator("http://comfy:8188", timeout_s=1)
+    checks = 0
+
+    def cancel_check() -> bool:
+        nonlocal checks
+        checks += 1
+        return checks >= 2
+
+    result = await generator.submit_workflow_result(
+        {"1": {"inputs": {}}},
+        {},
+        cancel_check=cancel_check,
+        cancel_reason=lambda: "live_voice_requested",
+    )
+
+    assert result.ok is False
+    assert result.prompt_id == "prompt-1"
+    assert result.error == "video_generation_cancelled:live_voice_requested"
+    assert client.posts[0]["url"] == "http://comfy:8188/prompt"
+    assert client.posts[1]["url"] == "http://comfy:8188/interrupt"
+    assert client.posts[1]["json"] == {"prompt_id": "prompt-1"}
+
+
+@pytest.mark.asyncio
 async def test_generate_ltx_loop_asset_pins_and_registers_manifest_asset(monkeypatch):
     client = _FakeComfyClient()
     _patch_comfy(monkeypatch, client)
