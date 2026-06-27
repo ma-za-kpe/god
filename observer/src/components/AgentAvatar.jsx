@@ -25,19 +25,42 @@ function nowMs() {
   return typeof performance !== 'undefined' ? performance.now() : Date.now();
 }
 
-export function AgentAvatar({ agent, avatarState, selected, speaking, runtimeBaseUrl, position, color, minimal = false }) {
+export function AgentAvatar({
+  agent,
+  avatarState,
+  selected,
+  speaking,
+  runtimeBaseUrl,
+  position,
+  color,
+  voicePlayback,
+  minimal = false,
+}) {
   const groupRef = useRef();
+  const avatarRootRef = useRef();
   const haloRef = useRef();
   const blinkRef = useRef();
   const mouthRef = useRef();
   const sourceSwitchStartedAt = useRef(nowMs());
+  const mouthLatencyRef = useRef(null);
   const [videoReady, setVideoReady] = useState(false);
   const [videoFailed, setVideoFailed] = useState(false);
   const [switchMs, setSwitchMs] = useState(0);
+  const [mouthLatencyMs, setMouthLatencyMs] = useState(null);
   const phase = useMemo(() => stablePhase(agent?.soul_id || agent?.current_name), [agent?.current_name, agent?.soul_id]);
 
+  const playbackMatchesAgent = Boolean(
+    voicePlayback?.status === 'playing' &&
+    (
+      (voicePlayback?.speakerSoulId && agent?.soul_id === voicePlayback.speakerSoulId) ||
+      (!voicePlayback?.speakerSoulId && voicePlayback?.speakerName &&
+        String(agent?.current_name || '').toLowerCase() === String(voicePlayback.speakerName).toLowerCase())
+    )
+  );
   const isActiveSpeaker = Boolean(
-    speaking || (avatarState?.speaker_soul_id && agent?.soul_id === avatarState.speaker_soul_id && avatarState?.speaking)
+    speaking ||
+    playbackMatchesAgent ||
+    (avatarState?.speaker_soul_id && agent?.soul_id === avatarState.speaker_soul_id && avatarState?.speaking)
   );
   const avatarSource = useMemo(
     () => selectAvatarSource({ agent, avatarState, runtimeBaseUrl, speaking: isActiveSpeaker }),
@@ -61,6 +84,11 @@ export function AgentAvatar({ agent, avatarState, selected, speaking, runtimeBas
     setVideoFailed(false);
     setSwitchMs(0);
   }, [videoUrl]);
+
+  useEffect(() => {
+    mouthLatencyRef.current = null;
+    setMouthLatencyMs(null);
+  }, [voicePlayback?.utteranceId]);
 
   const markVideoReady = (event) => {
     setVideoFailed(false);
@@ -113,13 +141,26 @@ export function AgentAvatar({ agent, avatarState, selected, speaking, runtimeBas
 
     if (mouthRef.current) {
       const snapshotMouth = usesSnapshotLife ? lifeNumber(life, 'mouth_amplitude') : Number.NaN;
+      const playbackMouth = playbackMatchesAgent ? Number(voicePlayback?.mouthAmplitude || 0) : Number.NaN;
       const mouth = isActiveSpeaker
-        ? (Number.isFinite(snapshotMouth)
+        ? (Number.isFinite(playbackMouth) && playbackMouth > 0
+          ? playbackMouth * (0.76 + Math.abs(Math.sin(t * 14 + phase)) * 0.24)
+          : Number.isFinite(snapshotMouth)
           ? snapshotMouth * (0.88 + Math.abs(Math.sin(t * 12)) * 0.12)
           : 0.35 + Math.abs(Math.sin(t * 10)) * 0.25)
         : 0;
       mouthRef.current.style.opacity = String(isActiveSpeaker ? 0.86 : 0.22);
       mouthRef.current.style.transform = `translateX(-50%) scaleY(${clamp(0.55 + mouth * 2.8, 0.45, 3.4)})`;
+      if (
+        playbackMatchesAgent &&
+        voicePlayback?.startedAtMs &&
+        mouth > 0.04 &&
+        mouthLatencyRef.current === null
+      ) {
+        const latency = Math.max(0, Math.round(nowMs() - voicePlayback.startedAtMs));
+        mouthLatencyRef.current = latency;
+        setMouthLatencyMs(latency);
+      }
     }
   });
 
@@ -141,12 +182,18 @@ export function AgentAvatar({ agent, avatarState, selected, speaking, runtimeBas
         occlude={false}
       >
         <div
+          ref={avatarRootRef}
           className={isActiveSpeaker ? 'speaking-avatar' : ''}
           data-avatar-source-kind={avatarSource.activeKind}
           data-avatar-source-status={sourceStatus}
           data-avatar-fallback-kind={avatarSource.fallbackKind}
           data-avatar-source-switch-ms={switchMs}
           data-avatar-black-frame-ms="0"
+          data-voice-playback-status={playbackMatchesAgent ? voicePlayback?.status || '' : ''}
+          data-voice-mouth-amplitude={playbackMatchesAgent ? Number(voicePlayback?.mouthAmplitude || 0).toFixed(4) : '0.0000'}
+          data-voice-mouth-latency-ms={mouthLatencyMs ?? ''}
+          data-voice-latency-target-ms={playbackMatchesAgent ? voicePlayback?.latencyTargetMs || 300 : ''}
+          data-voice-lip-sync-source={playbackMatchesAgent ? voicePlayback?.lipSyncSource || 'audio_rms' : ''}
           style={{
             width: '170px',
             height: '210px',

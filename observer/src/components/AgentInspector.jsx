@@ -24,6 +24,9 @@ export function AgentInspector() {
     [agents, selectedSoulId]
   );
   const avatarState = snapshot.avatar || {};
+  const voiceState = snapshot.voice || {};
+  const synthesis = voiceState.synthesis || {};
+  const referenceAudio = synthesis.reference_audio || {};
   const isSpeaking = Boolean(
     avatarState?.speaker_soul_id && agent?.soul_id === avatarState.speaker_soul_id && avatarState?.speaking
   );
@@ -64,6 +67,9 @@ export function AgentInspector() {
         <div><span>rent</span><strong>{agent.rent_paid_count}/{agent.rent_miss_count}</strong></div>
         <div><span>avatar</span><strong>{agent.avatar_cid ? 'yes' : 'no'}</strong></div>
         <div><span>voice</span><strong>{agent.voice_model_cid ? 'yes' : 'no'}</strong></div>
+        <div><span>synthesis</span><strong>{synthesis.ok ? 'ok' : (synthesis.reason || 'idle')}</strong></div>
+        <div><span>lip sync</span><strong>{synthesis.lip_sync?.source || voiceState.lip_sync_source || 'audio_rms'}</strong></div>
+        <div><span>ref audio</span><strong>{referenceAudio.source || (agent.voice_model_cid ? 'cid' : 'fallback')}</strong></div>
         <div><span>vrm</span><strong>{agent.vrm_avatar_url ? 'url' : 'fallback'}</strong></div>
         <div><span>visual</span><strong>{sourceStatusText(avatarSource)}</strong></div>
         <div><span>fallback</span><strong>{avatarSource.fallbackKind}</strong></div>
