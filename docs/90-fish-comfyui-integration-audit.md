@@ -1044,6 +1044,36 @@ Operational status:
   blocked until a live host/stream test window is available.
 - Do not close issue #101 from code alone.
 
+### Issue #102 Twitch Platform Boundary
+
+Date added: 2026-06-27
+
+Implemented in this repo:
+
+- Shared platform audience boundary: `runtime/src/platforms/boundary.py`.
+- Twitch adapter routes incoming EventSub/Helix-style events through that
+  boundary before producing world events.
+- Boundary tests: `runtime/tests/test_platform_boundary.py`.
+- Expanded Twitch replay/moderation/routing tests:
+  `runtime/tests/test_twitch_adapter.py`.
+- Field report/checklist: `field-reports/issue-102-twitch-platform-boundary.md`.
+
+The boundary makes Twitch expansion explicit without moving the immediate target
+away from YouTube:
+
+- platform events route to showrunner/audience state only;
+- direct avatar, voice, OBS, broadcast, and GPU effects are not allowed;
+- moderation state is represented before a chat event can affect presentation;
+- rate-limit bucket metadata is attached to chat/audience events;
+- replay keys remain stable across EventSub duplicate delivery;
+- Twitch status exposes bot/channel identity readiness.
+
+Operational status:
+
+- Code-only platform boundary is implemented.
+- Twitch launch remains gated on completion of the YouTube avatar-life milestone.
+- Do not close issue #102 from code alone.
+
 Vast.ai policy:
 
 - Keep background LTX/Wan/offline jobs disabled during live YouTube proof runs until the jobs
