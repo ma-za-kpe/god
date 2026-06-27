@@ -1,0 +1,47 @@
+#!/usr/bin/env bash
+# validate-local.sh - local validation pipeline required before commit.
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+if command -v cygpath >/dev/null 2>&1; then
+  ROOT="$(cygpath -aw "$ROOT")"
+fi
+
+if [[ -z "${POWERSHELL_BIN:-}" ]]; then
+  if command -v pwsh >/dev/null 2>&1; then
+    POWERSHELL_BIN="pwsh"
+  elif command -v powershell.exe >/dev/null 2>&1; then
+    POWERSHELL_BIN="powershell.exe"
+  else
+    echo "[validate] ERROR: neither pwsh nor powershell.exe is available" >&2
+    exit 127
+  fi
+fi
+
+"$POWERSHELL_BIN" -NoProfile -Command "
+\$ErrorActionPreference = 'Stop'
+\$root = '$ROOT'
+function Invoke-Checked([scriptblock]\$Command, [string]\$Name) {
+  & \$Command
+  if (\$LASTEXITCODE -ne 0) {
+    throw \"\$Name failed with exit code \$LASTEXITCODE\"
+  }
+}
+Write-Host '[validate] compose config'
+Invoke-Checked { docker compose --project-directory \$root config --quiet } 'compose config'
+Write-Host '[validate] runtime tests'
+\$testStatus = 0
+Invoke-Checked { docker exec god-runtime sh -lc 'rm -rf /tmp/god-validation && mkdir -p /tmp/god-validation/suite/src /tmp/god-validation/suite/runtime-tests' } 'prepare runtime test dir'
+Invoke-Checked { docker cp \"\$root/runtime/src/.\" god-runtime:/tmp/god-validation/suite/src } 'copy runtime src'
+Invoke-Checked { docker cp \"\$root/runtime/seed_utterances\" god-runtime:/tmp/god-validation/suite/seed_utterances } 'copy seed utterances'
+Invoke-Checked { docker cp \"\$root/runtime/tests/.\" god-runtime:/tmp/god-validation/suite/runtime-tests } 'copy runtime tests'
+try {
+  docker exec -e PYTHONPATH=/tmp/god-validation/suite/src -e VOICE_SYNTHESIS_ENABLED=false god-runtime python -m pytest /tmp/god-validation/suite/runtime-tests
+  \$testStatus = \$LASTEXITCODE
+} finally {
+  docker exec god-runtime rm -rf /tmp/god-validation | Out-Null
+}
+if (\$testStatus -ne 0) {
+  throw \"runtime tests failed with exit code \$testStatus\"
+}
+"

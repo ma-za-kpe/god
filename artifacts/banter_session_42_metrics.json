@@ -1,0 +1,24 @@
+{
+  "direct_response_rate": 0.6162790697674418,
+  "arc_title_leaks": 0,
+  "hard_ban_violations": 0,
+  "cross_elder_duplicates": 0,
+  "grammar_failures": 0,
+  "emotional_texture_coverage": 0.29213483146067415,
+  "clip_candidate_rate": 0.10112359550561797,
+  "crack_count": 4,
+  "veil_beats": 12,
+  "backchannel_rate": 0.6666666666666666,
+  "voice_similarity_max": 0.39249999999999996,
+  "total_beats": 100,
+  "non_silence_beats": 89,
+  "silence_beats": 11,
+  "backchannel_beats": 4,
+  "crack_beats": 4,
+  "scene_phase_counts": {
+    "build": 38,
+    "climax": 40,
+    "release": 5,
+    "reset": 17
+  }
+}

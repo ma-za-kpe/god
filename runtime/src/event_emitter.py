@@ -1,5 +1,5 @@
 """
-event_emitter.py — Publish structured events to NATS JetStream + persist to PostgreSQL.
+event_emitter.py - Publish structured events to NATS JetStream + persist to PostgreSQL.
 Subject: world.{world_id}.events.{category}.{event_type}
 """
 
@@ -22,29 +22,95 @@ WORLD_ID = os.getenv("WORLD_ID", "local-dev-world-1")
 NATS_URL = os.getenv("NATS_URL", "nats://localhost:4222")
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://god:localdev@localhost:5432/god_world")
 STREAM_NAME = "WORLD_EVENTS"
+STREAM_SUBJECTS = ["world.*.events.>"]
+
+
+class _NoopJetStream:
+    async def publish(self, subject: str, data: bytes):
+        class _Ack:
+            seq = 0
+
+        log.warning("Event publish skipped because NATS is unavailable: %s", subject)
+        return _Ack()
 
 
 class EventEmitter:
     def __init__(self):
         self.nc = None
         self.js = None
+        self._stream_ready = False
 
     async def connect(self):
         self.nc = await nats.connect(NATS_URL)
         self.js = self.nc.jetstream()
+        await self._ensure_stream()
+        self._stream_ready = True
+        log.info("EventEmitter connected -> %s", NATS_URL)
+
+    async def _ensure_stream(self):
+        if self.js is None:
+            raise RuntimeError("JetStream client is not initialized")
+
         try:
             await self.js.find_stream(name=STREAM_NAME)
-        except Exception:
+            self._stream_ready = True
+            return
+        except Exception as find_err:
+            log.debug("JetStream stream lookup failed for %s: %s", STREAM_NAME, find_err)
+
+        try:
             await self.js.add_stream(
                 StreamConfig(
                     name=STREAM_NAME,
-                    subjects=["world.*.events.>"],
+                    subjects=STREAM_SUBJECTS,
                     max_msgs=1_000_000,
                     max_bytes=512 * 1024 * 1024,
                 )
             )
-            log.info(f"Created JetStream stream: {STREAM_NAME}")
-        log.info(f"EventEmitter connected → {NATS_URL}")
+            log.info("Created JetStream stream: %s", STREAM_NAME)
+        except Exception as add_err:
+            # Another process may have created the stream during bootstrap.
+            try:
+                await self.js.find_stream(name=STREAM_NAME)
+            except Exception:
+                raise add_err
+
+        self._stream_ready = True
+
+    def is_ready(self) -> bool:
+        return bool(
+            self.nc is not None
+            and not self.nc.is_closed
+            and self.js is not None
+            and self._stream_ready
+            and not isinstance(self.js, _NoopJetStream)
+        )
+
+    async def _publish(self, subject: str, data: bytes):
+        try:
+            return await self.js.publish(subject, data)
+        except Exception as exc:
+            if self._looks_like_jetstream_bootstrap_error(exc):
+                try:
+                    self._stream_ready = False
+                    await self._ensure_stream()
+                    return await self.js.publish(subject, data)
+                except Exception as retry_exc:
+                    log.warning("Event publish failed after JetStream retry: %s", retry_exc)
+            else:
+                log.warning("Event publish failed after persistence: %s", exc)
+            return await _NoopJetStream().publish(subject, data)
+
+    @staticmethod
+    def _looks_like_jetstream_bootstrap_error(exc: Exception) -> bool:
+        name = exc.__class__.__name__
+        msg = str(exc).lower()
+        return (
+            name in {"NoRespondersError", "NoStreamResponseError", "ServiceUnavailableError"}
+            or "no response from stream" in msg
+            or "no responders" in msg
+            or "serviceunavailable" in msg
+        )
 
     async def emit(self, category: str, event_type: str, payload: dict[str, Any]) -> str:
         full_type = f"{category}.{event_type}"
@@ -69,11 +135,11 @@ class EventEmitter:
             **payload,
         }
         data = json.dumps(event, default=str).encode()
-        ack = await self.js.publish(subject, data)
-        log.debug(f"→ {subject} (seq={ack.seq})")
+        ack = await self._publish(subject, data)
+        log.debug("-> %s (seq=%s)", subject, ack.seq)
 
         # Persist to PostgreSQL so /events API can serve it
-        await asyncio.get_event_loop().run_in_executor(None, self._persist, event)
+        await asyncio.get_running_loop().run_in_executor(None, self._persist, event)
 
         # WebSocket delta push for public observers
         try:
@@ -156,7 +222,7 @@ class EventEmitter:
             cur.close()
             conn.close()
         except Exception as e:
-            log.warning(f"Event persist failed: {e}")
+            log.warning("Event persist failed: %s", e)
 
     async def close(self):
         if self.nc and not self.nc.is_closed:
@@ -164,11 +230,36 @@ class EventEmitter:
 
 
 _emitter: EventEmitter | None = None
+_emitter_lock: asyncio.Lock | None = None
+
+
+def _get_emitter_lock() -> asyncio.Lock:
+    global _emitter_lock
+    if _emitter_lock is None:
+        _emitter_lock = asyncio.Lock()
+    return _emitter_lock
 
 
 async def get_emitter() -> EventEmitter:
     global _emitter
-    if _emitter is None or (_emitter.nc is not None and _emitter.nc.is_closed):
-        _emitter = EventEmitter()
-        await _emitter.connect()
+    async with _get_emitter_lock():
+        needs_refresh = (
+            _emitter is None
+            or (_emitter.nc is not None and _emitter.nc.is_closed)
+            or not _emitter.is_ready()
+        )
+        if needs_refresh:
+            emitter = EventEmitter()
+            try:
+                await emitter.connect()
+                _emitter = emitter
+            except Exception as exc:
+                log.warning("EventEmitter NATS unavailable; events will persist only: %s", exc)
+                try:
+                    await emitter.close()
+                except Exception:
+                    pass
+                emitter.js = _NoopJetStream()
+                emitter._stream_ready = False
+                _emitter = emitter
     return _emitter

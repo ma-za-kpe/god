@@ -35,6 +35,7 @@ repos:
     rev: v0.10.0.1
     hooks:
       - id: shellcheck
+        args: [--severity=error]
         files: ^scripts/.*\.sh$
 
   - repo: https://github.com/hadolint/hadolint
@@ -43,3 +44,12 @@ repos:
       - id: hadolint-docker
         args: [--failure-threshold, error]
         files: Dockerfile
+
+  - repo: local
+    hooks:
+      - id: validation-pipeline
+        name: validation pipeline
+        entry: bash scripts/validate-local.sh
+        language: system
+        pass_filenames: false
+        stages: [pre-commit]

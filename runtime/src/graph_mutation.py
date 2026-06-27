@@ -50,14 +50,26 @@ def propose_mutation(soul_id: str, mutation_type: str, payload: dict) -> dict:
     now = int(time.time())
     cur.execute(
         """
+        UPDATE agents
+        SET balance_usdc = COALESCE(balance_usdc, 0) - %s
+        WHERE soul_id = %s
+          AND is_alive = true
+          AND COALESCE(balance_usdc, 0) >= %s
+        RETURNING balance_usdc
+        """,
+        (MUTATION_COST_USDC, soul_id, MUTATION_COST_USDC),
+    )
+    if not cur.fetchone():
+        conn.rollback()
+        cur.close()
+        conn.close()
+        return {"error": f"need ${MUTATION_COST_USDC:.4f} USDC for mutation"}
+    cur.execute(
+        """
         INSERT INTO agent_graph_mutations (mutation_id, soul_id, mutation_type, payload, status, created_at, world_id)
         VALUES (%s, %s, %s, %s, 'pending', %s, %s)
         """,
         (mutation_id, soul_id, mtype, json.dumps(payload), now, WORLD_ID),
-    )
-    cur.execute(
-        "UPDATE agents SET balance_usdc = balance_usdc - %s WHERE soul_id = %s",
-        (MUTATION_COST_USDC, soul_id),
     )
     conn.commit()
     cur.close()

@@ -4,17 +4,37 @@ Entry point. FastAPI server + background daemons for rent collection and agent e
 """
 
 import asyncio
+import base64
+import http.client
+import json
 import logging
 import os
+import pathlib
 from contextlib import asynccontextmanager
+from urllib.parse import urlparse
 
+import httpx
 import uvicorn
-from fastapi import FastAPI, Header, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, Header, Response, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
 
 from .agent_runner import agent_runner
 from .creator.routes import router as creator_router
+from .health_checks import probe_tcp, probe_url
 from .rent_daemon import rent_daemon
+from .runtime_endpoints import (
+    comfyui_health_url,
+    endpoint_path,
+    ipfs_api_url,
+    nats_tcp_target,
+    ollama_tags_url,
+    redis_tcp_target,
+    tts_base_url,
+    tts_health_url,
+    tts_synthesis_url,
+)
 from .services.routes import router as services_router
 from .status_engine import TIERS, status_review_daemon
 
@@ -23,6 +43,28 @@ logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
 )
 log = logging.getLogger("god.runtime")
+
+
+def _env_int(name: str, default: int) -> int:
+    try:
+        value = int(os.getenv(name, str(default)))
+    except ValueError:
+        return default
+    return max(1, value)
+
+
+PUBLIC_IPFS_MAX_BYTES = _env_int("PUBLIC_IPFS_MAX_BYTES", 8 * 1024 * 1024)
+PUBLIC_VOICE_AUDIO_MAX_BYTES = _env_int("PUBLIC_VOICE_AUDIO_MAX_BYTES", 10 * 1024 * 1024)
+
+# Runtime version is loaded from the canonical file (single source of truth, managed via release process).
+# This replaces manual hard-coded strings in FastAPI + /health.
+# See docs/79-documentation-release.md and scripts for how releases bump this + tag.
+try:
+    RUNTIME_VERSION = (
+        (pathlib.Path(__file__).parent / "VERSION").read_text(encoding="utf-8").strip()
+    )
+except Exception:
+    RUNTIME_VERSION = "0.1.0"
 
 _background_tasks: list[asyncio.Task] = []
 
@@ -46,9 +88,81 @@ async def _agent_jobs_daemon():
             log.debug(f"agent jobs daemon: {e}")
 
 
+async def _twitch_chat_relay_daemon():
+    """Tail social.agent.message_sent events and forward agent lines to Twitch chat.
+
+    Runs every 3 seconds. Deduplicates by event_id so each line is sent once.
+    Only active when TWITCH_ENABLED=true and TWITCH_DRY_RUN=false.
+    Rate-limited by helix._RateLimiter (20 msg / 30s).
+    """
+    if os.getenv("TWITCH_ENABLED", "false").lower() not in ("1", "true", "yes"):
+        return
+    channel_name = os.getenv("TWITCH_CHANNEL_NAME", "")
+    if not channel_name:
+        log.warning("TWITCH_CHANNEL_NAME not set — chat relay disabled")
+        return
+
+    from .twitch.adapter import TwitchAdapter
+    from .twitch.models import TwitchChatMessage
+
+    adapter = TwitchAdapter()
+    seen_ids: set[str] = set()
+    RELAY_INTERVAL = 3
+
+    while True:
+        try:
+            await asyncio.sleep(RELAY_INTERVAL)
+            if adapter.dry_run or not adapter.enabled:
+                continue
+
+            from .world_snapshot import build_world_snapshot_async
+
+            snap = await build_world_snapshot_async(events_limit=20)
+            events = snap.get("events") or []
+            msg_events = [
+                ev
+                for ev in events
+                if str(ev.get("event_type", "")).endswith("message_sent")
+                and ev.get("event_id") not in seen_ids
+            ]
+            # Newest first, cap at 2 per cycle so we don't burst the rate limit
+            for ev in sorted(msg_events, key=lambda e: e.get("timestamp", 0))[-2:]:
+                event_id = ev.get("event_id", "")
+                seen_ids.add(event_id)
+                payload = ev.get("payload") or {}
+                if isinstance(payload, str):
+                    import json as _json
+
+                    try:
+                        payload = _json.loads(payload)
+                    except Exception:
+                        payload = {}
+                body = str(payload.get("content") or payload.get("body") or "").strip()
+                sender = str(payload.get("sender_name") or ev.get("agent_id") or "").strip()
+                if not body or len(body) < 4:
+                    continue
+                # Format: "AgentName: line" — truncate to 490 chars (Twitch limit is 500)
+                line = f"{sender}: {body}"[:490] if sender else body[:490]
+                chat_msg = TwitchChatMessage(message=line, channel_name=channel_name)
+                result = await adapter.send_chat(chat_msg)
+                if not result.ok:
+                    log.debug("Twitch chat relay send failed: %s", result.reason)
+                else:
+                    log.debug("Twitch chat → %s: %s", channel_name, line[:80])
+
+            # Trim seen_ids to avoid unbounded growth (keep last 500)
+            if len(seen_ids) > 500:
+                seen_ids = set(list(seen_ids)[-500:])
+
+        except asyncio.CancelledError:
+            break
+        except Exception as exc:
+            log.debug("Twitch chat relay daemon: %s", exc)
+
+
 async def _ws_snapshot_daemon():
     """Periodic full snapshot push for WebSocket observers."""
-    interval = int(os.getenv("WS_SNAPSHOT_INTERVAL_S", "30"))
+    interval = int(os.getenv("WS_SNAPSHOT_INTERVAL_S", "8"))
     while True:
         try:
             await asyncio.sleep(interval)
@@ -81,26 +195,86 @@ async def lifespan(app: FastAPI):
     ensure_schema()
     await init_pool()
 
+    # Bootstrap NATS JetStream before agents start emitting.
+    # Without this the first N emits race to create the stream and most lose.
+    from .event_emitter import get_emitter
+
+    try:
+        await get_emitter()
+        log.info("NATS JetStream ready")
+    except Exception as _js_err:
+        log.warning(f"NATS JetStream bootstrap failed (agents will retry): {_js_err}")
+
     _background_tasks.append(asyncio.create_task(rent_daemon(), name="rent_daemon"))
     _background_tasks.append(asyncio.create_task(agent_runner(), name="agent_runner"))
     _background_tasks.append(asyncio.create_task(status_review_daemon(), name="status_review"))
     _background_tasks.append(asyncio.create_task(_ws_snapshot_daemon(), name="ws_snapshot"))
     _background_tasks.append(asyncio.create_task(_agent_jobs_daemon(), name="agent_jobs"))
+    _background_tasks.append(asyncio.create_task(_twitch_chat_relay_daemon(), name="twitch_relay"))
+
+    # ── Twitch EventSub WebSocket (only when TWITCH_ENABLED=true) ────────────
+    _twitch_client = None
+    if os.getenv("TWITCH_ENABLED", "false").lower() in ("1", "true", "yes"):
+        try:
+            from .twitch.eventsub import EventSubClient
+
+            _emitter = await get_emitter()
+            _twitch_client = EventSubClient(emit_fn=_emitter.emit)
+            _background_tasks.append(_twitch_client.start())
+            log.info("Twitch EventSub client started")
+        except Exception as _tw_err:
+            log.warning("Twitch EventSub start failed (runtime continues): %s", _tw_err)
+    else:
+        log.info("Twitch disabled (TWITCH_ENABLED=false) — set to true to connect live")
+
+    # ── YouTube Live Chat poller (only when YOUTUBE_ENABLED=true) ────────────
+    _youtube_client = None
+    if os.getenv("YOUTUBE_ENABLED", "false").lower() in ("1", "true", "yes"):
+        try:
+            from .youtube.chat_poller import ChatPoller
+
+            _emitter = await get_emitter()
+            _youtube_client = ChatPoller(emit_fn=_emitter.emit)
+            _background_tasks.append(_youtube_client.start())
+            log.info("YouTube Live Chat poller started")
+        except Exception as _yt_err:
+            log.warning("YouTube poller start failed (runtime continues): %s", _yt_err)
+    else:
+        log.info("YouTube disabled (YOUTUBE_ENABLED=false) — set to true to connect live")
 
     yield
 
     log.info("Shutting down daemons...")
+    if _twitch_client is not None:
+        _twitch_client.stop()
+    if _youtube_client is not None:
+        _youtube_client.stop()
     for task in _background_tasks:
         task.cancel()
     await asyncio.gather(*_background_tasks, return_exceptions=True)
     await close_pool()
 
 
-app = FastAPI(title="God Runtime", version="0.1.0", lifespan=lifespan)
+app = FastAPI(title="God Runtime", version=RUNTIME_VERSION, lifespan=lifespan)
+
+
+def _cors_allow_origins() -> list[str]:
+    raw = os.getenv("CORS_ALLOW_ORIGINS", "").strip()
+    if raw:
+        return [origin.strip() for origin in raw.split(",") if origin.strip()]
+    return [
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "http://localhost:8888",
+        "http://127.0.0.1:8888",
+        "http://localhost:10517",
+        "http://127.0.0.1:10517",
+    ]
+
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=_cors_allow_origins(),
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -108,13 +282,188 @@ app.add_middleware(
 app.include_router(services_router)
 app.include_router(creator_router)
 
+_OBSERVER_DIR = pathlib.Path(__file__).parent.parent.parent / "observer"
+if _OBSERVER_DIR.is_dir():
+    app.mount("/observer", StaticFiles(directory=str(_OBSERVER_DIR), html=True), name="observer")
+
+
+@app.get("/stage")
+async def stage_page():
+    """Serve the stage UI directly at /stage."""
+    f = _OBSERVER_DIR / "stage.html"
+    if f.exists():
+        return FileResponse(str(f), media_type="text/html")
+    return Response("stage not found", status_code=404)
+
 
 @app.get("/health")
 async def health():
     return {
         "status": "ok",
         "world_id": os.getenv("WORLD_ID", "unknown"),
-        "version": "0.1.0",
+        "version": RUNTIME_VERSION,
+    }
+
+
+def _db_ready() -> dict:
+    try:
+        import psycopg2
+
+        conn = psycopg2.connect(
+            os.getenv("DATABASE_URL", "postgresql://god:localdev@localhost:5432/god_world"),
+            connect_timeout=2,
+        )
+        try:
+            cur = conn.cursor()
+            cur.execute("SELECT 1")
+            cur.fetchone()
+        finally:
+            conn.close()
+        return {"ok": True, "probe": "postgres"}
+    except Exception as exc:
+        return {"ok": False, "probe": "postgres", "reason": str(exc)}
+
+
+def _obs_ready() -> dict:
+    obs_url = os.getenv("OBS_WEBSOCKET_URL", "ws://127.0.0.1:4444").strip()
+    if not obs_url:
+        return {"ok": True, "probe": "skipped", "reason": "not_configured"}
+    parsed = urlparse(obs_url)
+    host = parsed.hostname or "127.0.0.1"
+    port = parsed.port or (4455 if parsed.scheme == "wss" else 4444)
+    return probe_tcp(host, port, timeout=1.5)
+
+
+def _ipfs_ready() -> dict:
+    endpoint = ipfs_api_url()
+    try:
+        parsed_endpoint = urlparse(endpoint)
+        if parsed_endpoint.scheme not in {"http", "https"} or not parsed_endpoint.hostname:
+            return {
+                "ok": False,
+                "probe": "http",
+                "url": endpoint,
+                "reason": "invalid_ipfs_api",
+            }
+        connection_cls = (
+            http.client.HTTPSConnection
+            if parsed_endpoint.scheme == "https"
+            else http.client.HTTPConnection
+        )
+        conn = connection_cls(parsed_endpoint.hostname, parsed_endpoint.port or 5001, timeout=2.0)
+        try:
+            conn.request("POST", "/api/v0/version")
+            response = conn.getresponse()
+            body = response.read(256)
+            parsed = None
+            try:
+                parsed = json.loads(body.decode("utf-8")) if body else None
+            except Exception:
+                parsed = None
+            return {
+                "ok": 200 <= response.status < 400,
+                "probe": "http",
+                "url": endpoint_path(endpoint, "/api/v0/version"),
+                "status_code": int(response.status),
+                "body": parsed,
+            }
+        finally:
+            conn.close()
+    except Exception as exc:
+        return {
+            "ok": False,
+            "probe": "http",
+            "url": endpoint_path(endpoint, "/api/v0/version"),
+            "reason": str(exc),
+        }
+
+
+async def _fish_synthesis_ready() -> dict:
+    endpoint = tts_base_url()
+    if not endpoint:
+        return {"ok": False, "probe": "skipped", "reason": "not_configured"}
+    try:
+        timeout_seconds = max(1.0, float(os.getenv("VOICE_HEALTH_TIMEOUT_SECONDS", "90")))
+    except ValueError:
+        timeout_seconds = 90.0
+    seed_path = pathlib.Path(__file__).resolve().parents[1] / "seed_utterances" / "philosopher.wav"
+    if not seed_path.is_file():
+        return {"ok": False, "probe": "tts", "reason": "seed_utterance_missing"}
+    try:
+        payload = {
+            "text": "Ready check.",
+            "references": [
+                {
+                    "audio": base64.b64encode(seed_path.read_bytes()).decode("utf-8"),
+                    "text": "",
+                }
+            ],
+            "format": "wav",
+            "streaming": False,
+        }
+        async with httpx.AsyncClient(timeout=timeout_seconds) as client:
+            synthesis_url = tts_synthesis_url(endpoint)
+            response = await client.post(synthesis_url, json=payload)
+            if not 200 <= response.status_code < 300:
+                return {
+                    "ok": False,
+                    "probe": "tts",
+                    "endpoint": synthesis_url,
+                    "status_code": int(response.status_code),
+                    "reason": "tts_failed",
+                }
+            return {
+                "ok": bool(response.content),
+                "probe": "tts",
+                "endpoint": synthesis_url,
+                "byte_count": len(response.content or b""),
+                "timeout_seconds": timeout_seconds,
+            }
+    except Exception as exc:
+        return {
+            "ok": False,
+            "probe": "tts",
+            "endpoint": tts_synthesis_url(endpoint),
+            "reason": str(exc) or exc.__class__.__name__,
+            "timeout_seconds": timeout_seconds,
+        }
+
+
+@app.get("/ready")
+async def ready():
+    streaming_mode = os.getenv("STREAMING_MODE", "auto").lower()
+    obs_required = streaming_mode in ("1", "true", "yes", "on") or os.getenv(
+        "OBS_REQUIRED", ""
+    ).lower() in ("1", "true", "yes", "on")
+    voice_enabled = os.getenv("VOICE_ENABLED", "true").lower() in ("1", "true", "yes", "on")
+    redis_host, redis_port = redis_tcp_target()
+    nats_host, nats_port = nats_tcp_target()
+    checks = {
+        "postgres": _db_ready(),
+        "redis": probe_tcp(redis_host, redis_port, timeout=1.5),
+        "nats": probe_tcp(nats_host, nats_port, timeout=1.5),
+        "ipfs": probe_url(endpoint_path(ipfs_api_url(), "/debug/metrics/prometheus"), timeout=2.0),
+        "comfyui": probe_url(comfyui_health_url(), timeout=2.0),
+        "ollama": probe_url(ollama_tags_url(), timeout=2.0),
+        "nginx_runtime": probe_tcp("127.0.0.1", 10515, timeout=1.5),
+        "nginx_comfyui": probe_tcp("127.0.0.1", 10516, timeout=1.5),
+        "nginx_observer": probe_tcp("127.0.0.1", 10517, timeout=1.5),
+    }
+    if voice_enabled or tts_base_url() or tts_health_url():
+        checks["fish"] = await _fish_synthesis_ready()
+    else:
+        checks["fish"] = {"ok": True, "probe": "skipped", "reason": "voice_disabled"}
+    if obs_required:
+        checks["obs"] = _obs_ready()
+    else:
+        checks["obs"] = {"ok": True, "probe": "skipped", "reason": "obs_optional"}
+    ok = all(check.get("ok") for check in checks.values())
+    return {
+        "ok": ok,
+        "status": "ready" if ok else "not_ready",
+        "world_id": os.getenv("WORLD_ID", "unknown"),
+        "version": RUNTIME_VERSION,
+        "checks": checks,
     }
 
 
@@ -143,6 +492,10 @@ async def list_agents(limit: int = 10000):
                 COALESCE(rp.paid_count,  0)          AS rent_paid_count,
                 COALESCE(rp.miss_count,  0)          AS rent_miss_count,
                 COALESCE(ss.is_sleeping, false)      AS is_sleeping,
+                COALESCE(a.avatar_cid, '')           AS avatar_cid,
+                COALESCE(NULLIF(a.rigged_avatar_cid, ''), a.avatar_cid, '') AS rigged_avatar_cid,
+                COALESCE(a.vrm_avatar_url, '')       AS vrm_avatar_url,
+                COALESCE(a.voice_model_cid, '')      AS voice_model_cid,
                 e.last_thought
             FROM agents a
             LEFT JOIN (
@@ -180,10 +533,48 @@ async def world_snapshot(events_limit: int = 50, messages_limit: int = 80):
     try:
         from .world_snapshot import build_world_snapshot_async
 
-        return await build_world_snapshot_async(
+        snapshot = await build_world_snapshot_async(
             events_limit=min(events_limit, 200),
             messages_limit=min(messages_limit, 500),
         )
+        if snapshot.get("agents"):
+            try:
+                import psycopg2
+                import psycopg2.extras
+
+                world_id = snapshot.get("world_id", os.getenv("WORLD_ID", "local-dev-world-1"))
+                conn = psycopg2.connect(
+                    os.getenv("DATABASE_URL", "postgresql://god:localdev@localhost:5432/god_world"),
+                    cursor_factory=psycopg2.extras.RealDictCursor,
+                )
+                cur = conn.cursor()
+                cur.execute(
+                    """
+                           SELECT soul_id,
+                           COALESCE(avatar_cid, '') AS avatar_cid,
+                           COALESCE(NULLIF(rigged_avatar_cid, ''), avatar_cid, '') AS rigged_avatar_cid,
+                           COALESCE(vrm_avatar_url, '') AS vrm_avatar_url,
+                           COALESCE(voice_model_cid, '') AS voice_model_cid
+                    FROM agents
+                    WHERE world_id = %s
+                    """,
+                    (world_id,),
+                )
+                cid_map = {row["soul_id"]: dict(row) for row in cur.fetchall()}
+                cur.close()
+                conn.close()
+                for agent in snapshot["agents"]:
+                    if not isinstance(agent, dict):
+                        continue
+                    cid_row = cid_map.get(agent.get("soul_id"))
+                    if cid_row:
+                        agent["avatar_cid"] = cid_row.get("avatar_cid", "")
+                        agent["rigged_avatar_cid"] = cid_row.get("rigged_avatar_cid", "")
+                        agent["vrm_avatar_url"] = cid_row.get("vrm_avatar_url", "")
+                        agent["voice_model_cid"] = cid_row.get("voice_model_cid", "")
+            except Exception as merge_error:
+                log.debug(f"/world/snapshot CID merge skipped: {merge_error}")
+        return snapshot
     except Exception as e:
         log.warning(f"/world/snapshot error: {e}")
         try:
@@ -195,6 +586,407 @@ async def world_snapshot(events_limit: int = 50, messages_limit: int = 80):
             )
         except Exception as e2:
             return {"error": str(e2), "world_id": os.getenv("WORLD_ID", "local-dev-world-1")}
+
+
+@app.get("/showrunner")
+async def showrunner_plan(events_limit: int = 50, messages_limit: int = 80):
+    """Deterministic broadcast plan derived from the latest world snapshot."""
+    try:
+        from .world_snapshot import build_world_snapshot_async
+
+        snapshot = await build_world_snapshot_async(
+            events_limit=min(events_limit, 200),
+            messages_limit=min(messages_limit, 500),
+        )
+        return {
+            "showrunner": snapshot.get("showrunner", {}),
+            "world_id": snapshot.get("world_id", os.getenv("WORLD_ID", "local-dev-world-1")),
+            "epoch": snapshot.get("epoch"),
+        }
+    except Exception as e:
+        log.warning(f"/showrunner error: {e}")
+        return {"error": str(e), "world_id": os.getenv("WORLD_ID", "local-dev-world-1")}
+
+
+@app.get("/twitch/status")
+async def twitch_status():
+    """Current Twitch adapter configuration and supported event types."""
+    try:
+        from .twitch.adapter import build_twitch_status
+
+        status = build_twitch_status()
+        return {
+            "twitch": status,
+            "world_id": os.getenv("WORLD_ID", "local-dev-world-1"),
+        }
+    except Exception as e:
+        log.warning(f"/twitch/status error: {e}")
+        return {"error": str(e), "world_id": os.getenv("WORLD_ID", "local-dev-world-1")}
+
+
+@app.get("/audience/status")
+async def audience_status():
+    """Current audience/patronage adapter configuration."""
+    try:
+        from .audience import build_audience_status
+
+        return {
+            "audience": build_audience_status(),
+            "world_id": os.getenv("WORLD_ID", "local-dev-world-1"),
+        }
+    except Exception as e:
+        log.warning(f"/audience/status error: {e}")
+        return {"error": str(e), "world_id": os.getenv("WORLD_ID", "local-dev-world-1")}
+
+
+@app.get("/audience/state")
+async def audience_state(events_limit: int = 50, messages_limit: int = 80):
+    """Current audience/patronage state layered over the latest world snapshot."""
+    try:
+        from .world_snapshot import build_world_snapshot_async
+
+        snapshot = await build_world_snapshot_async(
+            events_limit=min(events_limit, 200),
+            messages_limit=min(messages_limit, 500),
+        )
+        return {
+            "audience": snapshot.get("audience", {}),
+            "showrunner": snapshot.get("showrunner", {}),
+            "world_id": snapshot.get("world_id", os.getenv("WORLD_ID", "local-dev-world-1")),
+            "epoch": snapshot.get("epoch"),
+        }
+    except Exception as e:
+        log.warning(f"/audience/state error: {e}")
+        return {"error": str(e), "world_id": os.getenv("WORLD_ID", "local-dev-world-1")}
+
+
+@app.get("/content-bank/status")
+async def content_bank_status():
+    """Current content-bank configuration and supported asset types."""
+    try:
+        from .content_bank import build_content_bank_status
+
+        return {
+            "content_bank": build_content_bank_status(),
+            "world_id": os.getenv("WORLD_ID", "local-dev-world-1"),
+        }
+    except Exception as e:
+        log.warning(f"/content-bank/status error: {e}")
+        return {"error": str(e), "world_id": os.getenv("WORLD_ID", "local-dev-world-1")}
+
+
+@app.get("/content-bank/state")
+async def content_bank_state(events_limit: int = 50, messages_limit: int = 80):
+    """Current content-bank state layered over the latest world snapshot."""
+    try:
+        from .world_snapshot import build_world_snapshot_async
+
+        snapshot = await build_world_snapshot_async(
+            events_limit=min(events_limit, 200),
+            messages_limit=min(messages_limit, 500),
+        )
+        return {
+            "content_bank": snapshot.get("content_bank", {}),
+            "audience": snapshot.get("audience", {}),
+            "showrunner": snapshot.get("showrunner", {}),
+            "world_id": snapshot.get("world_id", os.getenv("WORLD_ID", "local-dev-world-1")),
+            "epoch": snapshot.get("epoch"),
+        }
+    except Exception as e:
+        log.warning(f"/content-bank/state error: {e}")
+        return {"error": str(e), "world_id": os.getenv("WORLD_ID", "local-dev-world-1")}
+
+
+@app.get("/viewer/status")
+async def viewer_status():
+    """Current viewer overlay / extension configuration."""
+    try:
+        from .viewer import build_viewer_status
+
+        return {
+            "viewer": build_viewer_status(),
+            "world_id": os.getenv("WORLD_ID", "local-dev-world-1"),
+        }
+    except Exception as e:
+        log.warning(f"/viewer/status error: {e}")
+        return {"error": str(e), "world_id": os.getenv("WORLD_ID", "local-dev-world-1")}
+
+
+@app.get("/viewer/state")
+async def viewer_state(events_limit: int = 50, messages_limit: int = 80):
+    """Current viewer interaction state layered over the latest world snapshot."""
+    try:
+        from .world_snapshot import build_world_snapshot_async
+
+        snapshot = await build_world_snapshot_async(
+            events_limit=min(events_limit, 200),
+            messages_limit=min(messages_limit, 500),
+        )
+        return {
+            "viewer": snapshot.get("viewer", {}),
+            "content_bank": snapshot.get("content_bank", {}),
+            "audience": snapshot.get("audience", {}),
+            "world_id": snapshot.get("world_id", os.getenv("WORLD_ID", "local-dev-world-1")),
+            "epoch": snapshot.get("epoch"),
+        }
+    except Exception as e:
+        log.warning(f"/viewer/state error: {e}")
+        return {"error": str(e), "world_id": os.getenv("WORLD_ID", "local-dev-world-1")}
+
+
+@app.get("/nemo/status")
+async def nemo_status():
+    """Current NeMo director status and configuration."""
+    try:
+        from .nemo import build_nemo_status
+
+        return {
+            "nemo": build_nemo_status(),
+            "world_id": os.getenv("WORLD_ID", "local-dev-world-1"),
+        }
+    except Exception as e:
+        log.warning(f"/nemo/status error: {e}")
+        return {"error": str(e), "world_id": os.getenv("WORLD_ID", "local-dev-world-1")}
+
+
+@app.get("/nemo/director")
+async def nemo_director(events_limit: int = 50, messages_limit: int = 80):
+    """Current NeMo directive layered over the latest world snapshot."""
+    try:
+        from .world_snapshot import build_world_snapshot_async
+
+        snapshot = await build_world_snapshot_async(
+            events_limit=min(events_limit, 200),
+            messages_limit=min(messages_limit, 500),
+        )
+        return {
+            "nemo": snapshot.get("nemo", {}),
+            "showrunner": snapshot.get("showrunner", {}),
+            "world_id": snapshot.get("world_id", os.getenv("WORLD_ID", "local-dev-world-1")),
+            "epoch": snapshot.get("epoch"),
+        }
+    except Exception as e:
+        log.warning(f"/nemo/director error: {e}")
+        return {"error": str(e), "world_id": os.getenv("WORLD_ID", "local-dev-world-1")}
+
+
+@app.get("/voice/status")
+async def voice_status():
+    """Current voice stack configuration and health."""
+    try:
+        from .voice import build_voice_status
+
+        return {
+            "voice": build_voice_status(),
+            "world_id": os.getenv("WORLD_ID", "local-dev-world-1"),
+        }
+    except Exception as e:
+        log.warning(f"/voice/status error: {e}")
+        return {"error": str(e), "world_id": os.getenv("WORLD_ID", "local-dev-world-1")}
+
+
+@app.get("/voice/state")
+async def voice_state(events_limit: int = 50, messages_limit: int = 80):
+    """Current voice plan layered over the latest world snapshot."""
+    try:
+        from .world_snapshot import build_world_snapshot_async
+
+        snapshot = await build_world_snapshot_async(
+            events_limit=min(events_limit, 200),
+            messages_limit=min(messages_limit, 500),
+        )
+        return {
+            "voice": snapshot.get("voice", {}),
+            "showrunner": snapshot.get("showrunner", {}),
+            "broadcast": snapshot.get("broadcast", {}),
+            "world_id": snapshot.get("world_id", os.getenv("WORLD_ID", "local-dev-world-1")),
+            "epoch": snapshot.get("epoch"),
+        }
+    except Exception as e:
+        log.warning(f"/voice/state error: {e}")
+        return {"error": str(e), "world_id": os.getenv("WORLD_ID", "local-dev-world-1")}
+
+
+@app.get("/voice/audio/{utterance_id}")
+async def voice_audio(utterance_id: str):
+    """Return synthesized WAV bytes for a given utterance_id (cached from last TTS call)."""
+    from fastapi.responses import Response as FastResponse
+    from .voice.engine import get_cached_audio
+
+    audio = get_cached_audio(utterance_id)
+    if audio is None:
+        return FastResponse(status_code=404, content=b"")
+    if len(audio) > PUBLIC_VOICE_AUDIO_MAX_BYTES:
+        return FastResponse(status_code=413, content=b"")
+    return FastResponse(
+        content=audio,
+        media_type="audio/wav",
+        headers={
+            "Cache-Control": "public, max-age=60",
+        },
+    )
+
+
+@app.get("/ipfs/{cid}")
+async def ipfs_proxy(cid: str):
+    """Proxy IPFS content by CID so the observer can fetch portraits without a local gateway."""
+    from fastapi.responses import Response as FastResponse
+
+    if not cid or len(cid) > 160 or any(ch in cid for ch in "/\\?&#"):
+        return FastResponse(status_code=400, content=b"")
+
+    async def _cat_limited(client: httpx.AsyncClient, method: str) -> tuple[int, bytes]:
+        chunks: list[bytes] = []
+        total = 0
+        async with client.stream(
+            method,
+            f"{ipfs_api}/api/v0/cat",
+            params={"arg": cid},
+        ) as response:
+            if response.status_code != 200:
+                return response.status_code, b""
+            async for chunk in response.aiter_bytes():
+                total += len(chunk)
+                if total > PUBLIC_IPFS_MAX_BYTES:
+                    return 413, b""
+                chunks.append(chunk)
+        return 200, b"".join(chunks)
+
+    ipfs_api = (os.getenv("IPFS_API") or "http://localhost:5001").rstrip("/")
+    try:
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            status_code, content = await _cat_limited(client, "POST")
+            if status_code == 405:
+                status_code, content = await _cat_limited(client, "GET")
+            if status_code == 413:
+                return FastResponse(status_code=413, content=b"")
+            if status_code != 200 or not content:
+                return FastResponse(status_code=404, content=b"")
+            content_type = "image/png" if content[:4] == b"\x89PNG" else "application/octet-stream"
+            return FastResponse(
+                content=content,
+                media_type=content_type,
+                headers={
+                    "Cache-Control": "public, max-age=3600",
+                },
+            )
+    except Exception as exc:
+        log.warning("ipfs_proxy cid=%s error=%s", cid, exc)
+        return FastResponse(status_code=502, content=b"")
+
+
+@app.get("/avatar/status")
+async def avatar_status():
+    """Current avatar stack configuration and health."""
+    try:
+        from .avatar import build_avatar_status
+
+        return {
+            "avatar": build_avatar_status(),
+            "world_id": os.getenv("WORLD_ID", "local-dev-world-1"),
+        }
+    except Exception as e:
+        log.warning(f"/avatar/status error: {e}")
+        return {"error": str(e), "world_id": os.getenv("WORLD_ID", "local-dev-world-1")}
+
+
+@app.get("/avatar/state")
+async def avatar_state(events_limit: int = 50, messages_limit: int = 80):
+    """Current avatar plan layered over the latest world snapshot."""
+    try:
+        from .world_snapshot import build_world_snapshot_async
+
+        snapshot = await build_world_snapshot_async(
+            events_limit=min(events_limit, 200),
+            messages_limit=min(messages_limit, 500),
+        )
+        return {
+            "avatar": snapshot.get("avatar", {}),
+            "showrunner": snapshot.get("showrunner", {}),
+            "voice": snapshot.get("voice", {}),
+            "world_id": snapshot.get("world_id", os.getenv("WORLD_ID", "local-dev-world-1")),
+            "epoch": snapshot.get("epoch"),
+        }
+    except Exception as e:
+        log.warning(f"/avatar/state error: {e}")
+        return {"error": str(e), "world_id": os.getenv("WORLD_ID", "local-dev-world-1")}
+
+
+@app.get("/broadcast/state")
+async def broadcast_state(events_limit: int = 50, messages_limit: int = 80):
+    """Broadcast scene, captions, overlays, and OBS command plan."""
+    try:
+        from .world_snapshot import build_world_snapshot_async
+
+        snapshot = await build_world_snapshot_async(
+            events_limit=min(events_limit, 200),
+            messages_limit=min(messages_limit, 500),
+        )
+        return {
+            "broadcast": snapshot.get("broadcast", {}),
+            "showrunner": snapshot.get("showrunner", {}),
+            "nemo": snapshot.get("nemo", {}),
+            "world_id": snapshot.get("world_id", os.getenv("WORLD_ID", "local-dev-world-1")),
+            "epoch": snapshot.get("epoch"),
+        }
+    except Exception as e:
+        log.warning(f"/broadcast/state error: {e}")
+        return {"error": str(e), "world_id": os.getenv("WORLD_ID", "local-dev-world-1")}
+
+
+@app.get("/broadcast/status")
+async def broadcast_status():
+    """Current broadcast adapter mode and transport configuration."""
+    try:
+        from .broadcast import build_broadcast_status
+
+        return {
+            "broadcast": build_broadcast_status(),
+            "world_id": os.getenv("WORLD_ID", "local-dev-world-1"),
+        }
+    except Exception as e:
+        log.warning(f"/broadcast/status error: {e}")
+        return {"error": str(e), "world_id": os.getenv("WORLD_ID", "local-dev-world-1")}
+
+
+@app.get("/resilience/status")
+async def resilience_status():
+    """Current runtime resilience and fallback posture."""
+    try:
+        from .resilience import build_resilience_status
+        from .world_snapshot import build_world_snapshot_async
+
+        snapshot = await build_world_snapshot_async(events_limit=25, messages_limit=25)
+        return {
+            "resilience": build_resilience_status(snapshot),
+            "world_id": snapshot.get("world_id", os.getenv("WORLD_ID", "local-dev-world-1")),
+            "epoch": snapshot.get("epoch"),
+        }
+    except Exception as e:
+        log.warning(f"/resilience/status error: {e}")
+        return {"error": str(e), "world_id": os.getenv("WORLD_ID", "local-dev-world-1")}
+
+
+@app.get("/resilience/state")
+async def resilience_state(events_limit: int = 50, messages_limit: int = 80):
+    """Current resilience state layered over the latest world snapshot."""
+    try:
+        from .world_snapshot import build_world_snapshot_async
+
+        snapshot = await build_world_snapshot_async(
+            events_limit=min(events_limit, 200),
+            messages_limit=min(messages_limit, 500),
+        )
+        return {
+            "resilience": snapshot.get("resilience", {}),
+            "broadcast": snapshot.get("broadcast", {}),
+            "nemo": snapshot.get("nemo", {}),
+            "world_id": snapshot.get("world_id", os.getenv("WORLD_ID", "local-dev-world-1")),
+            "epoch": snapshot.get("epoch"),
+        }
+    except Exception as e:
+        log.warning(f"/resilience/state error: {e}")
+        return {"error": str(e), "world_id": os.getenv("WORLD_ID", "local-dev-world-1")}
 
 
 @app.websocket("/world/stream")
@@ -243,7 +1035,15 @@ async def list_events(limit: int = 50):
         cur = conn.cursor()
         cur.execute(
             "SELECT event_id, agent_id, event_type, timestamp, narrative, payload "
-            "FROM events WHERE world_id = %s ORDER BY timestamp DESC LIMIT %s",
+            """
+            FROM events
+            WHERE world_id = %s
+              AND NOT (
+                event_type = 'social.agent.message_sent'
+                AND COALESCE(payload->>'is_public', 'false') != 'true'
+              )
+            ORDER BY timestamp DESC LIMIT %s
+            """,
             (os.getenv("WORLD_ID", "local-dev-world-1"), limit),
         )
         events = [dict(r) for r in cur.fetchall()]
@@ -360,8 +1160,17 @@ async def list_tools():
 
 
 @app.get("/agents/{soul_id}/env")
-async def get_agent_env(soul_id: str):
+async def get_agent_env(
+    soul_id: str,
+    x_creator_token: str | None = Header(None, alias="X-Creator-Token"),
+):
     """Read-only environment summary for an agent (observer / debug)."""
+    from .security import deny_creator_action
+
+    denied = deny_creator_action(x_creator_token)
+    if denied:
+        return denied
+
     from .agent_env import fetch_recent_actions, format_env_for_decide, read_scratch
     from .capabilities import format_capabilities_summary, get_granted_capabilities
 
@@ -531,8 +1340,17 @@ async def get_milestones():
 
 
 @app.get("/tools/{soul_id}/grants")
-async def get_tool_grants(soul_id: str):
+async def get_tool_grants(
+    soul_id: str,
+    x_creator_token: str | None = Header(None, alias="X-Creator-Token"),
+):
     """Active tool grants for a specific agent."""
+    from .security import deny_creator_action
+
+    denied = deny_creator_action(x_creator_token)
+    if denied:
+        return denied
+
     try:
         import psycopg2
         import psycopg2.extras
@@ -566,8 +1384,18 @@ async def get_tool_grants(soul_id: str):
 
 
 @app.get("/agents/{soul_id}/episodes")
-async def get_agent_episodes(soul_id: str, limit: int = 20):
+async def get_agent_episodes(
+    soul_id: str,
+    limit: int = 20,
+    x_creator_token: str | None = Header(None, alias="X-Creator-Token"),
+):
     """Recent episodic memory index rows for an agent (GH #25 debug surface)."""
+    from .security import deny_creator_action
+
+    denied = deny_creator_action(x_creator_token)
+    if denied:
+        return denied
+
     from .episodic_memory import list_episodes
 
     rows = list_episodes(soul_id, limit=limit)
@@ -575,8 +1403,18 @@ async def get_agent_episodes(soul_id: str, limit: int = 20):
 
 
 @app.get("/agents/{soul_id}/dreams")
-async def get_agent_dreams(soul_id: str, limit: int = 20):
+async def get_agent_dreams(
+    soul_id: str,
+    limit: int = 20,
+    x_creator_token: str | None = Header(None, alias="X-Creator-Token"),
+):
     """Dream history for a specific agent."""
+    from .security import deny_creator_action
+
+    denied = deny_creator_action(x_creator_token)
+    if denied:
+        return denied
+
     try:
         import psycopg2
         import psycopg2.extras
@@ -598,8 +1436,17 @@ async def get_agent_dreams(soul_id: str, limit: int = 20):
 
 
 @app.get("/agents/{soul_id}/sleep")
-async def get_agent_sleep_state(soul_id: str):
+async def get_agent_sleep_state(
+    soul_id: str,
+    x_creator_token: str | None = Header(None, alias="X-Creator-Token"),
+):
     """Current sleep state for an agent (empty if awake)."""
+    from .security import deny_creator_action
+
+    denied = deny_creator_action(x_creator_token)
+    if denied:
+        return denied
+
     try:
         import psycopg2
         import psycopg2.extras
@@ -628,8 +1475,17 @@ async def get_agent_sleep_state(soul_id: str):
 
 
 @app.get("/messages")
-async def get_world_messages(limit: int = 100):
+async def get_world_messages(
+    limit: int = 100,
+    x_creator_token: str | None = Header(None, alias="X-Creator-Token"),
+):
     """All messages sent in this world (admin/observer view)."""
+    from .security import deny_creator_action
+
+    denied = deny_creator_action(x_creator_token)
+    if denied:
+        return denied
+
     try:
         from .messaging import get_world_messages as _gwm
 
@@ -640,8 +1496,18 @@ async def get_world_messages(limit: int = 100):
 
 
 @app.get("/agents/{soul_id}/messages")
-async def get_agent_messages(soul_id: str, limit: int = 50):
+async def get_agent_messages(
+    soul_id: str,
+    limit: int = 50,
+    x_creator_token: str | None = Header(None, alias="X-Creator-Token"),
+):
     """Messages sent by a specific agent."""
+    from .security import deny_creator_action
+
+    denied = deny_creator_action(x_creator_token)
+    if denied:
+        return denied
+
     try:
         from .messaging import get_agent_sent_messages
 
@@ -653,12 +1519,22 @@ async def get_agent_messages(soul_id: str, limit: int = 50):
 
 
 @app.get("/agents/{soul_id}/inbox")
-async def get_agent_inbox(soul_id: str):
-    """Pull unread inbox messages for an agent (marks as read)."""
+async def get_agent_inbox(
+    soul_id: str,
+    mark_read: bool = False,
+    x_creator_token: str | None = Header(None, alias="X-Creator-Token"),
+):
+    """Inspect unread inbox messages for an agent. mark_read=true consumes them."""
+    from .security import deny_creator_action
+
+    denied = deny_creator_action(x_creator_token)
+    if denied:
+        return denied
+
     try:
         from .messaging import pull_inbox
 
-        msgs = pull_inbox(soul_id)
+        msgs = pull_inbox(soul_id, mark_read=mark_read)
         return {"soul_id": soul_id, "messages": [m.to_dict() for m in msgs], "count": len(msgs)}
     except Exception as e:
         log.warning(f"/agents/{soul_id}/inbox error: {e}")
@@ -666,8 +1542,17 @@ async def get_agent_inbox(soul_id: str):
 
 
 @app.get("/agents/{soul_id}/reputation")
-async def get_agent_reputation(soul_id: str):
+async def get_agent_reputation(
+    soul_id: str,
+    x_creator_token: str | None = Header(None, alias="X-Creator-Token"),
+):
     """Reputation scores this agent holds about others."""
+    from .security import deny_creator_action
+
+    denied = deny_creator_action(x_creator_token)
+    if denied:
+        return denied
+
     try:
         import psycopg2
         import psycopg2.extras
@@ -788,6 +1673,30 @@ async def creator_genesis(
         f"@ {genesis_balance} USDC each"
     )
 
+    comfyui_probe = probe_url(comfyui_health_url())
+    if not comfyui_probe.get("ok"):
+        from fastapi.responses import JSONResponse
+
+        return JSONResponse(
+            status_code=503,
+            content={
+                "error": "ComfyUI is not healthy",
+                "probe": comfyui_probe,
+            },
+        )
+
+    fish_probe = probe_url(tts_health_url())
+    if not fish_probe.get("ok"):
+        from fastapi.responses import JSONResponse
+
+        return JSONResponse(
+            status_code=503,
+            content={
+                "error": "fish-speech is not healthy",
+                "probe": fish_probe,
+            },
+        )
+
     # Clear existing agents (hard delete for clean genesis)
     try:
         import psycopg2
@@ -829,17 +1738,44 @@ async def creator_genesis(
     from .seed_agents import seed_one_agent
 
     genesis_agents = []
+    genesis_failures = []
     for archetype in archetypes:
         try:
             agent = await seed_one_agent(
                 archetype=archetype,
                 seed_balance=Decimal(str(genesis_balance)),
                 is_elder=True,
+                block_on_avatar_genesis=True,
+                require_avatar_assets=True,
             )
+            if not agent.get("avatar_cid"):
+                raise RuntimeError(
+                    f"genesis agent missing avatar: avatar_cid={agent.get('avatar_cid')!r}"
+                )
+            if not agent.get("voice_model_cid"):
+                log.warning(
+                    f"  GENESIS: {archetype} voice embedding failed — agent created without voice"
+                )
             genesis_agents.append(agent)
             log.info(f"  GENESIS: {agent['name']} ({archetype}) soul={agent['soul_id'][:8]}")
         except Exception as e:
             log.error(f"  Failed to create genesis {archetype}: {e}")
+            genesis_failures.append({"archetype": archetype, "error": str(e)})
+
+    if not genesis_agents:
+        try:
+            _clear_world_state(world_id)
+        except Exception as cleanup_error:
+            log.error(f"  Cleanup after genesis failure failed: {cleanup_error}")
+        from fastapi.responses import JSONResponse
+
+        return JSONResponse(
+            status_code=500,
+            content={
+                "error": "All genesis agents failed to create",
+                "failures": genesis_failures,
+            },
+        )
 
     # Seed starter marketplace so USDC circulates via buy_service / x402 locally
     try:
@@ -879,12 +1815,213 @@ async def creator_genesis(
         "genesis_complete": True,
         "agents_created": len(genesis_agents),
         "agents": [
-            {"name": a["name"], "archetype": a["archetype"], "soul_id": a["soul_id"][:12]}
+            {
+                "name": a["name"],
+                "archetype": a["archetype"],
+                "soul_id": a["soul_id"],
+                "wallet_address": a["wallet_address"],
+                "graph_cid": a.get("graph_cid", ""),
+                "avatar_cid": a.get("avatar_cid", ""),
+                "rigged_avatar_cid": a.get("rigged_avatar_cid", ""),
+                "voice_model_cid": a.get("voice_model_cid", ""),
+                "avatar_genesis_status": a.get("avatar_genesis_status", ""),
+            }
             for a in genesis_agents
         ],
         "balance_each": genesis_balance,
         "message": "The world has begun. Agents will reproduce naturally from here.",
     }
+
+
+@app.post("/creator/one")
+@app.post("/one")
+async def creator_one(
+    body: dict = {},
+    x_creator_token: str | None = Header(None, alias="X-Creator-Token"),
+):
+    """
+    Creator-only: clear the world and create exactly one talk-first agent.
+
+    This is the smoke-test path. It blocks until both avatar and voice assets
+    are generated and pinned, and fails if either asset is missing.
+    """
+    from decimal import Decimal
+
+    from .security import deny_creator_action
+
+    denied = deny_creator_action(x_creator_token)
+    if denied:
+        return denied
+
+    if not body.get("confirm"):
+        return {
+            "warning": "This will DELETE all existing agents and create one agent. Pass {confirm: true} to proceed.",
+            "current_agent_count": _count_agents(),
+        }
+
+    world_id = os.getenv("WORLD_ID", "local-dev-world-1")
+    archetype = str(body.get("archetype") or "philosopher").strip().lower()
+    seed_balance = float(body.get("seed_balance_usdc", 2.0))
+
+    try:
+        from .avatar.archetype_config import ARCHETYPE_CONFIGS
+
+        if archetype not in ARCHETYPE_CONFIGS:
+            return {
+                "error": f"unknown archetype: {archetype}",
+                "valid_archetypes": sorted(ARCHETYPE_CONFIGS),
+            }
+    except Exception as exc:
+        return {"error": f"failed to validate archetype: {exc}"}
+
+    log.info("CREATOR ONE: clearing world, spawning one %s agent", archetype)
+
+    try:
+        _clear_world_state(world_id)
+    except Exception as e:
+        log.error(f"  Failed to clear world: {e}")
+        from fastapi.responses import JSONResponse
+
+        return JSONResponse(status_code=500, content={"error": f"Failed to clear world: {e}"})
+
+    from .seed_agents import seed_one_agent
+
+    try:
+        agent = await seed_one_agent(
+            archetype=archetype,
+            seed_balance=Decimal(str(seed_balance)),
+            is_elder=True,
+            block_on_avatar_genesis=True,
+            require_avatar_assets=True,
+        )
+    except Exception as exc:
+        log.error("  Failed to create one-agent world: %s", exc)
+        return {"error": str(exc)}
+
+    try:
+        import psycopg2
+        import psycopg2.extras
+
+        conn = psycopg2.connect(
+            os.getenv("DATABASE_URL", "postgresql://god:localdev@localhost:5432/god_world"),
+            cursor_factory=psycopg2.extras.RealDictCursor,
+        )
+        cur = conn.cursor()
+        cur.execute(
+            """
+            SELECT soul_id, current_name, archetype,
+                   COALESCE(avatar_cid, '') AS avatar_cid,
+                   COALESCE(NULLIF(rigged_avatar_cid, ''), avatar_cid, '') AS rigged_avatar_cid,
+                   COALESCE(vrm_avatar_url, '') AS vrm_avatar_url,
+                   COALESCE(voice_model_cid, '') AS voice_model_cid
+            FROM agents
+            WHERE world_id = %s
+            ORDER BY birth_timestamp DESC
+            LIMIT 1
+            """,
+            (world_id,),
+        )
+        row = cur.fetchone()
+        cur.close()
+        conn.close()
+    except Exception as exc:
+        return {"error": f"failed to verify one-agent world: {exc}", "agent": agent}
+
+    if not row:
+        return {"error": "one-agent world did not persist", "agent": agent}
+    if not row.get("avatar_cid") or not row.get("voice_model_cid"):
+        return {
+            "error": "one-agent world missing required assets",
+            "agent": dict(row),
+            "seed_agent": agent,
+        }
+
+    try:
+        from .messaging import send_message
+
+        bootstrap_line = (
+            body.get("bootstrap_line")
+            or body.get("speech")
+            or f"I am {row.get('current_name')}. This world has one voice now."
+        )
+        await send_message(
+            sender_soul_id=str(row["soul_id"]),
+            recipient_soul_id=str(row["soul_id"]),
+            body=str(bootstrap_line),
+            subject="solo bootstrap",
+            message_type="direct",
+            metadata={"source": "creator_one", "solo": True},
+        )
+    except Exception as exc:
+        log.warning("  Solo bootstrap speech failed: %s", exc)
+
+    return {
+        "one_complete": True,
+        "agent": dict(row),
+        "seed_agent": agent,
+        "message": "One agent is live with both avatar and voice assets.",
+    }
+
+
+@app.post("/creator/birth")
+async def creator_birth(
+    body: dict = {},
+    x_creator_token: str | None = Header(None, alias="X-Creator-Token"),
+):
+    """Add one agent by archetype without deleting existing agents."""
+    from decimal import Decimal
+
+    from .security import deny_creator_action
+
+    denied = deny_creator_action(x_creator_token)
+    if denied:
+        return denied
+
+    archetype = str(body.get("archetype") or "philosopher").strip().lower()
+    seed_balance = float(body.get("seed_balance_usdc", 2.0))
+
+    from .seed_agents import seed_one_agent
+
+    try:
+        agent = await seed_one_agent(
+            archetype=archetype,
+            seed_balance=Decimal(str(seed_balance)),
+            is_elder=True,
+            block_on_avatar_genesis=bool(body.get("block_on_avatar_genesis", True)),
+        )
+    except Exception as exc:
+        log.error("creator_birth failed: %s", exc)
+        return JSONResponse(status_code=500, content={"error": str(exc)})
+
+    return {"status": "born", "archetype": archetype, "agent": agent}
+
+
+def _clear_world_state(world_id: str) -> None:
+    import psycopg2
+
+    db = os.getenv("DATABASE_URL", "postgresql://god:localdev@localhost:5432/god_world")
+    conn = psycopg2.connect(db)
+    cur = conn.cursor()
+    cur.execute(
+        "DELETE FROM service_listings WHERE agent_soul_id IN "
+        "(SELECT soul_id FROM agents WHERE world_id = %s)",
+        (world_id,),
+    )
+    cur.execute("DELETE FROM agents WHERE world_id = %s", (world_id,))
+    cur.execute("DELETE FROM sleep_states WHERE world_id = %s", (world_id,))
+    cur.execute("DELETE FROM rent_payments WHERE soul_id NOT IN (SELECT soul_id FROM agents)")
+    cur.execute("DELETE FROM events WHERE world_id = %s", (world_id,))
+    cur.execute("DELETE FROM agent_messages WHERE world_id = %s", (world_id,))
+    cur.execute("DELETE FROM dreams WHERE world_id = %s", (world_id,))
+    cur.execute("DELETE FROM episodes WHERE world_id = %s", (world_id,))
+    cur.execute("DELETE FROM external_payments WHERE world_id = %s", (world_id,))
+    cur.execute("DELETE FROM agent_status WHERE world_id = %s", (world_id,))
+    cur.execute("DELETE FROM world_firsts WHERE world_id = %s", (world_id,))
+    cur.execute("DELETE FROM world_milestones WHERE world_id = %s", (world_id,))
+    conn.commit()
+    cur.close()
+    conn.close()
+    log.info("  Existing world state cleared")
 
 
 def _count_agents() -> int:
@@ -948,8 +2085,8 @@ async def deploy_token_endpoint(body: dict):
 if __name__ == "__main__":
     uvicorn.run(
         "src.main:app",
-        host="0.0.0.0",
+        host=os.getenv("UVICORN_HOST", "127.0.0.1"),
         port=8888,
-        reload=True,
+        reload=os.getenv("UVICORN_RELOAD", "false").lower() in ("1", "true", "yes"),
         log_level=os.getenv("LOG_LEVEL", "info").lower(),
     )

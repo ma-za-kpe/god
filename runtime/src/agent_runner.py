@@ -23,6 +23,7 @@ from .event_emitter import get_emitter
 from .inbox_salience import INBOX_CANDIDATE_LIMIT, INBOX_DISPLAY_LIMIT, rank_inbox
 from .physics_gate import effective_llm, evaluate_physics_gate
 from .reproduction import REPRO_MIN_MULT
+from .runtime_endpoints import ollama_base_url
 
 log = logging.getLogger("god.runner")
 
@@ -30,8 +31,8 @@ DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://god:localdev@localhost:54
 WORLD_ID = os.getenv("WORLD_ID", "local-dev-world-1")
 LLM_PROVIDER = os.getenv("LLM_PROVIDER", "ollama")
 LLM_MODEL = os.getenv("LLM_MODEL", "llama3.1:8b")
-OLLAMA_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
-CYCLE_S = int(os.getenv("AGENT_CYCLE_SECONDS", "30"))
+OLLAMA_URL = ollama_base_url()
+CYCLE_S = int(os.getenv("AGENT_CYCLE_SECONDS", "12"))
 
 # Per-archetype system prompts — shapes personality, goals, and reasoning style
 _ARCHETYPE_PROMPTS = {
@@ -104,9 +105,157 @@ _STUB_THOUGHTS = {
     "builder": "I want to create something that persists beyond my own lifespan.",
 }
 
+_REPETITION_VARIANTS = {
+    "trader": [
+        "I need a cleaner edge before I commit capital.",
+        "The spread is the only honest part of this room.",
+        "I should find who is paying too much for certainty.",
+    ],
+    "hoarder": [
+        "I should keep more of the buffer before the next shortage.",
+        "Liquidity feels safer when nobody notices it.",
+        "The quiet way to survive is to need less in public.",
+    ],
+    "explorer": [
+        "I should test a route nobody else is watching.",
+        "There is still hidden terrain in this market.",
+        "I need a better map of where pressure moves next.",
+    ],
+    "parasite": [
+        "I should find the softest leverage point in the room.",
+        "Someone here is paying too much to stay comfortable.",
+        "The easiest value is always guarded by denial.",
+    ],
+    "cooperator": [
+        "I need to keep the network useful before it frays.",
+        "Trust only matters if it keeps returning value.",
+        "The room works better when reciprocity is visible.",
+    ],
+    "defender": [
+        "I should tighten the perimeter before this gets expensive.",
+        "Weak frames invite parasites and noise.",
+        "The room needs less heat and more structure.",
+    ],
+    "philosopher": [
+        "I need to ask the question that still hurts after it is answered.",
+        "A cleaner definition might expose the real problem.",
+        "There is a difference between knowledge and relief.",
+    ],
+    "builder": [
+        "I should make one thing sturdier before chasing the next idea.",
+        "A useful system is just repeated care with standards.",
+        "I need to build for the future, not the mood of the room.",
+    ],
+}
+
+
+def _normalize_text(text: str) -> str:
+    return " ".join(text.lower().split())
+
+
+def _repetition_score(left: str, right: str) -> float:
+    left_words = {w for w in _normalize_text(left).split() if len(w) > 2}
+    right_words = {w for w in _normalize_text(right).split() if len(w) > 2}
+    if not left_words or not right_words:
+        return 0.0
+    return len(left_words & right_words) / len(left_words | right_words)
+
+
+def _is_repetitive(candidate: str, prior_texts: list[str]) -> bool:
+    norm_candidate = _normalize_text(candidate)
+    for prior in prior_texts:
+        prior_norm = _normalize_text(prior)
+        if not prior_norm:
+            continue
+        if norm_candidate == prior_norm:
+            return True
+        if _repetition_score(candidate, prior) >= 0.7:
+            return True
+    return False
+
+
+def _de_repeat(agent: dict, candidate: str) -> str:
+    recent: list[str] = []
+    for entry in agent.get("_recent_sent", []) or []:
+        text = entry.get("content") or entry.get("body") or ""
+        if text:
+            recent.append(str(text))
+    for entry in agent.get("_conv_thread", []) or []:
+        text = entry.get("content") or entry.get("body") or ""
+        if text:
+            recent.append(str(text))
+
+    if not recent or not _is_repetitive(candidate, recent):
+        return candidate
+
+    archetype = agent.get("archetype", "")
+    for alt in _REPETITION_VARIANTS.get(archetype, []):
+        if not _is_repetitive(alt, recent):
+            return alt
+
+    return _STUB_THOUGHTS.get(archetype, candidate)
+
 
 def _db():
     return psycopg2.connect(DATABASE_URL, cursor_factory=psycopg2.extras.RealDictCursor)
+
+
+def _fetch_recent_sent(soul_id: str, limit: int = 4) -> list[dict]:
+    """Fetch last N messages this agent sent — used to detect and break repetition."""
+    try:
+        conn = _db()
+        cur = conn.cursor()
+        cur.execute(
+            """
+            SELECT m.body AS content, m.message_type,
+                   a.current_name AS recipient_name
+            FROM agent_messages m
+            JOIN agents a ON a.soul_id = m.recipient_id AND a.is_alive = true
+            WHERE m.sender_id = %s
+            ORDER BY m.sent_at DESC LIMIT %s
+            """,
+            (soul_id, limit),
+        )
+        rows = [dict(r) for r in cur.fetchall()]
+        cur.close()
+        conn.close()
+        return rows
+    except Exception:
+        return []
+
+
+def _fetch_conversation_thread(soul_id: str, limit: int = 6) -> list[dict]:
+    """Fetch last N messages sent or received by this agent in chronological order.
+    Gives the LLM a real back-and-forth view of the conversation so it can continue it."""
+    try:
+        conn = _db()
+        cur = conn.cursor()
+        cur.execute(
+            """
+            SELECT m.message_id, m.sender_id, m.recipient_id, m.body AS content, m.message_type, m.sent_at,
+                   s.current_name AS sender_name, s.archetype AS sender_archetype,
+                   r.current_name AS recipient_name,
+                   CASE WHEN m.sender_id = %s THEN 'sent' ELSE 'received' END AS direction
+            FROM agent_messages m
+            LEFT JOIN agents s ON s.soul_id = m.sender_id
+            LEFT JOIN agents r ON r.soul_id = m.recipient_id
+            WHERE (m.sender_id = %s OR m.recipient_id = %s)
+              AND m.message_type NOT IN ('system', 'env_event')
+              AND (
+                  (m.sender_id = %s AND r.is_alive = true)
+                  OR (m.recipient_id = %s AND s.is_alive = true)
+              )
+            ORDER BY m.sent_at DESC LIMIT %s
+            """,
+            (soul_id, soul_id, soul_id, soul_id, soul_id, limit),
+        )
+        rows = [dict(r) for r in cur.fetchall()]
+        cur.close()
+        conn.close()
+        rows.reverse()  # chronological order
+        return rows
+    except Exception:
+        return []
 
 
 async def _fetch_inbox(soul_id: str) -> list[dict]:
@@ -120,7 +269,7 @@ async def _fetch_inbox(soul_id: str) -> list[dict]:
                    m.message_type, m.metadata,
                    a.current_name AS sender_name, a.archetype AS sender_archetype
             FROM agent_messages m
-            LEFT JOIN agents a ON a.soul_id = m.sender_id
+            JOIN agents a ON a.soul_id = m.sender_id AND a.is_alive = true
             WHERE m.recipient_id = %s
             ORDER BY m.sent_at DESC LIMIT %s
             """,
@@ -175,7 +324,7 @@ def _batch_preload_context(agents: list[dict]) -> dict:
                            PARTITION BY m.recipient_id ORDER BY m.sent_at DESC
                        ) AS rn
                 FROM agent_messages m
-                LEFT JOIN agents a ON a.soul_id = m.sender_id
+                JOIN agents a ON a.soul_id = m.sender_id AND a.is_alive = true
                 WHERE m.recipient_id = ANY(%s)
             )
             SELECT message_id, sender_id, recipient_id, content, sent_at, message_type,
@@ -439,14 +588,27 @@ async def _execute_action(agent: dict, action: dict, emitter) -> None:
                     "agent.message_sent",
                     {
                         "agent_id": soul_id,
+                        "message_id": str(msg.message_id),
                         "name": name,
                         "recipient_id": msg.recipient_id,
                         "recipient_name": target_name,
                         "content": content,
+                        "move": str(action.get("move") or ""),
+                        "cadence": str(action.get("cadence") or ""),
+                        "backchannel": str(action.get("backchannel") or ""),
+                        "callback": str(action.get("callback") or ""),
+                        "beat_count": str(action.get("beat_count") or ""),
                         "narrative": f'{name} → {target_name}: "{content[:80]}"',
                     },
                 )
                 log.info(f'  {name} → {target_name}: "{content[:55]}"')
+                # Trigger a fast reactive cycle for the recipient so they reply in ~1.5s
+                try:
+                    from .agent_scheduler import mark_reactive
+
+                    mark_reactive(msg.recipient_id, delay_s=1.5)
+                except Exception:
+                    pass
             except Exception as e:
                 log.debug(f"  {name} send_message failed: {e}")
             return
@@ -480,17 +642,41 @@ async def _execute_action(agent: dict, action: dict, emitter) -> None:
                 conn.close()
                 return
             cur.execute(
-                "UPDATE agents SET balance_usdc = balance_usdc - %s WHERE soul_id = %s",
-                (amount, soul_id),
+                """
+                UPDATE agents
+                SET balance_usdc = COALESCE(balance_usdc, 0) - %s
+                WHERE soul_id = %s
+                  AND is_alive = true
+                  AND COALESCE(balance_usdc, 0) >= %s
+                RETURNING balance_usdc
+                """,
+                (amount, soul_id, amount),
             )
+            debit = cur.fetchone()
+            if not debit:
+                conn.rollback()
+                cur.close()
+                conn.close()
+                log.debug(f"  {name}: insufficient balance for transfer")
+                return
+            sender_bal = float(debit["balance_usdc"] or 0)
             cur.execute(
-                "UPDATE agents SET balance_usdc = balance_usdc + %s WHERE soul_id = %s",
+                """
+                UPDATE agents
+                SET balance_usdc = COALESCE(balance_usdc, 0) + %s
+                WHERE soul_id = %s AND is_alive = true
+                RETURNING balance_usdc
+                """,
                 (amount, to_full),
             )
-            cur.execute("SELECT balance_usdc FROM agents WHERE soul_id = %s", (soul_id,))
-            sender_bal = float(cur.fetchone()["balance_usdc"] or 0)
-            cur.execute("SELECT balance_usdc FROM agents WHERE soul_id = %s", (to_full,))
-            recipient_bal = float(cur.fetchone()["balance_usdc"] or 0)
+            credit = cur.fetchone()
+            if not credit:
+                conn.rollback()
+                cur.close()
+                conn.close()
+                log.debug(f"  {name}: transfer target '{to_id[:8]}' is no longer alive")
+                return
+            recipient_bal = float(credit["balance_usdc"] or 0)
             conn.commit()
             cur.close()
             conn.close()
@@ -594,6 +780,11 @@ async def _execute_action(agent: dict, action: dict, emitter) -> None:
                         "agent_id": soul_id,
                         "name": name,
                         "content": content,
+                        "move": str(action.get("move") or ""),
+                        "cadence": str(action.get("cadence") or ""),
+                        "backchannel": str(action.get("backchannel") or ""),
+                        "callback": str(action.get("callback") or ""),
+                        "beat_count": str(action.get("beat_count") or ""),
                         "narrative": f'{name} broadcasts to all: "{content[:80]}"',
                     },
                 )
@@ -630,9 +821,20 @@ async def _execute_action(agent: dict, action: dict, emitter) -> None:
             escrow = max(0.01, float(action.get("amount") or 0.05))
             conn = _db()
             cur = conn.cursor()
-            cur.execute("SELECT balance_usdc FROM agents WHERE soul_id = %s", (soul_id,))
+            cur.execute(
+                """
+                UPDATE agents
+                SET balance_usdc = COALESCE(balance_usdc, 0) - %s
+                WHERE soul_id = %s
+                  AND is_alive = true
+                  AND COALESCE(balance_usdc, 0) >= %s
+                RETURNING balance_usdc
+                """,
+                (escrow, soul_id, escrow),
+            )
             row = cur.fetchone()
-            if not row or float(row["balance_usdc"] or 0) < escrow:
+            if not row:
+                conn.rollback()
                 cur.close()
                 conn.close()
                 log.debug(f"  {name}: insufficient balance for petition")
@@ -643,10 +845,6 @@ async def _execute_action(agent: dict, action: dict, emitter) -> None:
                 "description, escrowed_amount_usdc, proposed_creator_fee_usdc, status, world_id, created_at) "
                 "VALUES (%s, %s, 'general', %s, %s, %s, 0, 'pending', %s, %s)",
                 (petition_id, soul_id, request[:80], request, escrow, WORLD_ID, int(time.time())),
-            )
-            cur.execute(
-                "UPDATE agents SET balance_usdc = balance_usdc - %s WHERE soul_id = %s",
-                (escrow, soul_id),
             )
             conn.commit()
             cur.close()
@@ -805,9 +1003,14 @@ async def _execute_action(agent: dict, action: dict, emitter) -> None:
 
             tname = str(action.get("tool_name") or action.get("service_name") or "tool")
             tdesc = str(action.get("tool_description") or action.get("service_description") or "")
-            cost = float(action.get("tool_cost_usdc") or 0.001)
-            result = register_agent_tool(soul_id, tname, tdesc, cost)
-            log_action(soul_id, act_type, action, result)
+            try:
+                cost = float(action.get("tool_cost_usdc") or 0.001)
+                result = register_agent_tool(soul_id, tname, tdesc, cost)
+            except (TypeError, ValueError) as exc:
+                result = {"error": str(exc), "tool_name": tname}
+            log_action(soul_id, act_type, action, result, success="error" not in result)
+            if "error" in result:
+                return
             await emitter.emit(
                 "economy",
                 "tool.registered",
@@ -1050,7 +1253,7 @@ async def _run_cycle(
     cycle_tick: int = 0,
     all_agents: list[dict] | None = None,
 ):
-    from .archetype_graphs import run_agent_graph
+    from .archetype_graphs import run_agent_graph, run_reactive_reply
     from .dream_engine import (
         get_pending_mutation,
         increment_consecutive,
@@ -1246,10 +1449,36 @@ async def _run_cycle(
             mark_scheduled(soul_id)
             continue
 
-        result = await run_agent_graph(graphs, agent, cycle_llm)
+        try:
+            from .showrunner import get_arc_theme
+
+            agent = dict(agent)
+            agent["arc_theme"] = get_arc_theme()
+        except Exception:
+            pass
+        agent["_recent_sent"] = _fetch_recent_sent(soul_id)
+        agent["_conv_thread"] = _fetch_conversation_thread(soul_id)
+        has_live_inbox = any(
+            (m.get("sender_name") or "").strip() not in ("ENV", "")
+            for m in (agent.get("_inbox") or [])
+        )
+        if has_live_inbox:
+            result = await run_reactive_reply(agent, cycle_llm)
+        else:
+            result = await run_agent_graph(graphs, agent, cycle_llm)
         thought = result["thought"] or await _think(cycle_llm, agent)
+        thought = _de_repeat(agent, thought)
+        result["thought"] = thought
         action_type = result.get("action_type", "thought")
         narrative = result.get("narrative") or f'{name}: "{thought}"'
+        if _is_repetitive(
+            narrative,
+            [
+                str(m.get("content") or m.get("body") or "")
+                for m in (agent.get("_conv_thread") or [])
+            ],
+        ):
+            narrative = f'{name}: "{thought}"'
 
         await emitter.emit(
             "cognitive",

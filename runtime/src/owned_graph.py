@@ -63,6 +63,7 @@ class AgentIdentity:
 
     # Visual
     avatar_cid: str = ""
+    avatar_base_cid: str = ""  # original genesis portrait (never overwritten)
     avatar_style_prompt: str = ""
     mood_mapping: dict = field(default_factory=dict)
     color_palette: dict = field(
@@ -72,8 +73,18 @@ class AgentIdentity:
             "mood": "#888888",
         }
     )
+    visual_state: dict = field(
+        default_factory=lambda: {
+            "current_expression": "neutral",
+            "expression_override": "",
+            "override_expiry_epoch": 0,
+            "scar_layers": [],
+            "presentation_mode": "standard",
+        }
+    )
 
-    # Audio
+    # Audio. Legacy name: Fish Speech currently stores reference WAV bytes here,
+    # not a standalone model artifact. See docs/avatar-voice-field-naming-audit.md.
     voice_model_cid: str = ""
     voice_params: dict = field(default_factory=lambda: {"timbre": 0.5, "pitch": 0.5, "speed": 1.0})
     theme_music_cid: str = ""
@@ -160,7 +171,20 @@ class OwnedGraph:
         d["nodes"] = {name: NodeDef(**node) for name, node in d.get("nodes", {}).items()}
         d["edges"] = [EdgeDef(**e) for e in d.get("edges", [])]
         if d.get("identity"):
-            d["identity"] = AgentIdentity(**d["identity"])
+            identity_data = d["identity"].copy()
+            # Backward-compatible defaults for newer fields
+            identity_data.setdefault("avatar_base_cid", "")
+            identity_data.setdefault(
+                "visual_state",
+                {
+                    "current_expression": "neutral",
+                    "expression_override": "",
+                    "override_expiry_epoch": 0,
+                    "scar_layers": [],
+                    "presentation_mode": "standard",
+                },
+            )
+            d["identity"] = AgentIdentity(**identity_data)
         return cls(**d)
 
     # ── Content Hash ──────────────────────────────────────────────────────

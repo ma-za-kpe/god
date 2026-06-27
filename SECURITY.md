@@ -36,15 +36,17 @@ CI runs **GitGuardian**, **gitleaks**, and **detect-private-key** on every PR.
 | Setting | Local default | Production |
 |---------|---------------|------------|
 | `LOCAL_DEV_MODE` | `true` | **`false`** |
-| `ALLOW_INSECURE_LOCAL_ENDPOINTS` | `true` | **`false`** |
-| `CREATOR_GENESIS_TOKEN` | unset (open on localhost) | **required** strong random token |
+| `ALLOW_INSECURE_LOCAL_ENDPOINTS` | `false` | **`false`** |
+| `ALLOW_TOKENLESS_CREATOR` | `false` | **`false`** |
+| `CREATOR_GENESIS_TOKEN` | required for creator/admin HTTP actions | **required** strong random token |
 | `POSTGRES_PASSWORD` | change from default | strong unique password |
 
 Endpoints gated when `ALLOW_INSECURE_LOCAL_ENDPOINTS=false`:
 
 - `POST /tokens/deploy` (accepts private key in body — local dev only)
 
-`POST /creator/genesis` requires `X-Creator-Token` header when `CREATOR_GENESIS_TOKEN` is set.
+Creator/admin HTTP actions require `X-Creator-Token` matching `CREATOR_GENESIS_TOKEN`.
+Tokenless local mode is available only with `LOCAL_DEV_MODE=true` and `ALLOW_TOKENLESS_CREATOR=true`.
 
 ## Security audit
 

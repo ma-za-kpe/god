@@ -7,12 +7,13 @@ The flow:
   2. Client retries with X-Payment-Authorization header
   3. Middleware verifies payment → handler executes → 200
 
-Local dev: MOCK_X402_PAYMENTS=true skips real payment verification.
+Local dev: set MOCK_X402_PAYMENTS=true to skip real payment verification.
 """
 
 import logging
 import os
 import time
+import uuid
 
 import psycopg2
 import psycopg2.extras
@@ -20,7 +21,15 @@ from fastapi import APIRouter, Header, Request
 from fastapi.responses import JSONResponse
 
 from ..event_emitter import get_emitter
-from .payment import build_payment_required_response, verify_payment
+from ..runtime_endpoints import ollama_generate_url
+from ..security import deny_creator_action
+from .payment import (
+    MOCK_PAYMENTS,
+    NETWORK,
+    build_payment_required_response,
+    required_usdc_asset,
+    verify_payment,
+)
 from .registry import (
     deregister_service,
     get_agent_wallet,
@@ -54,22 +63,35 @@ async def list_all_services(soul_id: str | None = None):
 
 
 @router.post("/register")
-async def register_agent_service(body: dict):
+async def register_agent_service(
+    body: dict,
+    x_creator_token: str | None = Header(None, alias="X-Creator-Token"),
+):
     """
     Register a new service listing.
     Body: { soul_id, name, description, price_usdc, price_model? }
     """
+    denied = deny_creator_action(x_creator_token)
+    if denied:
+        return denied
+
     required = ("soul_id", "name", "description", "price_usdc")
     missing = [k for k in required if k not in body]
     if missing:
         return JSONResponse(status_code=422, content={"error": f"missing fields: {missing}"})
 
     try:
+        price_usdc = float(body["price_usdc"])
+        if price_usdc < 0:
+            return JSONResponse(
+                status_code=422, content={"error": "price_usdc must be non-negative"}
+            )
+
         listing = await register_service(
             soul_id=body["soul_id"],
             name=body["name"],
             description=body["description"],
-            price_usdc=float(body["price_usdc"]),
+            price_usdc=price_usdc,
             price_model=body.get("price_model", "per_call"),
         )
         emitter = await get_emitter()
@@ -79,19 +101,28 @@ async def register_agent_service(body: dict):
             {
                 "agent_id": body["soul_id"],
                 "service_name": body["name"],
-                "price_usdc": float(body["price_usdc"]),
-                "narrative": f"New service listed: '{body['name']}' at ${float(body['price_usdc']):.4f}/call",
+                "price_usdc": price_usdc,
+                "narrative": f"New service listed: '{body['name']}' at ${price_usdc:.4f}/call",
             },
         )
         return {"ok": True, "listing": listing}
+    except (TypeError, ValueError):
+        return JSONResponse(status_code=422, content={"error": "price_usdc must be numeric"})
     except Exception as e:
         log.error(f"register_service error: {e}")
         return JSONResponse(status_code=500, content={"error": str(e)})
 
 
 @router.post("/deregister")
-async def deregister_agent_service(body: dict):
+async def deregister_agent_service(
+    body: dict,
+    x_creator_token: str | None = Header(None, alias="X-Creator-Token"),
+):
     """Deactivate a service listing. Body: { soul_id, name }"""
+    denied = deny_creator_action(x_creator_token)
+    if denied:
+        return denied
+
     soul_id = body.get("soul_id")
     name = body.get("name")
     if not soul_id or not name:
@@ -129,6 +160,8 @@ async def call_service(
         "maxAmountRequired": str(int(price * 1_000_000)),
         "payTo": wallet,
         "resource": f"{BASE_URL}/services/{soul_id}/{service_name}",
+        "network": NETWORK,
+        "asset": required_usdc_asset(),
     }
 
     # Step 1: no payment header → return 402
@@ -146,6 +179,17 @@ async def call_service(
                 "detail": result.error,
             },
         )
+    if not _payment_matches_requirement(result, payment_config):
+        return JSONResponse(
+            status_code=402,
+            content={
+                "error": "payment authorization does not match required amount/resource/payee"
+            },
+        )
+    if _x402_payment_seen(result.transaction_hash):
+        return JSONResponse(
+            status_code=409, content={"error": "payment authorization already used"}
+        )
 
     # Step 3: dispatch to the appropriate service handler
     try:
@@ -156,7 +200,10 @@ async def call_service(
 
     # Credit seller balance and record external revenue for status / leaderboard
     payer_address = _payer_from_header(x_payment_authorization) or "external:anonymous"
-    await _credit_service_payment(soul_id, price, payer_address, result.transaction_hash)
+    try:
+        await _credit_service_payment(soul_id, price, payer_address, result.transaction_hash)
+    except ValueError as exc:
+        return JSONResponse(status_code=409, content={"error": str(exc)})
 
     # Increment call counter and emit event (non-blocking)
     await increment_call_count(soul_id, service_name)
@@ -193,10 +240,68 @@ async def call_service(
 def _payer_from_header(header: str | None) -> str | None:
     if not header:
         return None
-    # Mock/local headers may be plain addresses; production x402 carries structured proof.
+    # Mock/local headers are explicit; production x402 carries structured proof.
+    if header.startswith("mock-x402:"):
+        mock_payer = header.split(":", 1)[1].strip()
+        if mock_payer.startswith("0x") and len(mock_payer) >= 10:
+            return mock_payer[:42]
+        return f"mock:{mock_payer[:24]}"
+    # Legacy local headers may be plain addresses, but verification no longer accepts them.
     if header.startswith("0x") and len(header) >= 10:
         return header[:42]
     return f"x402:{header[:24]}"
+
+
+def _payment_matches_requirement(result, payment_config: dict) -> bool:
+    try:
+        if int(str(result.amount_paid or "0")) < int(str(payment_config["maxAmountRequired"])):
+            return False
+    except (TypeError, ValueError):
+        return False
+
+    if not MOCK_PAYMENTS and not result.transaction_hash:
+        return False
+
+    expected_resource = str(payment_config.get("resource") or "")
+    if not result.resource or result.resource != expected_resource:
+        return False
+
+    expected_pay_to = str(payment_config.get("payTo") or "").lower()
+    if not result.pay_to or result.pay_to.lower() != expected_pay_to:
+        return False
+
+    expected_network = str(payment_config.get("network") or "")
+    if not result.network or result.network != expected_network:
+        return False
+
+    expected_asset = str(payment_config.get("asset") or "").lower()
+    if not result.asset or result.asset.lower() != expected_asset:
+        return False
+
+    return True
+
+
+def _x402_payment_seen(tx_hash: str | None) -> bool:
+    if MOCK_PAYMENTS or not tx_hash:
+        return False
+
+    conn = psycopg2.connect(DATABASE_URL)
+    cur = conn.cursor()
+    try:
+        cur.execute(
+            """
+            SELECT 1
+            FROM external_payments
+            WHERE source_type = 'x402'
+              AND tx_hash = %s
+            LIMIT 1
+            """,
+            (tx_hash,),
+        )
+        return cur.fetchone() is not None
+    finally:
+        cur.close()
+        conn.close()
 
 
 async def _credit_service_payment(
@@ -206,7 +311,7 @@ async def _credit_service_payment(
     tx_hash: str | None,
 ) -> None:
     """Credit agent wallet and ledger for verified x402 service calls."""
-    from ..status_engine import record_external_payment, refresh_agent_status
+    from ..status_engine import refresh_agent_status
 
     amount = round(float(amount_usdc), 6)
     if amount < 0.0001:
@@ -215,6 +320,40 @@ async def _credit_service_payment(
     conn = psycopg2.connect(DATABASE_URL, cursor_factory=psycopg2.extras.RealDictCursor)
     cur = conn.cursor()
     try:
+        if not MOCK_PAYMENTS and tx_hash:
+            cur.execute("SELECT pg_advisory_xact_lock(hashtext(%s))", (tx_hash,))
+            cur.execute(
+                """
+                SELECT 1
+                FROM external_payments
+                WHERE source_type = 'x402'
+                  AND tx_hash = %s
+                LIMIT 1
+                """,
+                (tx_hash,),
+            )
+            if cur.fetchone():
+                raise ValueError("payment authorization already used")
+        cur.execute(
+            """
+            INSERT INTO external_payments
+                (payment_id, soul_id, payer_address, source_type, amount_usdc,
+                 timestamp, tx_hash, is_internal, world_id)
+            VALUES (%s, %s, %s, 'x402', %s, %s, %s, false, %s)
+            ON CONFLICT DO NOTHING
+            """,
+            (
+                str(uuid.uuid4()),
+                soul_id,
+                payer_address,
+                amount,
+                int(time.time()),
+                tx_hash,
+                os.getenv("WORLD_ID", "local-dev-world-1"),
+            ),
+        )
+        if not MOCK_PAYMENTS and tx_hash and cur.rowcount == 0:
+            raise ValueError("payment authorization already used")
         cur.execute(
             "UPDATE agents SET balance_usdc = balance_usdc + %s "
             "WHERE soul_id = %s AND is_alive = true RETURNING balance_usdc",
@@ -222,20 +361,16 @@ async def _credit_service_payment(
         )
         row = cur.fetchone()
         if not row:
+            conn.rollback()
             return
         conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
     finally:
         cur.close()
         conn.close()
 
-    await record_external_payment(
-        soul_id,
-        payer_address,
-        amount,
-        source_type="x402",
-        tx_hash=tx_hash,
-        is_internal=False,
-    )
     await refresh_agent_status(soul_id)
 
 
@@ -419,7 +554,7 @@ async def _generate_thought_llm(persona: str, agent: dict) -> str | None:
 
             async with httpx.AsyncClient(timeout=20) as client:
                 resp = await client.post(
-                    f"{os.getenv('OLLAMA_URL', 'http://localhost:11434')}/api/generate",
+                    ollama_generate_url(),
                     json={"model": model, "prompt": prompt, "stream": False},
                 )
                 resp.raise_for_status()

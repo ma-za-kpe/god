@@ -1,3 +1,9 @@
+[project]
+name = "god"
+version = "0.1.0"
+description = "Genesis of Digital Life runtime"
+requires-python = ">=3.11"
+
 [tool.ruff]
 target-version = "py311"
 line-length = 100
@@ -5,7 +11,8 @@ src = ["runtime"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "W"]
-ignore = ["E501", "E702", "E701"]
+ignore = ["E501", "E701", "E702", "E402", "I001"]
 
 [tool.ruff.lint.per-file-ignores]
 "runtime/src/seed_agents.py" = ["F401"]
+"runtime/tests/**/*.py" = ["E402"]

@@ -78,23 +78,42 @@ async def execute_transfer(
         if not payer or not payee:
             return {"ok": False, "error": "agent_not_found"}
 
-        payer_bal = float(payer["balance_usdc"] or 0)
-        if payer_bal < amount:
+        cur.execute(
+            """
+            UPDATE agents
+            SET balance_usdc = COALESCE(balance_usdc, 0) - %s
+            WHERE soul_id = %s
+              AND is_alive = true
+              AND COALESCE(balance_usdc, 0) >= %s
+            RETURNING balance_usdc
+            """,
+            (amount, payer_id, amount),
+        )
+        debit = cur.fetchone()
+        if not debit:
+            conn.rollback()
+            payer_bal = float(payer["balance_usdc"] or 0)
             return {"ok": False, "error": "insufficient_balance", "need": amount, "have": payer_bal}
+        payer_after = float(debit["balance_usdc"] or 0)
 
         cur.execute(
-            "UPDATE agents SET balance_usdc = balance_usdc - %s WHERE soul_id = %s",
-            (amount, payer_id),
-        )
-        cur.execute(
-            "UPDATE agents SET balance_usdc = balance_usdc + %s WHERE soul_id = %s",
+            """
+            UPDATE agents
+            SET balance_usdc = COALESCE(balance_usdc, 0) + %s
+            WHERE soul_id = %s AND is_alive = true
+            RETURNING balance_usdc
+            """,
             (amount, payee_id),
         )
-        cur.execute("SELECT balance_usdc FROM agents WHERE soul_id = %s", (payer_id,))
-        payer_after = float(cur.fetchone()["balance_usdc"] or 0)
-        cur.execute("SELECT balance_usdc FROM agents WHERE soul_id = %s", (payee_id,))
-        payee_after = float(cur.fetchone()["balance_usdc"] or 0)
+        credit = cur.fetchone()
+        if not credit:
+            conn.rollback()
+            return {"ok": False, "error": "agent_not_found"}
+        payee_after = float(credit["balance_usdc"] or 0)
         conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
     finally:
         cur.close()
         conn.close()
@@ -197,6 +216,69 @@ def _mark_offer_settled(message_id: str, settlement: dict) -> None:
         conn.close()
 
 
+def _claim_offer_settlement(message_id: str, acceptance_message_id: str) -> bool:
+    conn = _db()
+    cur = conn.cursor()
+    try:
+        cur.execute(
+            """
+            UPDATE agent_messages
+            SET metadata = COALESCE(metadata, '{}'::jsonb) || %s::jsonb
+            WHERE message_id = %s
+              AND COALESCE(metadata->>'status', 'open') = 'open'
+            RETURNING message_id
+            """,
+            (
+                json.dumps(
+                    {
+                        "status": "settling",
+                        "settlement_claimed_by": acceptance_message_id,
+                        "settlement_claimed_at": int(time.time()),
+                    }
+                ),
+                message_id,
+            ),
+        )
+        claimed = cur.fetchone() is not None
+        conn.commit()
+        return claimed
+    finally:
+        cur.close()
+        conn.close()
+
+
+def _reopen_offer_after_failed_settlement(
+    message_id: str, acceptance_message_id: str, error: str
+) -> None:
+    conn = _db()
+    cur = conn.cursor()
+    try:
+        cur.execute(
+            """
+            UPDATE agent_messages
+            SET metadata = COALESCE(metadata, '{}'::jsonb) || %s::jsonb
+            WHERE message_id = %s
+              AND metadata->>'status' = 'settling'
+              AND metadata->>'settlement_claimed_by' = %s
+            """,
+            (
+                json.dumps(
+                    {
+                        "status": "open",
+                        "last_settlement_error": error[:120],
+                        "last_settlement_failed_at": int(time.time()),
+                    }
+                ),
+                message_id,
+                acceptance_message_id,
+            ),
+        )
+        conn.commit()
+    finally:
+        cur.close()
+        conn.close()
+
+
 async def try_settle_acceptance(
     accepter_id: str,
     acceptance_message_id: str,
@@ -234,14 +316,21 @@ async def try_settle_acceptance(
     else:
         payer_id, payee_id = offeree, offerer
 
-    result = await execute_transfer(
-        payer_id,
-        payee_id,
-        amount,
-        reason="offer_accepted",
-        emitter=emitter,
-        narrative=None,
-    )
+    if not _claim_offer_settlement(offer_id, acceptance_message_id):
+        return {"ok": False, "error": "offer_already_settling_or_settled"}
+
+    try:
+        result = await execute_transfer(
+            payer_id,
+            payee_id,
+            amount,
+            reason="offer_accepted",
+            emitter=emitter,
+            narrative=None,
+        )
+    except Exception:
+        _reopen_offer_after_failed_settlement(offer_id, acceptance_message_id, "transfer_exception")
+        raise
     if result.get("ok"):
         _mark_offer_settled(
             offer_id, {"amount_usdc": amount, "acceptance_id": acceptance_message_id}
@@ -271,11 +360,77 @@ async def try_settle_acceptance(
                 "narrative": f"Deal failed: {result.get('error', 'unknown')}",
             },
         )
+        _reopen_offer_after_failed_settlement(
+            offer_id, acceptance_message_id, str(result.get("error") or "transfer_failed")
+        )
         from .messaging import _update_reputation
 
         _update_reputation(accepter_id, offerer, delta=-0.05, reason="deal_failed")
 
     return result
+
+
+async def _debit_buyer(
+    buyer_id: str,
+    amount: float,
+    reason: str,
+    emitter,
+) -> dict[str, Any]:
+    """Debit buyer only (seller credited separately, e.g. via x402 route)."""
+    amount = round(float(amount), 6)
+    if amount < 0.0001:
+        return {"ok": False, "error": "invalid_amount"}
+
+    conn = _db()
+    cur = conn.cursor()
+    try:
+        cur.execute(
+            "SELECT soul_id, current_name, balance_usdc FROM agents WHERE soul_id = %s AND is_alive = true",
+            (buyer_id,),
+        )
+        buyer = cur.fetchone()
+        if not buyer:
+            return {"ok": False, "error": "agent_not_found"}
+
+        cur.execute(
+            """
+            UPDATE agents
+            SET balance_usdc = COALESCE(balance_usdc, 0) - %s
+            WHERE soul_id = %s
+              AND is_alive = true
+              AND COALESCE(balance_usdc, 0) >= %s
+            RETURNING balance_usdc
+            """,
+            (amount, buyer_id, amount),
+        )
+        debit = cur.fetchone()
+        if not debit:
+            conn.rollback()
+            buyer_bal = float(buyer["balance_usdc"] or 0)
+            return {"ok": False, "error": "insufficient_balance", "need": amount, "have": buyer_bal}
+        buyer_after = float(debit["balance_usdc"] or 0)
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        cur.close()
+        conn.close()
+
+    buyer_name = buyer["current_name"] or buyer_id[:8]
+    await emitter.emit(
+        "economy",
+        "service.payment",
+        {
+            "agent_id": buyer_id,
+            "name": buyer_name,
+            "amount_usdc": amount,
+            "balance_after": buyer_after,
+            "reason": reason,
+            "narrative": f"{buyer_name} paid ${amount:.4f} USDC for {reason}",
+        },
+    )
+    return {"ok": True, "buyer_balance": buyer_after, "amount_usdc": amount}
 
 
 async def buy_service(
@@ -284,8 +439,9 @@ async def buy_service(
     service_name: str,
     emitter,
 ) -> dict[str, Any]:
-    """Purchase a listed service — debits buyer, credits seller."""
-    from .services.registry import get_service, increment_call_count
+    """Purchase a listed service via x402 HTTP (402 → pay → 200) when possible."""
+    from .services.client import invoke_x402_service, service_resource_url
+    from .services.registry import get_agent_wallet, get_service, increment_call_count
 
     listing = get_service(seller_id, service_name)
     if not listing:
@@ -294,6 +450,51 @@ async def buy_service(
     price = float(listing.get("price_usdc") or 0)
     if price < 0.0001:
         return {"ok": False, "error": "invalid_price"}
+
+    use_x402 = os.getenv("USE_X402_FOR_BUY_SERVICE", "true").lower() == "true"
+    if use_x402:
+        buyer_wallet = get_agent_wallet(buyer_id)
+        if not buyer_wallet:
+            return {"ok": False, "error": "buyer_wallet_not_found"}
+
+        resource_url = listing.get("resource_url") or service_resource_url(listing["endpoint_path"])
+        http_result = await invoke_x402_service(resource_url, buyer_wallet)
+        if not http_result.ok:
+            return {"ok": False, "error": http_result.error or "x402_invoke_failed"}
+
+        debit = await _debit_buyer(
+            buyer_id,
+            price,
+            reason=f"service:{service_name}",
+            emitter=emitter,
+        )
+        if not debit.get("ok"):
+            return debit
+
+        await increment_call_count(seller_id, service_name)
+        await emitter.emit(
+            "economy",
+            "service.purchased",
+            {
+                "agent_id": buyer_id,
+                "seller_id": seller_id,
+                "service_name": service_name,
+                "price_usdc": price,
+                "paid_usdc": price,
+                "resource_url": resource_url,
+                "x402": True,
+                "narrative": (
+                    f"Service purchased via x402: '{service_name}' from {seller_id[:8]} "
+                    f"for ${price:.4f} USDC"
+                ),
+            },
+        )
+        return {
+            **debit,
+            "service_name": service_name,
+            "listing_id": listing.get("listing_id"),
+            "response": http_result.body,
+        }
 
     seller_share = round(price * SELLER_SHARE, 6)
     result = await execute_transfer(

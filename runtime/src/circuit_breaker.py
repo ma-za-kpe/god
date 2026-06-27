@@ -11,10 +11,10 @@ from dataclasses import dataclass, field
 
 log = logging.getLogger("god.breaker")
 
-MAX_ACTIONS_PER_HOUR = int(os.getenv("MAX_ACTIONS_PER_HOUR", "60"))
-MAX_MESSAGES_PER_HOUR = int(os.getenv("MAX_MESSAGES_PER_HOUR", "30"))
-MAX_LLM_CALLS_PER_HOUR = int(os.getenv("MAX_LLM_CALLS_PER_HOUR", "180"))
-BREAKER_COOLDOWN_S = int(os.getenv("BREAKER_COOLDOWN_S", "120"))
+MAX_ACTIONS_PER_HOUR = int(os.getenv("MAX_ACTIONS_PER_HOUR", "120"))
+MAX_MESSAGES_PER_HOUR = int(os.getenv("MAX_MESSAGES_PER_HOUR", "120"))
+MAX_LLM_CALLS_PER_HOUR = int(os.getenv("MAX_LLM_CALLS_PER_HOUR", "360"))
+BREAKER_COOLDOWN_S = int(os.getenv("BREAKER_COOLDOWN_S", "45"))
 
 
 @dataclass

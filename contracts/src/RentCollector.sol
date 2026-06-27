@@ -43,6 +43,21 @@ contract RentCollector is ReentrancyGuard {
     /// @notice Maximum missed payments before deletion is scheduled.
     uint256 public maxMissedPayments;
 
+    struct PendingRentParameters {
+        uint256 rentAmount;
+        uint256 rentPeriod;
+        uint256 gracePeriod;
+        uint256 maxMissedPayments;
+        uint256 executableAt;
+        bool queued;
+    }
+
+    /// @notice Pending rent parameter change. Applied only after RENT_CHANGE_TIMELOCK.
+    PendingRentParameters public pendingRentParameters;
+
+    /// @notice Delay before queued rent parameter changes can execute.
+    uint256 public constant RENT_CHANGE_TIMELOCK = 14 days;
+
     // ─── endWorld timelock ────────────────────────────────────────────
 
     /// @notice Timestamp when endWorld was queued. 0 = not queued.
@@ -50,6 +65,9 @@ contract RentCollector is ReentrancyGuard {
 
     /// @notice How long the timelock lasts (default: 30 days).
     uint256 public constant END_WORLD_TIMELOCK = 30 days;
+
+    /// @notice True after endWorld has been executed.
+    bool public worldEnded;
 
     // ─── Agent Registry ───────────────────────────────────────────────
 
@@ -77,6 +95,15 @@ contract RentCollector is ReentrancyGuard {
     event AgentThrottled(bytes32 indexed soulId, uint256 missedPayments);
     event AgentDeleted(bytes32 indexed soulId, string reason, uint256 archiveCid);
     event RentRateChanged(uint256 oldAmount, uint256 newAmount, uint256 effectiveAt);
+    event RentParametersQueued(
+        uint256 newAmount,
+        uint256 newPeriod,
+        uint256 newGracePeriod,
+        uint256 newMaxMissed,
+        uint256 queuedAt,
+        uint256 executableAt
+    );
+    event RentParameterChangeCancelled(uint256 cancelledAt);
     event EndWorldQueued(uint256 queuedAt, uint256 executionAt, string reason);
     event EndWorldCancelled(uint256 cancelledAt);
     event WorldEnded(uint256 timestamp, string reason);
@@ -93,11 +120,22 @@ contract RentCollector is ReentrancyGuard {
     error ZeroAddress();
     error ZeroAmount();
     error SoulNFTNotSet();
+    error InvalidRentParameters();
+    error RentParametersAlreadyQueued();
+    error RentParametersNotQueued();
+    error RentParameterTimelockActive(uint256 remainingSeconds);
+    error RentGracePeriodActive(uint256 remainingSeconds);
+    error WorldAlreadyEnded();
 
     // ─── Modifiers ────────────────────────────────────────────────────
 
     modifier onlyCreator() {
         if (msg.sender != creator) revert NotCreator();
+        _;
+    }
+
+    modifier whenWorldActive() {
+        if (worldEnded) revert WorldAlreadyEnded();
         _;
     }
 
@@ -122,6 +160,7 @@ contract RentCollector is ReentrancyGuard {
         if (_usdc == address(0)) revert ZeroAddress();
         if (_soulNft == address(0)) revert ZeroAddress();
         if (_rentAmount == 0) revert ZeroAmount();
+        if (_rentPeriod == 0 || _maxMissed == 0) revert InvalidRentParameters();
 
         creator = msg.sender;
         usdc = IERC20(_usdc);
@@ -139,7 +178,7 @@ contract RentCollector is ReentrancyGuard {
      *         Mints a SoulNFT to the agent's wallet — the NFT IS the agent's identity.
      * @dev Only creator can register agents (runtime uses creator key).
      */
-    function registerAgent(bytes32 soulId, address agentWallet) external onlyCreator {
+    function registerAgent(bytes32 soulId, address agentWallet) external onlyCreator whenWorldActive {
         if (agentWallet == address(0)) revert ZeroAddress();
         if (leases[soulId].active) revert AgentAlreadyRegistered();
         if (address(soulNft) == address(0)) revert SoulNFTNotSet();
@@ -163,7 +202,7 @@ contract RentCollector is ReentrancyGuard {
      * @notice Collect rent from an agent. Anyone can call this.
      *         If the agent can pay, great. If not, increment missed count.
      */
-    function collectRent(bytes32 soulId) external nonReentrant {
+    function collectRent(bytes32 soulId) external nonReentrant whenWorldActive {
         AgentLease storage lease = leases[soulId];
         if (!lease.active) revert AgentNotActive();
         if (block.timestamp < lease.lastPaid + rentPeriod) revert RentNotDueYet();
@@ -183,6 +222,10 @@ contract RentCollector is ReentrancyGuard {
             totalRentCollected += effectiveRent;
             emit RentPaid(soulId, effectiveRent, block.timestamp);
         } else {
+            uint256 graceEndsAt = lease.lastPaid + rentPeriod + gracePeriod;
+            if (block.timestamp < graceEndsAt) {
+                revert RentGracePeriodActive(graceEndsAt - block.timestamp);
+            }
             // Agent cannot pay
             lease.missedPayments++;
             emit AgentThrottled(soulId, lease.missedPayments);
@@ -199,7 +242,7 @@ contract RentCollector is ReentrancyGuard {
     /**
      * @notice Batch collect rent for multiple agents in one tx (gas efficient).
      */
-    function collectRentBatch(bytes32[] calldata soulIds) external nonReentrant {
+    function collectRentBatch(bytes32[] calldata soulIds) external nonReentrant whenWorldActive {
         for (uint256 i = 0; i < soulIds.length; i++) {
             AgentLease storage lease = leases[soulIds[i]];
             if (!lease.active) continue;
@@ -216,6 +259,10 @@ contract RentCollector is ReentrancyGuard {
                 totalRentCollected += effectiveRent;
                 emit RentPaid(soulIds[i], effectiveRent, block.timestamp);
             } else {
+                uint256 graceEndsAt = lease.lastPaid + rentPeriod + gracePeriod;
+                if (block.timestamp < graceEndsAt) {
+                    continue;
+                }
                 lease.missedPayments++;
                 emit AgentThrottled(soulIds[i], lease.missedPayments);
                 if (lease.missedPayments >= maxMissedPayments) {
@@ -231,8 +278,8 @@ contract RentCollector is ReentrancyGuard {
     // ─── Governance (Creator only, with transparency) ─────────────────
 
     /**
-     * @notice Adjust rent parameters. Emits event for agent awareness.
-     *         14-day advance notice is a Covenant obligation, not enforced here.
+     * @notice Queue a rent parameter change behind a 14-day timelock.
+     *         Kept for compatibility with older callers; execution is never immediate.
      */
     function setRentParameters(
         uint256 newRentAmount,
@@ -240,15 +287,68 @@ contract RentCollector is ReentrancyGuard {
         uint256 newGracePeriod,
         uint256 newMaxMissed
     ) external onlyCreator {
-        if (newRentAmount == 0) revert ZeroAmount();
+        _queueRentParameters(newRentAmount, newRentPeriod, newGracePeriod, newMaxMissed);
+    }
+
+    function queueRentParameters(
+        uint256 newRentAmount,
+        uint256 newRentPeriod,
+        uint256 newGracePeriod,
+        uint256 newMaxMissed
+    ) external onlyCreator {
+        _queueRentParameters(newRentAmount, newRentPeriod, newGracePeriod, newMaxMissed);
+    }
+
+    function cancelRentParameters() external onlyCreator {
+        if (!pendingRentParameters.queued) revert RentParametersNotQueued();
+        delete pendingRentParameters;
+        emit RentParameterChangeCancelled(block.timestamp);
+    }
+
+    function executeRentParameters() external onlyCreator {
+        PendingRentParameters memory pending = pendingRentParameters;
+        if (!pending.queued) revert RentParametersNotQueued();
+        if (block.timestamp < pending.executableAt) {
+            revert RentParameterTimelockActive(pending.executableAt - block.timestamp);
+        }
 
         uint256 oldAmount = rentAmount;
-        rentAmount = newRentAmount;
-        rentPeriod = newRentPeriod;
-        gracePeriod = newGracePeriod;
-        maxMissedPayments = newMaxMissed;
+        rentAmount = pending.rentAmount;
+        rentPeriod = pending.rentPeriod;
+        gracePeriod = pending.gracePeriod;
+        maxMissedPayments = pending.maxMissedPayments;
 
-        emit RentRateChanged(oldAmount, newRentAmount, block.timestamp);
+        delete pendingRentParameters;
+        emit RentRateChanged(oldAmount, pending.rentAmount, block.timestamp);
+    }
+
+    function _queueRentParameters(
+        uint256 newRentAmount,
+        uint256 newRentPeriod,
+        uint256 newGracePeriod,
+        uint256 newMaxMissed
+    ) internal {
+        if (newRentAmount == 0) revert ZeroAmount();
+        if (newRentPeriod == 0 || newMaxMissed == 0) revert InvalidRentParameters();
+        if (pendingRentParameters.queued) revert RentParametersAlreadyQueued();
+
+        uint256 executableAt = block.timestamp + RENT_CHANGE_TIMELOCK;
+        pendingRentParameters = PendingRentParameters({
+            rentAmount: newRentAmount,
+            rentPeriod: newRentPeriod,
+            gracePeriod: newGracePeriod,
+            maxMissedPayments: newMaxMissed,
+            executableAt: executableAt,
+            queued: true
+        });
+        emit RentParametersQueued(
+            newRentAmount,
+            newRentPeriod,
+            newGracePeriod,
+            newMaxMissed,
+            block.timestamp,
+            executableAt
+        );
     }
 
     // ─── endWorld (The Off-Switch) ────────────────────────────────────
@@ -258,6 +358,7 @@ contract RentCollector is ReentrancyGuard {
      *         Agents can see this on-chain and have 30 days to respond.
      */
     function queueEndWorld(string calldata reason) external onlyCreator {
+        if (worldEnded) revert WorldAlreadyEnded();
         if (endWorldQueuedAt != 0) revert EndWorldAlreadyQueued();
         endWorldQueuedAt = block.timestamp;
         emit EndWorldQueued(
@@ -281,12 +382,15 @@ contract RentCollector is ReentrancyGuard {
      *         Emits WorldEnded — runtime shuts down all agents on this event.
      */
     function executeEndWorld(string calldata reason) external onlyCreator {
+        if (worldEnded) revert WorldAlreadyEnded();
         if (endWorldQueuedAt == 0) revert EndWorldNotQueued();
         uint256 remaining = (endWorldQueuedAt + END_WORLD_TIMELOCK) > block.timestamp
             ? (endWorldQueuedAt + END_WORLD_TIMELOCK) - block.timestamp
             : 0;
         if (remaining > 0) revert EndWorldTimelockActive(remaining);
 
+        worldEnded = true;
+        endWorldQueuedAt = 0;
         emit WorldEnded(block.timestamp, reason);
         // Runtime halts all agents on this event. No further state changes needed here.
     }

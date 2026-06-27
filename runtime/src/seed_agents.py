@@ -15,14 +15,29 @@ from decimal import Decimal
 import psycopg2
 from eth_account import Account
 
-from .owned_graph import ARCHETYPES, OwnedGraph, create_agent_zero
+from .owned_graph import create_agent_zero
 
 log = logging.getLogger("god.seed")
 
 SEED_BALANCE_USDC = Decimal(os.getenv("SEED_BALANCE_USDC", "0.10"))
-WORLD_ID = os.getenv("WORLD_ID", "local-dev-world-1")
 IPFS_API = os.getenv("IPFS_API", "http://localhost:5001")
+
+
+def _world_id() -> str:
+    return os.getenv("WORLD_ID", "local-dev-world-1")
+
+
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://god:localdev@localhost:5432/god_world")
+AVATAR_GENESIS_ENABLED = os.getenv("AVATAR_GENESIS_ENABLED", "true").lower() in (
+    "1",
+    "true",
+    "yes",
+    "on",
+)
+
+# Shared semaphores so concurrent genesis calls don't swamp ComfyUI / fish-speech.
+_comfyui_semaphore = asyncio.Semaphore(int(os.getenv("COMFYUI_CONCURRENCY", "2")))
+_tts_semaphore = asyncio.Semaphore(int(os.getenv("TTS_CONCURRENCY", "2")))
 
 
 def _persist_agent(agent: dict):
@@ -43,7 +58,7 @@ def _persist_agent(agent: dict):
             agent["wallet_address"],
             agent["name"],
             int(time.time()),
-            WORLD_ID,
+            _world_id(),
             agent["archetype"],
             float(agent.get("seed_balance", SEED_BALANCE_USDC)),
         ),
@@ -57,6 +72,8 @@ async def seed_one_agent(
     archetype: str,
     seed_balance: Decimal = SEED_BALANCE_USDC,
     is_elder: bool = False,
+    block_on_avatar_genesis: bool = False,
+    require_avatar_assets: bool = False,
 ) -> dict:
     """Create, pin, and register one seed agent. Returns registration info."""
 
@@ -71,7 +88,7 @@ async def seed_one_agent(
         soul_id=soul_id,
         owner_key=acct._key_obj.public_key.to_hex(),
         wallet_address=wallet_address,
-        world_id=WORLD_ID,
+        world_id=_world_id(),
         archetype=archetype,
         seed_balance=seed_balance,
     )
@@ -99,7 +116,6 @@ async def seed_one_agent(
         "soul_id": soul_id,
         "graph_cid": cid,
         "wallet_address": wallet_address,
-        "private_key": private_key,  # NEVER log this in production
         "archetype": archetype,
         "name": graph.identity.current_name,
         "is_elder": is_elder,
@@ -110,5 +126,51 @@ async def seed_one_agent(
         _persist_agent(result)
     except Exception as e:
         log.warning(f"  DB persist failed for {soul_id[:8]}: {e}")
+
+    if AVATAR_GENESIS_ENABLED:
+        try:
+            from .avatar import GenesisPipeline
+
+            pipeline = GenesisPipeline(
+                comfyui_concurrency=int(os.getenv("COMFYUI_CONCURRENCY", "2")),
+                tts_concurrency=int(os.getenv("TTS_CONCURRENCY", "2")),
+            )
+            pipeline._comfyui_semaphore = _comfyui_semaphore
+            pipeline._tts_semaphore = _tts_semaphore
+            if block_on_avatar_genesis:
+                pipeline_result = await pipeline.execute(soul_id, archetype, graph)
+                result["avatar_genesis"] = pipeline_result.to_dict()
+                result["avatar_cid"] = pipeline_result.portrait_cid or ""
+                result["rigged_avatar_cid"] = (
+                    getattr(pipeline_result, "rigged_avatar_cid", "")
+                    or pipeline_result.portrait_cid
+                    or ""
+                )
+                result["voice_model_cid"] = pipeline_result.voice_embedding_cid or ""
+                result["expression_sheet_cid"] = pipeline_result.expression_sheet_cid or ""
+                result["avatar_genesis_status"] = pipeline_result.status
+                if require_avatar_assets:
+                    missing = []
+                    if not pipeline_result.portrait_cid:
+                        missing.append("avatar_cid")
+                    if not pipeline_result.voice_embedding_cid:
+                        missing.append("voice_model_cid")
+                    if missing:
+                        raise RuntimeError(
+                            f"avatar genesis incomplete for {soul_id[:8]}: missing {missing}"
+                        )
+            else:
+                asyncio.create_task(pipeline.execute(soul_id, archetype, graph))
+        except Exception as exc:
+            log.warning("  Avatar genesis schedule failed for %s: %s", soul_id[:8], exc)
+
+    try:
+        from .chain_rent import fund_agent_wallet, is_configured, register_agent_on_chain
+
+        if is_configured():
+            register_agent_on_chain(soul_id, wallet_address)
+            fund_agent_wallet(wallet_address, seed_balance)
+    except Exception as e:
+        log.warning(f"  On-chain genesis register failed for {soul_id[:8]}: {e}")
 
     return result

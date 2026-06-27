@@ -20,8 +20,8 @@ log = logging.getLogger("god.gateway")
 
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://god:localdev@localhost:5432/god_world")
 WORLD_ID = os.getenv("WORLD_ID", "local-dev-world-1")
-RUNTIME_URL = os.getenv("RUNTIME_URL", "http://localhost:8000")
-ENABLE_EXTERNAL_FETCH = os.getenv("ENABLE_EXTERNAL_FETCH", "true").lower() in ("1", "true", "yes")
+RUNTIME_URL = os.getenv("RUNTIME_URL", "http://localhost:8888")
+ENABLE_EXTERNAL_FETCH = os.getenv("ENABLE_EXTERNAL_FETCH", "false").lower() in ("1", "true", "yes")
 
 ALLOWED_HOSTS = {
     "localhost",

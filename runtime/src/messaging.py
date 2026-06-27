@@ -376,10 +376,15 @@ async def send_broadcast(
     return msg
 
 
-def pull_inbox(soul_id: str, limit: int = INBOX_MAX_PULL) -> list[AgentMessage]:
+def pull_inbox(
+    soul_id: str,
+    limit: int = INBOX_MAX_PULL,
+    *,
+    mark_read: bool = True,
+) -> list[AgentMessage]:
     """
     Pull unread messages from an agent's inbox.
-    Marks them as read. Returns list newest-first.
+    Marks them as read by default. Returns list newest-first.
     """
     log.debug(f"INBOX PULL: {soul_id[:8]} limit={limit}")
     try:
@@ -397,7 +402,7 @@ def pull_inbox(soul_id: str, limit: int = INBOX_MAX_PULL) -> list[AgentMessage]:
         )
         rows = cur.fetchall()
 
-        if rows:
+        if rows and mark_read:
             ids = [r["message_id"] for r in rows]
             cur.execute(
                 "UPDATE agent_messages SET read = true WHERE message_id = ANY(%s)",
@@ -405,6 +410,8 @@ def pull_inbox(soul_id: str, limit: int = INBOX_MAX_PULL) -> list[AgentMessage]:
             )
             conn.commit()
             log.debug(f"  [{soul_id[:8]}] pulled {len(rows)} unread messages, marked read")
+        elif rows:
+            log.debug(f"  [{soul_id[:8]}] peeked {len(rows)} unread messages")
         else:
             log.debug(f"  [{soul_id[:8]}] inbox empty")
 
@@ -611,13 +618,25 @@ def _get_balance(soul_id: str) -> float:
 def _deduct_balance(soul_id: str, amount: float):
     conn = psycopg2.connect(DATABASE_URL)
     cur = conn.cursor()
-    cur.execute(
-        "UPDATE agents SET balance_usdc = balance_usdc - %s WHERE soul_id = %s",
-        (amount, soul_id),
-    )
-    conn.commit()
-    cur.close()
-    conn.close()
+    try:
+        cur.execute(
+            """
+            UPDATE agents
+            SET balance_usdc = COALESCE(balance_usdc, 0) - %s
+            WHERE soul_id = %s
+              AND is_alive = true
+              AND COALESCE(balance_usdc, 0) >= %s
+            RETURNING balance_usdc
+            """,
+            (amount, soul_id, amount),
+        )
+        if not cur.fetchone():
+            conn.rollback()
+            raise ValueError(f"Insufficient balance to debit {amount:.6f} USDC.")
+        conn.commit()
+    finally:
+        cur.close()
+        conn.close()
 
 
 def _agent_exists(soul_id: str) -> bool:
@@ -744,8 +763,8 @@ async def _publish_to_nats(msg: AgentMessage):
     subject = f"world.{WORLD_ID}.agent.{msg.recipient_id}.inbox"
     payload = json.dumps(msg.to_dict()).encode()
     log.debug(f"  NATS publish direct: subject={subject}")
-    if hasattr(emitter, "_nc") and emitter._nc:
-        await emitter._nc.publish(subject, payload)
+    if getattr(emitter, "nc", None):
+        await emitter.nc.publish(subject, payload)
     else:
         log.debug("  NATS: no connection object, skipping direct publish")
 
@@ -758,7 +777,7 @@ async def _publish_broadcast(msg: AgentMessage):
     subject = f"world.{WORLD_ID}.broadcast"
     payload = json.dumps(msg.to_dict()).encode()
     log.debug(f"  NATS publish broadcast: subject={subject}")
-    if hasattr(emitter, "_nc") and emitter._nc:
-        await emitter._nc.publish(subject, payload)
+    if getattr(emitter, "nc", None):
+        await emitter.nc.publish(subject, payload)
     else:
         log.debug("  NATS: no connection object, skipping broadcast publish")

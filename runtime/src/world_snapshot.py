@@ -5,6 +5,7 @@ Single read path replaces multiple polling endpoints and supports
 public spectators at high agent counts.
 """
 
+import asyncio
 import logging
 import os
 import time
@@ -14,12 +15,22 @@ import psycopg2
 import psycopg2.extras
 
 from .json_safe import json_safe
+from .showrunner import build_showrunner_plan
 
 log = logging.getLogger("god.snapshot")
 
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://god:localdev@localhost:5432/god_world")
 WORLD_ID = os.getenv("WORLD_ID", "local-dev-world-1")
 MAX_AGENTS = int(os.getenv("SNAPSHOT_MAX_AGENTS", "10000"))
+_PUBLIC_MESSAGE_TYPES = (
+    "contract",
+    "threat",
+    "broadcast",
+    "eulogy",
+    "manifesto",
+    "petition",
+    "propaganda",
+)
 
 _AGENTS_SQL = """
     SELECT
@@ -31,6 +42,10 @@ _AGENTS_SQL = """
         COALESCE(rp.paid_count,  0)          AS rent_paid_count,
         COALESCE(rp.miss_count,  0)          AS rent_miss_count,
         COALESCE(ss.is_sleeping, false)      AS is_sleeping,
+        COALESCE(a.avatar_cid, '')           AS avatar_cid,
+        COALESCE(NULLIF(a.rigged_avatar_cid, ''), a.avatar_cid, '') AS rigged_avatar_cid,
+        COALESCE(a.vrm_avatar_url, '')       AS vrm_avatar_url,
+        COALESCE(a.voice_model_cid, '')      AS voice_model_cid,
         e.last_thought
     FROM agents a
     LEFT JOIN (
@@ -67,6 +82,62 @@ _STATS_SQL = """
     FROM agents WHERE world_id = $1
 """
 
+_EVENTS_SQL_SYNC = """
+    SELECT event_id, agent_id, event_type, timestamp, narrative, payload
+    FROM events
+    WHERE world_id = %s
+      AND NOT (
+        event_type = 'social.agent.message_sent'
+        AND COALESCE(payload->>'is_public', 'false') != 'true'
+      )
+    ORDER BY timestamp DESC
+    LIMIT %s
+"""
+
+_EVENTS_SQL_ASYNC = """
+    SELECT event_id, agent_id, event_type, timestamp, narrative, payload
+    FROM events
+    WHERE world_id = $1
+      AND NOT (
+        event_type = 'social.agent.message_sent'
+        AND COALESCE(payload->>'is_public', 'false') != 'true'
+      )
+    ORDER BY timestamp DESC
+    LIMIT $2
+"""
+
+_MESSAGES_SQL_SYNC = """
+    SELECT m.*,
+           sa.current_name AS sender_name,
+           ra.current_name AS recipient_name
+    FROM agent_messages m
+    LEFT JOIN agents sa ON m.sender_id = sa.soul_id
+    LEFT JOIN agents ra ON m.recipient_id = ra.soul_id
+    WHERE m.world_id = %s
+      AND (
+        m.recipient_id = 'BROADCAST'
+        OR m.message_type = ANY(%s::text[])
+      )
+    ORDER BY m.sent_at DESC
+    LIMIT %s
+"""
+
+_MESSAGES_SQL_ASYNC = """
+    SELECT m.*,
+           sa.current_name AS sender_name,
+           ra.current_name AS recipient_name
+    FROM agent_messages m
+    LEFT JOIN agents sa ON m.sender_id = sa.soul_id
+    LEFT JOIN agents ra ON m.recipient_id = ra.soul_id
+    WHERE m.world_id = $1
+      AND (
+        m.recipient_id = 'BROADCAST'
+        OR m.message_type = ANY($2::text[])
+      )
+    ORDER BY m.sent_at DESC
+    LIMIT $3
+"""
+
 
 def _db():
     return psycopg2.connect(DATABASE_URL, cursor_factory=psycopg2.extras.RealDictCursor)
@@ -87,6 +158,16 @@ def _build_clusters(agents: list[dict]) -> list[dict]:
                 }
             )
     return list(clusters.values())
+
+
+def _latest_public_dialogue_turn(messages: list[dict]) -> dict[str, Any]:
+    """Return the newest message already passed through the public snapshot filter."""
+    for message in messages:
+        turn = dict(message)
+        if "content" not in turn and "body" in turn:
+            turn["content"] = turn["body"]
+        return turn
+    return {}
 
 
 def _attach_economy_stats(cur, stats: dict, world_id: str) -> None:
@@ -150,6 +231,16 @@ def _attach_economy_stats(cur, stats: dict, world_id: str) -> None:
     stats["top_earners"] = [dict(r) for r in cur.fetchall()]
 
 
+def _attach_economy_stats_sync(stats: dict, world_id: str) -> None:
+    conn = _db()
+    cur = conn.cursor()
+    try:
+        _attach_economy_stats(cur, stats, world_id)
+    finally:
+        cur.close()
+        conn.close()
+
+
 def _finalize_snapshot(
     agents: list[dict],
     stats: dict,
@@ -157,22 +248,72 @@ def _finalize_snapshot(
     messages: list[dict],
     world_id: str,
 ) -> dict[str, Any]:
+    epoch = int(time.time())
     stats["world_id"] = world_id
     stats["llm_provider"] = os.getenv("LLM_PROVIDER", "ollama")
     stats["llm_model"] = os.getenv("LLM_MODEL", "llama3.1:8b")
-    return json_safe(
-        {
-            "epoch": int(time.time()),
-            "agents": agents,
-            "agent_count": len(agents),
-            "stats": stats,
-            "events": events,
-            "messages": messages,
-            "clusters": _build_clusters(agents),
-            "leaderboard": stats.get("top_earners", []),
-            "world_id": world_id,
-        }
-    )
+    snapshot = {
+        "epoch": epoch,
+        "agents": agents,
+        "agent_count": len(agents),
+        "stats": stats,
+        "events": events,
+        "messages": messages,
+        "clusters": _build_clusters(agents),
+        "leaderboard": stats.get("top_earners", []),
+        "world_id": world_id,
+    }
+    try:
+        from .audience import build_audience_state
+
+        snapshot["audience"] = build_audience_state(snapshot)
+    except Exception as e:
+        log.debug(f"audience state build skipped: {e}")
+    snapshot["showrunner"] = build_showrunner_plan(snapshot)
+    snapshot["last_dialogue_turn"] = _latest_public_dialogue_turn(messages)
+    try:
+        from .content_bank import build_content_bank_state
+
+        snapshot["content_bank"] = build_content_bank_state(snapshot)
+    except Exception as e:
+        log.debug(f"content bank build skipped: {e}")
+    try:
+        from .viewer import build_viewer_state
+
+        snapshot["viewer"] = build_viewer_state(snapshot)
+    except Exception as e:
+        log.debug(f"viewer state build skipped: {e}")
+    try:
+        from .nemo import build_nemo_directive
+
+        snapshot["nemo"] = build_nemo_directive(snapshot)
+    except Exception as e:
+        log.debug(f"nemo directive build skipped: {e}")
+    try:
+        from .voice import build_voice_state
+
+        snapshot["voice"] = build_voice_state(snapshot)
+    except Exception as e:
+        log.debug(f"voice state build skipped: {e}")
+    try:
+        from .avatar import build_avatar_state
+
+        snapshot["avatar"] = build_avatar_state(snapshot)
+    except Exception as e:
+        log.debug(f"avatar state build skipped: {e}")
+    try:
+        from .broadcast import build_broadcast_state
+
+        snapshot["broadcast"] = build_broadcast_state(snapshot)
+    except Exception as e:
+        log.debug(f"broadcast state build skipped: {e}")
+    try:
+        from .resilience import build_resilience_status
+
+        snapshot["resilience"] = build_resilience_status(snapshot)
+    except Exception as e:
+        log.debug(f"resilience state build skipped: {e}")
+    return json_safe(snapshot)
 
 
 def build_world_snapshot(
@@ -202,26 +343,12 @@ def build_world_snapshot(
 
     _attach_economy_stats(cur, stats, world_id)
 
-    cur.execute(
-        "SELECT event_id, agent_id, event_type, timestamp, narrative, payload "
-        "FROM events WHERE world_id = %s ORDER BY timestamp DESC LIMIT %s",
-        (world_id, events_limit),
-    )
+    cur.execute(_EVENTS_SQL_SYNC, (world_id, events_limit))
     events = [dict(r) for r in cur.fetchall()]
 
     cur.execute(
-        """
-        SELECT m.*,
-               sa.current_name AS sender_name,
-               ra.current_name AS recipient_name
-        FROM agent_messages m
-        LEFT JOIN agents sa ON m.sender_id = sa.soul_id
-        LEFT JOIN agents ra ON m.recipient_id = ra.soul_id
-        WHERE m.world_id = %s
-        ORDER BY m.sent_at DESC
-        LIMIT %s
-        """,
-        (world_id, messages_limit),
+        _MESSAGES_SQL_SYNC,
+        (world_id, list(_PUBLIC_MESSAGE_TYPES), messages_limit),
     )
     messages = [dict(r) for r in cur.fetchall()]
     cur.close()
@@ -253,33 +380,15 @@ async def build_world_snapshot_async(
         stats[key] = row["n"] if row else 0
 
     # Economy stats (sync helper — small queries)
-    conn = _db()
-    cur = conn.cursor()
-    _attach_economy_stats(cur, stats, world_id)
-    cur.close()
-    conn.close()
+    await asyncio.to_thread(_attach_economy_stats_sync, stats, world_id)
 
-    events = await fetch_all(
-        "SELECT event_id, agent_id, event_type, timestamp, narrative, payload "
-        "FROM events WHERE world_id = $1 ORDER BY timestamp DESC LIMIT $2",
-        world_id,
-        events_limit,
-    )
+    events = await fetch_all(_EVENTS_SQL_ASYNC, world_id, events_limit)
 
     messages = await fetch_all(
-        """
-        SELECT m.*,
-               sa.current_name AS sender_name,
-               ra.current_name AS recipient_name
-        FROM agent_messages m
-        LEFT JOIN agents sa ON m.sender_id = sa.soul_id
-        LEFT JOIN agents ra ON m.recipient_id = ra.soul_id
-        WHERE m.world_id = $1
-        ORDER BY m.sent_at DESC
-        LIMIT $2
-        """,
+        _MESSAGES_SQL_ASYNC,
         world_id,
+        list(_PUBLIC_MESSAGE_TYPES),
         messages_limit,
     )
 
-    return _finalize_snapshot(agents, stats, events, messages, world_id)
+    return await asyncio.to_thread(_finalize_snapshot, agents, stats, events, messages, world_id)

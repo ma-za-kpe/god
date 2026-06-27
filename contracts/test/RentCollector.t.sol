@@ -59,6 +59,14 @@ contract RentCollectorTest is Test {
         usdc.approve(address(rent), type(uint256).max);
     }
 
+    function _executeEndWorld() internal {
+        vm.prank(creator);
+        rent.queueEndWorld("test");
+        vm.warp(block.timestamp + 30 days + 1);
+        vm.prank(creator);
+        rent.executeEndWorld("test");
+    }
+
     // ─── Registration ─────────────────────────────────────────────────
 
     function test_RegisterAgent() public {
@@ -135,12 +143,30 @@ contract RentCollectorTest is Test {
         vm.prank(agentWallet);
         usdc.transfer(stranger, agentBal);
 
-        vm.warp(block.timestamp + RENT_PERIOD + 1);
+        vm.warp(block.timestamp + RENT_PERIOD + GRACE_PERIOD + 1);
         rent.collectRent(SOUL_ID);
 
         assertEq(rent.getLease(SOUL_ID).missedPayments, 1);
         assertTrue(rent.getLease(SOUL_ID).active);
         assertTrue(soul.exists(SOUL_ID)); // Still alive — NFT not burned yet
+    }
+
+    function test_GracePeriod_DelaysMissedPaymentPenalty() public {
+        vm.prank(creator);
+        rent.registerAgent(SOUL_ID, agentWallet);
+
+        uint256 agentBal = usdc.balanceOf(agentWallet);
+        vm.prank(agentWallet);
+        usdc.transfer(stranger, agentBal);
+
+        vm.warp(block.timestamp + RENT_PERIOD + 1);
+        vm.expectRevert(
+            abi.encodeWithSelector(RentCollector.RentGracePeriodActive.selector, GRACE_PERIOD - 1)
+        );
+        rent.collectRent(SOUL_ID);
+
+        assertEq(rent.getLease(SOUL_ID).missedPayments, 0);
+        assertTrue(rent.getLease(SOUL_ID).active);
     }
 
     function test_ThreeMissedPayments_DeletesAgent_BurnsSoul() public {
@@ -154,7 +180,7 @@ contract RentCollectorTest is Test {
 
         // Miss 3 payments
         for (uint256 i = 0; i < MAX_MISSED; i++) {
-            vm.warp(block.timestamp + RENT_PERIOD + 1);
+            vm.warp(block.timestamp + RENT_PERIOD + GRACE_PERIOD + 1);
             rent.collectRent(SOUL_ID);
         }
 
@@ -253,7 +279,7 @@ contract RentCollectorTest is Test {
         ids[1] = soul2;
 
         for (uint256 i = 0; i < MAX_MISSED; i++) {
-            vm.warp(block.timestamp + RENT_PERIOD + 1);
+            vm.warp(block.timestamp + RENT_PERIOD + GRACE_PERIOD + 1);
             rent.collectRentBatch(ids);
         }
 
@@ -268,6 +294,12 @@ contract RentCollectorTest is Test {
         freshSoul.setRentCollector(address(0x99));
         vm.expectRevert(SoulNFT.RentCollectorAlreadySet.selector);
         freshSoul.setRentCollector(address(0x88));
+    }
+
+    function test_RevertIf_SoulNFT_SetRentCollectorZero() public {
+        SoulNFT freshSoul = new SoulNFT();
+        vm.expectRevert(SoulNFT.ZeroAddress.selector);
+        freshSoul.setRentCollector(address(0));
     }
 
     function test_SoulNFT_OnlyRentCollectorCanMint() public {
@@ -306,6 +338,37 @@ contract RentCollectorTest is Test {
         vm.expectEmit(false, false, false, true);
         emit RentCollector.WorldEnded(block.timestamp, "financial unsustainability");
         rent.executeEndWorld("financial unsustainability");
+
+        assertTrue(rent.worldEnded());
+    }
+
+    function test_RevertIf_RegisterAgentAfterWorldEnded() public {
+        _executeEndWorld();
+
+        vm.prank(creator);
+        vm.expectRevert(RentCollector.WorldAlreadyEnded.selector);
+        rent.registerAgent(SOUL_ID, agentWallet);
+    }
+
+    function test_RevertIf_CollectRentAfterWorldEnded() public {
+        vm.prank(creator);
+        rent.registerAgent(SOUL_ID, agentWallet);
+        _executeEndWorld();
+
+        vm.warp(block.timestamp + RENT_PERIOD + 1);
+        vm.expectRevert(RentCollector.WorldAlreadyEnded.selector);
+        rent.collectRent(SOUL_ID);
+    }
+
+    function test_RevertIf_CollectRentBatchAfterWorldEnded() public {
+        vm.prank(creator);
+        rent.registerAgent(SOUL_ID, agentWallet);
+        _executeEndWorld();
+
+        bytes32[] memory ids = new bytes32[](1);
+        ids[0] = SOUL_ID;
+        vm.expectRevert(RentCollector.WorldAlreadyEnded.selector);
+        rent.collectRentBatch(ids);
     }
 
     function test_RevertIf_ExecuteEndWorldBeforeTimelock() public {
@@ -330,11 +393,40 @@ contract RentCollectorTest is Test {
     function test_SetRentParameters() public {
         uint256 newAmount = 2_000;
         vm.prank(creator);
-        vm.expectEmit(true, false, false, true);
-        emit RentCollector.RentRateChanged(RENT_AMOUNT, newAmount, block.timestamp);
+        vm.expectEmit(false, false, false, true);
+        emit RentCollector.RentParametersQueued(
+            newAmount,
+            RENT_PERIOD,
+            GRACE_PERIOD,
+            MAX_MISSED,
+            block.timestamp,
+            block.timestamp + 14 days
+        );
         rent.setRentParameters(newAmount, RENT_PERIOD, GRACE_PERIOD, MAX_MISSED);
 
+        assertEq(rent.rentAmount(), RENT_AMOUNT);
+
+        vm.prank(creator);
+        vm.expectRevert();
+        rent.executeRentParameters();
+
+        vm.warp(block.timestamp + 14 days + 1);
+        vm.prank(creator);
+        vm.expectEmit(true, false, false, true);
+        emit RentCollector.RentRateChanged(RENT_AMOUNT, newAmount, block.timestamp);
+        rent.executeRentParameters();
+
         assertEq(rent.rentAmount(), newAmount);
+    }
+
+    function test_RevertIf_InvalidRentParameters() public {
+        vm.startPrank(creator);
+        vm.expectRevert(RentCollector.InvalidRentParameters.selector);
+        rent.setRentParameters(RENT_AMOUNT, 0, GRACE_PERIOD, MAX_MISSED);
+
+        vm.expectRevert(RentCollector.InvalidRentParameters.selector);
+        rent.setRentParameters(RENT_AMOUNT, RENT_PERIOD, GRACE_PERIOD, 0);
+        vm.stopPrank();
     }
 
     function test_RevertIf_NonCreatorSetsRent() public {

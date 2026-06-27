@@ -14,6 +14,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
 import time
 from pathlib import Path
 from typing import Any, Optional
@@ -26,10 +27,18 @@ log = logging.getLogger("god.agent_env")
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://god:localdev@localhost:5432/god_world")
 WORLD_ID = os.getenv("WORLD_ID", "local-dev-world-1")
 ENV_ROOT = Path(os.getenv("AGENT_ENV_ROOT", "data/agent_env"))
+_SCRATCH_KEY_RE = re.compile(r"[^A-Za-z0-9_.-]+")
 
 
 def _agent_root(soul_id: str) -> Path:
     return ENV_ROOT / soul_id[:8] / soul_id
+
+
+def _safe_scratch_key(key: str | None) -> str:
+    """Return a single filename-safe scratch key."""
+    cleaned = _SCRATCH_KEY_RE.sub("_", str(key or "")[:64].strip())
+    cleaned = cleaned.strip("._-")
+    return cleaned or "note"
 
 
 def ensure_agent_env(soul_id: str) -> Path:
@@ -127,9 +136,10 @@ def read_scratch(soul_id: str, key: Optional[str] = None) -> dict[str, str]:
         conn = psycopg2.connect(DATABASE_URL, cursor_factory=psycopg2.extras.RealDictCursor)
         cur = conn.cursor()
         if key:
+            safe_key = _safe_scratch_key(key)
             cur.execute(
                 "SELECT scratch_key, content FROM agent_scratch WHERE soul_id = %s AND scratch_key = %s",
-                (soul_id, key[:64]),
+                (soul_id, safe_key),
             )
             row = cur.fetchone()
             cur.close()
@@ -148,7 +158,7 @@ def read_scratch(soul_id: str, key: Optional[str] = None) -> dict[str, str]:
 
 
 def write_scratch(soul_id: str, key: str, content: str) -> bool:
-    key = key[:64].strip() or "note"
+    key = _safe_scratch_key(key)
     content = str(content or "")[:2000]
     now = int(time.time())
     try:
@@ -167,7 +177,10 @@ def write_scratch(soul_id: str, key: str, content: str) -> bool:
         cur.close()
         conn.close()
         root = ensure_agent_env(soul_id)
-        scratch_file = root / "scratch" / f"{key}.txt"
+        scratch_dir = (root / "scratch").resolve()
+        scratch_file = (scratch_dir / f"{key}.txt").resolve()
+        if not scratch_file.is_relative_to(scratch_dir):
+            raise ValueError("scratch key resolves outside scratch directory")
         scratch_file.write_text(content, encoding="utf-8")
         return True
     except Exception as e:

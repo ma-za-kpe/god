@@ -4,6 +4,7 @@ security.py — Production vs local-dev gates for dangerous endpoints.
 
 from __future__ import annotations
 
+import hmac
 import os
 
 from fastapi.responses import JSONResponse
@@ -14,22 +15,26 @@ def _truthy(name: str, default: str = "false") -> bool:
 
 
 def local_dev_mode() -> bool:
-    return _truthy("LOCAL_DEV_MODE", "true")
+    return _truthy("LOCAL_DEV_MODE", "false")
 
 
 def insecure_local_endpoints_allowed() -> bool:
     """Endpoints that accept private keys in request bodies."""
-    if _truthy("ALLOW_INSECURE_LOCAL_ENDPOINTS", "true" if local_dev_mode() else "false"):
-        return True
-    return local_dev_mode() and not os.getenv("ALLOW_INSECURE_LOCAL_ENDPOINTS")
+    return local_dev_mode() and _truthy("ALLOW_INSECURE_LOCAL_ENDPOINTS", "false")
 
 
 def verify_creator_token(header_token: str | None) -> bool:
-    """When CREATOR_GENESIS_TOKEN is set, require matching X-Creator-Token."""
-    expected = os.getenv("CREATOR_GENESIS_TOKEN", "").strip()
+    """Require X-Creator-Token for creator/admin HTTP actions.
+
+    Local tokenless mode is available only when explicitly opted in. This keeps
+    production and accidentally exposed Docker stacks deny-by-default.
+    """
+    expected = (
+        os.getenv("CREATOR_GENESIS_TOKEN", "").strip() or os.getenv("CREATOR_TOKEN", "").strip()
+    )
     if not expected:
-        return True
-    return bool(header_token) and header_token.strip() == expected
+        return local_dev_mode() and _truthy("ALLOW_TOKENLESS_CREATOR", "false")
+    return bool(header_token) and hmac.compare_digest(header_token.strip(), expected)
 
 
 def deny_insecure_endpoint(endpoint: str) -> JSONResponse | None:
@@ -51,6 +56,6 @@ def deny_creator_action(header_token: str | None) -> JSONResponse | None:
         status_code=403,
         content={
             "error": "Creator authentication required",
-            "hint": "Set X-Creator-Token header matching CREATOR_GENESIS_TOKEN",
+            "hint": "Set X-Creator-Token header matching CREATOR_GENESIS_TOKEN (or legacy CREATOR_TOKEN)",
         },
     )

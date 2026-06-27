@@ -1,0 +1,76 @@
+{
+  "_meta": {
+    "title": "SDXL Portrait Genesis",
+    "description": "Portrait generation using SDXL base. No custom nodes required — works out of the box with any ComfyUI install.",
+    "version": "1.0.0",
+    "required_custom_nodes": [],
+    "required_models": {
+      "checkpoint": "sd_xl_base_1.0.safetensors"
+    },
+    "placeholder_tokens": {
+      "{{STYLE_PROMPT}}": "Archetype style prompt filled at runtime from ArchetypeStyleConfig",
+      "{{NEGATIVE_PROMPT}}": "Negative prompt for quality control",
+      "{{SEED}}": "Integer seed for reproducibility",
+      "{{WIDTH}}": "Output width in pixels (min 512, SDXL native 1024)",
+      "{{HEIGHT}}": "Output height in pixels (min 512, SDXL native 1024)",
+      "{{BATCH_SIZE}}": "Number of images to generate (default 1)"
+    }
+  },
+  "1": {
+    "class_type": "CheckpointLoaderSimple",
+    "inputs": {
+      "ckpt_name": "sd_xl_base_1.0.safetensors"
+    }
+  },
+  "2": {
+    "class_type": "CLIPTextEncode",
+    "inputs": {
+      "text": "{{STYLE_PROMPT}}, portrait, detailed face, cinematic lighting, ultra-detailed, 8k",
+      "clip": ["1", 1]
+    }
+  },
+  "3": {
+    "class_type": "CLIPTextEncode",
+    "inputs": {
+      "text": "{{NEGATIVE_PROMPT}}, deformed, ugly, low quality, bad anatomy, extra limbs",
+      "clip": ["1", 1]
+    }
+  },
+  "4": {
+    "class_type": "EmptyLatentImage",
+    "inputs": {
+      "width": "{{WIDTH}}",
+      "height": "{{HEIGHT}}",
+      "batch_size": "{{BATCH_SIZE}}"
+    }
+  },
+  "5": {
+    "class_type": "KSampler",
+    "inputs": {
+      "model": ["1", 0],
+      "positive": ["2", 0],
+      "negative": ["3", 0],
+      "latent_image": ["4", 0],
+      "seed": "{{SEED}}",
+      "steps": 25,
+      "cfg": 7.0,
+      "sampler_name": "dpmpp_2m",
+      "scheduler": "karras",
+      "denoise": 1.0
+    }
+  },
+  "6": {
+    "class_type": "VAEDecode",
+    "inputs": {
+      "samples": ["5", 0],
+      "vae": ["1", 2]
+    }
+  },
+  "7": {
+    "class_type": "SaveImage",
+    "inputs": {
+      "images": ["6", 0],
+      "filename_prefix": "genesis_portrait"
+    }
+  }
+}

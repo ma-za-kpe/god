@@ -369,8 +369,24 @@
 <div id="loading"></div>
 
 <script>
-const API = 'http://localhost:8888';
+function defaultRuntimeUrl() {
+  const { hostname, port, origin } = window.location;
+  if ((hostname === 'localhost' || hostname === '127.0.0.1') && port === '3000') {
+    return 'http://localhost:8888';
+  }
+  return origin;
+}
+const API = window.RUNTIME_URL || defaultRuntimeUrl();
 const PAGE_SIZE = 100;
+
+function creatorHeaders(headers = {}) {
+  const token = window.CREATOR_TOKEN || sessionStorage.getItem('creator_token') || '';
+  return token ? { ...headers, 'X-Creator-Token': token } : headers;
+}
+
+function renderedText(value) {
+  return String(value ?? '').replace(/<[^>]*>/g, '');
+}
 
 let S = {
   section: 'agents',
@@ -596,7 +612,17 @@ function buildFilterOptions(def) {
   if (!def.filterKey) return;
   const fsel = document.getElementById('filter-select');
   const vals = [...new Set(S.data.map(r => r[def.filterKey]).filter(Boolean))].sort();
-  fsel.innerHTML = `<option value="">all ${def.filterLabel?.toLowerCase()}</option>` + vals.map(v=>`<option value="${v}">${v}</option>`).join('');
+  fsel.replaceChildren();
+  const all = document.createElement('option');
+  all.value = '';
+  all.textContent = `all ${String(def.filterLabel || '').toLowerCase()}`;
+  fsel.appendChild(all);
+  vals.forEach(v => {
+    const option = document.createElement('option');
+    option.value = String(v);
+    option.textContent = String(v);
+    fsel.appendChild(option);
+  });
   fsel.value = S.filterVal;
 }
 
@@ -651,6 +677,44 @@ function renderTable(rows) {
     const sel = S.selected === (row.soul_id||row.event_id||row.message_id||row.dream_id||row.token_id||i) ? 'selected' : '';
     return `<tr class="${sel}" onclick="selectRow(${i})">${cells}</tr>`;
   }).join('');
+
+  document.getElementById('row-count').textContent = `${S.filtered.length} records`;
+}
+
+function renderTable(rows) {
+  const def = SECTIONS[S.section];
+  if (!def) return;
+
+  const thead = document.getElementById('thead');
+  const tbody = document.getElementById('tbody');
+
+  const headerRow = document.createElement('tr');
+  def.cols.forEach(c => {
+    const th = document.createElement('th');
+    th.dataset.key = c.key;
+    th.className = S.sortCol === c.key ? 'sorted' : '';
+    th.textContent = `${c.label}${S.sortCol===c.key?(S.sortDir>0?' ▲':' ▼'):''}`;
+    th.addEventListener('click', () => sortBy(c.key));
+    headerRow.appendChild(th);
+  });
+  thead.replaceChildren(headerRow);
+
+  const bodyRows = rows.map((row, i) => {
+    const tr = document.createElement('tr');
+    const rowId = row.soul_id || row.event_id || row.message_id || row.dream_id || row.token_id || i;
+    if (S.selected === rowId) tr.classList.add('selected');
+    tr.addEventListener('click', () => selectRow(i));
+    def.cols.forEach(c => {
+      const td = document.createElement('td');
+      if (c.cls) td.className = c.cls;
+      const v = row[c.key];
+      const rendered = c.render ? c.render(v) : (v ?? '-');
+      td.textContent = renderedText(rendered);
+      tr.appendChild(td);
+    });
+    return tr;
+  });
+  tbody.replaceChildren(...bodyRows);
 
   document.getElementById('row-count').textContent = `${S.filtered.length} records`;
 }
@@ -892,9 +956,13 @@ async function runGenesis() {
   status.style.color = 'var(--dim)';
   status.textContent = '⟳ Resetting world and spawning genesis agents…';
   try {
+    if (!window.CREATOR_TOKEN && !sessionStorage.getItem('creator_token')) {
+      const token = window.prompt('Creator token required for genesis:');
+      if (token) sessionStorage.setItem('creator_token', token);
+    }
     const r = await fetch(`${API}/creator/genesis`, {
       method: 'POST',
-      headers: {'Content-Type': 'application/json'},
+      headers: creatorHeaders({'Content-Type': 'application/json'}),
       body: JSON.stringify({confirm: true}),
     });
     const d = await r.json();

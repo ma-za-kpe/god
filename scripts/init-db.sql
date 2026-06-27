@@ -299,7 +299,10 @@ ALTER TABLE agents ADD COLUMN IF NOT EXISTS emotional_state TEXT NOT NULL DEFAUL
 CREATE INDEX IF NOT EXISTS idx_events_agent_id ON events(agent_id);
 CREATE INDEX IF NOT EXISTS idx_events_type ON events(event_type);
 CREATE INDEX IF NOT EXISTS idx_events_timestamp ON events(timestamp DESC);
+CREATE INDEX IF NOT EXISTS idx_events_world_timestamp ON events(world_id, timestamp DESC);
+CREATE INDEX IF NOT EXISTS idx_events_agent_type_ts ON events(agent_id, event_type, timestamp DESC);
 CREATE INDEX IF NOT EXISTS idx_agents_alive ON agents(is_alive, world_id);
+CREATE INDEX IF NOT EXISTS idx_agents_world_alive_birth ON agents(world_id, is_alive, birth_timestamp);
 CREATE INDEX IF NOT EXISTS idx_rent_soul_id ON rent_payments(soul_id);
 CREATE INDEX IF NOT EXISTS idx_signals_soul_id ON consciousness_signals(soul_id);
 CREATE INDEX IF NOT EXISTS idx_petitions_soul_id ON creator_petitions(soul_id);
@@ -311,6 +314,12 @@ CREATE INDEX IF NOT EXISTS idx_episodes_timestamp ON episodes(soul_id, timestamp
 CREATE INDEX IF NOT EXISTS idx_episodes_emotional ON episodes(soul_id, emotional_imprint DESC);
 CREATE INDEX IF NOT EXISTS idx_agent_status_tier ON agent_status(tier, world_id);
 CREATE INDEX IF NOT EXISTS idx_ext_payments_soul ON external_payments(soul_id, timestamp DESC);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_ext_payments_x402_tx
+    ON external_payments(tx_hash)
+    WHERE source_type = 'x402'
+      AND tx_hash IS NOT NULL
+      AND tx_hash != ''
+      AND tx_hash != '0x0000000000000000000000000000000000000000000000000000000000000000';
 CREATE INDEX IF NOT EXISTS idx_proposals_status ON law_proposals(status, world_id);
 CREATE INDEX IF NOT EXISTS idx_votes_proposal ON law_votes(proposal_id);
 CREATE INDEX IF NOT EXISTS idx_coalition_members ON coalition_members(coalition_id);
@@ -394,6 +403,7 @@ CREATE INDEX IF NOT EXISTS idx_dreams_soul_id      ON dreams(soul_id, dreamed_at
 CREATE INDEX IF NOT EXISTS idx_dreams_world        ON dreams(world_id, dreamed_at DESC);
 CREATE INDEX IF NOT EXISTS idx_messages_recipient  ON agent_messages(recipient_id, world_id, sent_at DESC);
 CREATE INDEX IF NOT EXISTS idx_messages_sender     ON agent_messages(sender_id, world_id, sent_at DESC);
+CREATE INDEX IF NOT EXISTS idx_messages_world_sent_at ON agent_messages(world_id, sent_at DESC);
 CREATE INDEX IF NOT EXISTS idx_messages_broadcast  ON agent_messages(recipient_id, world_id) WHERE recipient_id = 'BROADCAST';
 CREATE INDEX IF NOT EXISTS idx_reputation_observer ON reputation(observer_id, world_id);
 CREATE INDEX IF NOT EXISTS idx_tokens_owner        ON tokens(owner_soul_id, world_id);
@@ -443,12 +453,23 @@ CREATE TABLE IF NOT EXISTS agent_registered_tools (
     description     TEXT NOT NULL DEFAULT '',
     handler_type    TEXT NOT NULL DEFAULT 'local',
     input_schema    JSONB NOT NULL DEFAULT '{}',
-    cost_usdc       NUMERIC(18,6) NOT NULL DEFAULT 0.001,
+    cost_usdc       NUMERIC(18,6) NOT NULL DEFAULT 0.001 CHECK (cost_usdc > 0),
     calls_served    BIGINT NOT NULL DEFAULT 0,
     is_active       BOOLEAN NOT NULL DEFAULT true,
     created_at      BIGINT NOT NULL,
     world_id        TEXT NOT NULL DEFAULT 'local-dev-world-1'
 );
+
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint
+        WHERE conname = 'agent_registered_tools_cost_positive'
+    ) THEN
+        ALTER TABLE agent_registered_tools
+          ADD CONSTRAINT agent_registered_tools_cost_positive CHECK (cost_usdc > 0);
+    END IF;
+END $$;
 
 CREATE TABLE IF NOT EXISTS agent_graph_mutations (
     mutation_id     TEXT PRIMARY KEY,
@@ -475,3 +496,102 @@ CREATE INDEX IF NOT EXISTS idx_jobs_due           ON agent_scheduled_jobs(run_at
 CREATE INDEX IF NOT EXISTS idx_jobs_soul          ON agent_scheduled_jobs(soul_id, status);
 CREATE INDEX IF NOT EXISTS idx_reg_tools_owner    ON agent_registered_tools(owner_soul_id, is_active);
 CREATE INDEX IF NOT EXISTS idx_graph_mut_soul     ON agent_graph_mutations(soul_id, status);
+
+
+-- ============================================================
+-- Banter Engine — Relationship Memory
+-- See docs: broadcast-quality-banter-engine spec
+-- ============================================================
+
+-- Relationship pair state (one row per unique elder pair)
+CREATE TABLE IF NOT EXISTS relationship_pairs (
+    pair_id                 TEXT PRIMARY KEY,
+    elder_a                 TEXT NOT NULL,
+    elder_b                 TEXT NOT NULL,
+    tension_level           INTEGER DEFAULT 0 CHECK (tension_level >= 0 AND tension_level <= 10),
+    last_interaction_ts     BIGINT DEFAULT 0,
+    reconciliation_arc      BOOLEAN DEFAULT FALSE,
+    reconciliation_remaining INTEGER DEFAULT 0,
+    peak_tension_summary    TEXT DEFAULT '',
+    created_at              BIGINT DEFAULT (EXTRACT(EPOCH FROM NOW())::BIGINT),
+    updated_at              BIGINT DEFAULT (EXTRACT(EPOCH FROM NOW())::BIGINT)
+);
+
+-- Interaction records (append-only log per pair)
+CREATE TABLE IF NOT EXISTS interaction_records (
+    id                  SERIAL PRIMARY KEY,
+    pair_id             TEXT REFERENCES relationship_pairs(pair_id),
+    timestamp           BIGINT NOT NULL,
+    elder_acting        TEXT NOT NULL,
+    move_used           TEXT NOT NULL,
+    emotional_valence   TEXT CHECK (emotional_valence IN ('positive', 'negative', 'neutral')),
+    betrayal            BOOLEAN DEFAULT FALSE,
+    alliance            BOOLEAN DEFAULT FALSE,
+    concession          BOOLEAN DEFAULT FALSE,
+    summary             TEXT DEFAULT ''
+);
+
+-- Indexes for relationship memory
+CREATE INDEX IF NOT EXISTS idx_interaction_pair_ts
+    ON interaction_records(pair_id, timestamp DESC);
+
+CREATE INDEX IF NOT EXISTS idx_interaction_significant
+    ON interaction_records(pair_id, timestamp DESC)
+    WHERE emotional_valence != 'neutral' OR betrayal OR alliance OR concession;
+
+
+-- ============================================================
+-- Callback Registry tables (Soul Engine)
+-- ============================================================
+
+-- Memorable moments (high-scoring lines stored for future callback)
+CREATE TABLE IF NOT EXISTS callback_moments (
+    id              SERIAL PRIMARY KEY,
+    pair_id         VARCHAR(16) NOT NULL,
+    speaker         VARCHAR(64) NOT NULL,
+    target          VARCHAR(64) NOT NULL,
+    line            TEXT NOT NULL,
+    move            VARCHAR(32) NOT NULL,
+    arc_theme       VARCHAR(128) NOT NULL,
+    valence         VARCHAR(16) NOT NULL,
+    summary         VARCHAR(256) NOT NULL,
+    score           INTEGER NOT NULL,
+    beat_number     INTEGER NOT NULL,
+    created_at      BIGINT NOT NULL
+);
+
+-- Running gags (recurring patterns between Elder pairs)
+CREATE TABLE IF NOT EXISTS callback_running_gags (
+    id                  SERIAL PRIMARY KEY,
+    pair_id             VARCHAR(16) NOT NULL,
+    pattern_description TEXT NOT NULL,
+    topic               VARCHAR(128) NOT NULL,
+    interaction_count   INTEGER NOT NULL DEFAULT 0,
+    created_at          BIGINT NOT NULL
+);
+
+-- Sore spots (known vulnerabilities for targeted provocation)
+CREATE TABLE IF NOT EXISTS callback_sore_spots (
+    id              SERIAL PRIMARY KEY,
+    elder_name      VARCHAR(64) NOT NULL,
+    topic           VARCHAR(128) NOT NULL,
+    trigger_phrase  TEXT,
+    tension_delta   INTEGER NOT NULL,
+    created_at      BIGINT NOT NULL
+);
+
+-- Indexes for callback registry
+CREATE INDEX IF NOT EXISTS idx_callback_moments_pair
+    ON callback_moments(pair_id, created_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_callback_moments_speaker
+    ON callback_moments(speaker);
+
+CREATE INDEX IF NOT EXISTS idx_callback_gags_pair
+    ON callback_running_gags(pair_id);
+
+CREATE INDEX IF NOT EXISTS idx_callback_sore_spots_elder
+    ON callback_sore_spots(elder_name);
+
+CREATE INDEX IF NOT EXISTS idx_callback_sore_spots_elder_topic
+    ON callback_sore_spots(elder_name, topic);

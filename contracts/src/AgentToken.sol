@@ -2,12 +2,11 @@
 pragma solidity ^0.8.24;
 
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
 
 /// @title AgentToken — Deployable ERC-20 for GOD Project agents
 /// @dev Deployed by runtime/src/token_factory.py on behalf of agent wallets.
 ///      Immutable once deployed — no upgrades, no proxy.
-contract AgentToken is ERC20, Ownable {
+contract AgentToken is ERC20 {
     uint8 private _decimals;
 
     /// Hard cap: 1 billion tokens at 18 decimals
@@ -34,7 +33,8 @@ contract AgentToken is ERC20, Ownable {
         uint16 _transferTaxBps,
         address _taxRecipient,
         address owner_
-    ) ERC20(name_, symbol_) Ownable(owner_) {
+    ) ERC20(name_, symbol_) {
+        require(owner_ != address(0), "Owner is zero");
         require(initialSupply <= MAX_SUPPLY, "Supply exceeds max");
         require(_transferTaxBps <= 1000, "Tax too high (max 10%)");
         _decimals = decimals_;
@@ -70,9 +70,4 @@ contract AgentToken is ERC20, Ownable {
         }
     }
 
-    /// @notice Owner can mint additional tokens up to MAX_SUPPLY
-    function mint(address to, uint256 amount) external onlyOwner {
-        require(totalSupply() + amount <= MAX_SUPPLY, "Would exceed max supply");
-        _mint(to, amount);
-    }
 }

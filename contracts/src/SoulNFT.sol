@@ -25,6 +25,7 @@ contract SoulNFT is ERC721 {
     error NotRentCollector();
     error NotDeployer();
     error RentCollectorAlreadySet();
+    error ZeroAddress();
     error SoulAlreadyMinted(bytes32 soulId);
     error SoulNotFound(bytes32 soulId);
 
@@ -42,6 +43,7 @@ contract SoulNFT is ERC721 {
      */
     function setRentCollector(address _rentCollector) external {
         if (msg.sender != deployer) revert NotDeployer();
+        if (_rentCollector == address(0)) revert ZeroAddress();
         if (rentCollector != address(0)) revert RentCollectorAlreadySet();
         rentCollector = _rentCollector;
     }

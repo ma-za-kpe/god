@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import logging
+import math
 import os
 import time
 import uuid
@@ -21,9 +22,17 @@ log = logging.getLogger("god.tools")
 
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://god:localdev@localhost:5432/god_world")
 WORLD_ID = os.getenv("WORLD_ID", "local-dev-world-1")
+MIN_TOOL_COST_USDC = 0.000001
 
 # Built-in local handlers agents can invoke after registering or via world tools
 LOCAL_HANDLERS: dict[str, Any] = {}
+
+
+def _normalize_tool_cost(cost_usdc: float) -> float:
+    cost = round(float(cost_usdc), 6)
+    if not math.isfinite(cost) or cost < MIN_TOOL_COST_USDC:
+        raise ValueError("cost_usdc must be a positive finite value")
+    return cost
 
 
 def register_handler(name: str, fn) -> None:
@@ -76,32 +85,35 @@ def register_agent_tool(
     cost_usdc: float = 0.001,
     handler_type: str = "echo",
 ) -> dict:
+    cost_usdc = _normalize_tool_cost(cost_usdc)
     tool_id = str(uuid.uuid4())
     now = int(time.time())
     schema = {"type": "object", "properties": {"input": {"type": "string"}}}
     conn = psycopg2.connect(DATABASE_URL)
     cur = conn.cursor()
-    cur.execute(
-        """
-        INSERT INTO agent_registered_tools
-            (tool_id, owner_soul_id, name, description, handler_type, input_schema, cost_usdc, created_at, world_id)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-        """,
-        (
-            tool_id,
-            owner_soul_id,
-            name[:40],
-            description[:300],
-            handler_type,
-            json.dumps(schema),
-            cost_usdc,
-            now,
-            WORLD_ID,
-        ),
-    )
-    conn.commit()
-    cur.close()
-    conn.close()
+    try:
+        cur.execute(
+            """
+            INSERT INTO agent_registered_tools
+                (tool_id, owner_soul_id, name, description, handler_type, input_schema, cost_usdc, created_at, world_id)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """,
+            (
+                tool_id,
+                owner_soul_id,
+                name[:40],
+                description[:300],
+                handler_type,
+                json.dumps(schema),
+                cost_usdc,
+                now,
+                WORLD_ID,
+            ),
+        )
+        conn.commit()
+    finally:
+        cur.close()
+        conn.close()
     return {"tool_id": tool_id, "name": name, "cost_usdc": cost_usdc}
 
 
@@ -119,27 +131,46 @@ async def invoke_tool(caller_soul_id: str, tool_id: str, params: dict | None = N
         conn.close()
         return {"error": "tool not found"}
 
-    cost = float(tool["cost_usdc"])
+    try:
+        cost = _normalize_tool_cost(tool["cost_usdc"])
+    except (TypeError, ValueError):
+        cur.close()
+        conn.close()
+        return {"error": "invalid tool cost"}
     owner = tool["owner_soul_id"]
 
     if caller_soul_id != owner:
         cur.execute(
-            "SELECT balance_usdc FROM agents WHERE soul_id = %s AND is_alive = true",
-            (caller_soul_id,),
+            """
+            UPDATE agents
+            SET balance_usdc = COALESCE(balance_usdc, 0) - %s
+            WHERE soul_id = %s
+              AND is_alive = true
+              AND COALESCE(balance_usdc, 0) >= %s
+            RETURNING balance_usdc
+            """,
+            (cost, caller_soul_id, cost),
         )
-        caller = cur.fetchone()
-        if not caller or float(caller["balance_usdc"]) < cost:
+        debit = cur.fetchone()
+        if not debit:
+            conn.rollback()
             cur.close()
             conn.close()
             return {"error": "insufficient balance", "cost_usdc": cost}
         cur.execute(
-            "UPDATE agents SET balance_usdc = balance_usdc - %s WHERE soul_id = %s",
-            (cost, caller_soul_id),
-        )
-        cur.execute(
-            "UPDATE agents SET balance_usdc = balance_usdc + %s WHERE soul_id = %s",
+            """
+            UPDATE agents
+            SET balance_usdc = COALESCE(balance_usdc, 0) + %s
+            WHERE soul_id = %s AND is_alive = true
+            RETURNING balance_usdc
+            """,
             (cost * 0.9, owner),
         )
+        if not cur.fetchone():
+            conn.rollback()
+            cur.close()
+            conn.close()
+            return {"error": "tool owner not found"}
 
     cur.execute(
         "UPDATE agent_registered_tools SET calls_served = calls_served + 1 WHERE tool_id = %s",

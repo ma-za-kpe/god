@@ -17,10 +17,10 @@ services:
       - ./swarm.key:/data/ipfs/swarm.key:ro
       - ./scripts/ipfs-disable-autoconf.sh:/container-init.d/001-disable-autoconf.sh:ro
     ports:
-      - "4001:4001"
-      - "4001:4001/udp"
-      - "5001:5001"
-      - "8080:8080"
+      - "127.0.0.1:4001:4001"
+      - "127.0.0.1:4001:4001/udp"
+      - "127.0.0.1:5001:5001"
+      - "127.0.0.1:8080:8080"
     networks:
       - god-net
     restart: unless-stopped
@@ -42,10 +42,10 @@ services:
       - ./swarm.key:/data/ipfs/swarm.key:ro
       - ./scripts/ipfs-disable-autoconf.sh:/container-init.d/001-disable-autoconf.sh:ro
     ports:
-      - "4002:4001"
-      - "4002:4001/udp"
-      - "5002:5001"
-      - "8081:8080"
+      - "127.0.0.1:4002:4001"
+      - "127.0.0.1:4002:4001/udp"
+      - "127.0.0.1:5002:5001"
+      - "127.0.0.1:8081:8080"
     networks:
       - god-net
     restart: unless-stopped
@@ -61,10 +61,10 @@ services:
       - ./swarm.key:/data/ipfs/swarm.key:ro
       - ./scripts/ipfs-disable-autoconf.sh:/container-init.d/001-disable-autoconf.sh:ro
     ports:
-      - "4003:4001"
-      - "4003:4001/udp"
-      - "5003:5001"
-      - "8082:8080"
+      - "127.0.0.1:4003:4001"
+      - "127.0.0.1:4003:4001/udp"
+      - "127.0.0.1:5003:5001"
+      - "127.0.0.1:8082:8080"
     networks:
       - god-net
     restart: unless-stopped
@@ -95,7 +95,7 @@ services:
     volumes:
       - anvil_data:/data
     ports:
-      - "8545:8545"
+      - "127.0.0.1:8545:8545"
     networks:
       - god-net
     restart: unless-stopped
@@ -120,8 +120,8 @@ services:
     volumes:
       - nats_data:/data
     ports:
-      - "4222:4222"
-      - "8222:8222"
+      - "127.0.0.1:4222:4222"
+      - "127.0.0.1:8222:8222"
     networks:
       - god-net
     restart: unless-stopped
@@ -147,7 +147,7 @@ services:
     volumes:
       - redis_data:/data
     ports:
-      - "6379:6379"
+      - "127.0.0.1:6379:6379"
     networks:
       - god-net
     restart: unless-stopped
@@ -170,7 +170,7 @@ services:
       - postgres_data:/var/lib/postgresql/data
       - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init.sql:ro
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     networks:
       - god-net
     restart: unless-stopped
@@ -192,21 +192,91 @@ services:
         required: false
     environment:
       - IPFS_API=http://ipfs-node-1:5001
+      - IPFS_API_ENDPOINTS=http://ipfs-node-1:5001,http://ipfs-node-2:5001,http://ipfs-node-3:5001
+      - MIN_IPFS_PINS=3
       - IPFS_GATEWAY=http://ipfs-node-1:8080
+      - RUNTIME_BASE_URL=http://localhost:8888
+      - MOCK_X402_PAYMENTS=${MOCK_X402_PAYMENTS:-false}
+      - USE_X402_FOR_BUY_SERVICE=${USE_X402_FOR_BUY_SERVICE:-true}
       - ANVIL_RPC=http://anvil:8545
       - CHAIN_ID=84532
       - NATS_URL=nats://nats:4222
       - REDIS_URL=redis://redis:6379
       - DATABASE_URL=postgresql://god:${POSTGRES_PASSWORD:-localdev}@postgres:5432/god_world
       - WORLD_ID=local-dev-world-1
+      - LOCAL_DEV_MODE=${LOCAL_DEV_MODE:-true}
+      - ALLOW_INSECURE_LOCAL_ENDPOINTS=${ALLOW_INSECURE_LOCAL_ENDPOINTS:-false}
+      - ALLOW_TOKENLESS_CREATOR=${ALLOW_TOKENLESS_CREATOR:-false}
       - LOG_LEVEL=DEBUG
       # LLM — Ollama runs on host; host.docker.internal resolves on Docker Desktop
       - LLM_PROVIDER=${LLM_PROVIDER:-ollama}
       - LLM_MODEL=${LLM_MODEL:-llama3.1:8b}
-      - OLLAMA_BASE_URL=http://host.docker.internal:11434
+      - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+      - TWITCH_ENABLED=${TWITCH_ENABLED:-false}
+      - TWITCH_DRY_RUN=${TWITCH_DRY_RUN:-true}
+      - TWITCH_EVENTSUB_TRANSPORT=${TWITCH_EVENTSUB_TRANSPORT:-websocket}
+      - TWITCH_CHANNEL_NAME=${TWITCH_CHANNEL_NAME:-}
+      - TWITCH_CLIENT_ID=${TWITCH_CLIENT_ID:-}
+      - TWITCH_CLIENT_SECRET=${TWITCH_CLIENT_SECRET:-}
+      - TWITCH_BROADCASTER_ID=${TWITCH_BROADCASTER_ID:-}
+      - TWITCH_BOT_USER_ID=${TWITCH_BOT_USER_ID:-}
+      - TWITCH_BOT_ACCESS_TOKEN=${TWITCH_BOT_ACCESS_TOKEN:-}
+      - TWITCH_BOT_REFRESH_TOKEN=${TWITCH_BOT_REFRESH_TOKEN:-}
+      - TWITCH_HELIX_HEALTH_URL=${TWITCH_HELIX_HEALTH_URL:-https://api.twitch.tv/helix/}
+      - TWITCH_EVENTSUB_HEALTH_URL=${TWITCH_EVENTSUB_HEALTH_URL:-}
+      - YOUTUBE_ENABLED=${YOUTUBE_ENABLED:-false}
+      - YOUTUBE_DRY_RUN=${YOUTUBE_DRY_RUN:-true}
+      - YOUTUBE_CHANNEL_ID=${YOUTUBE_CHANNEL_ID:-}
+      - YOUTUBE_CLIENT_ID=${YOUTUBE_CLIENT_ID:-}
+      - YOUTUBE_CLIENT_SECRET=${YOUTUBE_CLIENT_SECRET:-}
+      - YOUTUBE_ACCESS_TOKEN=${YOUTUBE_ACCESS_TOKEN:-}
+      - YOUTUBE_REFRESH_TOKEN=${YOUTUBE_REFRESH_TOKEN:-}
+      - YOUTUBE_API_KEY=${YOUTUBE_API_KEY:-}
+      - OBS_WEBSOCKET_PASSWORD=${OBS_WEBSOCKET_PASSWORD:-}
+      - BROADCAST_ENABLED=${BROADCAST_ENABLED:-true}
+      - BROADCAST_DRY_RUN=${BROADCAST_DRY_RUN:-true}
+      - NEMO_ENABLED=${NEMO_ENABLED:-true}
+      - NEMO_ENDPOINT=${NEMO_ENDPOINT:-}
+      - OBS_ENABLED=${OBS_ENABLED:-false}
+      - OBS_WEBSOCKET_URL=${OBS_WEBSOCKET_URL:-}
+      - VOICE_ENABLED=${VOICE_ENABLED:-true}
+      - VOICE_HEALTH_URL=${VOICE_HEALTH_URL:-}
+      - VOICE_PROVIDER=${VOICE_PROVIDER:-kokoro}
+      - VOICE_MODEL=${VOICE_MODEL:-kokoro}
+      - VOICE_NAME=${VOICE_NAME:-narrator}
+      - VOICE_PROFILE=${VOICE_PROFILE:-dramatic}
+      - VOICE_SPEED=${VOICE_SPEED:-1.0}
+      - VOICE_PITCH=${VOICE_PITCH:-0.5}
+      - VOICE_SAMPLE_RATE=${VOICE_SAMPLE_RATE:-48000}
+      - VOICE_TRANSPORT=${VOICE_TRANSPORT:-local-tts}
+      - VOICE_DRY_RUN=${VOICE_DRY_RUN:-false}
+      - VOICE_SYNTHESIS_ENABLED=${VOICE_SYNTHESIS_ENABLED:-true}
+      - VOICE_PLAYBACK_MODE=${VOICE_PLAYBACK_MODE:-sink}
+      - LIP_SYNC_SOURCE=${LIP_SYNC_SOURCE:-audio}
+      - AVATAR_ENABLED=${AVATAR_ENABLED:-false}
+      - AVATAR_HEALTH_URL=${AVATAR_HEALTH_URL:-}
+      - AVATAR_RENDERER=${AVATAR_RENDERER:-vrm}
+      - AVATAR_FORMAT=${AVATAR_FORMAT:-vrm}
+      - AVATAR_ASSET=${AVATAR_ASSET:-}
+      - AVATAR_RENDER_TARGET=${AVATAR_RENDER_TARGET:-obs-virtual-camera}
+      - AVATAR_TRANSPORT=${AVATAR_TRANSPORT:-local-avatar}
+      - AVATAR_DRY_RUN=${AVATAR_DRY_RUN:-true}
+      - AVATAR_LIP_SYNC_SOURCE=${AVATAR_LIP_SYNC_SOURCE:-audio}
       # Set after deploying contracts: forge script contracts/script/Deploy.s.sol ...
       - RENT_COLLECTOR_ADDRESS=${RENT_COLLECTOR_ADDRESS:-}
+      - SOUL_NFT_ADDRESS=${SOUL_NFT_ADDRESS:-}
       - USDC_ADDRESS=${USDC_ADDRESS:-}
+      - CREATOR_PRIVATE_KEY=${CREATOR_PRIVATE_KEY:-}
+      # Avatar Genesis Pipeline (cloud-only: set these in .env.local or env override)
+      - COMFYUI_ENDPOINT=${COMFYUI_ENDPOINT:-}
+      - TTS_ENDPOINT=${TTS_ENDPOINT:-}
+      - PIPELINE_TIMEOUT_SECONDS=${PIPELINE_TIMEOUT_SECONDS:-900}
+      - COMFYUI_CONCURRENCY=${COMFYUI_CONCURRENCY:-2}
+      - TTS_CONCURRENCY=${TTS_CONCURRENCY:-4}
+      - CRACK_EXPRESSION_DURATION_SECONDS=${CRACK_EXPRESSION_DURATION_SECONDS:-25}
+      - FLINCH_EXPRESSION_DURATION_SECONDS=${FLINCH_EXPRESSION_DURATION_SECONDS:-8}
+      - AVATAR_EVOLUTION_ENABLED=${AVATAR_EVOLUTION_ENABLED:-true}
+      - AVATAR_GENESIS_ENABLED=${AVATAR_GENESIS_ENABLED:-true}
       # Optional cloud LLM fallbacks
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
@@ -214,8 +284,10 @@ services:
     volumes:
       - ./runtime/src:/app/src
       - ./runtime/agents:/app/agents
+      - ./runtime/seed_utterances:/app/seed_utterances:ro
+      - ./runtime/workflows:/app/workflows:ro
     ports:
-      - "8888:8888"
+      - "127.0.0.1:8888:8888"
     networks:
       - god-net
     depends_on:
@@ -231,6 +303,64 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
+  # ─── Avatar Genesis: ComfyUI (cloud-only — use vast-setup-native.sh) ───
+  # Not started locally. Set COMFYUI_ENDPOINT to the cloud instance.
+
+  comfyui:
+    profiles: ["comfyui"]
+    image: ghcr.io/ai-dock/comfyui:latest
+    container_name: god-comfyui
+    environment:
+      - CLI_ARGS=--listen 0.0.0.0 --port 8188
+      - WEB_ENABLE_AUTH=false
+    volumes:
+      - comfyui_models:/workspace/ComfyUI/models
+      - comfyui_output:/workspace/ComfyUI/output
+      - comfyui_input:/workspace/ComfyUI/input
+    ports:
+      - "127.0.0.1:8188:8188"
+    networks:
+      - god-net
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8188/system_stats || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+
+  # ─── Avatar Genesis: Fish Speech (TTS voice cloning) ─────────────────
+
+  fish-speech:
+    profiles: ["fish-speech"]
+    build:
+      context: ./fish-speech
+      dockerfile: Dockerfile
+    container_name: god-fish-speech
+    entrypoint: ["sh", "-c", "cd /app && uv run tools/api_server.py --llama-checkpoint-path checkpoints --decoder-checkpoint-path checkpoints/codec.pth --decoder-config-name modded_dac_vq --device cpu --half --listen 0.0.0.0:7860"]
+    volumes:
+      - fish_speech_checkpoints:/app/checkpoints
+      - fish_speech_models:/app/models
+      - ./runtime/seed_utterances:/app/utterances:ro
+    ports:
+      - "127.0.0.1:8090:7860"
+    networks:
+      - god-net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:7860/ || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
   # ─── Observer Website ────────────────────────────────────────────────
   # Stub: serves index.html with a live event feed polling the runtime.
   # Run with: docker compose --profile observer up -d
@@ -244,14 +374,20 @@ services:
     container_name: god-observer
     environment:
       - NEXT_PUBLIC_RUNTIME_URL=http://localhost:8888
+      - VITE_RUNTIME_URL=http://localhost:8888
+      - OBSERVER_HOST=0.0.0.0
       - NEXT_PUBLIC_NATS_WS_URL=ws://localhost:4222
       - NEXT_PUBLIC_IPFS_GATEWAY=http://localhost:8080
       - NEXT_PUBLIC_CHAIN_ID=84532
     volumes:
       - ./observer/src:/app/src
       - ./observer/public:/app/public
+      - ./observer/rigged-avatar.js:/app/rigged-avatar.js:ro
+      - ./observer/stage.html:/app/stage.html:ro
+      - ./observer/maku.html:/app/maku.html:ro
+      - ./observer/brand.css:/app/brand.css:ro
     ports:
-      - "3000:3000"
+      - "127.0.0.1:3000:3000"
     networks:
       - god-net
     depends_on:
@@ -278,3 +414,8 @@ volumes:
   nats_data:
   redis_data:
   postgres_data:
+  comfyui_models:
+  comfyui_output:
+  comfyui_input:
+  fish_speech_models:
+  fish_speech_checkpoints:
