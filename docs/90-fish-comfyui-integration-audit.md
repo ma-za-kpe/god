@@ -1094,6 +1094,30 @@ Operational policy:
   the default live observer path unless explicitly requested.
 - IPFS failures should degrade to cached video, then static portrait, never to a black stage.
 
+### Issue #99 LTX Background Loop Path
+
+Date added: 2026-06-27
+
+Implemented in this repo:
+
+- `runtime/src/avatar/video_generator.py` now has a richer `VideoGenerationResult` path for
+  Comfy workflow submission, polling, MP4/WebM fetch, timeout, and error reporting.
+- `LTXLoopRequest` and `generate_ltx_loop_asset()` queue LTX generation as
+  `ltx_background`, pin returned video bytes through an injected pin adapter, and register the
+  result as a `low_res_live` asset in `VideoManifest`.
+- LTX generation is rejected when the GPU queue disables background jobs for live mode.
+- Mocked tests cover Comfy submission, history polling, output fetch, timeout behavior, pinning,
+  manifest registration, and live-mode rejection.
+- Added background-only workflow template: `runtime/workflows/ltx_image_to_video_loop.json`.
+
+Current constraint:
+
+- No actual LTX model was loaded or run in this code-only pass.
+- The workflow template still requires a provisioned ComfyUI-LTXVideo environment before a real
+  MP4/WebM can be produced on a GPU host.
+- Production enablement still requires a field run showing Fish synthesis is not starved while
+  LTX jobs are queued or cancelled.
+
 ### TODO Backlog
 
 Status legend: `todo`, `blocked`, `in_progress`, `done`.
@@ -1106,8 +1130,8 @@ Status legend: `todo`, `blocked`, `in_progress`, `done`.
 | done | Data model | Add video manifest fields instead of overloading image/voice CIDs | #98 adds versioned video manifest schema, deterministic selection, cache policy, and GC candidate helpers |
 | todo | Live animation | Add procedural breathing/blink/head-sway/mouth-amplitude layer | Fastest path to perceived life |
 | blocked | Lip sync | Evaluate MuseTalk vs Wav2Lip vs LivePortrait on target hardware | #96 selected MuseTalk sidecar first; target GPU/model run is blocked because the Vast.ai instance was deleted and this pass is code-only |
-| todo | Comfy video | Implement `VideoGenerator` for MP4/WebM outputs | Current helper validates only PNG/JPEG |
-| todo | LTX | Run one LTX image-to-video loop workflow from avatar portrait | First video model integration |
+| done | Comfy video | Implement `VideoGenerator` for MP4/WebM outputs | #99 adds mocked Comfy submission, polling, fetch, timeout, and MP4/WebM validation path |
+| blocked | LTX | Run one LTX image-to-video loop workflow from avatar portrait | #99 adds workflow/template/queue/manifest path; actual LTX model run is blocked until a GPU/model window |
 | todo | LTX Lipdub | Verify Fish WAV -> LTX Lipdub/highlight workflow | Async only until measured |
 | todo | Wan | Run one Wan image/text-to-video cinematic workflow | Quality backend, not live path |
 | done | Queue | Add GPU job priority: Fish > Ollama live > real-time render > LTX > Wan | #97 adds priority scheduling, cooperative background cancellation, live-mode background rejection, and `/diagnostics/gpu` |

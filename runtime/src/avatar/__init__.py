@@ -35,6 +35,12 @@ from .video_manifest import (
     parse_video_manifest,
     select_video_asset,
 )
+from .video_generator import (
+    LTXLoopRequest,
+    VideoAssetGeneration,
+    VideoGenerationResult,
+    VideoGenerator,
+)
 from .visual_reactor import MOVE_EXPRESSION_MAP, VisualReactor
 from .voice_cloner import VoiceCloneResult, VoiceCloner
 
@@ -53,6 +59,7 @@ __all__ = [
     "GenesisPipeline",
     "HardwareProfile",
     "IntegrationPath",
+    "LTXLoopRequest",
     "LifeSignals",
     "LifeState",
     "MOVE_EXPRESSION_MAP",
@@ -62,7 +69,10 @@ __all__ = [
     "SceneLayout",
     "VIDEO_MANIFEST_SCHEMA_VERSION",
     "VideoAsset",
+    "VideoAssetGeneration",
     "VideoAssetStatus",
+    "VideoGenerationResult",
+    "VideoGenerator",
     "VideoManifest",
     "VideoRetentionPolicy",
     "VideoSelection",

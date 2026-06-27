@@ -1,0 +1,49 @@
+{
+  "_meta": {
+    "name": "ltx_image_to_video_loop",
+    "description": "Image-to-video loop template for low-resolution live avatar loops.",
+    "model_family": "ltx",
+    "required_custom_nodes": [
+      "ComfyUI-LTXVideo"
+    ],
+    "output": "mp4_or_webm",
+    "live_policy": "background_only",
+    "notes": [
+      "Runtime replaces PORTRAIT_CID, MOTION_PROMPT, VIDEO_MODEL, WIDTH, HEIGHT, and DURATION_MS before submission.",
+      "This workflow is disabled during live mode unless the GPU job queue allows LTX background work."
+    ]
+  },
+  "1": {
+    "class_type": "LoadImageFromIPFS",
+    "inputs": {
+      "cid": "{{PORTRAIT_CID}}"
+    }
+  },
+  "2": {
+    "class_type": "LTXImageToVideo",
+    "inputs": {
+      "image": [
+        "1",
+        0
+      ],
+      "prompt": "{{MOTION_PROMPT}}",
+      "model": "{{VIDEO_MODEL}}",
+      "width": "{{WIDTH}}",
+      "height": "{{HEIGHT}}",
+      "duration_ms": "{{DURATION_MS}}",
+      "loop": true
+    }
+  },
+  "3": {
+    "class_type": "VHS_VideoCombine",
+    "inputs": {
+      "images": [
+        "2",
+        0
+      ],
+      "frame_rate": 24,
+      "format": "video/h264-mp4",
+      "filename_prefix": "god_ltx_avatar_loop"
+    }
+  }
+}
