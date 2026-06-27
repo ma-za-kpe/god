@@ -1,5 +1,16 @@
 """Avatar surface for visual, voice, and genesis wiring."""
 
+from .acceptance_suite import (
+    ACCEPTANCE_CASES,
+    AUDIT_MATRIX_LINK,
+    REQUIRED_FAILURE_USE_CASES,
+    REQUIRED_PERSONAS,
+    REQUIRED_USE_CASES,
+    AcceptanceCase,
+    AcceptanceMode,
+    build_acceptance_suite_report,
+    validate_acceptance_suite,
+)
 from .archetype_config import ARCHETYPE_CONFIGS, ArchetypeStyleConfig, validate_archetype_configs
 from .engine import (
     AvatarSurface,
@@ -47,6 +58,13 @@ from .voice_cloner import VoiceCloneResult, VoiceCloner
 
 __all__ = [
     "ARCHETYPE_CONFIGS",
+    "ACCEPTANCE_CASES",
+    "AUDIT_MATRIX_LINK",
+    "REQUIRED_FAILURE_USE_CASES",
+    "REQUIRED_PERSONAS",
+    "REQUIRED_USE_CASES",
+    "AcceptanceCase",
+    "AcceptanceMode",
     "ArchetypeStyleConfig",
     "AvatarPlan",
     "AvatarState",
@@ -86,11 +104,13 @@ __all__ = [
     "build_avatar_state",
     "build_avatar_status",
     "build_avatar_status_surface",
+    "build_acceptance_suite_report",
     "build_sidecar_contract",
     "cache_plan",
     "gc_candidate_cids",
     "generate_life_state",
     "parse_video_manifest",
     "select_video_asset",
+    "validate_acceptance_suite",
     "validate_archetype_configs",
 ]
