@@ -33,8 +33,10 @@ _AGENT_BARE_NAME_RE = re.compile(r"^[A-Za-z]+-[A-Za-z0-9]+-[A-Za-z0-9]+\s+")
 
 try:  # pragma: no cover - runtime package import path
     from ..health_checks import probe_url
+    from ..runtime_endpoints import ollama_base_url, tts_base_url, tts_health_url
 except ImportError:  # pragma: no cover - flat test path
     from health_checks import probe_url
+    from runtime_endpoints import ollama_base_url, tts_base_url, tts_health_url
 try:  # pragma: no cover - runtime package import path
     from ..avatar.archetype_config import ARCHETYPE_CONFIGS
 except ImportError:  # pragma: no cover - flat test path
@@ -188,7 +190,7 @@ def _voice_synthesis_enabled() -> bool:
     raw = os.getenv("VOICE_SYNTHESIS_ENABLED")
     if raw is not None:
         return _env_bool("VOICE_SYNTHESIS_ENABLED", "true")
-    return bool(os.getenv("VOICE_HEALTH_URL") or os.getenv("TTS_ENDPOINT"))
+    return bool(tts_base_url())
 
 
 def _dialogue_speed(snapshot: dict[str, Any], line: str) -> float:
@@ -372,7 +374,7 @@ def _select_prosody_tag(
 
 
 def build_voice_status() -> dict[str, Any]:
-    endpoint = os.getenv("VOICE_HEALTH_URL") or os.getenv("TTS_ENDPOINT")
+    endpoint = tts_health_url()
     provider = os.getenv("VOICE_PROVIDER") or os.getenv("TTS_PROVIDER") or "kokoro"
     return {
         "enabled": _env_bool("VOICE_ENABLED") or bool(os.getenv("TTS_MODEL")) or bool(endpoint),
@@ -459,9 +461,7 @@ class VoiceSurface:
         voice_model = _pick_voice_model()
         voice_name = _pick_voice_name()
         utterance_id = _utterance_id(snapshot, speaker, line)
-        health = self._cached_health.get(
-            os.getenv("VOICE_HEALTH_URL") or os.getenv("TTS_ENDPOINT"), timeout=1.5
-        )
+        health = self._cached_health.get(tts_health_url(), timeout=1.5)
         move = _pick_move(snapshot)
         quality_score = _current_quality_score(snapshot)
         emotional_texture_score = min(3, max(0, quality_score // 5))
@@ -559,7 +559,7 @@ class VoiceSurface:
         health: dict[str, Any],
         agent: dict[str, Any] | None,
     ) -> dict[str, Any]:
-        endpoint = os.getenv("VOICE_HEALTH_URL") or os.getenv("TTS_ENDPOINT")
+        endpoint = tts_base_url()
         if not self.enabled:
             return {"ok": False, "reason": "disabled"}
         if self.dry_run:
@@ -610,7 +610,7 @@ class VoiceSurface:
 
             # Unload Ollama from GPU so fish-speech has full VRAM bandwidth
             try:
-                _ollama = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434").rstrip("/")
+                _ollama = ollama_base_url()
                 _model = os.getenv("LLM_MODEL", "llama3.1:8b")
                 httpx.post(
                     f"{_ollama}/api/generate", json={"model": _model, "keep_alive": 0}, timeout=8.0

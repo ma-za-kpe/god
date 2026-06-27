@@ -15,8 +15,10 @@ from typing import Any
 
 try:  # pragma: no cover - runtime package import path
     from ..owned_graph import OwnedGraph
+    from ..runtime_endpoints import comfyui_base_url, ollama_base_url, tts_base_url
 except ImportError:  # pragma: no cover - flat test path
     from owned_graph import OwnedGraph
+    from runtime_endpoints import comfyui_base_url, ollama_base_url, tts_base_url
 
 try:  # pragma: no cover - runtime package import path
     from .archetype_config import ARCHETYPE_CONFIGS, validate_archetype_configs
@@ -30,14 +32,6 @@ except ImportError:  # pragma: no cover - flat test path
     from avatar.voice_cloner import VoiceCloner
 
 log = logging.getLogger(__name__)
-
-
-def _resolve_endpoint(*candidates: str | None) -> str:
-    for candidate in candidates:
-        value = str(candidate or "").strip().rstrip("/")
-        if value:
-            return value
-    return ""
 
 
 @dataclass
@@ -71,22 +65,8 @@ class GenesisPipeline:
         tts_concurrency: int | None = None,
     ) -> None:
         validate_archetype_configs()
-        self.comfyui_endpoint = _resolve_endpoint(
-            comfyui_endpoint,
-            os.getenv("COMFYUI_ENDPOINT"),
-            os.getenv("COMFYUI_HEALTH_URL"),
-            os.getenv("COMFYUI_URL"),
-            "http://localhost:8188",
-            "http://comfyui:8188",
-        )
-        self.tts_endpoint = _resolve_endpoint(
-            tts_endpoint,
-            os.getenv("TTS_ENDPOINT"),
-            os.getenv("VOICE_HEALTH_URL"),
-            os.getenv("TTS_HEALTH_URL"),
-            "http://localhost:7860",
-            "http://fish-speech:7860",
-        )
+        self.comfyui_endpoint = comfyui_base_url(comfyui_endpoint)
+        self.tts_endpoint = tts_base_url(tts_endpoint)
         self.pipeline_timeout_seconds = pipeline_timeout_seconds or int(
             os.getenv("PIPELINE_TIMEOUT_SECONDS", "300")
         )
@@ -409,7 +389,7 @@ class GenesisPipeline:
 
     async def _unload_ollama_from_gpu(self) -> None:
         """Ask Ollama to immediately unload its model from GPU, freeing VRAM for ComfyUI."""
-        ollama_url = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434").rstrip("/")
+        ollama_url = ollama_base_url()
         model = os.getenv("LLM_MODEL", "llama3.1:8b")
         try:
             import httpx as _httpx

@@ -23,6 +23,7 @@ from .event_emitter import get_emitter
 from .inbox_salience import INBOX_CANDIDATE_LIMIT, INBOX_DISPLAY_LIMIT, rank_inbox
 from .physics_gate import effective_llm, evaluate_physics_gate
 from .reproduction import REPRO_MIN_MULT
+from .runtime_endpoints import ollama_base_url
 
 log = logging.getLogger("god.runner")
 
@@ -30,7 +31,7 @@ DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://god:localdev@localhost:54
 WORLD_ID = os.getenv("WORLD_ID", "local-dev-world-1")
 LLM_PROVIDER = os.getenv("LLM_PROVIDER", "ollama")
 LLM_MODEL = os.getenv("LLM_MODEL", "llama3.1:8b")
-OLLAMA_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
+OLLAMA_URL = ollama_base_url()
 CYCLE_S = int(os.getenv("AGENT_CYCLE_SECONDS", "12"))
 
 # Per-archetype system prompts — shapes personality, goals, and reasoning style

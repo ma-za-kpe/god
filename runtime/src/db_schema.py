@@ -179,7 +179,9 @@ _MIGRATIONS: list[str] = [
         ON interaction_records(pair_id, timestamp DESC)
         WHERE emotional_valence != 'neutral' OR betrayal OR alliance OR concession
     """,
-    # Avatar genesis: direct CID columns so the /agents API can return them
+    # Avatar genesis: direct CID columns so the /agents API can return them.
+    # rigged_avatar_cid is a legacy name and may contain a static portrait CID
+    # until the follow-up naming migration is applied.
     "ALTER TABLE agents ADD COLUMN IF NOT EXISTS avatar_cid TEXT NOT NULL DEFAULT ''",
     "ALTER TABLE agents ADD COLUMN IF NOT EXISTS rigged_avatar_cid TEXT NOT NULL DEFAULT ''",
     "ALTER TABLE agents ADD COLUMN IF NOT EXISTS vrm_avatar_url TEXT NOT NULL DEFAULT ''",
