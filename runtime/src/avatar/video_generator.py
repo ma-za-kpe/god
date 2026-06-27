@@ -106,7 +106,12 @@ class VideoGenerator:
         return result.video_bytes if result.ok else None
 
     async def submit_workflow_result(
-        self, workflow_template: dict[str, Any], replacements: dict[str, Any]
+        self,
+        workflow_template: dict[str, Any],
+        replacements: dict[str, Any],
+        *,
+        cancel_check: Callable[[], bool] | None = None,
+        cancel_reason: Callable[[], str] | None = None,
     ) -> VideoGenerationResult:
         if not self.endpoint:
             return VideoGenerationResult(ok=False, error="comfy_endpoint_not_configured")
@@ -114,6 +119,11 @@ class VideoGenerator:
         workflow = {key: value for key, value in workflow.items() if key != "_meta"}
 
         async with httpx.AsyncClient(timeout=self.timeout_s, follow_redirects=True) as client:
+            if self._cancel_requested(cancel_check):
+                return VideoGenerationResult(
+                    ok=False,
+                    error=self._cancel_error(cancel_reason),
+                )
             response = await client.post(f"{self.endpoint}/prompt", json={"prompt": workflow})
             if response.status_code >= 400:
                 return VideoGenerationResult(
@@ -124,7 +134,12 @@ class VideoGenerator:
             prompt_id = data.get("prompt_id")
             if not prompt_id:
                 return VideoGenerationResult(ok=False, error="missing_prompt_id")
-            return await self._poll_for_video(client, str(prompt_id))
+            return await self._poll_for_video(
+                client,
+                str(prompt_id),
+                cancel_check=cancel_check,
+                cancel_reason=cancel_reason,
+            )
 
     async def generate_loop(
         self,
@@ -152,6 +167,8 @@ class VideoGenerator:
         motion: str,
         model: str = "ltx",
         replacements: dict[str, Any] | None = None,
+        cancel_check: Callable[[], bool] | None = None,
+        cancel_reason: Callable[[], str] | None = None,
     ) -> VideoGenerationResult:
         template = self._load_workflow_template(template_name)
         merged = {
@@ -160,7 +177,12 @@ class VideoGenerator:
             "{{VIDEO_MODEL}}": model,
             **(replacements or {}),
         }
-        return await self.submit_workflow_result(template, merged)
+        return await self.submit_workflow_result(
+            template,
+            merged,
+            cancel_check=cancel_check,
+            cancel_reason=cancel_reason,
+        )
 
     async def generate_ltx_loop_asset(
         self,
@@ -173,7 +195,9 @@ class VideoGenerator:
     ) -> VideoAssetGeneration:
         queue = queue or get_gpu_job_queue()
         try:
-            async with queue.acquire(JobPriority.LTX_BACKGROUND, job_name="ltx_loop_generation"):
+            async with queue.acquire(
+                JobPriority.LTX_BACKGROUND, job_name="ltx_loop_generation"
+            ) as lease:
                 result = await self.generate_loop_result(
                     template_name=request.workflow_template,
                     portrait_cid=request.portrait_cid,
@@ -184,6 +208,8 @@ class VideoGenerator:
                         "{{HEIGHT}}": request.height,
                         "{{DURATION_MS}}": request.duration_ms,
                     },
+                    cancel_check=lambda: lease.cancellation_requested,
+                    cancel_reason=lambda: lease.cancel_reason,
                 )
         except GPUJobRejected as exc:
             result = VideoGenerationResult(ok=False, error=f"gpu_job_rejected:{exc}")
@@ -257,7 +283,7 @@ class VideoGenerator:
         try:
             async with queue.acquire(
                 request.job_priority, job_name=f"{request.model}_quality_clip"
-            ):
+            ) as lease:
                 result = await self.generate_loop_result(
                     template_name=request.workflow_template,
                     portrait_cid=request.portrait_cid,
@@ -270,6 +296,8 @@ class VideoGenerator:
                         "{{DURATION_MS}}": request.duration_ms,
                         "{{SOURCE_AUDIO_CID}}": request.source_audio_cid,
                     },
+                    cancel_check=lambda: lease.cancellation_requested,
+                    cancel_reason=lambda: lease.cancel_reason,
                 )
         except GPUJobRejected as exc:
             result = VideoGenerationResult(ok=False, error=f"gpu_job_rejected:{exc}")
@@ -331,11 +359,30 @@ class VideoGenerator:
         )
 
     async def _poll_for_video(
-        self, client: httpx.AsyncClient, prompt_id: str
+        self,
+        client: httpx.AsyncClient,
+        prompt_id: str,
+        *,
+        cancel_check: Callable[[], bool] | None = None,
+        cancel_reason: Callable[[], str] | None = None,
     ) -> VideoGenerationResult:
         deadline = asyncio.get_running_loop().time() + self.timeout_s
         while asyncio.get_running_loop().time() < deadline:
+            if self._cancel_requested(cancel_check):
+                await self._interrupt_prompt(client, prompt_id)
+                return VideoGenerationResult(
+                    ok=False,
+                    prompt_id=prompt_id,
+                    error=self._cancel_error(cancel_reason),
+                )
             await asyncio.sleep(2)
+            if self._cancel_requested(cancel_check):
+                await self._interrupt_prompt(client, prompt_id)
+                return VideoGenerationResult(
+                    ok=False,
+                    prompt_id=prompt_id,
+                    error=self._cancel_error(cancel_reason),
+                )
             history = await client.get(f"{self.endpoint}/history/{prompt_id}")
             if history.status_code != 200:
                 continue
@@ -374,6 +421,29 @@ class VideoGenerator:
                         content_type=response.headers.get("content-type", "video/mp4"),
                     )
         return VideoGenerationResult(ok=False, prompt_id=prompt_id, error="video_output_missing")
+
+    async def _interrupt_prompt(self, client: httpx.AsyncClient, prompt_id: str) -> None:
+        try:
+            await client.post(f"{self.endpoint}/interrupt", json={"prompt_id": prompt_id})
+        except Exception:
+            return
+
+    def _cancel_requested(self, cancel_check: Callable[[], bool] | None) -> bool:
+        if cancel_check is None:
+            return False
+        try:
+            return bool(cancel_check())
+        except Exception:
+            return False
+
+    def _cancel_error(self, cancel_reason: Callable[[], str] | None) -> str:
+        reason = ""
+        if cancel_reason is not None:
+            try:
+                reason = str(cancel_reason() or "")
+            except Exception:
+                reason = ""
+        return f"video_generation_cancelled:{reason}" if reason else "video_generation_cancelled"
 
     def _load_workflow_template(self, template_name: str) -> dict[str, Any]:
         candidates = [

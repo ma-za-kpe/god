@@ -91,6 +91,7 @@ async def test_live_voice_requests_active_background_cancellation():
     assert cancel_reason == "live_voice_requested"
     diagnostics = queue.diagnostics()
     assert diagnostics["total_preemptions_requested"] == 1
+    assert diagnostics["total_cancelled"] == 1
     assert diagnostics["last_cancel_reason"] == "live_voice_requested"
 
 

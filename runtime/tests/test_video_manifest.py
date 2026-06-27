@@ -164,6 +164,34 @@ def test_ipfs_retrieval_failure_falls_back_to_static_portrait():
     assert selection.cache_action == "none"
 
 
+def test_ipfs_video_selection_uses_video_proxy_route():
+    manifest = VideoManifest(
+        agent_id="soul-1",
+        static_portrait_cid="portrait-cid",
+        assets=(
+            _asset(
+                "talking-ipfs",
+                "cid-talk-ipfs",
+                expression="animated",
+                motion="talking",
+                priority=70,
+            ),
+        ),
+    )
+
+    selection = select_video_asset(
+        manifest,
+        purpose="live",
+        expression="animated",
+        motion="talking",
+        now=200.0,
+    )
+
+    assert selection.asset is not None
+    assert selection.source == "ipfs"
+    assert selection.url == "/ipfs/video/cid-talk-ipfs"
+
+
 def test_expired_assets_are_skipped_with_static_fallback():
     manifest = VideoManifest(
         agent_id="soul-1",

@@ -64,3 +64,16 @@ def test_avatar_surface_compose_is_stable():
     assert state.enabled is True
     assert state.plan.speaker == "Beta"
     assert 0.0 <= state.life["breathing_phase"] <= 1.0
+
+
+def test_avatar_surface_does_not_use_voice_model_as_visual_fallback(monkeypatch):
+    monkeypatch.delenv("AVATAR_ASSET", raising=False)
+    monkeypatch.delenv("AVATAR_RIGGED_ASSET", raising=False)
+    snapshot = _snapshot()
+    snapshot["agents"][0].pop("avatar_cid")
+    snapshot["agents"][0]["voice_model_cid"] = "bafy-voice-reference"
+
+    state = AvatarSurface(enabled=True, dry_run=True).compose(snapshot)
+
+    assert state.avatar_asset == ""
+    assert state.rigged_avatar_cid == ""
