@@ -1448,7 +1448,11 @@
       speechStartedAt: 0,
       voiceVoices: [],
       currentSpeakerId: null,
-      currentRecipientId: null
+      currentRecipientId: null,
+      fishSpeaking: false,
+      fishSeenUtterances: new Set(),
+      fishAudio: null,
+      voicePlayback: null
     };
     const AGENT_COLORS = ['#4effb5', '#54c8ff', '#f4c95d', '#cc86ff', '#ff6b88', '#87a7ff', '#7df2e3', '#ffc66b'];
     const AVATAR_CID_FIELDS = ['cid', 'ipfs_cid', 'ipfsCid', 'asset_cid', 'assetCid', 'hash'];
@@ -1483,6 +1487,21 @@
 
     function wsUrl() {
       return RUNTIME.replace(/^http/, 'ws') + '/world/stream';
+    }
+
+    function nowMs() {
+      return typeof performance !== 'undefined' ? performance.now() : Date.now();
+    }
+
+    function resolveVoiceAudioUrl(audioUrl, utteranceId) {
+      if (audioUrl) {
+        try {
+          return new URL(audioUrl, RUNTIME).toString();
+        } catch {
+          return String(audioUrl);
+        }
+      }
+      return `${RUNTIME}/voice/audio/${utteranceId}`;
     }
 
     function fmt(value, fallback = '—') {
@@ -1710,14 +1729,18 @@
 
     function avatarLifeAttrs(life, avatarState, useSnapshotLife, isSpeaking) {
       const source = useSnapshotLife && life && typeof life === 'object' ? life : {};
-      const mouthFallback = isSpeaking ? finiteNumber(avatarState.mouth_open, 0.35) : 0;
+      const playbackMouth = (
+        isSpeaking &&
+        STATE.voicePlayback?.status === 'playing'
+      ) ? finiteNumber(STATE.voicePlayback.mouthAmplitude, 0.36) : 0;
+      const mouthFallback = isSpeaking ? Math.max(playbackMouth, finiteNumber(avatarState.mouth_open, 0.35)) : 0;
       return {
         breathing: clampNumber(finiteNumber(source.breathing_phase, 0.5), 0, 1).toFixed(4),
         blink: source.blink_state ? '1' : '0',
         headSwayX: clampNumber(finiteNumber(source.head_sway_x, 0), -0.25, 0.25).toFixed(4),
         headSwayY: clampNumber(finiteNumber(source.head_sway_y, 0), -0.25, 0.25).toFixed(4),
         mouthAmplitude: clampNumber(
-          finiteNumber(source.mouth_amplitude, mouthFallback),
+          Math.max(finiteNumber(source.mouth_amplitude, mouthFallback), playbackMouth),
           0,
           1
         ).toFixed(4),
@@ -1869,6 +1892,175 @@
       return agents[0];
     }
 
+    function voiceSpeakerAgent(snap) {
+      const agents = (snap.agents || []).filter(a => a && a.is_alive !== false);
+      const direct = snap.last_dialogue_turn?.sender_soul_id || snap.last_dialogue_turn?.sender_id || snap.avatar?.speaker_soul_id;
+      if (direct) {
+        const byId = agents.find(a => a.soul_id === direct);
+        if (byId) return byId;
+      }
+      const speaker = String(snap.voice?.plan?.speaker || '').toLowerCase();
+      return agents.find(a =>
+        speaker &&
+        ((a.current_name || '').toLowerCase() === speaker || (a.soul_id || '').toLowerCase() === speaker)
+      ) || pickActiveAgent(snap);
+    }
+
+    function voiceRecipientAgent(snap, speaker) {
+      const agents = (snap.agents || []).filter(a => a && a.is_alive !== false);
+      const lastTurn = snap.last_dialogue_turn || {};
+      const recipientId = lastTurn.recipient_soul_id || lastTurn.recipient_id || lastTurn.to_id;
+      if (recipientId) {
+        const recipient = agents.find(a => a.soul_id === recipientId);
+        if (recipient) return recipient;
+      }
+      const pair = pickConversationPair(snap);
+      if (pair.secondary && pair.secondary.soul_id !== speaker?.soul_id) return pair.secondary;
+      return null;
+    }
+
+    function voicePlaybackContext(snap) {
+      const voice = snap.voice || {};
+      const plan = voice.plan || {};
+      const synthesis = voice.synthesis || {};
+      const speaker = voiceSpeakerAgent(snap);
+      const recipient = voiceRecipientAgent(snap, speaker);
+      const body = cleanDialogueText(plan.line || snap.last_dialogue_turn?.content || '');
+      return {
+        utteranceId: plan.utterance_id || '',
+        speaker,
+        recipient,
+        speakerSoulId: speaker?.soul_id || '',
+        speakerName: plan.speaker || speaker?.current_name || '',
+        body,
+        audioRms: finiteNumber(synthesis.audio_rms || plan.audio_rms, 0),
+        mouthAmplitude: finiteNumber(synthesis.mouth_amplitude || plan.mouth_amplitude, 0.36),
+        durationSeconds: finiteNumber(synthesis.duration_seconds, 0),
+        latencyTargetMs: finiteNumber(synthesis.latency_target_ms || synthesis.lip_sync?.latency_target_ms, 300),
+        lipSyncSource: synthesis.lip_sync?.source || plan.lip_sync_source || 'audio_rms',
+        meta: {
+          cadence: String(snap.last_dialogue_turn?.cadence || ''),
+          move: String(snap.last_dialogue_turn?.move || ''),
+        }
+      };
+    }
+
+    function applyVoicePlaybackToDom() {
+      const playback = STATE.voicePlayback;
+      if (!playback) return;
+      const amp = clampNumber(finiteNumber(playback.mouthAmplitude, 0.36), 0, 1);
+      const mouthScale = clampNumber(0.85 + amp * 2.3, 0.65, 3.4).toFixed(2);
+      const hosts = [];
+      if (playback.speakerSoulId) {
+        hosts.push(...document.querySelectorAll(`.avatar-orb[data-agent-id="${CSS.escape(playback.speakerSoulId)}"]`));
+      }
+      const focusOrb = document.getElementById('focus-orb');
+      if (focusOrb) hosts.push(focusOrb);
+      if (
+        playback.status === 'playing' &&
+        playback.startedAtMs &&
+        amp > 0.04 &&
+        playback.mouthLatencyMs == null
+      ) {
+        playback.mouthLatencyMs = Math.max(0, Math.round(nowMs() - playback.startedAtMs));
+      }
+      hosts.forEach(host => {
+        host.dataset.voicePlaybackStatus = playback.status || '';
+        host.dataset.voiceMouthAmplitude = amp.toFixed(4);
+        host.dataset.voiceLatencyTargetMs = String(playback.latencyTargetMs || 300);
+        host.dataset.voiceLipSyncSource = playback.lipSyncSource || 'audio_rms';
+        host.dataset.voiceMouthLatencyMs = playback.mouthLatencyMs == null ? '' : String(playback.mouthLatencyMs);
+        host.dataset.avatarMouthAmplitude = amp.toFixed(4);
+        const tile = host.closest?.('.agent-tile');
+        if (tile) tile.classList.toggle('speaking', playback.status === 'starting' || playback.status === 'playing');
+        const overlay = host.querySelector('.avatar-life-overlay');
+        if (overlay) overlay.style.setProperty('--mouth-scale', mouthScale);
+      });
+    }
+
+    function enqueueFishFallback(playback) {
+      if (!('speechSynthesis' in window) || !playback?.body) return;
+      STATE.dialogueQueue.unshift({
+        id: `fish-fallback:${playback.utteranceId || Date.now()}`,
+        body: playback.body.slice(0, 260),
+        sender: playback.speaker,
+        recipient: playback.recipient,
+        meta: playback.meta || {},
+      });
+      drainDialogue();
+    }
+
+    function finishFishVoice(status) {
+      const playback = STATE.voicePlayback || {};
+      STATE.fishSpeaking = false;
+      STATE.dialogueSpeaking = false;
+      STATE.speechStartedAt = 0;
+      STATE.currentSpeakerId = null;
+      STATE.currentRecipientId = null;
+      STATE.fishAudio = null;
+      STATE.voicePlayback = {
+        ...playback,
+        status,
+        updatedAtMs: nowMs(),
+      };
+      applyVoicePlaybackToDom();
+      setTimeout(drainDialogue, cadencePauseMs(playback.meta || {}));
+    }
+
+    function playFishVoiceFromSnapshot(snap) {
+      const voice = snap.voice || {};
+      const plan = voice.plan || {};
+      const synthesis = voice.synthesis || {};
+      const uid = plan.utterance_id || '';
+      if (!uid || !synthesis.ok) return false;
+      if (STATE.fishSeenUtterances.has(uid)) return true;
+
+      const playback = voicePlaybackContext(snap);
+      const audioUrl = resolveVoiceAudioUrl(synthesis.audio_url, uid);
+      let failed = false;
+      const failToSpeech = () => {
+        if (failed) return;
+        failed = true;
+        finishFishVoice('blocked');
+        enqueueFishFallback(playback);
+      };
+
+      STATE.fishSeenUtterances.add(uid);
+      STATE.fishSpeaking = true;
+      STATE.dialogueSpeaking = true;
+      STATE.speechStartedAt = Date.now();
+      STATE.currentSpeakerId = playback.speakerSoulId || null;
+      STATE.currentRecipientId = playback.recipient?.soul_id || null;
+      STATE.voicePlayback = {
+        ...playback,
+        status: 'starting',
+        audioUrl,
+        updatedAtMs: nowMs(),
+      };
+      _highlightDialogueTurn(playback.speaker, playback.recipient);
+      const focusLine = document.getElementById('focus-line');
+      if (focusLine && playback.body) focusLine.textContent = playback.body;
+      applyVoicePlaybackToDom();
+
+      const audio = new Audio(audioUrl);
+      STATE.fishAudio = audio;
+      audio.volume = 1.0;
+      audio.addEventListener('playing', () => {
+        STATE.voicePlayback = {
+          ...STATE.voicePlayback,
+          status: 'playing',
+          startedAtMs: nowMs(),
+          updatedAtMs: nowMs(),
+        };
+        requestAnimationFrame(applyVoicePlaybackToDom);
+      }, { once: true });
+      audio.addEventListener('ended', () => finishFishVoice('ended'), { once: true });
+      audio.addEventListener('error', failToSpeech, { once: true });
+      const playPromise = audio.play();
+      if (playPromise?.catch) playPromise.catch(failToSpeech);
+      return true;
+    }
+
     function agentDialogue(agent, snap, isActive) {
       const showrunner = snap.showrunner || {};
       const audience = snap.audience || {};
@@ -1955,6 +2147,11 @@
     setInterval(() => {
       if (!STATE.speechStartedAt) return;
       if (Date.now() - STATE.speechStartedAt > 40000) {
+        if (STATE.fishSpeaking && STATE.fishAudio) {
+          try { STATE.fishAudio.pause(); } catch {}
+          finishFishVoice('timeout');
+          return;
+        }
         try { window.speechSynthesis.cancel(); } catch {}
         STATE.dialogueSpeaking = false;
         STATE.speechStartedAt = 0;
@@ -2016,6 +2213,7 @@
 
     function drainDialogue() {
       if (!('speechSynthesis' in window)) return;
+      if (STATE.fishSpeaking) return;
       if (STATE.dialogueSpeaking) return;
       if (!STATE.dialogueQueue.length) return;
 
@@ -2190,6 +2388,11 @@
         const avatarMotion = String(avatarState.motion || 'live-reactive');
         const lipSyncSource = String(avatarState.lip_sync_source || 'audio');
         const lifeAttrs = avatarLifeAttrs(avatarLife, avatarState, isActive || isAvatarSpeaker, isSpeaking);
+        const voicePlayback = STATE.voicePlayback || {};
+        const isVoicePlaybackSpeaker = Boolean(voicePlayback.status && agent.soul_id === voicePlayback.speakerSoulId);
+        const voiceMouthAmplitude = isVoicePlaybackSpeaker
+          ? clampNumber(finiteNumber(voicePlayback.mouthAmplitude, 0.36), 0, 1).toFixed(4)
+          : '0.0000';
         const visualTag = `visual:${sourceStatusText(avatarSource)}`;
         const tile = document.createElement('article');
         tile.className = `agent-tile${isActive ? ' active' : ''}${isSecondary ? ' secondary-speaker' : ''}${isSpeaking ? ' speaking' : ''}${isListening ? ' listening' : ''}`;
@@ -2228,6 +2431,11 @@
               data-avatar-mouth-amplitude="${lifeAttrs.mouthAmplitude}"
               data-avatar-eye-focus-x="${lifeAttrs.eyeFocusX}"
               data-avatar-eye-focus-y="${lifeAttrs.eyeFocusY}"
+              data-voice-playback-status="${isVoicePlaybackSpeaker ? fmt(voicePlayback.status) : ''}"
+              data-voice-mouth-amplitude="${voiceMouthAmplitude}"
+              data-voice-mouth-latency-ms="${isVoicePlaybackSpeaker && voicePlayback.mouthLatencyMs != null ? fmt(voicePlayback.mouthLatencyMs) : ''}"
+              data-voice-latency-target-ms="${isVoicePlaybackSpeaker ? fmt(voicePlayback.latencyTargetMs || 300) : ''}"
+              data-voice-lip-sync-source="${isVoicePlaybackSpeaker ? fmt(voicePlayback.lipSyncSource || 'audio_rms') : ''}"
               data-agent-id="${fmt(agent.soul_id)}"
               style="background:${agent.soul_id?.startsWith('empty-') ? 'radial-gradient(circle at center, rgba(255,255,255,0.08), rgba(255,255,255,0.02))' : `radial-gradient(circle at 35% 30%, rgba(255,255,255,0.72), rgba(255,255,255,0.18) 15%, transparent 17%), radial-gradient(circle at center, ${AGENT_COLORS[index % AGENT_COLORS.length]}, rgba(84,200,255,0.52) 36%, rgba(5,8,16,0.15) 74%)`}; opacity:${agent.soul_id?.startsWith('empty-') ? 0.35 : 1}"
             >
@@ -2290,6 +2498,7 @@
       if (window.GodRig && typeof window.GodRig.scan === 'function') {
         window.GodRig.scan();
       }
+      applyVoicePlaybackToDom();
     }
 
     function renderFocus(snap) {
@@ -2453,9 +2662,10 @@
       });
 
       renderEnsemble(snap);
+      const fishHandled = playFishVoiceFromSnapshot(snap);
       renderArcTheme(snap);
       renderChatThread(snap);
-      enqueueDialogue(snap.events || [], snap.agents || []);
+      if (!fishHandled) enqueueDialogue(snap.events || [], snap.agents || []);
       // Update focus panel from snapshot only when dialogue is quiet
       if (!STATE.dialogueSpeaking && !STATE.dialogueQueue.length) renderFocus(snap);
 
@@ -2527,8 +2737,6 @@
             const msg = JSON.parse(evt.data);
             if (msg.type === 'snapshot') applySnapshot(msg);
             if (msg.type === 'delta') {
-              // Feed delta events directly into dialogue queue for instant TTS
-              if (msg.events) enqueueDialogue(msg.events, STATE.agents);
               fetchSnapshot();
             }
           } catch {}

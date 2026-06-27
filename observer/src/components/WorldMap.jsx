@@ -42,6 +42,7 @@ export function WorldMap({ mode, minimal = false }) {
   const agents = useObserverStore((s) => s.agents).filter((a) => a && a.is_alive !== false);
   const snapshot = useObserverStore((s) => s.snapshot) || {};
   const selectedSoulId = useObserverStore((s) => s.selectedSoulId);
+  const voicePlayback = useObserverStore((s) => s.voicePlayback);
   const activeIndex = activeIndexFor(agents, selectedSoulId || snapshot?.showrunner?.speaker);
   const activeAgent = agents[activeIndex] || agents[0] || null;
   const avatarState = snapshot.avatar || {};
@@ -87,6 +88,7 @@ export function WorldMap({ mode, minimal = false }) {
                 position={pos}
                 color={color}
                 runtimeBaseUrl={API_BASE}
+                voicePlayback={voicePlayback}
                 minimal={minimal}
               />
             );

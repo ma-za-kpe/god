@@ -13,9 +13,63 @@ export const API_BASE = window.RUNTIME_URL || import.meta.env.VITE_RUNTIME_URL |
 
 let _lastPlayedUtteranceId = '';
 let _pendingUrl = null;
+let _pendingPlayback = null;
 
 function streamUrl() {
   return API_BASE.replace(/^http/i, 'ws') + '/world/stream';
+}
+
+function nowMs() {
+  return typeof performance !== 'undefined' ? performance.now() : Date.now();
+}
+
+function resolveVoiceAudioUrl(audioUrl, utteranceId) {
+  if (audioUrl) {
+    try {
+      return new URL(audioUrl, API_BASE).toString();
+    } catch {
+      return String(audioUrl);
+    }
+  }
+  return `${API_BASE}/voice/audio/${utteranceId}`;
+}
+
+function speakerSoulIdFromSnapshot(snap) {
+  const direct = snap?.last_dialogue_turn?.sender_soul_id || snap?.last_dialogue_turn?.sender_id || snap?.avatar?.speaker_soul_id;
+  if (direct) return String(direct);
+  const speaker = String(snap?.voice?.plan?.speaker || '').toLowerCase();
+  const agent = (snap?.agents || []).find((item) => {
+    const name = String(item?.current_name || '').toLowerCase();
+    const soulId = String(item?.soul_id || '').toLowerCase();
+    return speaker && (name === speaker || soulId === speaker);
+  });
+  return agent?.soul_id || '';
+}
+
+function playbackContextFromSnapshot(snap) {
+  const voice = snap?.voice || {};
+  const plan = voice.plan || {};
+  const synthesis = voice.synthesis || {};
+  return {
+    utteranceId: plan.utterance_id || '',
+    speakerSoulId: speakerSoulIdFromSnapshot(snap),
+    speakerName: plan.speaker || '',
+    audioRms: Number(synthesis.audio_rms || plan.audio_rms || 0),
+    mouthAmplitude: Number(synthesis.mouth_amplitude || plan.mouth_amplitude || 0),
+    durationSeconds: Number(synthesis.duration_seconds || 0),
+    latencyTargetMs: Number(synthesis.latency_target_ms || synthesis.lip_sync?.latency_target_ms || 300),
+    lipSyncSource: synthesis.lip_sync?.source || plan.lip_sync_source || 'audio_rms',
+    synthesisOk: Boolean(synthesis.ok),
+  };
+}
+
+function markVoicePlayback(status, playback, extra = {}) {
+  useObserverStore.getState().setVoicePlayback({
+    ...(playback || {}),
+    status,
+    updatedAtMs: nowMs(),
+    ...extra,
+  });
 }
 
 // Singleton AudioContext — pre-unlocked in OBS CEF, unlockable in Firefox
@@ -27,10 +81,28 @@ function _getCtx() {
   return _audioCtx;
 }
 
-function _playAudioUrl(url) {
+function _playAudioUrl(url, playback = {}) {
   // Strategy 1: HTMLAudioElement (works when user has interacted or in OBS CEF)
   const audio = new Audio(url);
+  let markedPlaying = false;
   audio.volume = 1.0;
+  audio.addEventListener('playing', () => {
+    markedPlaying = true;
+    useObserverStore.getState().setAudioBlocked(false);
+    markVoicePlayback('playing', playback, {
+      audioUrl: url,
+      transport: 'html-audio',
+      startedAtMs: nowMs(),
+    });
+  }, { once: true });
+  audio.addEventListener('ended', () => {
+    markVoicePlayback('ended', playback, { audioUrl: url, transport: 'html-audio' });
+  }, { once: true });
+  audio.addEventListener('error', () => {
+    if (!markedPlaying) {
+      markVoicePlayback('blocked', playback, { audioUrl: url, transport: 'html-audio' });
+    }
+  }, { once: true });
   const p = audio.play();
   if (p && p.catch) {
     p.catch(() => {
@@ -41,22 +113,46 @@ function _playAudioUrl(url) {
         fetch(url)
           .then((r) => r.ok ? r.arrayBuffer() : null)
           .then((buf) => {
-            if (!buf) return;
+            if (!buf) {
+              _pendingUrl = url;
+              _pendingPlayback = playback;
+              useObserverStore.getState().setAudioBlocked(true);
+              markVoicePlayback('blocked', playback, { audioUrl: url, transport: 'audio-context' });
+              return;
+            }
             ctx.decodeAudioData(buf, (decoded) => {
               const src = ctx.createBufferSource();
               src.buffer = decoded;
               src.connect(ctx.destination);
+              src.onended = () => {
+                markVoicePlayback('ended', playback, { audioUrl: url, transport: 'audio-context' });
+              };
               src.start(0);
               useObserverStore.getState().setAudioBlocked(false);
-            }, () => {});
+              markVoicePlayback('playing', playback, {
+                audioUrl: url,
+                durationSeconds: decoded.duration || playback.durationSeconds || 0,
+                transport: 'audio-context',
+                startedAtMs: nowMs(),
+              });
+            }, () => {
+              _pendingUrl = url;
+              _pendingPlayback = playback;
+              useObserverStore.getState().setAudioBlocked(true);
+              markVoicePlayback('blocked', playback, { audioUrl: url, transport: 'audio-context' });
+            });
           })
           .catch(() => {
             _pendingUrl = url;
+            _pendingPlayback = playback;
             useObserverStore.getState().setAudioBlocked(true);
+            markVoicePlayback('blocked', playback, { audioUrl: url, transport: 'audio-context' });
           });
       }).catch(() => {
         _pendingUrl = url;
+        _pendingPlayback = playback;
         useObserverStore.getState().setAudioBlocked(true);
+        markVoicePlayback('blocked', playback, { audioUrl: url, transport: 'audio-context' });
       });
     });
   }
@@ -68,8 +164,10 @@ function _unlockAndPlay() {
   if (ctx.state === 'suspended') ctx.resume().catch(() => {});
   if (_pendingUrl) {
     const url = _pendingUrl;
+    const playback = _pendingPlayback;
     _pendingUrl = null;
-    _playAudioUrl(url);
+    _pendingPlayback = null;
+    _playAudioUrl(url, playback);
   }
 }
 
@@ -112,7 +210,9 @@ export function useWorld() {
       const synthOk = snap?.voice?.synthesis?.ok;
       if (uid && synthOk && uid !== _lastPlayedUtteranceId) {
         _lastPlayedUtteranceId = uid;
-        _playAudioUrl(`${API_BASE}/voice/audio/${uid}`);
+        const playback = playbackContextFromSnapshot(snap);
+        const audioUrl = resolveVoiceAudioUrl(snap?.voice?.synthesis?.audio_url, uid);
+        _playAudioUrl(audioUrl, playback);
       }
       markHealth(true, '', transport);
     };

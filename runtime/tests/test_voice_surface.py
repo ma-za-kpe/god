@@ -1,6 +1,32 @@
 """Voice surface tests."""
 
+from __future__ import annotations
+
+import io
+import math
+import struct
+import wave
+
 from voice import VoiceSurface, build_voice_state, build_voice_status
+from voice.engine import _audio_cache, _synthesis_cache
+
+
+def _clear_voice_caches() -> None:
+    _synthesis_cache.clear()
+    _audio_cache.clear()
+
+
+def _wav_bytes(*, amplitude: float = 0.45, seconds: float = 0.05, sample_rate: int = 8000) -> bytes:
+    frames = int(sample_rate * seconds)
+    with io.BytesIO() as buf:
+        with wave.open(buf, "wb") as wav:
+            wav.setnchannels(1)
+            wav.setsampwidth(2)
+            wav.setframerate(sample_rate)
+            for idx in range(frames):
+                sample = int(32767 * amplitude * math.sin(2 * math.pi * 440 * idx / sample_rate))
+                wav.writeframesraw(struct.pack("<h", sample))
+        return buf.getvalue()
 
 
 def _snapshot() -> dict:
@@ -42,6 +68,9 @@ def test_voice_status_exposes_tts_contract():
     assert "voice_model" in status
     assert "playback_mode" in status
     assert "health" in status
+    assert status["phoneme_output"] is False
+    assert status["voice_reference_semantics"] == "fish_reference_wav_cid"
+    assert status["voice_model_semantics"] == "tts_backend_model_name"
 
 
 def test_voice_state_layers_from_snapshot():
@@ -71,6 +100,7 @@ def test_voice_surface_falls_back_when_dialogue_is_stale():
 
 
 def test_voice_surface_synthesizes_when_tts_is_available(monkeypatch):
+    _clear_voice_caches()
     surface = VoiceSurface(enabled=True, dry_run=False)
     snapshot = _snapshot()
 
@@ -96,3 +126,122 @@ def test_voice_surface_synthesizes_when_tts_is_available(monkeypatch):
     assert state.synthesis["ok"] is True
     assert state.synthesis["endpoint"].endswith("/v1/tts")
     assert state.synthesis["audio_url"] == "http://tts/audio.wav"
+    assert state.synthesis["mouth_amplitude"] > 0
+    assert state.synthesis["audio_analysis"]["reason"] == "external_audio_url"
+    assert state.synthesis["lip_sync"]["phoneme_output"] is False
+
+
+def test_voice_surface_analyzes_fish_audio_for_mouth_amplitude(monkeypatch):
+    _clear_voice_caches()
+    surface = VoiceSurface(enabled=True, dry_run=False)
+    snapshot = _snapshot()
+    wav_audio = _wav_bytes(amplitude=0.6)
+
+    class _OllamaResponse:
+        status_code = 200
+        headers = {"content-type": "application/json"}
+        content = b"{}"
+
+        def raise_for_status(self):
+            return None
+
+    class _AudioResponse:
+        status_code = 200
+        headers = {"content-type": "audio/wav"}
+        content = wav_audio
+
+        def raise_for_status(self):
+            return None
+
+    def _post(url, *args, **kwargs):
+        if str(url).endswith("/v1/tts"):
+            return _AudioResponse()
+        return _OllamaResponse()
+
+    monkeypatch.setenv("TTS_ENDPOINT", "http://fish-speech:7860")
+    monkeypatch.setenv("VOICE_ENABLED", "true")
+    monkeypatch.setenv("VOICE_SYNTHESIS_ENABLED", "true")
+    monkeypatch.setattr("voice.engine.probe_url", lambda *args, **kwargs: {"ok": True})
+    monkeypatch.setattr("voice.engine.httpx.post", _post)
+
+    state = surface.compose(snapshot)
+
+    assert state.synthesis["ok"] is True
+    assert state.synthesis["audio_present"] is True
+    assert state.synthesis["audio_rms"] > 0
+    assert state.synthesis["audio_peak"] > 0
+    assert state.synthesis["mouth_amplitude"] > state.synthesis["audio_rms"]
+    assert state.synthesis["audio_analysis"]["ok"] is True
+    assert _audio_cache[state.plan.utterance_id] == wav_audio
+
+
+def test_voice_reference_failure_reports_philosopher_fallback(monkeypatch):
+    _clear_voice_caches()
+    surface = VoiceSurface(enabled=True, dry_run=False)
+    snapshot = _snapshot()
+    snapshot["epoch"] = 200
+    snapshot["agents"] = [
+        {
+            "soul_id": "agent-alpha",
+            "current_name": "Alpha",
+            "archetype": "unknown-archetype",
+            "voice_model_cid": "bafybadreference",
+        }
+    ]
+    snapshot["last_dialogue_turn"] = {
+        "content": "I need the fallback to keep talking.",
+        "sender_name": "Alpha",
+        "sender_soul_id": "agent-alpha",
+        "sent_at": 199,
+    }
+
+    class _RefFailure:
+        status_code = 500
+        headers = {"content-type": "text/plain"}
+        content = b""
+
+        def raise_for_status(self):
+            return None
+
+    class _OllamaResponse:
+        status_code = 200
+        headers = {"content-type": "application/json"}
+        content = b"{}"
+
+        def raise_for_status(self):
+            return None
+
+    class _SynthesisResponse:
+        status_code = 200
+        headers = {"content-type": "application/json"}
+        content = b'{"audio_url":"http://tts/fallback.wav"}'
+
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return {"audio_url": "http://tts/fallback.wav"}
+
+    def _post(url, *args, **kwargs):
+        text = str(url)
+        if text.endswith("/api/v0/cat"):
+            return _RefFailure()
+        if text.endswith("/v1/tts"):
+            return _SynthesisResponse()
+        return _OllamaResponse()
+
+    monkeypatch.setenv("TTS_ENDPOINT", "http://fish-speech:7860")
+    monkeypatch.setenv("VOICE_ENABLED", "true")
+    monkeypatch.setenv("VOICE_SYNTHESIS_ENABLED", "true")
+    monkeypatch.setattr("voice.engine.probe_url", lambda *args, **kwargs: {"ok": True})
+    monkeypatch.setattr("voice.engine.httpx.post", _post)
+
+    state = surface.compose(snapshot)
+
+    reference = state.synthesis["reference_audio"]
+    assert state.synthesis["ok"] is True
+    assert reference["source"] == "philosopher_seed_wav"
+    assert reference["fallback_used"] is True
+    assert reference["failure_reason"] == "cid_fetch_status:500"
+    assert reference["semantics"] == "reference_wav"
+    assert reference["legacy_field"] == "voice_model_cid"

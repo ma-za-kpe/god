@@ -41,6 +41,7 @@ try:  # pragma: no cover - runtime package import path
     from ..avatar.archetype_config import ARCHETYPE_CONFIGS
 except ImportError:  # pragma: no cover - flat test path
     from avatar.archetype_config import ARCHETYPE_CONFIGS
+from .audio_features import analyze_audio_bytes, procedural_mouth_amplitude  # noqa: E402
 from .state import VoicePlan, VoiceState  # noqa: E402
 
 
@@ -266,10 +267,79 @@ def _voice_agent(snapshot: dict[str, Any], speaker: str) -> dict[str, Any] | Non
     return None
 
 
-def _reference_audio_for_agent(agent: dict[str, Any] | None) -> bytes | None:
-    if not agent:
-        return None
-    cid = str(agent.get("voice_model_cid") or "").strip()
+def _reference_diagnostics(
+    *,
+    cid: str = "",
+    source: str = "none",
+    ok: bool = False,
+    fallback_used: bool = False,
+    failure_reason: str = "",
+    path_name: str = "",
+) -> dict[str, Any]:
+    payload: dict[str, Any] = {
+        "ok": ok,
+        "source": source,
+        "fallback_used": fallback_used,
+        "semantics": "reference_wav",
+        "legacy_field": "voice_model_cid",
+    }
+    if cid:
+        payload["cid"] = cid
+    if failure_reason:
+        payload["failure_reason"] = failure_reason
+    if path_name:
+        payload["path_name"] = path_name
+    return payload
+
+
+def _reference_candidates(ref_path: str) -> list[Path]:
+    return [
+        Path(ref_path),
+        Path.cwd() / ref_path,
+        Path(__file__).resolve().parents[3] / ref_path,
+        Path(__file__).resolve().parents[2] / ref_path,
+    ]
+
+
+def _read_reference_path(ref_path: str) -> tuple[bytes | None, str]:
+    if not ref_path:
+        return None, ""
+    for candidate in _reference_candidates(ref_path):
+        try:
+            resolved = candidate.resolve()
+        except Exception:
+            continue
+        if resolved.is_file():
+            try:
+                return resolved.read_bytes() or None, resolved.name
+            except Exception as exc:
+                _log.warning("voice reference file unavailable: %s", exc)
+                return None, resolved.name
+    return None, Path(ref_path).name
+
+
+def _philosopher_reference_paths() -> tuple[Path, ...]:
+    return (
+        Path(__file__).resolve().parents[2] / "seed_utterances/philosopher.wav",
+        Path(__file__).resolve().parents[3] / "runtime/seed_utterances/philosopher.wav",
+    )
+
+
+def _read_philosopher_reference() -> tuple[bytes | None, str]:
+    for candidate in _philosopher_reference_paths():
+        try:
+            if candidate.is_file():
+                return candidate.read_bytes() or None, candidate.name
+        except Exception as exc:
+            _log.warning("philosopher voice reference unavailable: %s", exc)
+    return None, "philosopher.wav"
+
+
+def _resolve_reference_audio(agent: dict[str, Any] | None) -> tuple[bytes | None, dict[str, Any]]:
+    """Resolve Fish reference WAV bytes and explain every fallback."""
+    cid = str((agent or {}).get("voice_model_cid") or "").strip()
+    failure_reason = ""
+
     if cid:
         ipfs_api = (os.getenv("IPFS_API") or "http://localhost:5001").rstrip("/")
         try:
@@ -281,37 +351,68 @@ def _reference_audio_for_agent(agent: dict[str, Any] | None) -> bytes | None:
             if response.status_code == 405:
                 response = httpx.get(f"{ipfs_api}/api/v0/cat", params={"arg": cid}, timeout=10.0)
             if 200 <= response.status_code < 300 and response.content:
-                return response.content
+                return response.content, _reference_diagnostics(
+                    cid=cid,
+                    source="voice_model_cid",
+                    ok=True,
+                )
+            failure_reason = f"cid_fetch_status:{response.status_code}"
             _log.warning(
                 "voice reference fetch failed: cid=%s status=%s",
                 cid,
                 response.status_code,
             )
         except Exception as exc:
+            failure_reason = f"cid_fetch_exception:{type(exc).__name__}"
             _log.warning("voice reference fetch failed: %s", exc)
 
-    archetype = str(agent.get("archetype") or "").strip()
+    archetype = str((agent or {}).get("archetype") or "").strip()
     style_config = ARCHETYPE_CONFIGS.get(archetype)
     if style_config and style_config.seed_utterance_path:
         ref_path = style_config.seed_utterance_path
+        source = "archetype_seed_wav"
     else:
         ref_path = os.getenv("VOICE_REFERENCE_AUDIO_PATH") or ""
-    if not ref_path:
-        return None
-    try:
-        candidate_paths = [
-            Path(ref_path),
-            Path.cwd() / ref_path,
-            Path(__file__).resolve().parents[3] / ref_path,
-            Path(__file__).resolve().parents[2] / ref_path,
-        ]
-        for candidate in candidate_paths:
-            resolved = candidate.resolve()
-            if resolved.is_file():
-                return resolved.read_bytes() or None
-    except Exception as exc:
-        _log.warning("voice reference file unavailable: %s", exc)
-    return None
+        source = "env_reference_wav"
+
+    reference_audio, path_name = _read_reference_path(ref_path)
+    if reference_audio:
+        return reference_audio, _reference_diagnostics(
+            cid=cid,
+            source=source,
+            ok=True,
+            fallback_used=bool(cid or failure_reason),
+            failure_reason=failure_reason,
+            path_name=path_name,
+        )
+
+    if ref_path and not failure_reason:
+        failure_reason = "reference_file_unavailable"
+    elif not ref_path and not failure_reason:
+        failure_reason = "no_agent_reference"
+
+    reference_audio, path_name = _read_philosopher_reference()
+    if reference_audio:
+        return reference_audio, _reference_diagnostics(
+            cid=cid,
+            source="philosopher_seed_wav",
+            ok=True,
+            fallback_used=True,
+            failure_reason=failure_reason,
+            path_name=path_name,
+        )
+
+    return None, _reference_diagnostics(
+        cid=cid,
+        ok=False,
+        fallback_used=bool(cid or failure_reason),
+        failure_reason=failure_reason or "no_reference_audio",
+    )
+
+
+def _reference_audio_for_agent(agent: dict[str, Any] | None) -> bytes | None:
+    reference_audio, _diagnostics = _resolve_reference_audio(agent)
+    return reference_audio
 
 
 def _prosody_supports_tags(agent: dict[str, Any] | None, snapshot: dict[str, Any]) -> bool:
@@ -376,6 +477,7 @@ def _select_prosody_tag(
 def build_voice_status() -> dict[str, Any]:
     endpoint = tts_health_url()
     provider = os.getenv("VOICE_PROVIDER") or os.getenv("TTS_PROVIDER") or "kokoro"
+    lip_sync_source = os.getenv("LIP_SYNC_SOURCE", "audio_rms")
     return {
         "enabled": _env_bool("VOICE_ENABLED") or bool(os.getenv("TTS_MODEL")) or bool(endpoint),
         "dry_run": _env_bool("VOICE_DRY_RUN", "false"),
@@ -385,12 +487,115 @@ def build_voice_status() -> dict[str, Any]:
         "voice_name": _pick_voice_name(),
         "playback_mode": os.getenv("VOICE_PLAYBACK_MODE", "browser+sink"),
         "speech_profile": os.getenv("VOICE_PROFILE", "dramatic"),
-        "lip_sync_source": os.getenv("LIP_SYNC_SOURCE", "audio"),
+        "lip_sync_source": lip_sync_source,
+        "lip_sync": {
+            "source": lip_sync_source,
+            "phoneme_output": False,
+            "limitation": "Fish Speech currently returns audio, not phoneme timings.",
+            "latency_target_ms": 300,
+        },
+        "phoneme_output": False,
+        "voice_reference_field": "voice_model_cid",
+        "voice_reference_semantics": "fish_reference_wav_cid",
+        "voice_model_semantics": "tts_backend_model_name",
         "transport": os.getenv("VOICE_TRANSPORT", "local-tts"),
         "health": probe_url(endpoint, timeout=1.5),
         "render_target": os.getenv("VOICE_RENDER_TARGET", "obs-audio"),
         "sample_rate": int(os.getenv("VOICE_SAMPLE_RATE", "48000")),
     }
+
+
+def _lip_sync_metadata(source: str) -> dict[str, Any]:
+    return {
+        "source": source,
+        "phoneme_output": False,
+        "limitation": "Fish Speech currently returns audio, not phoneme timings.",
+        "latency_target_ms": 300,
+    }
+
+
+def _mouth_fallback(plan: VoicePlan) -> float:
+    return round(
+        procedural_mouth_amplitude(
+            is_speaking=True,
+            emotional_texture_score=plan.emotional_texture_score,
+        ),
+        6,
+    )
+
+
+def _fallback_synthesis(
+    plan: VoicePlan,
+    reason: str,
+    *,
+    endpoint: str | None = None,
+    reference_audio: dict[str, Any] | None = None,
+    error: str = "",
+) -> dict[str, Any]:
+    payload: dict[str, Any] = {
+        "ok": False,
+        "reason": reason,
+        "audio_rms": 0.0,
+        "audio_peak": 0.0,
+        "mouth_amplitude": _mouth_fallback(plan),
+        "audio_analysis": {"ok": False, "reason": reason},
+        "lip_sync": _lip_sync_metadata("procedural"),
+        "latency_target_ms": 300,
+    }
+    if endpoint:
+        payload["endpoint"] = endpoint
+    if reference_audio is not None:
+        payload["reference_audio"] = reference_audio
+    if error:
+        payload["error"] = error
+    return payload
+
+
+def _decode_inline_audio(body: dict[str, Any]) -> tuple[bytes | None, str]:
+    for key in ("audio", "audio_base64", "wav", "audio_data"):
+        value = body.get(key)
+        if not isinstance(value, str) or not value.strip():
+            continue
+        encoded = value.strip()
+        if encoded.startswith("data:") and "," in encoded:
+            encoded = encoded.split(",", 1)[1]
+        try:
+            return base64.b64decode(encoded, validate=True), key
+        except Exception:
+            return None, f"{key}_decode_failed"
+    return None, "no_inline_audio"
+
+
+def _attach_audio_analysis(
+    synthesis: dict[str, Any],
+    plan: VoicePlan,
+    audio_bytes: bytes | None,
+    *,
+    content_type: str,
+    reason_when_missing: str,
+) -> None:
+    if audio_bytes:
+        features = analyze_audio_bytes(
+            audio_bytes,
+            content_type=content_type,
+            emotional_texture_score=plan.emotional_texture_score,
+        )
+        synthesis["audio_analysis"] = features.to_dict()
+        if features.ok:
+            synthesis["audio_rms"] = features.audio_rms
+            synthesis["audio_peak"] = features.audio_peak
+            synthesis["mouth_amplitude"] = features.mouth_amplitude
+            if not synthesis.get("duration_seconds"):
+                synthesis["duration_seconds"] = features.duration_seconds
+            synthesis["lip_sync"] = _lip_sync_metadata("audio_rms")
+            return
+    else:
+        synthesis["audio_analysis"] = {"ok": False, "reason": reason_when_missing}
+
+    synthesis["audio_rms"] = 0.0
+    synthesis["audio_peak"] = 0.0
+    synthesis["mouth_amplitude"] = _mouth_fallback(plan)
+    synthesis["lip_sync"] = _lip_sync_metadata("procedural")
 
 
 class VoiceSurface:
@@ -510,7 +715,7 @@ class VoiceSurface:
             pitch=float(os.getenv("VOICE_PITCH", "0.5")) * pitch_modifier,
             speed=float(os.getenv("VOICE_SPEED", str(speed))) * speed_modifier,
             sample_rate=int(os.getenv("VOICE_SAMPLE_RATE", "48000")),
-            lip_sync_source=os.getenv("LIP_SYNC_SOURCE", "audio"),
+            lip_sync_source=os.getenv("LIP_SYNC_SOURCE", "audio_rms"),
             transport=self.transport,
             notes=tuple(
                 filter(
@@ -543,7 +748,7 @@ class VoiceSurface:
             voice_name=voice_name,
             playback_mode=os.getenv("VOICE_PLAYBACK_MODE", "browser+sink"),
             speech_profile=os.getenv("VOICE_PROFILE", "dramatic"),
-            lip_sync_source=os.getenv("LIP_SYNC_SOURCE", "audio"),
+            lip_sync_source=os.getenv("LIP_SYNC_SOURCE", "audio_rms"),
             transport=self.transport,
             health=health,
             plan=plan,
@@ -561,40 +766,35 @@ class VoiceSurface:
     ) -> dict[str, Any]:
         endpoint = tts_base_url()
         if not self.enabled:
-            return {"ok": False, "reason": "disabled"}
+            return _fallback_synthesis(plan, "disabled")
         if self.dry_run:
-            return {"ok": False, "reason": "dry_run"}
+            return _fallback_synthesis(plan, "dry_run")
         if not self.synthesis_enabled:
-            return {"ok": False, "reason": "synthesis_disabled"}
+            return _fallback_synthesis(plan, "synthesis_disabled")
         if not endpoint:
-            return {"ok": False, "reason": "missing_tts_endpoint"}
+            return _fallback_synthesis(plan, "missing_tts_endpoint")
         if not health.get("ok"):
-            return {"ok": False, "reason": "unhealthy_endpoint", "endpoint": endpoint}
+            return _fallback_synthesis(plan, "unhealthy_endpoint", endpoint=endpoint)
 
         cached = _synthesis_cache.get(plan.utterance_id)
         if cached is not None:
             return cached
 
         if not _synthesis_lock.acquire(blocking=False):
-            return {"ok": False, "reason": "synthesis_in_progress"}
+            return _fallback_synthesis(plan, "synthesis_in_progress", endpoint=endpoint)
 
         try:
             cached = _synthesis_cache.get(plan.utterance_id)
             if cached is not None:
                 return cached
 
-            reference_audio = _reference_audio_for_agent(agent)
+            reference_audio, reference_info = _resolve_reference_audio(agent)
             if reference_audio is None:
-                # fish-speech 2.0 uses /v1/tts with inline references.
-                for _fallback in (
-                    Path(__file__).resolve().parents[2] / "seed_utterances/philosopher.wav",
-                    Path(__file__).resolve().parents[3] / "runtime/seed_utterances/philosopher.wav",
-                ):
-                    if _fallback.is_file():
-                        reference_audio = _fallback.read_bytes() or None
-                        break
-            if reference_audio is None:
-                return {"ok": False, "reason": "no_reference_audio"}
+                return _fallback_synthesis(
+                    plan,
+                    "no_reference_audio",
+                    reference_audio=reference_info,
+                )
             synth_url = f"{endpoint.rstrip('/')}/v1/tts"
             payload = {
                 "text": plan.line,
@@ -630,7 +830,12 @@ class VoiceSurface:
                     "endpoint": synth_url,
                     "content_type": content_type,
                     "byte_count": len(response.content or b""),
+                    "reference_audio": reference_info,
+                    "latency_target_ms": 300,
                 }
+                audio_bytes: bytes | None = None
+                analysis_content_type = content_type
+                analysis_missing_reason = "audio_bytes_unavailable"
                 if content_type.startswith("application/json"):
                     try:
                         body = response.json()
@@ -640,12 +845,37 @@ class VoiceSurface:
                         synthesis["response_keys"] = sorted(body.keys())
                         if body.get("audio_url"):
                             synthesis["audio_url"] = str(body["audio_url"])
+                            analysis_missing_reason = "external_audio_url"
                         if body.get("audio") is not None:
                             synthesis["audio_present"] = True
+                        if body.get("content_type") or body.get("mime_type"):
+                            analysis_content_type = str(
+                                body.get("content_type") or body.get("mime_type") or content_type
+                            )
                         if body.get("duration_seconds") is not None:
                             synthesis["duration_seconds"] = body["duration_seconds"]
+                        audio_bytes, decode_reason = _decode_inline_audio(body)
+                        if audio_bytes:
+                            synthesis["audio_present"] = True
+                            synthesis["audio_byte_count"] = len(audio_bytes)
+                        elif decode_reason != "no_inline_audio":
+                            analysis_missing_reason = decode_reason
                 elif content_type.startswith("audio/"):
                     synthesis["audio_present"] = True
+                    audio_bytes = response.content or None
+                    synthesis["audio_byte_count"] = len(audio_bytes or b"")
+                elif response.content and response.content.startswith(b"RIFF"):
+                    synthesis["audio_present"] = True
+                    audio_bytes = response.content
+                    analysis_content_type = "audio/wav"
+                    synthesis["audio_byte_count"] = len(audio_bytes)
+                _attach_audio_analysis(
+                    synthesis,
+                    plan,
+                    audio_bytes,
+                    content_type=analysis_content_type,
+                    reason_when_missing=analysis_missing_reason,
+                )
                 if len(_synthesis_cache) >= _SYNTHESIS_CACHE_MAX:
                     try:
                         oldest = next(iter(_synthesis_cache))
@@ -654,13 +884,19 @@ class VoiceSurface:
                     except StopIteration:
                         pass
                 _synthesis_cache[plan.utterance_id] = synthesis
-                if response.content:
-                    _audio_cache[plan.utterance_id] = response.content
-                    _play_to_pulse_sink_async(response.content)
+                if audio_bytes:
+                    _audio_cache[plan.utterance_id] = audio_bytes
+                    _play_to_pulse_sink_async(audio_bytes)
                 return synthesis
             except Exception as exc:
                 _log.warning("voice synthesis failed: %s", exc)
-                return {"ok": False, "endpoint": synth_url, "error": str(exc)}
+                return _fallback_synthesis(
+                    plan,
+                    "synthesis_failed",
+                    endpoint=synth_url,
+                    reference_audio=reference_info,
+                    error=str(exc),
+                )
         finally:
             _synthesis_lock.release()
 
@@ -743,11 +979,15 @@ def build_voice_state(snapshot: dict[str, Any]) -> dict[str, Any]:
             "voice_name": _pick_voice_name(),
             "playback_mode": os.getenv("VOICE_PLAYBACK_MODE", "browser+sink"),
             "speech_profile": os.getenv("VOICE_PROFILE", "dramatic"),
-            "lip_sync_source": os.getenv("LIP_SYNC_SOURCE", "audio"),
+            "lip_sync_source": os.getenv("LIP_SYNC_SOURCE", "audio_rms"),
             "transport": os.getenv("VOICE_TRANSPORT", "local-tts"),
             "health": {"ok": False, "reason": "compose_failed"},
             "plan": None,
-            "synthesis": {"ok": False, "reason": "compose_failed"},
+            "synthesis": {
+                "ok": False,
+                "reason": "compose_failed",
+                "lip_sync": _lip_sync_metadata("procedural"),
+            },
         }
 
 
