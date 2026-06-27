@@ -1057,6 +1057,43 @@ Inference:
 - Short 5-15 second loops at moderate resolution are the practical live asset unit. Longer or high-resolution cinematic clips should be optional/offline until storage, bandwidth, and playback behavior are measured.
 - Without explicit asset size and lifecycle policies, video generation will create operational debt faster than value.
 
+### Issue #98 Video Manifest And Cache Policy
+
+Date added: 2026-06-27
+
+Implemented in this repo:
+
+- Versioned video manifest schema: `runtime/src/avatar/video_manifest.py`.
+- Asset variants:
+  - `low_res_live` for hot observer playback loops.
+  - `high_res_highlight` for durable/export-quality clips.
+- Manifest fields track asset id, CID, variant, model, resolution, duration, source image/audio
+  CIDs, expression, motion, priority, status, size, local cache path, creation time, and expiry.
+- Manifest serialization deliberately does not include `avatar_cid`, `rigged_avatar_cid`, or
+  `voice_model_cid`; video assets stay separate from identity image and voice references.
+- Deterministic selection helper:
+  - live path prefers matching low-res live loop;
+  - then neutral low-res live loop;
+  - then any low-res live loop;
+  - then static portrait;
+  - then no asset.
+- Highlight path prefers matching high-res highlight clips, then low-res live fallback, then
+  static portrait.
+- IPFS retrieval failure is represented through failed CIDs and falls back to local cache or
+  static portrait instead of black video.
+- Retention policy marks expired or old low-priority CIDs as GC candidates while retaining
+  highlight clips by default.
+- Local cache policy separates hot playback cache from durable IPFS identity.
+
+Operational policy:
+
+- Generated video CIDs should be pinned durably only when they are useful enough for the
+  manifest priority floor.
+- Low-res live loops may be kept hot in local/browser cache for stream-time playback.
+- High-res highlight clips should remain durable/export-focused and should not be selected for
+  the default live observer path unless explicitly requested.
+- IPFS failures should degrade to cached video, then static portrait, never to a black stage.
+
 ### TODO Backlog
 
 Status legend: `todo`, `blocked`, `in_progress`, `done`.
@@ -1066,7 +1103,7 @@ Status legend: `todo`, `blocked`, `in_progress`, `done`.
 | todo | Tests | Fix `banter.types` import blocker | Current avatar/voice tests fail during collection |
 | todo | Config | Normalize Comfy/Fish endpoint resolution across runtime, Compose, Vast | Drift documented in Deployment / Configuration section |
 | todo | Health | Add Comfy workflow readiness probe | `/system_stats` is too shallow |
-| todo | Data model | Add video manifest fields instead of overloading image/voice CIDs | Proposed fields listed above |
+| done | Data model | Add video manifest fields instead of overloading image/voice CIDs | #98 adds versioned video manifest schema, deterministic selection, cache policy, and GC candidate helpers |
 | todo | Live animation | Add procedural breathing/blink/head-sway/mouth-amplitude layer | Fastest path to perceived life |
 | blocked | Lip sync | Evaluate MuseTalk vs Wav2Lip vs LivePortrait on target hardware | #96 selected MuseTalk sidecar first; target GPU/model run is blocked because the Vast.ai instance was deleted and this pass is code-only |
 | todo | Comfy video | Implement `VideoGenerator` for MP4/WebM outputs | Current helper validates only PNG/JPEG |
@@ -1075,7 +1112,7 @@ Status legend: `todo`, `blocked`, `in_progress`, `done`.
 | todo | Wan | Run one Wan image/text-to-video cinematic workflow | Quality backend, not live path |
 | done | Queue | Add GPU job priority: Fish > Ollama live > real-time render > LTX > Wan | #97 adds priority scheduling, cooperative background cancellation, live-mode background rejection, and `/diagnostics/gpu` |
 | todo | Observer | Add video loop playback and fallback selection | Current avatar runtime does not consume video CIDs |
-| todo | Assets | Pin generated video and store manifest CID | Keep asset identity durable |
+| in_progress | Assets | Pin generated video and store manifest CID | #98 defines durable video CIDs, source CIDs, expiry, priority, local cache status, and retention/GC policy; actual generation/pinning remains for later model issues |
 | blocked | Benchmarks | Record generation time, VRAM, disk per model/workflow | #96 benchmark contract and runner added; real latency/VRAM/output evidence still requires a target GPU host |
 
 ### Acceptance Criteria For "Alive On Twitch"
