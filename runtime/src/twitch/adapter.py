@@ -24,6 +24,11 @@ try:  # pragma: no cover - runtime package import path
 except ImportError:  # pragma: no cover - tests import via flat path
     from health_checks import probe_url
 
+try:  # pragma: no cover - runtime package import path
+    from ..platforms import build_platform_audience_event
+except ImportError:  # pragma: no cover - tests import via flat path
+    from platforms import build_platform_audience_event
+
 from .models import TwitchChatMessage, TwitchEvent, TwitchOutgoingChat
 
 SUPPORTED_EVENT_TYPES = {
@@ -153,18 +158,40 @@ class TwitchAdapter:
             return None
 
         replay_key = _replay_key(event_type, payload)
+        timestamp = int(payload.get("timestamp") or payload.get("ts") or time.time())
+        platform_event = build_platform_audience_event(
+            platform="twitch",
+            event_id=twitch_event.event_id,
+            platform_event_type=twitch_event.event_type,
+            channel_name=twitch_event.channel_name,
+            actor_name=twitch_event.user_name,
+            actor_id=twitch_event.user_id,
+            message=twitch_event.message,
+            timestamp=timestamp,
+            metadata=twitch_event.metadata,
+            replay_key=replay_key,
+        )
         if not _register_replay_key(replay_key, twitch_event.event_id, event_type):
             return None
 
-        world_category, world_event_type = EVENT_TO_WORLD[event_type]
+        if not platform_event.moderation.get("allowed", True):
+            world_category = "moderation"
+            world_event_type = "twitch.blocked"
+            narrative = (
+                f"Twitch event from {twitch_event.user_name or twitch_event.user_id} "
+                f"blocked by moderation: {platform_event.moderation.get('reason')}"
+            )
+        else:
+            world_category, world_event_type = EVENT_TO_WORLD[event_type]
+            narrative = self._narrative_for(twitch_event)
         world_event = {
             "event_id": twitch_event.event_id,
             "category": world_category,
             "event_type": f"{world_category}.{world_event_type}",
-            "timestamp": int(payload.get("timestamp") or payload.get("ts") or time.time()),
+            "timestamp": timestamp,
             "agent_id": twitch_event.user_id or None,
-            "narrative": self._narrative_for(twitch_event),
-            "payload": twitch_event.to_dict(),
+            "narrative": narrative,
+            "payload": platform_event.to_payload(),
             "replay_key": replay_key,
         }
         return json_safe(world_event)
@@ -220,6 +247,17 @@ class TwitchAdapter:
             "transport": self.transport,
             "health": health,
             "supported_event_types": sorted(SUPPORTED_EVENT_TYPES),
+            "platform_boundary": {
+                "platform": "twitch",
+                "route": "showrunner",
+                "surface": "audience",
+                "direct_effects_allowed": False,
+            },
+            "bot_identity": {
+                "bot_user_id": os.getenv("TWITCH_BOT_USER_ID", ""),
+                "bot_user_id_configured": bool(os.getenv("TWITCH_BOT_USER_ID", "")),
+                "channel_configured": bool(self.channel_name),
+            },
         }
 
     def _narrative_for(self, twitch_event: TwitchEvent) -> str:
