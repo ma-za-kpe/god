@@ -687,6 +687,56 @@ Risk:
 
 - Without this contract, each embodiment candidate will require custom runtime integration code.
 
+### Issue #96 Benchmark Status
+
+Date added: 2026-06-27
+
+Candidate selected for the first real-time embodiment benchmark: MuseTalk.
+
+Integration path to test first: dedicated sidecar, not ComfyUI. This follows the sidecar
+recommendation above because the live path needs low request latency and explicit GPU
+scheduling, while ComfyUI polling/custom-node provisioning is better reserved for background
+asset generation until measured otherwise.
+
+Current status: blocked, not measured.
+
+Exact blocker:
+
+- The prior Vast.ai instance was deleted.
+- The current operator constraint for this pass is code only: no Vast.ai work and no model
+  loading.
+- No target GPU host with MuseTalk models and a sidecar service is available for `nvidia-smi`
+  capture, dependency installation, or an `/embody` request.
+
+Added repo artifacts:
+
+- Benchmark record model: `runtime/src/avatar/embodiment_benchmark.py`.
+- Sidecar benchmark runner: `scripts/benchmark-embodiment-sidecar.py`.
+- Contract tests: `runtime/tests/test_embodiment_benchmark.py`.
+- Field report: `field-reports/issue-96-embodiment-benchmark.md`.
+
+Command to run when a target GPU host exists:
+
+```bash
+python scripts/benchmark-embodiment-sidecar.py \
+  --candidate musetalk \
+  --endpoint http://localhost:7861 \
+  --portrait-file avatar.png \
+  --audio-file fish.wav \
+  --host-label vast-4090 \
+  --gpu-name "RTX 4090" \
+  --vram-total-mb 24576 \
+  --out field-reports/issue-96-musetalk.json
+```
+
+Decision:
+
+- Do not integrate MuseTalk, LivePortrait, Wav2Lip, or any real-time embodiment sidecar into
+  the live path until a target GPU run records latency, VRAM, output quality, and failure
+  behavior.
+- Keep the live baseline on Fish audio amplitude plus procedural life signals until the first
+  sidecar benchmark is measured.
+
 ### Revised Target Architecture
 
 The target should be a hybrid avatar system with four layers:
@@ -986,7 +1036,7 @@ Status legend: `todo`, `blocked`, `in_progress`, `done`.
 | todo | Health | Add Comfy workflow readiness probe | `/system_stats` is too shallow |
 | todo | Data model | Add video manifest fields instead of overloading image/voice CIDs | Proposed fields listed above |
 | todo | Live animation | Add procedural breathing/blink/head-sway/mouth-amplitude layer | Fastest path to perceived life |
-| todo | Lip sync | Evaluate MuseTalk vs Wav2Lip vs LivePortrait on target hardware | Must measure latency/quality before choosing |
+| blocked | Lip sync | Evaluate MuseTalk vs Wav2Lip vs LivePortrait on target hardware | #96 selected MuseTalk sidecar first; target GPU/model run is blocked because the Vast.ai instance was deleted and this pass is code-only |
 | todo | Comfy video | Implement `VideoGenerator` for MP4/WebM outputs | Current helper validates only PNG/JPEG |
 | todo | LTX | Run one LTX image-to-video loop workflow from avatar portrait | First video model integration |
 | todo | LTX Lipdub | Verify Fish WAV -> LTX Lipdub/highlight workflow | Async only until measured |
@@ -994,7 +1044,7 @@ Status legend: `todo`, `blocked`, `in_progress`, `done`.
 | todo | Queue | Add GPU job priority: Fish > Ollama live > real-time render > LTX > Wan | Prevent video jobs starving live stream |
 | todo | Observer | Add video loop playback and fallback selection | Current avatar runtime does not consume video CIDs |
 | todo | Assets | Pin generated video and store manifest CID | Keep asset identity durable |
-| todo | Benchmarks | Record generation time, VRAM, disk per model/workflow | Required before production claims |
+| blocked | Benchmarks | Record generation time, VRAM, disk per model/workflow | #96 benchmark contract and runner added; real latency/VRAM/output evidence still requires a target GPU host |
 
 ### Acceptance Criteria For "Alive On Twitch"
 
