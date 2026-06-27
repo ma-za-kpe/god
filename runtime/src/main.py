@@ -955,6 +955,30 @@ async def broadcast_status():
         return {"error": str(e), "world_id": os.getenv("WORLD_ID", "local-dev-world-1")}
 
 
+@app.get("/broadcast/youtube-proof")
+async def broadcast_youtube_proof(events_limit: int = 50, messages_limit: int = 80):
+    """Operator-facing YouTube private-stream proof and fallback readiness."""
+    try:
+        from .broadcast import build_youtube_live_proof_report
+        from .world_snapshot import build_world_snapshot_async
+
+        snapshot = await build_world_snapshot_async(
+            events_limit=min(events_limit, 200),
+            messages_limit=min(messages_limit, 500),
+        )
+        return {
+            "proof": build_youtube_live_proof_report(
+                snapshot,
+                gpu_diagnostics=get_gpu_job_queue().diagnostics(),
+            ),
+            "world_id": snapshot.get("world_id", os.getenv("WORLD_ID", "local-dev-world-1")),
+            "epoch": snapshot.get("epoch"),
+        }
+    except Exception as e:
+        log.warning(f"/broadcast/youtube-proof error: {e}")
+        return {"error": str(e), "world_id": os.getenv("WORLD_ID", "local-dev-world-1")}
+
+
 @app.get("/resilience/status")
 async def resilience_status():
     """Current runtime resilience and fallback posture."""

@@ -1016,6 +1016,34 @@ Implemented in this repo:
   Fish, ComfyUI, or embodiment implementations.
 - Runtime exposes queue state at `/diagnostics/gpu`.
 
+### Issue #101 YouTube Live Proof Readiness
+
+Date added: 2026-06-27
+
+Implemented in this repo:
+
+- YouTube private-stream readiness report: `runtime/src/broadcast/live_proof.py`.
+- Operator endpoint: `GET /broadcast/youtube-proof`.
+- Contract tests: `runtime/tests/test_youtube_live_proof.py`.
+- Field report/checklist: `field-reports/issue-101-youtube-live-proof.md`.
+
+The report checks the exact pre-stream surface needed for the YouTube proof:
+
+- Fish voice is configured and has audio evidence.
+- Avatar visual source is available.
+- Procedural life signals are visible.
+- Mouth state reacts while voice is active.
+- Captions are present.
+- Comfy/video failure degrades to portrait/generated fallback instead of a
+  black stage.
+
+Operational status:
+
+- Code-only readiness is implemented.
+- The real 5-10 minute private YouTube/OBS VOD and benchmark JSON/notes remain
+  blocked until a live host/stream test window is available.
+- Do not close issue #101 from code alone.
+
 Vast.ai policy:
 
 - Keep background LTX/Wan/offline jobs disabled during live YouTube proof runs until the jobs
