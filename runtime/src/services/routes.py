@@ -21,6 +21,7 @@ from fastapi import APIRouter, Header, Request
 from fastapi.responses import JSONResponse
 
 from ..event_emitter import get_emitter
+from ..runtime_endpoints import ollama_generate_url
 from ..security import deny_creator_action
 from .payment import (
     MOCK_PAYMENTS,
@@ -553,7 +554,7 @@ async def _generate_thought_llm(persona: str, agent: dict) -> str | None:
 
             async with httpx.AsyncClient(timeout=20) as client:
                 resp = await client.post(
-                    f"{os.getenv('OLLAMA_URL', 'http://localhost:11434')}/api/generate",
+                    ollama_generate_url(),
                     json={"model": model, "prompt": prompt, "stream": False},
                 )
                 resp.raise_for_status()

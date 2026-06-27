@@ -211,7 +211,7 @@ services:
       # LLM — Ollama runs on host; host.docker.internal resolves on Docker Desktop
       - LLM_PROVIDER=${LLM_PROVIDER:-ollama}
       - LLM_MODEL=${LLM_MODEL:-llama3.1:8b}
-      - OLLAMA_BASE_URL=http://host.docker.internal:11434
+      - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
       - TWITCH_ENABLED=${TWITCH_ENABLED:-false}
       - TWITCH_DRY_RUN=${TWITCH_DRY_RUN:-true}
       - TWITCH_EVENTSUB_TRANSPORT=${TWITCH_EVENTSUB_TRANSPORT:-websocket}

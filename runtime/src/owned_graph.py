@@ -83,7 +83,8 @@ class AgentIdentity:
         }
     )
 
-    # Audio
+    # Audio. Legacy name: Fish Speech currently stores reference WAV bytes here,
+    # not a standalone model artifact. See docs/avatar-voice-field-naming-audit.md.
     voice_model_cid: str = ""
     voice_params: dict = field(default_factory=lambda: {"timbre": 0.5, "pitch": 0.5, "speed": 1.0})
     theme_music_cid: str = ""

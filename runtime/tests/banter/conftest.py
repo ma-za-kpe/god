@@ -14,7 +14,7 @@ import time
 # resolves to src/banter/. Works both locally and in the Docker container.
 # ---------------------------------------------------------------------------
 _src_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "src"))
-for _p in (_src_path, "/app/src"):
+for _p in ("/app/src", _src_path):
     if _p not in sys.path:
         sys.path.insert(0, _p)
 

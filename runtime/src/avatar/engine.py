@@ -8,8 +8,10 @@ from typing import Any
 
 try:  # pragma: no cover - runtime package import path
     from ..health_checks import probe_url
+    from ..runtime_endpoints import avatar_health_url
 except ImportError:  # pragma: no cover - flat test path
     from health_checks import probe_url
+    from runtime_endpoints import avatar_health_url
 
 try:  # pragma: no cover - runtime package import path
     from ..banter.types import Beat, PairState, SceneContextData
@@ -193,9 +195,7 @@ class AvatarSurface:
         visual_state["current_expression"] = expression
 
         pose = _pick_pose(snapshot)
-        health = probe_url(
-            os.getenv("AVATAR_HEALTH_URL") or os.getenv("AVATAR_ENDPOINT"), timeout=1.5
-        )
+        health = probe_url(avatar_health_url(), timeout=1.5)
         avatar_asset = (
             os.getenv("AVATAR_ASSET")
             or (
@@ -365,7 +365,7 @@ class AvatarSurface:
 
 
 def build_avatar_status() -> dict[str, Any]:
-    endpoint = os.getenv("AVATAR_HEALTH_URL") or os.getenv("AVATAR_ENDPOINT")
+    endpoint = avatar_health_url()
     return {
         "enabled": _env_bool("AVATAR_ENABLED") or bool(os.getenv("AVATAR_ASSET")) or bool(endpoint),
         "dry_run": _env_bool("AVATAR_DRY_RUN", "true"),

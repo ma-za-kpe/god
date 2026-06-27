@@ -98,18 +98,32 @@ async def test_genesis_pipeline_pins_all_assets(monkeypatch):
     assert persist_calls == ["s-test"]
 
 
-def test_genesis_pipeline_uses_default_endpoints_when_env_missing(monkeypatch):
+def test_genesis_pipeline_skips_unconfigured_endpoints(monkeypatch):
     monkeypatch.delenv("COMFYUI_ENDPOINT", raising=False)
     monkeypatch.delenv("COMFYUI_HEALTH_URL", raising=False)
     monkeypatch.delenv("COMFYUI_URL", raising=False)
+    monkeypatch.delenv("AVATAR_ENDPOINT", raising=False)
+    monkeypatch.delenv("AVATAR_HEALTH_URL", raising=False)
     monkeypatch.delenv("TTS_ENDPOINT", raising=False)
+    monkeypatch.delenv("FISH_SPEECH_ENDPOINT", raising=False)
+    monkeypatch.delenv("VOICE_ENDPOINT", raising=False)
     monkeypatch.delenv("VOICE_HEALTH_URL", raising=False)
     monkeypatch.delenv("TTS_HEALTH_URL", raising=False)
 
     pipeline = GenesisPipeline()
 
-    assert pipeline.comfyui_endpoint == "http://localhost:8188"
-    assert pipeline.tts_endpoint == "http://localhost:7860"
+    assert pipeline.comfyui_endpoint == ""
+    assert pipeline.tts_endpoint == ""
+
+
+def test_genesis_pipeline_uses_configured_endpoint_aliases(monkeypatch):
+    monkeypatch.setenv("COMFYUI_HEALTH_URL", "http://comfyui:8188/system_stats")
+    monkeypatch.setenv("VOICE_HEALTH_URL", "http://fish-speech:7860/v1/health")
+
+    pipeline = GenesisPipeline()
+
+    assert pipeline.comfyui_endpoint == "http://comfyui:8188"
+    assert pipeline.tts_endpoint == "http://fish-speech:7860"
 
 
 @pytest.mark.asyncio

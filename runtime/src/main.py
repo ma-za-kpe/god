@@ -24,6 +24,17 @@ from .agent_runner import agent_runner
 from .creator.routes import router as creator_router
 from .health_checks import probe_tcp, probe_url
 from .rent_daemon import rent_daemon
+from .runtime_endpoints import (
+    comfyui_health_url,
+    endpoint_path,
+    ipfs_api_url,
+    nats_tcp_target,
+    ollama_tags_url,
+    redis_tcp_target,
+    tts_base_url,
+    tts_health_url,
+    tts_synthesis_url,
+)
 from .services.routes import router as services_router
 from .status_engine import TIERS, status_review_daemon
 
@@ -324,8 +335,22 @@ def _obs_ready() -> dict:
 
 
 def _ipfs_ready() -> dict:
+    endpoint = ipfs_api_url()
     try:
-        conn = http.client.HTTPConnection("localhost", 5001, timeout=2.0)
+        parsed_endpoint = urlparse(endpoint)
+        if parsed_endpoint.scheme not in {"http", "https"} or not parsed_endpoint.hostname:
+            return {
+                "ok": False,
+                "probe": "http",
+                "url": endpoint,
+                "reason": "invalid_ipfs_api",
+            }
+        connection_cls = (
+            http.client.HTTPSConnection
+            if parsed_endpoint.scheme == "https"
+            else http.client.HTTPConnection
+        )
+        conn = connection_cls(parsed_endpoint.hostname, parsed_endpoint.port or 5001, timeout=2.0)
         try:
             conn.request("POST", "/api/v0/version")
             response = conn.getresponse()
@@ -338,7 +363,7 @@ def _ipfs_ready() -> dict:
             return {
                 "ok": 200 <= response.status < 400,
                 "probe": "http",
-                "url": "http://localhost:5001/api/v0/version",
+                "url": endpoint_path(endpoint, "/api/v0/version"),
                 "status_code": int(response.status),
                 "body": parsed,
             }
@@ -348,13 +373,13 @@ def _ipfs_ready() -> dict:
         return {
             "ok": False,
             "probe": "http",
-            "url": "http://localhost:5001/api/v0/version",
+            "url": endpoint_path(endpoint, "/api/v0/version"),
             "reason": str(exc),
         }
 
 
 async def _fish_synthesis_ready() -> dict:
-    endpoint = os.getenv("VOICE_HEALTH_URL") or os.getenv("TTS_ENDPOINT")
+    endpoint = tts_base_url()
     if not endpoint:
         return {"ok": False, "probe": "skipped", "reason": "not_configured"}
     try:
@@ -377,19 +402,20 @@ async def _fish_synthesis_ready() -> dict:
             "streaming": False,
         }
         async with httpx.AsyncClient(timeout=timeout_seconds) as client:
-            response = await client.post(f"{endpoint.rstrip('/')}/v1/tts", json=payload)
+            synthesis_url = tts_synthesis_url(endpoint)
+            response = await client.post(synthesis_url, json=payload)
             if not 200 <= response.status_code < 300:
                 return {
                     "ok": False,
                     "probe": "tts",
-                    "endpoint": f"{endpoint.rstrip('/')}/v1/tts",
+                    "endpoint": synthesis_url,
                     "status_code": int(response.status_code),
                     "reason": "tts_failed",
                 }
             return {
                 "ok": bool(response.content),
                 "probe": "tts",
-                "endpoint": f"{endpoint.rstrip('/')}/v1/tts",
+                "endpoint": synthesis_url,
                 "byte_count": len(response.content or b""),
                 "timeout_seconds": timeout_seconds,
             }
@@ -397,7 +423,7 @@ async def _fish_synthesis_ready() -> dict:
         return {
             "ok": False,
             "probe": "tts",
-            "endpoint": f"{endpoint.rstrip('/')}/v1/tts",
+            "endpoint": tts_synthesis_url(endpoint),
             "reason": str(exc) or exc.__class__.__name__,
             "timeout_seconds": timeout_seconds,
         }
@@ -410,18 +436,20 @@ async def ready():
         "OBS_REQUIRED", ""
     ).lower() in ("1", "true", "yes", "on")
     voice_enabled = os.getenv("VOICE_ENABLED", "true").lower() in ("1", "true", "yes", "on")
+    redis_host, redis_port = redis_tcp_target()
+    nats_host, nats_port = nats_tcp_target()
     checks = {
         "postgres": _db_ready(),
-        "redis": probe_tcp("127.0.0.1", 6379, timeout=1.5),
-        "nats": probe_tcp("127.0.0.1", 4222, timeout=1.5),
-        "ipfs": probe_url("http://localhost:5001/debug/metrics/prometheus", timeout=2.0),
-        "comfyui": probe_url("http://localhost:8188/system_stats", timeout=2.0),
-        "ollama": probe_url("http://localhost:11434/api/tags", timeout=2.0),
+        "redis": probe_tcp(redis_host, redis_port, timeout=1.5),
+        "nats": probe_tcp(nats_host, nats_port, timeout=1.5),
+        "ipfs": probe_url(endpoint_path(ipfs_api_url(), "/debug/metrics/prometheus"), timeout=2.0),
+        "comfyui": probe_url(comfyui_health_url(), timeout=2.0),
+        "ollama": probe_url(ollama_tags_url(), timeout=2.0),
         "nginx_runtime": probe_tcp("127.0.0.1", 10515, timeout=1.5),
         "nginx_comfyui": probe_tcp("127.0.0.1", 10516, timeout=1.5),
         "nginx_observer": probe_tcp("127.0.0.1", 10517, timeout=1.5),
     }
-    if voice_enabled or os.getenv("VOICE_HEALTH_URL") or os.getenv("TTS_ENDPOINT"):
+    if voice_enabled or tts_base_url() or tts_health_url():
         checks["fish"] = await _fish_synthesis_ready()
     else:
         checks["fish"] = {"ok": True, "probe": "skipped", "reason": "voice_disabled"}
@@ -1645,7 +1673,7 @@ async def creator_genesis(
         f"@ {genesis_balance} USDC each"
     )
 
-    comfyui_probe = probe_url("http://localhost:8188/system_stats")
+    comfyui_probe = probe_url(comfyui_health_url())
     if not comfyui_probe.get("ok"):
         from fastapi.responses import JSONResponse
 
@@ -1657,7 +1685,7 @@ async def creator_genesis(
             },
         )
 
-    fish_probe = probe_url("http://localhost:7860/v1/health")
+    fish_probe = probe_url(tts_health_url())
     if not fish_probe.get("ok"):
         from fastapi.responses import JSONResponse
 
