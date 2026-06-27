@@ -1074,6 +1074,45 @@ Operational status:
 - Twitch launch remains gated on completion of the YouTube avatar-life milestone.
 - Do not close issue #102 from code alone.
 
+### Issue #103 Avatar Acceptance Suite
+
+Date added: 2026-06-27
+
+Current matrix:
+
+- Runtime contract: `runtime/src/avatar/acceptance_suite.py`.
+- Contract tests: `runtime/tests/test_avatar_acceptance_suite.py`.
+- Field report/checklist: `field-reports/issue-103-avatar-acceptance-suite.md`.
+
+Personas covered:
+
+- Live Speaker.
+- Listener.
+- Emotional Reactor.
+- Cinematic Cutaway.
+- Highlight Producer.
+- Operator.
+
+Use cases covered:
+
+- Agent speaks normally.
+- Agent listens silently for 30 seconds.
+- Emotional beat changes expression within one second.
+- Fish failure degrades visibly instead of hiding silence risk.
+- Comfy/video failure stays alive through visual fallback.
+- Background asset jobs do not block Fish.
+- Observer switches between procedural/static fallback, loop, and cinematic
+  sources.
+- Offline highlight clip export has a benchmark/manual evidence path.
+- Operator can see health, fallback, queue, and current visual-source state.
+
+Validation status:
+
+- `build_acceptance_suite_report()` returns `status=complete` and no validation
+  gaps for the shipped matrix.
+- Manual VOD evidence is still required by the individual cases during later
+  live field runs, but the acceptance suite definition is complete.
+
 Vast.ai policy:
 
 - Keep background LTX/Wan/offline jobs disabled during live YouTube proof runs until the jobs
