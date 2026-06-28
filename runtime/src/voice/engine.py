@@ -246,10 +246,20 @@ def _turn_age_seconds(snapshot: dict[str, Any], turn: dict[str, Any]) -> float |
 
 def _pick_move(snapshot: dict[str, Any]) -> str:
     last_turn = snapshot.get("last_dialogue_turn") or {}
+    meta = last_turn.get("metadata") or {}
+    if isinstance(meta, str):
+        try:
+            import json as _json
+
+            meta = _json.loads(meta)
+        except Exception:
+            meta = {}
+    if not isinstance(meta, dict):
+        meta = {}
     return str(
         last_turn.get("move")
         or last_turn.get("move_type")
-        or last_turn.get("metadata", {}).get("move")
+        or meta.get("move")
         or snapshot.get("current_move")
         or ""
     ).upper()
