@@ -68,7 +68,7 @@ class GenesisPipeline:
         self.comfyui_endpoint = comfyui_base_url(comfyui_endpoint)
         self.tts_endpoint = tts_base_url(tts_endpoint)
         self.pipeline_timeout_seconds = pipeline_timeout_seconds or int(
-            os.getenv("PIPELINE_TIMEOUT_SECONDS", "300")
+            os.getenv("PIPELINE_TIMEOUT_SECONDS", "600")
         )
         self.comfyui_concurrency = comfyui_concurrency or int(os.getenv("COMFYUI_CONCURRENCY", "2"))
         self.tts_concurrency = tts_concurrency or int(os.getenv("TTS_CONCURRENCY", "4"))
