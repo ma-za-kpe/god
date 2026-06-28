@@ -76,7 +76,8 @@
         "95",
         0
       ],
-      "lora_name": "wan2.2_i2v_lightx2v_4steps_lora_v1_low_noise.safetensors"
+      "lora_name": "wan2.2_i2v_lightx2v_4steps_lora_v1_low_noise.safetensors",
+      "strength_model": 1.0
     }
   },
   "102": {
@@ -86,7 +87,8 @@
         "96",
         0
       ],
-      "lora_name": "wan2.2_i2v_lightx2v_4steps_lora_v1_high_noise.safetensors"
+      "lora_name": "wan2.2_i2v_lightx2v_4steps_lora_v1_high_noise.safetensors",
+      "strength_model": 1.0
     }
   },
   "104": {
@@ -119,7 +121,8 @@
         0
       ],
       "height": "{{HEIGHT}}",
-      "length": "{{FRAME_COUNT_16FPS}}"
+      "length": "{{FRAME_COUNT_16FPS}}",
+      "batch_size": 1
     }
   },
   "86": {
@@ -129,8 +132,8 @@
         "104",
         0
       ],
-      "add_noise": 0,
-      "noise_seed": "randomize",
+      "add_noise": "enable",
+      "noise_seed": 42,
       "steps": 4,
       "cfg": 1,
       "sampler_name": "euler",
@@ -146,7 +149,10 @@
       "latent_image": [
         "98",
         2
-      ]
+      ],
+      "start_at_step": 0,
+      "end_at_step": 2,
+      "return_with_leftover_noise": "enable"
     }
   },
   "85": {
@@ -156,8 +162,8 @@
         "103",
         0
       ],
-      "add_noise": 0,
-      "noise_seed": "fixed",
+      "add_noise": "disable",
+      "noise_seed": 43,
       "steps": 4,
       "cfg": 1,
       "sampler_name": "euler",
@@ -173,7 +179,10 @@
       "latent_image": [
         "86",
         0
-      ]
+      ],
+      "start_at_step": 2,
+      "end_at_step": 4,
+      "return_with_leftover_noise": "disable"
     }
   },
   "117": {
@@ -182,7 +191,8 @@
       "images": [
         "87",
         0
-      ]
+      ],
+      "fps": 16
     }
   },
   "87": {

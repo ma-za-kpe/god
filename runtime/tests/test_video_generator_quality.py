@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+import pathlib
 from dataclasses import dataclass
 
 import pytest
@@ -12,6 +14,11 @@ from gpu import GPUJobQueue, JobPriority
 
 
 MP4_BYTES = b"\x00\x00\x00\x18ftypmp42" + (b"1" * 2048)
+
+
+def _workflow(name: str) -> dict:
+    path = pathlib.Path(__file__).resolve().parents[1] / "workflows" / name
+    return json.loads(path.read_text(encoding="utf-8"))
 
 
 class _Response:
@@ -94,6 +101,25 @@ class _Pin:
 def _patch_comfy(monkeypatch, client: _FakeComfyClient) -> None:
     monkeypatch.setattr(video_generator.asyncio, "sleep", _no_sleep)
     monkeypatch.setattr(video_generator.httpx, "AsyncClient", lambda **_kwargs: client)
+
+
+def test_wan_workflow_includes_required_live_comfy_inputs():
+    workflow = _workflow("wan_cinematic_clip.json")
+
+    assert workflow["101"]["inputs"]["strength_model"] == 1.0
+    assert workflow["102"]["inputs"]["strength_model"] == 1.0
+    assert workflow["98"]["inputs"]["batch_size"] == 1
+    assert workflow["86"]["inputs"]["add_noise"] == "enable"
+    assert workflow["86"]["inputs"]["noise_seed"] == 42
+    assert workflow["86"]["inputs"]["start_at_step"] == 0
+    assert workflow["86"]["inputs"]["end_at_step"] == 2
+    assert workflow["86"]["inputs"]["return_with_leftover_noise"] == "enable"
+    assert workflow["85"]["inputs"]["add_noise"] == "disable"
+    assert workflow["85"]["inputs"]["noise_seed"] == 43
+    assert workflow["85"]["inputs"]["start_at_step"] == 2
+    assert workflow["85"]["inputs"]["end_at_step"] == 4
+    assert workflow["85"]["inputs"]["return_with_leftover_noise"] == "disable"
+    assert workflow["117"]["inputs"]["fps"] == 16
 
 
 def _wan_template() -> dict:
