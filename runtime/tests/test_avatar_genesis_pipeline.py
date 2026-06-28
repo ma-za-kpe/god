@@ -7,7 +7,7 @@ import pytest
 from avatar.genesis_pipeline import GenesisPipeline
 from ipfs_client import PinResult
 from owned_graph import AgentIdentity, OwnedGraph
-from avatar.voice_cloner import VoiceCloneResult
+from avatar.voice_cloner import VoiceCloner, VoiceCloneResult
 
 
 class _FakePortraitGenerator:
@@ -124,6 +124,26 @@ def test_genesis_pipeline_uses_configured_endpoint_aliases(monkeypatch):
 
     assert pipeline.comfyui_endpoint == "http://comfyui:8188"
     assert pipeline.tts_endpoint == "http://fish-speech:7860"
+
+
+def test_genesis_pipeline_defaults_allow_slow_fish_synthesis(monkeypatch):
+    monkeypatch.delenv("PIPELINE_TIMEOUT_SECONDS", raising=False)
+    monkeypatch.delenv("VOICE_CLONE_TIMEOUT_SECONDS", raising=False)
+    monkeypatch.delenv("TTS_TIMEOUT_SECONDS", raising=False)
+
+    pipeline = GenesisPipeline()
+    cloner = VoiceCloner("http://tts")
+
+    assert pipeline.pipeline_timeout_seconds == 600
+    assert cloner.timeout_s == 180
+
+
+def test_voice_cloner_uses_configured_timeout(monkeypatch):
+    monkeypatch.setenv("VOICE_CLONE_TIMEOUT_SECONDS", "240")
+
+    cloner = VoiceCloner("http://tts")
+
+    assert cloner.timeout_s == 240
 
 
 @pytest.mark.asyncio

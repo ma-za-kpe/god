@@ -31,11 +31,17 @@ class VoiceCloner:
         self,
         tts_endpoint: str | None,
         semaphore: asyncio.Semaphore | None = None,
-        timeout_s: int = 60,
+        timeout_s: int | None = None,
     ) -> None:
         self.tts_endpoint = (tts_endpoint or "").rstrip("/")
         self.semaphore = semaphore or asyncio.Semaphore(int(os.getenv("TTS_CONCURRENCY", "4")))
-        self.timeout_s = timeout_s
+        self.timeout_s = (
+            timeout_s
+            if timeout_s is not None
+            else int(
+                os.getenv("VOICE_CLONE_TIMEOUT_SECONDS", os.getenv("TTS_TIMEOUT_SECONDS", "180"))
+            )
+        )
 
     async def health_check(self) -> bool:
         if not self.tts_endpoint:
