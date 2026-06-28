@@ -40,7 +40,7 @@ class _StreamingAddClient:
         return self.response
 
 
-class _StreamingVerifyResponse:
+class _StreamingBlockStatResponse:
     def __init__(self):
         self.closed = False
 
@@ -54,13 +54,13 @@ class _StreamingVerifyResponse:
         return None
 
     async def aiter_bytes(self):
-        yield b'{"Keys":{"QmStreamCID123":{"Type":"recursive"}}}\n'
-        raise AssertionError("_verify_once should close after the first streamed pin result")
+        yield b'{"Key":"QmStreamCID123","Size":42}\n'
+        raise AssertionError("_verify_once should close after the first streamed block stat")
 
 
-class _StreamingVerifyClient:
+class _StreamingBlockStatClient:
     def __init__(self):
-        self.response = _StreamingVerifyResponse()
+        self.response = _StreamingBlockStatResponse()
         self.request = None
 
     def stream(self, method, url, *, params):
@@ -157,8 +157,8 @@ async def test_pin_once_returns_from_first_streamed_add_result():
 
 
 @pytest.mark.asyncio
-async def test_verify_once_returns_from_first_streamed_pin_ls_result():
-    client = _StreamingVerifyClient()
+async def test_verify_once_returns_from_first_streamed_block_stat_result():
+    client = _StreamingBlockStatClient()
 
     verified = await _verify_once(client, "http://node-1:5001", "QmStreamCID123")
 
@@ -166,6 +166,6 @@ async def test_verify_once_returns_from_first_streamed_pin_ls_result():
     assert client.response.closed
     assert client.request == {
         "method": "POST",
-        "url": "http://node-1:5001/api/v0/pin/ls",
+        "url": "http://node-1:5001/api/v0/block/stat",
         "params": {"arg": "QmStreamCID123"},
     }
