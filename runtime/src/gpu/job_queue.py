@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import inspect
+import os
 import time
 from contextlib import asynccontextmanager
 from dataclasses import asdict, dataclass, field
@@ -32,6 +33,27 @@ BACKGROUND_PRIORITIES = {
 
 class GPUJobRejected(RuntimeError):
     """Raised when a job is rejected by the active GPU policy."""
+
+
+def _env_bool(name: str, default: bool | None = None) -> bool | None:
+    raw = os.getenv(name)
+    if raw is None or raw.strip() == "":
+        return default
+    normalized = raw.strip().lower()
+    if normalized in {"1", "true", "yes", "on"}:
+        return True
+    if normalized in {"0", "false", "no", "off"}:
+        return False
+    return default
+
+
+def background_jobs_allowed_from_env() -> bool:
+    """Return the process startup policy for LTX/Wan/offline GPU work."""
+
+    explicit = _env_bool("GPU_BACKGROUND_JOBS_ALLOWED")
+    if explicit is not None:
+        return explicit
+    return True
 
 
 @dataclass
@@ -349,7 +371,7 @@ class GPUJobQueue:
             await result
 
 
-_GPU_JOB_QUEUE = GPUJobQueue()
+_GPU_JOB_QUEUE = GPUJobQueue(background_jobs_allowed=background_jobs_allowed_from_env())
 
 
 def get_gpu_job_queue() -> GPUJobQueue:

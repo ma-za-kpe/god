@@ -152,3 +152,13 @@ async def test_gpu_diagnostics_endpoint_reports_queue_state():
     assert diagnostics["queue_depth"] == 0
     assert "average_wait_seconds" in diagnostics
     assert "average_run_seconds" in diagnostics
+
+
+@pytest.mark.asyncio
+async def test_gpu_diagnostics_endpoint_honors_startup_background_policy(monkeypatch):
+    monkeypatch.setenv("GPU_BACKGROUND_JOBS_ALLOWED", "false")
+    main = _load_runtime_main()
+
+    diagnostics = await main.gpu_diagnostics()
+
+    assert diagnostics["background_jobs_allowed"] is False

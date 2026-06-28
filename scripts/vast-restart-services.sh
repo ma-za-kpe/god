@@ -245,6 +245,12 @@ configure_streaming_mode() {
     export YOUTUBE_DRY_RUN=false
     export BROADCAST_ENABLED=true
     export BROADCAST_DRY_RUN=false
+    if [ -z "${GPU_BACKGROUND_JOBS_ALLOWED:-}" ]; then
+      export GPU_BACKGROUND_JOBS_ALLOWED=false
+      log "GPU background LTX/Wan/offline jobs disabled for live streaming"
+    else
+      log "GPU background job policy explicit: GPU_BACKGROUND_JOBS_ALLOWED=${GPU_BACKGROUND_JOBS_ALLOWED}"
+    fi
     log "Stream key present: YouTube + OBS live streaming enabled (streaming /stage)"
     return 0
   fi
@@ -253,6 +259,12 @@ configure_streaming_mode() {
   export YOUTUBE_DRY_RUN=true
   export BROADCAST_ENABLED=false
   export BROADCAST_DRY_RUN=true
+  if [ -z "${GPU_BACKGROUND_JOBS_ALLOWED:-}" ]; then
+    export GPU_BACKGROUND_JOBS_ALLOWED=true
+    log "GPU background LTX/Wan/offline jobs allowed in dry-run/offline mode"
+  else
+    log "GPU background job policy explicit: GPU_BACKGROUND_JOBS_ALLOWED=${GPU_BACKGROUND_JOBS_ALLOWED}"
+  fi
   log "No OBS_STREAM_KEY — streaming in dry-run mode"
 }
 
@@ -1259,6 +1271,7 @@ start_runtime() {
   # shellcheck disable=SC1090
   source "$REPO_DIR/.env.local"
   set +a
+  configure_streaming_mode
   nohup python3 -m uvicorn src.main:app --host 0.0.0.0 --port 8888 >"$LOG_DIR/runtime.log" 2>&1 &
   cd "$REPO_DIR"
   wait_ready_json "http://localhost:8888/ready" "runtime /ready" 180 3 || die "Runtime not ready"
