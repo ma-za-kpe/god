@@ -53,7 +53,23 @@ test('prefers a speaking cinematic clip over an idle loop', () => {
   });
 
   assert.equal(source.activeKind, 'cinematic');
-  assert.equal(source.video.url, 'http://runtime.local/ipfs/bafySpeakingClip');
+  assert.equal(source.video.url, 'http://runtime.local/ipfs/video/bafySpeakingClip');
+  assert.equal(source.fallback.url, 'http://runtime.local/ipfs/bafyPortrait');
+});
+
+test('routes loop CIDs through the video IPFS proxy while portraits use portrait proxy', () => {
+  const source = selectAvatarSource({
+    runtimeBaseUrl: 'http://runtime.local',
+    agent: { current_name: 'Loop', avatar_cid: 'bafyPortrait' },
+    avatarState: {
+      video_manifest: {
+        loop: 'ipfs://bafyIdleLoop',
+      },
+    },
+  });
+
+  assert.equal(source.activeKind, 'loop');
+  assert.equal(source.video.url, 'http://runtime.local/ipfs/video/bafyIdleLoop');
   assert.equal(source.fallback.url, 'http://runtime.local/ipfs/bafyPortrait');
 });
 

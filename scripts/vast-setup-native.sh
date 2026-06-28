@@ -194,6 +194,10 @@ OLLAMA_BASE_URL=http://localhost:11434
 NATS_URL=nats://localhost:4222
 REDIS_URL=redis://localhost:6379
 IPFS_API=http://localhost:5001
+# Vast native live-test profile runs one local Kubo API. This is not Law-2
+# durable replication; Compose remains the three-node profile.
+IPFS_API_ENDPOINTS=http://localhost:5001
+MIN_IPFS_PINS=1
 
 # Avatar genesis — SDXL
 COMFYUI_PORTRAIT_TEMPLATE=sdxl_portrait.json

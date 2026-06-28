@@ -56,6 +56,7 @@ def _env_int(name: str, default: int) -> int:
 
 PUBLIC_IPFS_MAX_BYTES = _env_int("PUBLIC_IPFS_MAX_BYTES", 8 * 1024 * 1024)
 PUBLIC_IPFS_VIDEO_MAX_BYTES = _env_int("PUBLIC_IPFS_VIDEO_MAX_BYTES", 128 * 1024 * 1024)
+PUBLIC_IPFS_VIDEO_RANGE_MAX_BYTES = _env_int("PUBLIC_IPFS_VIDEO_RANGE_MAX_BYTES", 4 * 1024 * 1024)
 PUBLIC_VOICE_AUDIO_MAX_BYTES = _env_int("PUBLIC_VOICE_AUDIO_MAX_BYTES", 10 * 1024 * 1024)
 
 # Runtime version is loaded from the canonical file (single source of truth, managed via release process).
@@ -845,13 +846,20 @@ async def _cat_ipfs_limited(
     cid: str,
     method: str,
     max_bytes: int,
+    offset: int | None = None,
+    length: int | None = None,
 ) -> tuple[int, bytes]:
     chunks: list[bytes] = []
     total = 0
+    params: dict[str, str | int] = {"arg": cid}
+    if offset is not None:
+        params["offset"] = offset
+    if length is not None:
+        params["length"] = length
     async with client.stream(
         method,
         f"{ipfs_api}/api/v0/cat",
-        params={"arg": cid},
+        params=params,
     ) as response:
         if response.status_code != 200:
             return response.status_code, b""
@@ -884,6 +892,60 @@ async def _fetch_public_ipfs(cid: str, *, max_bytes: int) -> tuple[int, bytes]:
         return status_code, content
 
 
+async def _fetch_public_ipfs_range(
+    cid: str,
+    *,
+    offset: int,
+    length: int,
+) -> tuple[int, bytes]:
+    ipfs_api = (ipfs_api_url() or "http://localhost:5001").rstrip("/")
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        status_code, content = await _cat_ipfs_limited(
+            client,
+            ipfs_api=ipfs_api,
+            cid=cid,
+            method="POST",
+            max_bytes=length,
+            offset=offset,
+            length=length,
+        )
+        if status_code == 405:
+            status_code, content = await _cat_ipfs_limited(
+                client,
+                ipfs_api=ipfs_api,
+                cid=cid,
+                method="GET",
+                max_bytes=length,
+                offset=offset,
+                length=length,
+            )
+        return status_code, content
+
+
+async def _fetch_public_ipfs_size(cid: str) -> int | None:
+    ipfs_api = (ipfs_api_url() or "http://localhost:5001").rstrip("/")
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        for method in ("POST", "GET"):
+            try:
+                response = await client.request(
+                    method,
+                    f"{ipfs_api}/api/v0/files/stat",
+                    params={"arg": f"/ipfs/{cid}", "size": "true"},
+                )
+                if response.status_code == 405:
+                    continue
+                response.raise_for_status()
+                body = response.json()
+                size = body.get("Size") or body.get("size")
+                if size is None:
+                    return None
+                return max(0, int(size))
+            except Exception as exc:
+                log.debug("ipfs file size cid=%s method=%s error=%s", cid, method, exc)
+                return None
+    return None
+
+
 def _detect_public_media_type(content: bytes, *, prefer_video: bool = False) -> str:
     if content[:4] == b"\x89PNG":
         return "image/png"
@@ -894,6 +956,73 @@ def _detect_public_media_type(content: bytes, *, prefer_video: bool = False) -> 
     if content.startswith(b"\x1aE\xdf\xa3"):
         return "video/webm"
     return "video/mp4" if prefer_video else "application/octet-stream"
+
+
+def _parse_video_range(
+    range_header: str,
+    *,
+    total_size: int | None,
+    max_length: int,
+) -> tuple[int, int] | None:
+    if not range_header.startswith("bytes=") or "," in range_header:
+        return None
+    start_text, _, end_text = range_header[6:].partition("-")
+    try:
+        if start_text:
+            start = int(start_text)
+            if start < 0:
+                return None
+            if total_size is not None and start >= total_size:
+                return None
+            if end_text:
+                requested_end = int(end_text)
+                if requested_end < start:
+                    return None
+                if total_size is not None:
+                    requested_end = min(requested_end, total_size - 1)
+                length = requested_end - start + 1
+            elif total_size is not None:
+                length = total_size - start
+            else:
+                length = max_length
+        else:
+            if total_size is None:
+                return None
+            suffix_len = int(end_text)
+            if suffix_len <= 0:
+                return None
+            length = min(suffix_len, total_size)
+            start = max(0, total_size - length)
+    except ValueError:
+        return None
+
+    if length <= 0:
+        return None
+    return start, min(length, max_length)
+
+
+def _video_partial_response(
+    content: bytes,
+    *,
+    media_type: str,
+    start: int,
+    total_size: int | None,
+) -> Response:
+    from fastapi.responses import Response as FastResponse
+
+    end = start + len(content) - 1
+    total = str(total_size) if total_size is not None else "*"
+    return FastResponse(
+        status_code=206,
+        content=content,
+        media_type=media_type,
+        headers={
+            "Accept-Ranges": "bytes",
+            "Cache-Control": "public, max-age=3600",
+            "Content-Range": f"bytes {start}-{end}/{total}",
+            "Content-Length": str(len(content)),
+        },
+    )
 
 
 def _video_range_response(
@@ -973,6 +1102,40 @@ async def ipfs_video_proxy(
     if not _valid_public_cid(cid):
         return FastResponse(status_code=400, content=b"")
     try:
+        if range_header:
+            total_size = await _fetch_public_ipfs_size(cid)
+            parsed_range = _parse_video_range(
+                range_header,
+                total_size=total_size,
+                max_length=PUBLIC_IPFS_VIDEO_RANGE_MAX_BYTES,
+            )
+            if parsed_range is None:
+                return FastResponse(
+                    status_code=416,
+                    content=b"",
+                    headers={"Accept-Ranges": "bytes"},
+                )
+            offset, length = parsed_range
+            status_code, content = await _fetch_public_ipfs_range(
+                cid,
+                offset=offset,
+                length=length,
+            )
+            if status_code == 413:
+                return FastResponse(
+                    status_code=413,
+                    content=b"",
+                    headers={"Accept-Ranges": "bytes"},
+                )
+            if status_code != 200 or not content:
+                return FastResponse(status_code=404, content=b"")
+            return _video_partial_response(
+                content,
+                media_type=_detect_public_media_type(content, prefer_video=True),
+                start=offset,
+                total_size=total_size,
+            )
+
         status_code, content = await _fetch_public_ipfs(cid, max_bytes=PUBLIC_IPFS_VIDEO_MAX_BYTES)
         if status_code == 413:
             return FastResponse(status_code=413, content=b"", headers={"Accept-Ranges": "bytes"})

@@ -299,6 +299,36 @@ start_nats() {
   die "NATS not listening on :4222"
 }
 
+write_vast_ipfs_env() {
+  python3 - "$REPO_DIR/.env.local" <<'PY'
+from pathlib import Path
+import sys
+
+path = Path(sys.argv[1])
+updates = {
+    "IPFS_API": "http://localhost:5001",
+    "IPFS_API_ENDPOINTS": "http://localhost:5001",
+    "MIN_IPFS_PINS": "1",
+}
+text = path.read_text(encoding="utf-8", errors="ignore") if path.exists() else ""
+lines = []
+seen = set()
+for line in text.splitlines():
+    if "=" in line and not line.lstrip().startswith("#"):
+        key = line.split("=", 1)[0].strip()
+        if key in updates:
+            lines.append(f"{key}={updates[key]}")
+            seen.add(key)
+            continue
+    lines.append(line)
+for key, value in updates.items():
+    if key not in seen:
+        lines.append(f"{key}={value}")
+path.write_text("\n".join(lines).rstrip() + "\n", encoding="utf-8")
+PY
+  log "Vast IPFS profile: single local Kubo node, MIN_IPFS_PINS=1 (not Law-2 durable replication)"
+}
+
 start_ipfs() {
   if ! command -v ipfs >/dev/null 2>&1; then
     die "ipfs binary missing; install IPFS before running the stack"
@@ -306,6 +336,7 @@ start_ipfs() {
 
   log "Starting IPFS..."
   if curl -sf -X POST http://localhost:5001/api/v0/version >/dev/null 2>&1; then
+    write_vast_ipfs_env
     log "IPFS OK"
     return 0
   fi
@@ -315,6 +346,7 @@ start_ipfs() {
     nohup ipfs daemon --enable-gc >"$LOG_DIR/ipfs.log" 2>&1 &
   fi
   wait_http_post "http://localhost:5001/api/v0/version" "IPFS" 180 3 || die "IPFS not responding"
+  write_vast_ipfs_env
 }
 
 start_ollama() {
