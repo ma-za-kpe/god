@@ -4,7 +4,7 @@ import json
 from unittest.mock import patch
 
 import pytest
-from ipfs_client import _cid_from_add_line, _pin_once, ipfs_endpoints, pin_bytes
+from ipfs_client import _cid_from_add_line, _pin_once, _verify_once, ipfs_endpoints, pin_bytes
 
 
 class _StreamingAddResponse:
@@ -36,6 +36,38 @@ class _StreamingAddClient:
             "url": url,
             "params": params,
             "files": files,
+        }
+        return self.response
+
+
+class _StreamingVerifyResponse:
+    def __init__(self):
+        self.closed = False
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, exc_type, exc, tb):
+        self.closed = True
+
+    def raise_for_status(self):
+        return None
+
+    async def aiter_bytes(self):
+        yield b'{"Keys":{"QmStreamCID123":{"Type":"recursive"}}}\n'
+        raise AssertionError("_verify_once should close after the first streamed pin result")
+
+
+class _StreamingVerifyClient:
+    def __init__(self):
+        self.response = _StreamingVerifyResponse()
+        self.request = None
+
+    def stream(self, method, url, *, params):
+        self.request = {
+            "method": method,
+            "url": url,
+            "params": params,
         }
         return self.response
 
@@ -121,4 +153,19 @@ async def test_pin_once_returns_from_first_streamed_add_result():
         "url": "http://node-1:5001/api/v0/add",
         "params": {"pin": "true"},
         "files": {"file": ("voice.wav", b"audio", "application/octet-stream")},
+    }
+
+
+@pytest.mark.asyncio
+async def test_verify_once_returns_from_first_streamed_pin_ls_result():
+    client = _StreamingVerifyClient()
+
+    verified = await _verify_once(client, "http://node-1:5001", "QmStreamCID123")
+
+    assert verified
+    assert client.response.closed
+    assert client.request == {
+        "method": "POST",
+        "url": "http://node-1:5001/api/v0/pin/ls",
+        "params": {"arg": "QmStreamCID123"},
     }
