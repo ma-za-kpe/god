@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+import pathlib
 from dataclasses import dataclass
 
 import pytest
@@ -12,6 +14,11 @@ from gpu import GPUJobQueue
 
 
 MP4_BYTES = b"\x00\x00\x00\x18ftypmp42" + (b"0" * 2048)
+
+
+def _workflow(name: str) -> dict:
+    path = pathlib.Path(__file__).resolve().parents[1] / "workflows" / name
+    return json.loads(path.read_text(encoding="utf-8"))
 
 
 class _Response:
@@ -98,6 +105,21 @@ class _Pin:
 def _patch_comfy(monkeypatch, client: _FakeComfyClient) -> None:
     monkeypatch.setattr(video_generator.asyncio, "sleep", _no_sleep)
     monkeypatch.setattr(video_generator.httpx, "AsyncClient", lambda **_kwargs: client)
+
+
+def test_ltx_workflow_includes_required_live_comfy_inputs():
+    workflow = _workflow("ltx_image_to_video_loop.json")
+
+    assert workflow["286"]["inputs"]["longer_edge"] == "{{WIDTH}}"
+    assert workflow["288"]["inputs"]["strength"] == 1.0
+    assert workflow["289"]["inputs"]["img_compression"] == 35
+    assert workflow["290"]["inputs"]["resize_type.crop"] == "center"
+    assert workflow["296"]["inputs"]["strength"] == 1.0
+    assert workflow["285"]["inputs"]["strength_model"] == 1.0
+    assert workflow["282"]["inputs"]["cfg"] == 1.0
+    assert workflow["314"]["inputs"]["cfg"] == 1.0
+    assert workflow["315"]["inputs"]["temporal_size"] == 64
+    assert workflow["315"]["inputs"]["temporal_overlap"] == 8
 
 
 @pytest.mark.asyncio
