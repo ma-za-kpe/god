@@ -45,8 +45,15 @@ class _FakeComfyClient:
     async def __aexit__(self, exc_type, exc, tb):
         return None
 
-    async def post(self, url, json):
-        self.posts.append({"url": url, "json": json})
+    async def post(self, url, json=None, data=None, files=None, params=None):
+        self.posts.append(
+            {"url": url, "json": json, "data": data, "files": files, "params": params}
+        )
+        if url.endswith("/api/v0/cat"):
+            return _Response(content=b"\x89PNG\r\n\x1a\n" + (b"0" * 2048))
+        if url.endswith("/upload/image"):
+            filename = files["image"][0] if files and "image" in files else "upload.png"
+            return _Response(payload={"name": filename, "type": "input"})
         return _Response(payload={"prompt_id": "prompt-1"})
 
     async def get(self, url, params=None):
@@ -112,7 +119,7 @@ async def test_submit_workflow_result_posts_polls_and_fetches_video(monkeypatch)
     assert result.prompt_id == "prompt-1"
     assert result.filename == "loop.mp4"
     assert client.posts[0]["json"]["prompt"] == {
-        "1": {"inputs": {"prompt": "idle breathing", "width": "640"}}
+        "1": {"inputs": {"prompt": "idle breathing", "width": 640}}
     }
     assert client.view_params[0]["filename"] == "loop.mp4"
 
@@ -121,7 +128,7 @@ async def test_submit_workflow_result_posts_polls_and_fetches_video(monkeypatch)
 async def test_submit_workflow_result_blocks_missing_comfy_nodes_before_prompt(monkeypatch):
     client = _FakeComfyClient(object_info={"LoadImage": {}, "SaveVideo": {}})
     _patch_comfy(monkeypatch, client)
-    generator = VideoGenerator("http://comfy:8188", timeout_s=1)
+    generator = VideoGenerator("http://comfy:8188", timeout_s=1, stage_ipfs_media=False)
 
     result = await generator.submit_workflow_result(
         {
@@ -134,6 +141,29 @@ async def test_submit_workflow_result_blocks_missing_comfy_nodes_before_prompt(m
     assert result.ok is False
     assert result.error == "missing_comfy_nodes:LoadImageFromIPFS,LTXImageToVideo"
     assert client.posts == []
+
+
+@pytest.mark.asyncio
+async def test_submit_workflow_result_stages_ipfs_image_before_prompt(monkeypatch):
+    client = _FakeComfyClient(object_info={"LoadImage": {}, "SaveVideo": {}})
+    _patch_comfy(monkeypatch, client)
+    generator = VideoGenerator("http://comfy:8188", timeout_s=1, ipfs_api="http://ipfs:5001")
+
+    result = await generator.submit_workflow_result(
+        {
+            "1": {"class_type": "LoadImageFromIPFS", "inputs": {"cid": "portrait-cid"}},
+            "2": {"class_type": "SaveVideo", "inputs": {"video": ["1", 0]}},
+        },
+        {},
+    )
+
+    assert result.ok is True
+    assert client.posts[0]["url"] == "http://ipfs:5001/api/v0/cat"
+    assert client.posts[0]["params"] == {"arg": "portrait-cid"}
+    assert client.posts[1]["url"] == "http://comfy:8188/upload/image"
+    posted_prompt = client.posts[2]["json"]["prompt"]
+    assert posted_prompt["1"]["class_type"] == "LoadImage"
+    assert posted_prompt["1"]["inputs"]["image"] == "god_image_portrait-cid.png"
 
 
 @pytest.mark.asyncio

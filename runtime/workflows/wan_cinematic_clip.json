@@ -1,17 +1,10 @@
 {
   "_meta": {
     "name": "wan_cinematic_clip",
-    "description": "Offline Wan cinematic image-to-video template for high-resolution highlight/cutaway clips.",
+    "source": "ComfyUI Image to Video (Wan 2.2) blueprint",
     "model_family": "wan",
-    "required_custom_nodes": [
-      "ComfyUI-WanVideoWrapper"
-    ],
-    "output": "mp4_or_webm",
-    "live_policy": "offline_only",
-    "notes": [
-      "Runtime replaces PORTRAIT_CID, PROMPT, MOTION_PROMPT, VIDEO_MODEL, WIDTH, HEIGHT, and DURATION_MS before submission.",
-      "Never place this workflow in the blocking live speaker path."
-    ]
+    "output": "mp4",
+    "live_policy": "offline_only"
   },
   "1": {
     "class_type": "LoadImageFromIPFS",
@@ -19,30 +12,202 @@
       "cid": "{{PORTRAIT_CID}}"
     }
   },
-  "2": {
+  "84": {
+    "class_type": "CLIPLoader",
+    "inputs": {
+      "clip_name": "umt5_xxl_fp8_e4m3fn_scaled.safetensors",
+      "type": "wan",
+      "device": "default"
+    }
+  },
+  "90": {
+    "class_type": "VAELoader",
+    "inputs": {
+      "vae_name": "wan_2.1_vae.safetensors"
+    }
+  },
+  "95": {
+    "class_type": "UNETLoader",
+    "inputs": {
+      "unet_name": "wan2.2_i2v_low_noise_14B_fp8_scaled.safetensors",
+      "weight_dtype": "default"
+    }
+  },
+  "96": {
+    "class_type": "UNETLoader",
+    "inputs": {
+      "unet_name": "wan2.2_i2v_high_noise_14B_fp8_scaled.safetensors",
+      "weight_dtype": "default"
+    }
+  },
+  "103": {
+    "class_type": "ModelSamplingSD3",
+    "inputs": {
+      "model": [
+        "102",
+        0
+      ]
+    }
+  },
+  "93": {
+    "class_type": "CLIPTextEncode",
+    "inputs": {
+      "text": "{{PROMPT}} {{MOTION_PROMPT}}",
+      "clip": [
+        "84",
+        0
+      ]
+    }
+  },
+  "89": {
+    "class_type": "CLIPTextEncode",
+    "inputs": {
+      "text": "\u8272\u8c03\u8273\u4e3d\uff0c\u8fc7\u66dd\uff0c\u9759\u6001\uff0c\u7ec6\u8282\u6a21\u7cca\u4e0d\u6e05\uff0c\u5b57\u5e55\uff0c\u98ce\u683c\uff0c\u4f5c\u54c1\uff0c\u753b\u4f5c\uff0c\u753b\u9762\uff0c\u9759\u6b62\uff0c\u6574\u4f53\u53d1\u7070\uff0c\u6700\u5dee\u8d28\u91cf\uff0c\u4f4e\u8d28\u91cf\uff0cJPEG\u538b\u7f29\u6b8b\u7559\uff0c\u4e11\u964b\u7684\uff0c\u6b8b\u7f3a\u7684\uff0c\u591a\u4f59\u7684\u624b\u6307\uff0c\u753b\u5f97\u4e0d\u597d\u7684\u624b\u90e8\uff0c\u753b\u5f97\u4e0d\u597d\u7684\u8138\u90e8\uff0c\u7578\u5f62\u7684\uff0c\u6bc1\u5bb9\u7684\uff0c\u5f62\u6001\u7578\u5f62\u7684\u80a2\u4f53\uff0c\u624b\u6307\u878d\u5408\uff0c\u9759\u6b62\u4e0d\u52a8\u7684\u753b\u9762\uff0c\u6742\u4e71\u7684\u80cc\u666f\uff0c\u4e09\u6761\u817f\uff0c\u80cc\u666f\u4eba\u5f88\u591a\uff0c\u5012\u7740\u8d70",
+      "clip": [
+        "84",
+        0
+      ]
+    }
+  },
+  "101": {
+    "class_type": "LoraLoaderModelOnly",
+    "inputs": {
+      "model": [
+        "95",
+        0
+      ],
+      "lora_name": "wan2.2_i2v_lightx2v_4steps_lora_v1_low_noise.safetensors"
+    }
+  },
+  "102": {
+    "class_type": "LoraLoaderModelOnly",
+    "inputs": {
+      "model": [
+        "96",
+        0
+      ],
+      "lora_name": "wan2.2_i2v_lightx2v_4steps_lora_v1_high_noise.safetensors"
+    }
+  },
+  "104": {
+    "class_type": "ModelSamplingSD3",
+    "inputs": {
+      "model": [
+        "101",
+        0
+      ]
+    }
+  },
+  "98": {
     "class_type": "WanImageToVideo",
     "inputs": {
-      "image": [
+      "positive": [
+        "93",
+        0
+      ],
+      "negative": [
+        "89",
+        0
+      ],
+      "vae": [
+        "90",
+        0
+      ],
+      "width": "{{WIDTH}}",
+      "start_image": [
         "1",
         0
       ],
-      "prompt": "{{PROMPT}} {{MOTION_PROMPT}}",
-      "model": "{{VIDEO_MODEL}}",
-      "width": "{{WIDTH}}",
       "height": "{{HEIGHT}}",
-      "duration_ms": "{{DURATION_MS}}"
+      "length": "{{FRAME_COUNT_16FPS}}"
     }
   },
-  "3": {
-    "class_type": "VHS_VideoCombine",
+  "86": {
+    "class_type": "KSamplerAdvanced",
     "inputs": {
-      "images": [
-        "2",
+      "model": [
+        "104",
         0
       ],
-      "frame_rate": 24,
-      "format": "video/h264-mp4",
-      "filename_prefix": "god_wan_cinematic"
+      "add_noise": 0,
+      "noise_seed": "randomize",
+      "steps": 4,
+      "cfg": 1,
+      "sampler_name": "euler",
+      "scheduler": "simple",
+      "positive": [
+        "98",
+        0
+      ],
+      "negative": [
+        "98",
+        1
+      ],
+      "latent_image": [
+        "98",
+        2
+      ]
+    }
+  },
+  "85": {
+    "class_type": "KSamplerAdvanced",
+    "inputs": {
+      "model": [
+        "103",
+        0
+      ],
+      "add_noise": 0,
+      "noise_seed": "fixed",
+      "steps": 4,
+      "cfg": 1,
+      "sampler_name": "euler",
+      "scheduler": "simple",
+      "positive": [
+        "98",
+        0
+      ],
+      "negative": [
+        "98",
+        1
+      ],
+      "latent_image": [
+        "86",
+        0
+      ]
+    }
+  },
+  "117": {
+    "class_type": "CreateVideo",
+    "inputs": {
+      "images": [
+        "87",
+        0
+      ]
+    }
+  },
+  "87": {
+    "class_type": "VAEDecode",
+    "inputs": {
+      "samples": [
+        "85",
+        0
+      ],
+      "vae": [
+        "90",
+        0
+      ]
+    }
+  },
+  "1117": {
+    "class_type": "SaveVideo",
+    "inputs": {
+      "video": [
+        "117",
+        0
+      ],
+      "filename_prefix": "god_wan_cinematic",
+      "format": "mp4",
+      "codec": "h264"
     }
   }
 }
