@@ -7,8 +7,8 @@ Status: Vast OBS/Fish proof captured, YouTube VOD link still pending
 ## Scope
 
 Issue #101 requires a YouTube-first OBS/private stream proof where Fish voice,
-procedural life, captions, and fallback state are visible. The current pass is
-code-only: no Vast.ai host, OBS stream start, model loading, or YouTube VOD run.
+procedural life, captions, and fallback state are visible. The initial pass was
+code-only; later Vast field runs added OBS, Fish, runtime, and rendered-stage evidence.
 
 ## Code Contract Added
 
@@ -115,11 +115,25 @@ Verified after restart:
 - `GPU_BACKGROUND_JOBS_ALLOWED=false` was exported by the Vast runtime stage.
 - `/diagnostics/gpu` reported `background_jobs_allowed=false`, queue depth `0`, and no
   active GPU job.
+- A fresh `/ready` probe on runtime port `8888` returned `ok=true` with no failed checks.
 - OBS was already streaming and the restart script restarted the RTMP stream to clear
   stale ingest state.
 - Fish S2-Pro restarted and a direct synthesis probe returned `86060` WAV bytes.
 - `/broadcast/youtube-proof` reached `degraded_private_test_ready` at
   `2026-06-28 17:49:56 UTC` with no failed checks.
+
+Additional rendered proof captured from the Vast Xvfb display at `2026-06-28 18:10:09 UTC`:
+
+- Live stage screenshot:
+  `field-reports/assets/2026-06-28-vast-video-proof/live-surface-20260628-181009.png`
+- Live stage 8 second capture:
+  `field-reports/assets/2026-06-28-vast-video-proof/live-surface-20260628-181009.mp4`
+
+The first capture showed OBS live and the stage rendering, but also exposed the browser's
+`AUDIO MUTED` overlay. The stage was clicked on the Vast display to unlock browser audio,
+then the final screenshot/video were captured. The final screenshot was visually inspected
+and shows the ensemble stage, `OBSERVER LIVE runtime healthy`, procedural mouth bars, and
+no audio-muted overlay.
 
 Remaining caveat:
 
@@ -127,3 +141,4 @@ Remaining caveat:
   already busy generating speech. Later proof/readiness probes intermittently fell back to
   `voice_fallback` while Fish completed long TTS requests. Treat this as a #101 field
   stability issue; it does not block #99/#100 video asset acceptance.
+- The issue still needs a linked 5-10 minute YouTube VOD and benchmark notes before closure.
