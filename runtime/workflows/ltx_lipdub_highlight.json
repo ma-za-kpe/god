@@ -1,58 +1,14 @@
 {
   "_meta": {
     "name": "ltx_lipdub_highlight",
-    "description": "Offline LTX LipDub/highlight template for source portrait plus Fish/audio reference.",
+    "description": "Disabled placeholder for LTX LipDub/highlight generation.",
     "model_family": "ltx_lipdub",
-    "required_custom_nodes": [
-      "ComfyUI-LTXVideo"
-    ],
-    "output": "mp4_or_webm",
+    "output": "mp4",
     "live_policy": "offline_only",
+    "disabled_error": "ltx_lipdub_requires_source_video_workflow",
     "notes": [
-      "Runtime replaces PORTRAIT_CID, SOURCE_AUDIO_CID, PROMPT, MOTION_PROMPT, VIDEO_MODEL, WIDTH, HEIGHT, and DURATION_MS before submission.",
-      "This workflow is for highlight/export generation, not live dialogue rendering."
+      "The installed ComfyUI-LTXVideo package exposes LipDub as an IC-LoRA workflow over a source video with audio, not as a single LTXLipDub portrait+audio node.",
+      "Do not submit the old fake LTXLipDub node. Add a source-video preparation workflow before enabling this path."
     ]
-  },
-  "1": {
-    "class_type": "LoadImageFromIPFS",
-    "inputs": {
-      "cid": "{{PORTRAIT_CID}}"
-    }
-  },
-  "2": {
-    "class_type": "LoadAudioFromIPFS",
-    "inputs": {
-      "cid": "{{SOURCE_AUDIO_CID}}"
-    }
-  },
-  "3": {
-    "class_type": "LTXLipDub",
-    "inputs": {
-      "image": [
-        "1",
-        0
-      ],
-      "audio": [
-        "2",
-        0
-      ],
-      "prompt": "{{PROMPT}} {{MOTION_PROMPT}}",
-      "model": "{{VIDEO_MODEL}}",
-      "width": "{{WIDTH}}",
-      "height": "{{HEIGHT}}",
-      "duration_ms": "{{DURATION_MS}}"
-    }
-  },
-  "4": {
-    "class_type": "VHS_VideoCombine",
-    "inputs": {
-      "images": [
-        "3",
-        0
-      ],
-      "frame_rate": 24,
-      "format": "video/h264-mp4",
-      "filename_prefix": "god_ltx_lipdub"
-    }
   }
 }

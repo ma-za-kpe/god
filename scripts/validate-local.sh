@@ -33,6 +33,7 @@ Write-Host '[validate] runtime tests'
 \$testStatus = 0
 Invoke-Checked { docker exec god-runtime sh -lc 'rm -rf /tmp/god-validation && mkdir -p /tmp/god-validation/suite/src /tmp/god-validation/suite/runtime-tests /tmp/god-validation/observer' } 'prepare runtime test dir'
 Invoke-Checked { docker cp \"\$root/runtime/src/.\" god-runtime:/tmp/god-validation/suite/src } 'copy runtime src'
+Invoke-Checked { docker cp \"\$root/runtime/workflows\" god-runtime:/tmp/god-validation/suite/workflows } 'copy runtime workflows'
 Invoke-Checked { docker cp \"\$root/runtime/seed_utterances\" god-runtime:/tmp/god-validation/suite/seed_utterances } 'copy seed utterances'
 Invoke-Checked { docker cp \"\$root/runtime/tests/.\" god-runtime:/tmp/god-validation/suite/runtime-tests } 'copy runtime tests'
 Invoke-Checked { docker cp \"\$root/scripts\" god-runtime:/tmp/god-validation/scripts } 'copy scripts'

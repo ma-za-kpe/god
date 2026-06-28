@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
+import re
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -85,9 +87,19 @@ PinVideo = Callable[[bytes], Awaitable[Any]]
 class VideoGenerator:
     """Submit ComfyUI video workflows and fetch MP4/WebM outputs."""
 
-    def __init__(self, comfy_endpoint: str, *, timeout_s: int = 300) -> None:
+    def __init__(
+        self,
+        comfy_endpoint: str,
+        *,
+        timeout_s: int = 300,
+        ipfs_api: str | None = None,
+        stage_ipfs_media: bool = True,
+    ) -> None:
         self.endpoint = (comfy_endpoint or "").rstrip("/")
         self.timeout_s = timeout_s
+        self.ipfs_api = (ipfs_api or os.getenv("IPFS_API") or "http://localhost:5001").rstrip("/")
+        self.stage_ipfs_media = stage_ipfs_media
+        self.stage_media_max_bytes = int(os.getenv("COMFYUI_STAGE_MEDIA_MAX_BYTES", "67108864"))
 
     async def health_check(self) -> bool:
         if not self.endpoint:
@@ -115,10 +127,16 @@ class VideoGenerator:
     ) -> VideoGenerationResult:
         if not self.endpoint:
             return VideoGenerationResult(ok=False, error="comfy_endpoint_not_configured")
+        disabled_error = self._workflow_disabled_error(workflow_template)
+        if disabled_error:
+            return VideoGenerationResult(ok=False, error=disabled_error)
         workflow = self._replace_tokens(workflow_template, replacements)
         workflow = {key: value for key, value in workflow.items() if key != "_meta"}
 
         async with httpx.AsyncClient(timeout=self.timeout_s, follow_redirects=True) as client:
+            stage_error = await self._stage_ipfs_inputs(client, workflow)
+            if stage_error:
+                return VideoGenerationResult(ok=False, error=stage_error)
             missing_nodes = await self._missing_comfy_nodes(client, workflow)
             if missing_nodes:
                 return VideoGenerationResult(
@@ -213,6 +231,8 @@ class VideoGenerator:
                         "{{WIDTH}}": request.width,
                         "{{HEIGHT}}": request.height,
                         "{{DURATION_MS}}": request.duration_ms,
+                        "{{DURATION_S}}": self._duration_seconds(request.duration_ms),
+                        "{{FRAME_COUNT_24FPS}}": self._frame_count(request.duration_ms, fps=24),
                     },
                     cancel_check=lambda: lease.cancellation_requested,
                     cancel_reason=lambda: lease.cancel_reason,
@@ -300,6 +320,9 @@ class VideoGenerator:
                         "{{WIDTH}}": request.width,
                         "{{HEIGHT}}": request.height,
                         "{{DURATION_MS}}": request.duration_ms,
+                        "{{DURATION_S}}": self._duration_seconds(request.duration_ms),
+                        "{{FRAME_COUNT_16FPS}}": self._frame_count(request.duration_ms, fps=16),
+                        "{{FRAME_COUNT_24FPS}}": self._frame_count(request.duration_ms, fps=24),
                         "{{SOURCE_AUDIO_CID}}": request.source_audio_cid,
                     },
                     cancel_check=lambda: lease.cancellation_requested,
@@ -463,6 +486,15 @@ class VideoGenerator:
                 required.append(class_type)
         return required
 
+    def _workflow_disabled_error(self, workflow_template: dict[str, Any]) -> str:
+        meta = workflow_template.get("_meta")
+        if not isinstance(meta, dict):
+            return ""
+        disabled_error = meta.get("disabled_error")
+        if not disabled_error:
+            return ""
+        return f"workflow_disabled:{disabled_error}"
+
     def _cancel_requested(self, cancel_check: Callable[[], bool] | None) -> bool:
         if cancel_check is None:
             return False
@@ -497,11 +529,114 @@ class VideoGenerator:
         if isinstance(value, list):
             return [self._replace_tokens(item, replacements) for item in value]
         if isinstance(value, str):
+            if value in replacements:
+                return replacements[value]
             result = value
             for token, replacement in replacements.items():
                 result = result.replace(token, str(replacement))
             return result
         return value
+
+    async def _stage_ipfs_inputs(self, client: httpx.AsyncClient, workflow: dict[str, Any]) -> str:
+        if not self.stage_ipfs_media:
+            return ""
+        if not self.endpoint or not self.ipfs_api:
+            return ""
+
+        for node in workflow.values():
+            if not isinstance(node, dict):
+                continue
+            class_type = node.get("class_type")
+            inputs = node.get("inputs")
+            if not isinstance(inputs, dict):
+                continue
+            if class_type == "LoadImageFromIPFS":
+                cid = str(inputs.get("cid") or "")
+                filename, error = await self._stage_ipfs_media_file(client, cid, media_kind="image")
+                if error:
+                    return error
+                node["class_type"] = "LoadImage"
+                node["inputs"] = {"image": filename}
+            elif class_type == "LoadAudioFromIPFS":
+                cid = str(inputs.get("cid") or "")
+                filename, error = await self._stage_ipfs_media_file(client, cid, media_kind="audio")
+                if error:
+                    return error
+                node["class_type"] = "LoadAudio"
+                node["inputs"] = {"audio": filename}
+        return ""
+
+    async def _stage_ipfs_media_file(
+        self, client: httpx.AsyncClient, cid: str, *, media_kind: str
+    ) -> tuple[str, str]:
+        if not cid:
+            return "", f"ipfs_media_cid_missing:{media_kind}"
+        payload, error = await self._fetch_ipfs_media(client, cid)
+        if error:
+            return "", error
+        ext = self._media_extension(payload, media_kind=media_kind)
+        filename = f"god_{media_kind}_{self._safe_cid_filename(cid)}{ext}"
+        response = await client.post(
+            f"{self.endpoint}/upload/image",
+            data={"overwrite": "true", "type": "input"},
+            files={"image": (filename, payload, self._media_content_type(payload, media_kind))},
+        )
+        if response.status_code >= 400:
+            return "", f"comfy_media_upload_failed:{media_kind}:{response.status_code}"
+        try:
+            uploaded = response.json()
+        except Exception:
+            uploaded = {}
+        return str(uploaded.get("name") or filename), ""
+
+    async def _fetch_ipfs_media(self, client: httpx.AsyncClient, cid: str) -> tuple[bytes, str]:
+        try:
+            response = await client.post(
+                f"{self.ipfs_api}/api/v0/cat",
+                params={"arg": cid},
+            )
+        except Exception:
+            return b"", f"ipfs_media_fetch_failed:{cid}"
+        if response.status_code != 200:
+            return b"", f"ipfs_media_fetch_failed:{cid}:{response.status_code}"
+        payload = response.content
+        if not payload:
+            return b"", f"ipfs_media_empty:{cid}"
+        if len(payload) > self.stage_media_max_bytes:
+            return b"", f"ipfs_media_too_large:{cid}:{len(payload)}"
+        return payload, ""
+
+    def _safe_cid_filename(self, cid: str) -> str:
+        return re.sub(r"[^A-Za-z0-9._-]+", "_", cid).strip("._-")[:96] or "asset"
+
+    def _duration_seconds(self, duration_ms: int) -> int:
+        return max(1, round(duration_ms / 1000))
+
+    def _frame_count(self, duration_ms: int, *, fps: int) -> int:
+        frames = max(1, round((duration_ms / 1000) * fps))
+        if frames < 9:
+            return 9
+        return ((frames - 1) // 8) * 8 + 1
+
+    def _media_extension(self, payload: bytes, *, media_kind: str) -> str:
+        if payload.startswith(b"\x89PNG\r\n\x1a\n"):
+            return ".png"
+        if payload.startswith(b"\xff\xd8\xff"):
+            return ".jpg"
+        if payload[:4] == b"RIFF" and payload[8:12] == b"WAVE":
+            return ".wav"
+        if payload.startswith(b"ID3") or payload[:2] == b"\xff\xfb":
+            return ".mp3"
+        return ".wav" if media_kind == "audio" else ".png"
+
+    def _media_content_type(self, payload: bytes, media_kind: str) -> str:
+        ext = self._media_extension(payload, media_kind=media_kind)
+        return {
+            ".png": "image/png",
+            ".jpg": "image/jpeg",
+            ".wav": "audio/wav",
+            ".mp3": "audio/mpeg",
+        }.get(ext, "application/octet-stream")
 
     def validate_video_bytes(self, payload: bytes | None) -> bool:
         if not payload or len(payload) < 1024:

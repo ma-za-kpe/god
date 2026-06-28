@@ -42,8 +42,10 @@ class _FakeComfyClient:
     async def __aexit__(self, exc_type, exc, tb):
         return None
 
-    async def post(self, url, json):
-        self.posts.append({"url": url, "json": json})
+    async def post(self, url, json=None, data=None, files=None, params=None):
+        self.posts.append(
+            {"url": url, "json": json, "data": data, "files": files, "params": params}
+        )
         return _Response(payload={"prompt_id": "quality-1"})
 
     async def get(self, url, params=None):
@@ -136,7 +138,7 @@ def _lipdub_template() -> dict:
 async def test_wan_quality_clip_registers_highlight_manifest_asset(monkeypatch):
     client = _FakeComfyClient()
     _patch_comfy(monkeypatch, client)
-    generator = VideoGenerator("http://comfy:8188", timeout_s=1)
+    generator = VideoGenerator("http://comfy:8188", timeout_s=1, stage_ipfs_media=False)
     monkeypatch.setattr(generator, "_load_workflow_template", lambda _name: _wan_template())
     manifest = VideoManifest(agent_id="soul-1", static_portrait_cid="portrait-cid")
     queue = GPUJobQueue()
@@ -175,7 +177,7 @@ async def test_wan_quality_clip_registers_highlight_manifest_asset(monkeypatch):
 async def test_ltx_lipdub_highlight_records_audio_source_and_offline_priority(monkeypatch):
     client = _FakeComfyClient()
     _patch_comfy(monkeypatch, client)
-    generator = VideoGenerator("http://comfy:8188", timeout_s=1)
+    generator = VideoGenerator("http://comfy:8188", timeout_s=1, stage_ipfs_media=False)
     monkeypatch.setattr(generator, "_load_workflow_template", lambda _name: _lipdub_template())
     manifest = VideoManifest(agent_id="soul-1", static_portrait_cid="portrait-cid")
     queue = GPUJobQueue()
@@ -208,6 +210,38 @@ async def test_ltx_lipdub_highlight_records_audio_source_and_offline_priority(mo
     posted_prompt = client.posts[0]["json"]["prompt"]
     assert posted_prompt["2"]["inputs"]["cid"] == "fish-audio-cid"
     assert posted_prompt["3"]["inputs"]["model"] == "ltx_lipdub"
+
+
+@pytest.mark.asyncio
+async def test_disabled_lipdub_template_fails_before_prompt(monkeypatch):
+    client = _FakeComfyClient()
+    _patch_comfy(monkeypatch, client)
+    generator = VideoGenerator("http://comfy:8188", timeout_s=1)
+    manifest = VideoManifest(agent_id="soul-1", static_portrait_cid="portrait-cid")
+
+    async def pin_video(_payload: bytes):
+        return _Pin(ok=True, cid="cid-lipdub")
+
+    generation = await generator.generate_quality_clip_asset(
+        QualityClipRequest(
+            agent_id="soul-1",
+            portrait_cid="portrait-cid",
+            prompt="highlight line delivery",
+            motion="clear lip sync",
+            source_audio_cid="fish-audio-cid",
+            workflow_template="ltx_lipdub_highlight.json",
+            model="ltx_lipdub",
+            job_priority=JobPriority.OFFLINE_HIGHLIGHT,
+        ),
+        manifest=manifest,
+        pin_video=pin_video,
+        queue=GPUJobQueue(),
+        now=300.0,
+    )
+
+    assert generation.ok is False
+    assert generation.error == "workflow_disabled:ltx_lipdub_requires_source_video_workflow"
+    assert client.posts == []
 
 
 @pytest.mark.asyncio
