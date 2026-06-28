@@ -1041,9 +1041,13 @@ def ensure_section(data: str, section: str, key_values: dict[str, str]) -> str:
 
 simple_keys = {
     "keyint_sec": "2",
+    "KeyframeIntervalSec": "2",
+    "KeyframeInterval": "2",
 }
 adv_keys = {
     "keyint_sec": "2",
+    "KeyframeIntervalSec": "2",
+    "KeyframeInterval": "2",
 }
 updated = ensure_section(text, "SimpleOutput", simple_keys)
 updated = ensure_section(updated, "AdvOut", adv_keys)
