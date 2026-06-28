@@ -783,12 +783,13 @@ class VoiceSurface:
             return _fallback_synthesis(plan, "synthesis_disabled")
         if not endpoint:
             return _fallback_synthesis(plan, "missing_tts_endpoint")
-        if not health.get("ok"):
-            return _fallback_synthesis(plan, "unhealthy_endpoint", endpoint=endpoint)
 
         cached = _synthesis_cache.get(plan.utterance_id)
         if cached is not None:
             return cached
+
+        if not health.get("ok"):
+            return _fallback_synthesis(plan, "unhealthy_endpoint", endpoint=endpoint)
 
         if not _synthesis_lock.acquire(blocking=False):
             return _fallback_synthesis(plan, "synthesis_in_progress", endpoint=endpoint)
