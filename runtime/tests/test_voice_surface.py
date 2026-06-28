@@ -193,6 +193,60 @@ def test_voice_surface_analyzes_fish_audio_for_mouth_amplitude(monkeypatch):
     assert _audio_cache[state.plan.utterance_id] == wav_audio
 
 
+def test_voice_surface_uses_cached_audio_when_health_probe_flakes(monkeypatch):
+    _clear_voice_caches()
+    snapshot = _snapshot()
+    wav_audio = _wav_bytes(amplitude=0.5)
+
+    class _OllamaResponse:
+        status_code = 200
+        headers = {"content-type": "application/json"}
+        content = b"{}"
+
+        def raise_for_status(self):
+            return None
+
+    class _AudioResponse:
+        status_code = 200
+        headers = {"content-type": "audio/wav"}
+        content = wav_audio
+
+        def raise_for_status(self):
+            return None
+
+    def _post(url, *args, **kwargs):
+        if str(url).endswith("/v1/tts"):
+            return _AudioResponse()
+        return _OllamaResponse()
+
+    monkeypatch.setenv("TTS_ENDPOINT", "http://fish-speech:7860")
+    monkeypatch.setenv("VOICE_ENABLED", "true")
+    monkeypatch.setenv("VOICE_SYNTHESIS_ENABLED", "true")
+    monkeypatch.setattr("voice.engine.probe_url", lambda *args, **kwargs: {"ok": True})
+    monkeypatch.setattr("voice.engine.httpx.post", _post)
+
+    first = VoiceSurface(enabled=True, dry_run=False).compose(snapshot)
+    assert first.synthesis["ok"] is True
+    assert first.synthesis["audio_present"] is True
+
+    def _unexpected_post(*args, **kwargs):
+        raise AssertionError("cached synthesis should not call the TTS endpoint")
+
+    monkeypatch.setattr(
+        "voice.engine.probe_url",
+        lambda *args, **kwargs: {"ok": False, "reason": "timeout"},
+    )
+    monkeypatch.setattr("voice.engine.httpx.post", _unexpected_post)
+
+    second = VoiceSurface(enabled=True, dry_run=False).compose(snapshot)
+
+    assert second.health["ok"] is False
+    assert second.synthesis["ok"] is True
+    assert second.synthesis["audio_present"] is True
+    assert second.synthesis["endpoint"].endswith("/v1/tts")
+    assert _audio_cache[second.plan.utterance_id] == wav_audio
+
+
 def test_voice_reference_failure_reports_philosopher_fallback(monkeypatch):
     _clear_voice_caches()
     surface = VoiceSurface(enabled=True, dry_run=False)
