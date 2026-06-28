@@ -497,6 +497,9 @@ ensure_xvfb_display() {
       pkill -9 -x Xvfb 2>/dev/null || true
       rm -f /tmp/.X99-lock /tmp/.X11-unix/X99 2>/dev/null || true
       sleep 2
+    elif [ -e /tmp/.X99-lock ] || [ -S /tmp/.X11-unix/X99 ]; then
+      log "Removing stale Xvfb display :99 lock/socket"
+      rm -f /tmp/.X99-lock /tmp/.X11-unix/X99 2>/dev/null || true
     fi
 
     nohup Xvfb :99 -screen 0 1920x1080x24 -ac >"$LOG_DIR/xvfb.log" 2>&1 &
