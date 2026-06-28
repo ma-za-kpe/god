@@ -112,6 +112,23 @@ def test_youtube_proof_blocks_silent_or_non_fish_voice_path():
     assert "fish_voice_audio" in failed
 
 
+def test_youtube_proof_recognizes_fish_base_endpoint_without_trailing_slash():
+    snapshot = _snapshot()
+    snapshot["voice"]["provider"] = "local-tts"
+    snapshot["voice"]["synthesis"] = {
+        "ok": False,
+        "reason": "unhealthy_endpoint",
+        "endpoint": "http://localhost:7860",
+    }
+
+    report = build_youtube_live_proof_report(snapshot)
+
+    assert report["status"] == "blocked"
+    assert report["evidence"]["voice"]["fish_configured"] is True
+    assert report["evidence"]["voice"]["audio_present"] is False
+    assert report["operator_state"]["silence_risk"] is True
+
+
 def test_youtube_proof_blocks_missing_procedural_life_and_captions():
     snapshot = _snapshot()
     snapshot["avatar"]["life"] = {}

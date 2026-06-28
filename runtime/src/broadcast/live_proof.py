@@ -105,8 +105,15 @@ def _voice_path(voice: dict[str, Any]) -> dict[str, Any]:
         )
     ).lower()
     endpoint_lc = endpoint.lower()
+    endpoint_base = endpoint_lc.rstrip("/")
     fish_configured = (
         "fish" in provider_blob
+        or endpoint_base
+        in {
+            "http://localhost:7860",
+            "http://127.0.0.1:7860",
+            "http://fish-speech:7860",
+        }
         or endpoint_lc.startswith("http://localhost:7860/")
         or endpoint_lc.startswith("http://127.0.0.1:7860/")
         or endpoint_lc.startswith("http://fish-speech:7860/")
