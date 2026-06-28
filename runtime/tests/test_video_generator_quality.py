@@ -108,6 +108,8 @@ def test_wan_workflow_includes_required_live_comfy_inputs():
 
     assert workflow["101"]["inputs"]["strength_model"] == 1.0
     assert workflow["102"]["inputs"]["strength_model"] == 1.0
+    assert workflow["103"]["inputs"]["shift"] == 3.0
+    assert workflow["104"]["inputs"]["shift"] == 3.0
     assert workflow["98"]["inputs"]["batch_size"] == 1
     assert workflow["86"]["inputs"]["add_noise"] == "enable"
     assert workflow["86"]["inputs"]["noise_seed"] == 42
