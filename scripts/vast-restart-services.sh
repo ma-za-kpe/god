@@ -570,6 +570,12 @@ updates = {
     "VOICE_PULSE_SINK": sys.argv[2],
     "VOICE_XDG_RUNTIME_DIR": sys.argv[3],
     "PULSE_COOKIE": sys.argv[4],
+    "VOICE_PROVIDER": "fish",
+    "TTS_PROVIDER": "fish",
+    "VOICE_MODEL": "fish-speech-s2-pro",
+    "TTS_MODEL": "fish-speech-s2-pro",
+    "VOICE_NAME": "agent-reference",
+    "VOICE_HEALTH_FAILURE_GRACE_SECONDS": "180",
 }
 text = path.read_text(encoding="utf-8", errors="ignore") if path.exists() else ""
 lines = []
