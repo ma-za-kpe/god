@@ -3,84 +3,146 @@
 Date: 2026-06-28
 Parent: #91
 Issues: #99, #100
-Status: runtime preflight hardened; real LTX/Wan/LipDub generation blocked by missing Comfy nodes/models
+Status: LTX and Wan field generation passed; LipDub remains explicitly blocked
 
 ## Vast.ai Host
 
 - Instance: `42507936`
 - GPU: NVIDIA RTX A6000, 48 GB VRAM
-- Deployed commit: `58bd8e1`
-- Free disk at inspection: about 152 GB
+- Deployed commit after fixes: `18d1843`
 - ComfyUI endpoint: `http://localhost:8188`
+- IPFS API: `http://localhost:5001`
+- Disk after model install and field runs: about 67 GB free on the 220 GB root volume
 
-## What Is Present
+## Installed Comfy Support
 
-ComfyUI is running and reports `794` node classes through `/object_info`.
+ComfyUI reported `1156` node classes after installing the video custom nodes.
 
-The host has base Comfy video blueprints under `/opt/ComfyUI/blueprints`, including:
+Required node availability:
 
-- `Image to Video (LTX-2.3).json`
-- `Text to Video (LTX-2.3).json`
-- `Image to Video (Wan 2.2).json`
-- `Text to Video (Wan 2.2).json`
+- `LoadImage`: present
+- `SaveVideo`: present
+- `CreateVideo`: present
+- `LTXVImgToVideoInplace`: present
+- `WanImageToVideo`: present
+- `LoadAudio`: present
+- `LTXLipDub`: not present
 
-Base Comfy includes some Wan node support:
+Installed model files included:
 
-- `WanImageToVideo` is present.
+- LTX: `ltx-2.3-22b-dev-fp8.safetensors`
+- LTX text encoder: `gemma_3_12B_it_fp4_mixed.safetensors`
+- LTX LoRA: `ltxv/ltx2/ltx-2.3-22b-distilled-lora-384.safetensors`
+- LTX upscaler: `ltx-2.3-spatial-upscaler-x2-1.1.safetensors`
+- Wan low/high diffusion models: `wan2.2_i2v_low_noise_14B_fp8_scaled.safetensors`,
+  `wan2.2_i2v_high_noise_14B_fp8_scaled.safetensors`
+- Wan LoRAs: `wan2.2_i2v_lightx2v_4steps_lora_v1_low_noise.safetensors`,
+  `wan2.2_i2v_lightx2v_4steps_lora_v1_high_noise.safetensors`
+- Wan text encoder: `umt5_xxl_fp8_e4m3fn_scaled.safetensors`
+- Wan VAE: `wan_2.1_vae.safetensors`
 
-## What Is Missing
+## Workflow Fixes Validated
 
-The runtime workflow templates still require node classes that are not installed on the host:
+Field generation exposed live Comfy schema requirements that static node-presence checks do not catch.
+The runtime workflows were aligned through PRs #143 and #144:
 
-- `LoadImageFromIPFS`
-- `LoadAudioFromIPFS`
-- `LTXImageToVideo`
-- `LTXLipDub`
-- `VHS_VideoCombine`
+- LTX: added required resize, preprocess, strength, LoRA strength, CFG, and tiled VAE inputs.
+- Wan: added required LoRA strength, sampler control, batch, FPS, and `ModelSamplingSD3.shift` inputs.
 
-Model storage inspection found SDXL only in active model directories. No LTX, Wan, or LipDub
-model files were installed under the expected Comfy model folders.
+## #99 LTX Loop Result
 
-## Live Runtime Preflight
+Input portrait CID:
 
-After PR #139, `VideoGenerator` checks Comfy `/object_info` before submitting video jobs.
-The live Vast preflight now fails explicitly before queueing or submitting impossible jobs:
+- `QmWxZbQXziZGVrdFehBTdfJi3pFoehPDvPCAV2tEumrehn`
+
+Generated output:
+
+- Filename: `god_ltx_avatar_loop_00001_.mp4`
+- Prompt ID: `dc449bf7-f70b-4660-918e-317e82988b7e`
+- Runtime: `154.575` seconds
+- Output bytes: `98703`
+- Content type: `video/mp4`
+- Pinned CID: `bafkreidbdx66etbmvllhlxu6yybefrm6gc5piw26tttvawgp7wczfi6z2u`
+
+Manifest asset:
+
+- Asset ID: `ltx-a4bf1ce0-a62b-432c-8bdc-184a051fb666-1782667625`
+- Variant: `low_res_live`
+- Resolution: `512x288`
+- Duration: `1000 ms`
+- Status: `ready`
+- Motion: `subtle breathing idle loop, natural blink, slight head sway, living portrait`
+
+GPU/disk:
+
+- Before: `269 MiB` used, `48283 MiB` free
+- After: `36773 MiB` used, `11779 MiB` free
+- Disk after run: about `67 GB` free
+
+## #100 Wan Result
+
+Input portrait CID:
+
+- `QmWxZbQXziZGVrdFehBTdfJi3pFoehPDvPCAV2tEumrehn`
+
+Generated output:
+
+- Filename: `god_wan_cinematic_00001_.mp4`
+- Prompt ID: `df30f3c0-7aea-4e03-ba99-0bc6a617ca9c`
+- Runtime: `53.38` seconds
+- Output bytes: `180868`
+- Content type: `video/mp4`
+- Pinned CID: `bafkreih42kgyvihcriiuznswvbofyos7tfxvhamw2sneevx7ocuogfchci`
+
+Manifest asset:
+
+- Asset ID: `wan-a4bf1ce0-a62b-432c-8bdc-184a051fb666-1782668089`
+- Variant: `high_res_highlight`
+- Resolution: `512x288`
+- Duration: `1000 ms`
+- Status: `ready`
+- Motion: `slow cinematic breathing and head movement`
+
+GPU/disk:
+
+- Before: `269 MiB` used, `48283 MiB` free
+- After: `34375 MiB` used, `14177 MiB` free
+- Disk after run: about `67 GB` free
+
+## LipDub Status
+
+LipDub remains explicitly blocked, which satisfies the #100 acceptance branch that allows a measured blocker:
+
+- The installed Comfy environment does not expose `LTXLipDub`.
+- The available ComfyUI-LTXVideo path is an IC-LoRA source-video workflow, not the
+  portrait-plus-audio node assumed by the first runtime skeleton.
+- The attempted LipDub IC-LoRA model URL returned HTTP 401 during provisioning.
+- Runtime workflow `ltx_lipdub_highlight.json` therefore fails closed with
+  `workflow_disabled:ltx_lipdub_requires_source_video_workflow`.
+
+## Live Safety
+
+Before offline video generation, Vast live runtime was restarted from `main` with
+`GPU_BACKGROUND_JOBS_ALLOWED=false`. `/diagnostics/gpu` reported:
 
 ```json
 {
-  "ltx": {
-    "ok": false,
-    "error": "missing_comfy_nodes:LoadImageFromIPFS,LTXImageToVideo,VHS_VideoCombine"
-  },
-  "wan": {
-    "ok": false,
-    "error": "missing_comfy_nodes:LoadImageFromIPFS,VHS_VideoCombine"
-  },
-  "lipdub": {
-    "ok": false,
-    "error": "missing_comfy_nodes:LoadImageFromIPFS,LoadAudioFromIPFS,LTXLipDub,VHS_VideoCombine"
-  }
+  "background_jobs_allowed": false,
+  "queue_depth": 0,
+  "current_job": null
 }
 ```
 
-## Issue Impact
-
-#99 cannot close yet because no real LTX loop was generated, pinned, or registered.
-
-#100 cannot close yet because no real Wan cinematic clip or LTX LipDub/highlight clip was
-generated, pinned, or registered.
-
-The current blocker is provisioning/template alignment, not queue orchestration:
-
-- either install the custom nodes expected by the runtime templates;
-- or replace the runtime templates with API-format workflows that use the built-in Comfy
-  LTX/Wan blueprint node classes;
-- and install the required LTX/Wan/LipDub model files before retrying generation.
+The post-generation stream restart restored Fish, runtime, and OBS. A proof snapshot at
+`2026-06-28 17:49:56 UTC` reported `degraded_private_test_ready` with no failed checks and
+`background_video_jobs_disabled_for_live` passing. Later proof/readiness probes showed Fish
+can still time out while S2-Pro is busy; this remains a #101 field stability caveat, not a
+new #99/#100 blocker.
 
 ## Validation
 
-- Docker focused tests: `runtime/tests/test_video_generator_ltx.py` and
-  `runtime/tests/test_video_generator_quality.py` passed (`9 passed`).
-- Scoped pre-commit for `runtime/src/avatar/video_generator.py` and
-  `runtime/tests/test_video_generator_ltx.py` passed.
-- PR #139 CI/security/pre-commit checks passed.
+- Docker focused tests:
+  `tests/test_video_generator_ltx.py tests/test_video_generator_quality.py tests/test_gpu_job_queue.py`
+  passed (`18 passed`, one existing websockets warning).
+- Full `python -m pre_commit run --all-files` passed for PRs #142, #143, and #144.
+- GitHub checks passed for PRs #142, #143, and #144.

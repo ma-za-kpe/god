@@ -104,3 +104,26 @@ The issue cannot close until a real private YouTube/OBS run records:
 - visible Fish voice plus procedural life;
 - visible captions and live/fallback operator state;
 - no black or silent stream when Comfy/video is unavailable.
+
+## Post-LTX/Wan Field Run Update - 2026-06-28
+
+After PRs #142-#144 and the #99/#100 offline video generation run, Vast was restored to
+the live stream path on commit `18d1843`.
+
+Verified after restart:
+
+- `GPU_BACKGROUND_JOBS_ALLOWED=false` was exported by the Vast runtime stage.
+- `/diagnostics/gpu` reported `background_jobs_allowed=false`, queue depth `0`, and no
+  active GPU job.
+- OBS was already streaming and the restart script restarted the RTMP stream to clear
+  stale ingest state.
+- Fish S2-Pro restarted and a direct synthesis probe returned `86060` WAV bytes.
+- `/broadcast/youtube-proof` reached `degraded_private_test_ready` at
+  `2026-06-28 17:49:56 UTC` with no failed checks.
+
+Remaining caveat:
+
+- Fish S2-Pro can still take longer than the 90 second `/ready` synthesis probe when it is
+  already busy generating speech. Later proof/readiness probes intermittently fell back to
+  `voice_fallback` while Fish completed long TTS requests. Treat this as a #101 field
+  stability issue; it does not block #99/#100 video asset acceptance.
