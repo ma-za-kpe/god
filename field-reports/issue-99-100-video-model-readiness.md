@@ -10,6 +10,7 @@ Status: LTX and Wan field generation passed; LipDub remains explicitly blocked
 - Instance: `42507936`
 - GPU: NVIDIA RTX A6000, 48 GB VRAM
 - Deployed commit after fixes: `18d1843`
+- Field report and proof assets synced on `main` at `b4e177c`
 - ComfyUI endpoint: `http://localhost:8188`
 - IPFS API: `http://localhost:5001`
 - Disk after model install and field runs: about 67 GB free on the 220 GB root volume
@@ -58,6 +59,10 @@ Input portrait CID:
 Generated output:
 
 - Filename: `god_ltx_avatar_loop_00001_.mp4`
+- Proof video:
+  `field-reports/assets/2026-06-28-vast-video-proof/god_ltx_avatar_loop_00001_.mp4`
+- Proof frame:
+  `field-reports/assets/2026-06-28-vast-video-proof/ltx-avatar-loop.png`
 - Prompt ID: `dc449bf7-f70b-4660-918e-317e82988b7e`
 - Runtime: `154.575` seconds
 - Output bytes: `98703`
@@ -88,6 +93,10 @@ Input portrait CID:
 Generated output:
 
 - Filename: `god_wan_cinematic_00001_.mp4`
+- Proof video:
+  `field-reports/assets/2026-06-28-vast-video-proof/god_wan_cinematic_00001_.mp4`
+- Proof frame:
+  `field-reports/assets/2026-06-28-vast-video-proof/wan-cinematic.png`
 - Prompt ID: `df30f3c0-7aea-4e03-ba99-0bc6a617ca9c`
 - Runtime: `53.38` seconds
 - Output bytes: `180868`
@@ -138,6 +147,17 @@ The post-generation stream restart restored Fish, runtime, and OBS. A proof snap
 `background_video_jobs_disabled_for_live` passing. Later proof/readiness probes showed Fish
 can still time out while S2-Pro is busy; this remains a #101 field stability caveat, not a
 new #99/#100 blocker.
+
+Rendered proof captured after the post-generation restart:
+
+- Live stage screenshot:
+  `field-reports/assets/2026-06-28-vast-video-proof/live-surface-20260628-181009.png`
+- Live stage 8 second capture:
+  `field-reports/assets/2026-06-28-vast-video-proof/live-surface-20260628-181009.mp4`
+
+The screenshot was visually inspected and shows the Firefox stage rendering the ensemble,
+`OBSERVER LIVE runtime healthy`, active procedural mouth bars, and no browser audio-muted
+overlay after the stage was clicked to unlock audio.
 
 ## Validation
 
