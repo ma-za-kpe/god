@@ -45,6 +45,13 @@ from .audio_features import analyze_audio_bytes, procedural_mouth_amplitude  # n
 from .state import VoicePlan, VoiceState  # noqa: E402
 
 
+def _env_float(name: str, default: str) -> float:
+    try:
+        return float(os.getenv(name, default))
+    except (TypeError, ValueError):
+        return float(default)
+
+
 class _CachedHealthProbe:
     """TTL-based cached health probe that avoids blocking compose() on network I/O.
 
@@ -66,6 +73,11 @@ class _CachedHealthProbe:
             "reason": "not_yet_probed",
         }
         self._last_probe_time: float = 0.0
+        self._last_success_time: float = 0.0
+        self._failure_grace_seconds = max(
+            0.0,
+            _env_float("VOICE_HEALTH_FAILURE_GRACE_SECONDS", "30"),
+        )
         self._probe_in_flight: bool = False
         self._initialized: bool = False
 
@@ -100,9 +112,31 @@ class _CachedHealthProbe:
         """Run probe with retry in background thread and update the cache."""
         try:
             result = _probe_with_retry(url, timeout=timeout)
+            now = time.monotonic()
             with self._lock:
-                self._cached_result = result
-                self._last_probe_time = time.monotonic()
+                if result.get("ok"):
+                    self._cached_result = result
+                    self._last_success_time = now
+                elif (
+                    self._cached_result.get("ok")
+                    and self._last_success_time > 0.0
+                    and (now - self._last_success_time) <= self._failure_grace_seconds
+                ):
+                    stale_result = dict(self._cached_result)
+                    stale_result["stale_after_failure"] = True
+                    stale_result["last_failure"] = {
+                        key: result.get(key)
+                        for key in ("reason", "status_code", "error", "url")
+                        if result.get(key) is not None
+                    }
+                    stale_result["last_failure_age_seconds"] = round(
+                        now - self._last_success_time,
+                        3,
+                    )
+                    self._cached_result = stale_result
+                else:
+                    self._cached_result = result
+                self._last_probe_time = now
                 self._initialized = True
         except Exception:
             # On unexpected error, keep stale cache and allow next cycle to retry

@@ -5,10 +5,11 @@ from __future__ import annotations
 import io
 import math
 import struct
+import time
 import wave
 
 from voice import VoiceSurface, build_voice_state, build_voice_status
-from voice.engine import _audio_cache, _synthesis_cache
+from voice.engine import _CachedHealthProbe, _audio_cache, _synthesis_cache
 
 
 def _clear_voice_caches() -> None:
@@ -245,6 +246,32 @@ def test_voice_surface_uses_cached_audio_when_health_probe_flakes(monkeypatch):
     assert second.synthesis["audio_present"] is True
     assert second.synthesis["endpoint"].endswith("/v1/tts")
     assert _audio_cache[second.plan.utterance_id] == wav_audio
+
+
+def test_cached_health_probe_keeps_recent_success_after_single_failure(monkeypatch):
+    monkeypatch.setenv("VOICE_HEALTH_FAILURE_GRACE_SECONDS", "30")
+    probe = _CachedHealthProbe(ttl=0.0)
+
+    monkeypatch.setattr(
+        "voice.engine.probe_url",
+        lambda *args, **kwargs: {"ok": True, "probe": "http", "url": "http://fish/health"},
+    )
+    probe._refresh("http://fish/health", timeout=0.01)
+    assert probe._cached_result["ok"] is True
+
+    monkeypatch.setattr(
+        "voice.engine.probe_url",
+        lambda *args, **kwargs: {"ok": False, "reason": "timeout", "url": "http://fish/health"},
+    )
+    probe._refresh("http://fish/health", timeout=0.01)
+    assert probe._cached_result["ok"] is True
+    assert probe._cached_result["stale_after_failure"] is True
+    assert probe._cached_result["last_failure"]["reason"] == "timeout"
+
+    probe._last_success_time = time.monotonic() - 31.0
+    probe._refresh("http://fish/health", timeout=0.01)
+    assert probe._cached_result["ok"] is False
+    assert probe._cached_result["reason"] == "timeout"
 
 
 def test_voice_reference_failure_reports_philosopher_fallback(monkeypatch):
