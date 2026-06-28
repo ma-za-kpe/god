@@ -22,7 +22,9 @@ ENDPOINTS_RAW = os.getenv("IPFS_API_ENDPOINTS", DEFAULT_ENDPOINT)
 MIN_PINS = int(os.getenv("MIN_IPFS_PINS", "3"))
 PIN_RETRIES = int(os.getenv("IPFS_PIN_RETRIES", "3"))
 PIN_TIMEOUT_S = float(os.getenv("IPFS_PIN_TIMEOUT_S", "15"))
-MAX_ADD_RESPONSE_BYTES = int(os.getenv("IPFS_ADD_RESPONSE_MAX_BYTES", "1048576"))
+MAX_STREAM_RESPONSE_BYTES = int(
+    os.getenv("IPFS_STREAM_RESPONSE_MAX_BYTES", os.getenv("IPFS_ADD_RESPONSE_MAX_BYTES", "1048576"))
+)
 
 
 @dataclass(frozen=True)
@@ -40,7 +42,7 @@ def ipfs_endpoints() -> list[str]:
     return endpoints or [DEFAULT_ENDPOINT]
 
 
-def _cid_from_add_line(line: bytes, endpoint: str) -> str | None:
+def _json_object_from_line(line: bytes, endpoint: str) -> dict | None:
     line = line.strip()
     if not line:
         return None
@@ -49,7 +51,53 @@ def _cid_from_add_line(line: bytes, endpoint: str) -> str | None:
     except (UnicodeDecodeError, json.JSONDecodeError):
         return None
     if not isinstance(body, dict):
-        raise ValueError(f"unexpected add response from {endpoint}")
+        raise ValueError(f"unexpected IPFS response from {endpoint}")
+    return body
+
+
+async def _first_streamed_json(
+    client: httpx.AsyncClient,
+    endpoint: str,
+    url: str,
+    *,
+    params: dict[str, str] | None = None,
+    files: dict[str, tuple[str, bytes, str]] | None = None,
+) -> dict:
+    buffer = b""
+    kwargs = {}
+    if params is not None:
+        kwargs["params"] = params
+    if files is not None:
+        kwargs["files"] = files
+
+    async with client.stream("POST", url, **kwargs) as resp:
+        resp.raise_for_status()
+        async for chunk in resp.aiter_bytes():
+            buffer += chunk
+
+            while b"\n" in buffer:
+                line, buffer = buffer.split(b"\n", 1)
+                body = _json_object_from_line(line, endpoint)
+                if body is not None:
+                    return body
+
+            body = _json_object_from_line(buffer, endpoint)
+            if body is not None:
+                return body
+
+            if len(buffer) > MAX_STREAM_RESPONSE_BYTES:
+                raise ValueError(f"IPFS response from {endpoint} exceeded byte limit")
+
+    body = _json_object_from_line(buffer, endpoint)
+    if body is not None:
+        return body
+    raise ValueError(f"empty IPFS response from {endpoint}")
+
+
+def _cid_from_add_line(line: bytes, endpoint: str) -> str | None:
+    body = _json_object_from_line(line, endpoint)
+    if body is None:
+        return None
     cid = body.get("Hash") or body.get("hash") or body.get("Cid") or body.get("cid")
     if not cid:
         raise ValueError(f"no CID in response from {endpoint}")
@@ -63,34 +111,16 @@ async def _pin_once(
     filename: str,
 ) -> str:
     url = f"{endpoint.rstrip('/')}/api/v0/add"
-    buffer = b""
-
-    async with client.stream(
-        "POST",
+    body = await _first_streamed_json(
+        client,
+        endpoint,
         url,
         params={"pin": "true"},
         files={"file": (filename, data, "application/octet-stream")},
-    ) as resp:
-        resp.raise_for_status()
-        async for chunk in resp.aiter_bytes():
-            buffer += chunk
-
-            while b"\n" in buffer:
-                line, buffer = buffer.split(b"\n", 1)
-                cid = _cid_from_add_line(line, endpoint)
-                if cid:
-                    return cid
-
-            cid = _cid_from_add_line(buffer, endpoint)
-            if cid:
-                return cid
-
-            if len(buffer) > MAX_ADD_RESPONSE_BYTES:
-                raise ValueError(f"add response from {endpoint} exceeded byte limit")
-
-    cid = _cid_from_add_line(buffer, endpoint)
+    )
+    cid = body.get("Hash") or body.get("hash") or body.get("Cid") or body.get("cid")
     if cid:
-        return cid
+        return str(cid)
     raise ValueError(f"no CID in response from {endpoint}")
 
 
@@ -99,12 +129,12 @@ async def _verify_once(
     endpoint: str,
     cid: str,
 ) -> bool:
-    resp = await client.post(
+    body = await _first_streamed_json(
+        client,
+        endpoint,
         f"{endpoint.rstrip('/')}/api/v0/pin/ls",
         params={"arg": cid},
     )
-    resp.raise_for_status()
-    body = resp.json()
     keys = body.get("Keys") or body.get("keys") or {}
     if isinstance(keys, dict) and cid in keys:
         return True
