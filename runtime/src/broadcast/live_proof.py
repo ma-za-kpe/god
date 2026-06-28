@@ -267,6 +267,9 @@ def _visual_path(
         voice_path["mouth_amplitude"],
     )
     speaking = bool(avatar.get("speaking") or _as_dict(avatar.get("plan")).get("speaking"))
+    voice_audio_present = bool(
+        voice_path["audio_present"] and voice_path["mode"] in {"fish_audio", "tts_audio"}
+    )
     return {
         "mode": mode,
         "source": source,
@@ -275,7 +278,7 @@ def _visual_path(
         "black_screen_risk": mode == "missing",
         "procedural_life_visible": life_visible,
         "speaking": speaking,
-        "mouth_reacts_to_voice": bool(speaking and mouth_open > 0.0),
+        "mouth_reacts_to_voice": bool(voice_audio_present and mouth_open > 0.0),
         "mouth_open": round(mouth_open, 4),
         "speaker": speaker,
         "agent_id": _text(agent.get("soul_id")),

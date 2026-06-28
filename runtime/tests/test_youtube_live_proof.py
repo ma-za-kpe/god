@@ -98,6 +98,25 @@ def test_youtube_proof_allows_comfy_unavailable_with_portrait_fallback():
     assert report["evidence"]["comfy"]["mode"] == "fallback_only"
 
 
+def test_youtube_proof_accepts_fish_mouth_amplitude_without_avatar_speaking_flag():
+    snapshot = _snapshot()
+    snapshot["avatar"]["speaking"] = False
+    snapshot["avatar"]["mouth_open"] = 0.0
+    snapshot["avatar"]["life"]["mouth_amplitude"] = 0.0
+    snapshot["avatar"]["plan"] = {"speaker": "Alpha", "speaking": False}
+
+    report = build_youtube_live_proof_report(
+        snapshot,
+        runtime_ready={"checks": {"comfyui": {"ok": True}}},
+        gpu_diagnostics={"background_jobs_allowed": False, "queue_depth": 0},
+    )
+
+    assert report["status"] == "ready_for_private_test"
+    assert report["evidence"]["avatar"]["speaking"] is False
+    assert report["evidence"]["avatar"]["mouth_open"] == 0.41
+    assert report["evidence"]["avatar"]["mouth_reacts_to_voice"] is True
+
+
 def test_youtube_proof_blocks_silent_or_non_fish_voice_path():
     snapshot = _snapshot()
     snapshot["voice"]["provider"] = "dry-run"
@@ -110,6 +129,7 @@ def test_youtube_proof_blocks_silent_or_non_fish_voice_path():
     assert report["operator_state"]["silence_risk"] is True
     failed = {check["name"] for check in report["checks"] if not check["ok"]}
     assert "fish_voice_audio" in failed
+    assert "mouth_reacts_to_voice" in failed
 
 
 def test_youtube_proof_recognizes_fish_base_endpoint_without_trailing_slash():
