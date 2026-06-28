@@ -33,8 +33,9 @@ class _Response:
 
 
 class _FakeComfyClient:
-    def __init__(self, *, empty_history: bool = False) -> None:
+    def __init__(self, *, empty_history: bool = False, object_info: dict | None = None) -> None:
         self.empty_history = empty_history
+        self.object_info = object_info
         self.posts: list[dict] = []
         self.view_params: list[dict] = []
 
@@ -49,6 +50,8 @@ class _FakeComfyClient:
         return _Response(payload={"prompt_id": "prompt-1"})
 
     async def get(self, url, params=None):
+        if url.endswith("/object_info") and self.object_info is not None:
+            return _Response(payload=self.object_info)
         if "/history/" in url:
             if self.empty_history:
                 return _Response(payload={})
@@ -112,6 +115,25 @@ async def test_submit_workflow_result_posts_polls_and_fetches_video(monkeypatch)
         "1": {"inputs": {"prompt": "idle breathing", "width": "640"}}
     }
     assert client.view_params[0]["filename"] == "loop.mp4"
+
+
+@pytest.mark.asyncio
+async def test_submit_workflow_result_blocks_missing_comfy_nodes_before_prompt(monkeypatch):
+    client = _FakeComfyClient(object_info={"LoadImage": {}, "SaveVideo": {}})
+    _patch_comfy(monkeypatch, client)
+    generator = VideoGenerator("http://comfy:8188", timeout_s=1)
+
+    result = await generator.submit_workflow_result(
+        {
+            "1": {"class_type": "LoadImageFromIPFS", "inputs": {"cid": "portrait-cid"}},
+            "2": {"class_type": "LTXImageToVideo", "inputs": {"image": ["1", 0]}},
+        },
+        {},
+    )
+
+    assert result.ok is False
+    assert result.error == "missing_comfy_nodes:LoadImageFromIPFS,LTXImageToVideo"
+    assert client.posts == []
 
 
 @pytest.mark.asyncio

@@ -119,6 +119,12 @@ class VideoGenerator:
         workflow = {key: value for key, value in workflow.items() if key != "_meta"}
 
         async with httpx.AsyncClient(timeout=self.timeout_s, follow_redirects=True) as client:
+            missing_nodes = await self._missing_comfy_nodes(client, workflow)
+            if missing_nodes:
+                return VideoGenerationResult(
+                    ok=False,
+                    error=f"missing_comfy_nodes:{','.join(missing_nodes)}",
+                )
             if self._cancel_requested(cancel_check):
                 return VideoGenerationResult(
                     ok=False,
@@ -427,6 +433,35 @@ class VideoGenerator:
             await client.post(f"{self.endpoint}/interrupt", json={"prompt_id": prompt_id})
         except Exception:
             return
+
+    async def _missing_comfy_nodes(
+        self, client: httpx.AsyncClient, workflow: dict[str, Any]
+    ) -> list[str]:
+        required_nodes = self._workflow_class_types(workflow)
+        if not required_nodes:
+            return []
+        try:
+            response = await client.get(f"{self.endpoint}/object_info")
+        except Exception:
+            return []
+        if response.status_code != 200:
+            return []
+        available = response.json()
+        if not isinstance(available, dict):
+            return []
+        return [node for node in required_nodes if node not in available]
+
+    def _workflow_class_types(self, workflow: dict[str, Any]) -> list[str]:
+        seen: set[str] = set()
+        required: list[str] = []
+        for value in workflow.values():
+            if not isinstance(value, dict):
+                continue
+            class_type = value.get("class_type")
+            if isinstance(class_type, str) and class_type and class_type not in seen:
+                seen.add(class_type)
+                required.append(class_type)
+        return required
 
     def _cancel_requested(self, cancel_check: Callable[[], bool] | None) -> bool:
         if cancel_check is None:
