@@ -197,6 +197,25 @@ Open **http://localhost:3000** — five agents will appear and begin thinking an
 
 ---
 
+### 8. Boot a Vast.ai stream host
+
+Use this checklist when restarting a Vast.ai GPU instance for a YouTube/OBS field test. Keep
+secrets in the host's `.env.local`; do not paste stream keys, wallet keys, or API tokens into
+issues, PRs, or logs.
+
+1. Start the Vast instance and wait for SSH.
+2. Pull the latest `main` on the Vast host.
+3. Restart the native services and streaming stack.
+4. Validate agents, Fish voice, OBS `/stage`, and `/broadcast/youtube-proof`.
+5. Report either field success or the remaining field risks with evidence.
+
+Useful references:
+- Vast deployment workflow: [docs/88-cloud-deploy-workflow.md](./docs/88-cloud-deploy-workflow.md)
+- Streaming recovery notes: [docs/89-streaming-recovery-notes.md](./docs/89-streaming-recovery-notes.md)
+- Previous YouTube streams: <https://studio.youtube.com/channel/UC2j-X5M8TeAxpcAwphpOhLg>
+
+---
+
 ## Services & Ports
 
 | Service | Port | Purpose |
