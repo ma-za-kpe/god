@@ -92,6 +92,24 @@ def test_voice_surface_compose_is_stable():
     assert state.plan.speaker == "Alpha"
 
 
+def test_voice_surface_accepts_string_metadata_on_dialogue_turn():
+    surface = VoiceSurface(enabled=True, dry_run=True)
+    snapshot = _snapshot()
+    snapshot["epoch"] = 200
+    snapshot["last_dialogue_turn"] = {
+        "content": "This line should still synthesize.",
+        "sender_name": "Alpha",
+        "sent_at": 199,
+        "metadata": '{"move":"probe","cadence":"short"}',
+    }
+
+    state = surface.compose(snapshot)
+
+    assert state.plan.speaker == "Alpha"
+    assert state.plan.line == "This line should still synthesize."
+    assert "move=PROBE" in state.plan.notes
+
+
 def test_voice_surface_falls_back_when_dialogue_is_stale():
     surface = VoiceSurface(enabled=True, dry_run=True)
     state = surface.compose(_stale_snapshot())
