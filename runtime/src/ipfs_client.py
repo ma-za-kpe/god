@@ -132,9 +132,13 @@ async def _verify_once(
     body = await _first_streamed_json(
         client,
         endpoint,
-        f"{endpoint.rstrip('/')}/api/v0/pin/ls",
+        f"{endpoint.rstrip('/')}/api/v0/block/stat",
         params={"arg": cid},
     )
+    key = body.get("Key") or body.get("key")
+    if str(key) == cid:
+        return True
+
     keys = body.get("Keys") or body.get("keys") or {}
     if isinstance(keys, dict) and cid in keys:
         return True
