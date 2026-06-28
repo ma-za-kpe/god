@@ -486,6 +486,111 @@ ensure_browser_user() {
   install -d -o stream -g stream /tmp/runtime-stream
 }
 
+ensure_voice_audio() {
+  if ! streaming_launch_requested; then
+    return 0
+  fi
+
+  if ! command -v pulseaudio >/dev/null 2>&1; then
+    die "pulseaudio missing; cannot wire OBS voice audio"
+  fi
+  if ! command -v pactl >/dev/null 2>&1; then
+    die "pactl missing; cannot wire OBS voice audio"
+  fi
+  if ! command -v paplay >/dev/null 2>&1; then
+    die "paplay missing; runtime cannot play synthesized voice to Pulse"
+  fi
+
+  ensure_browser_user
+
+  export VOICE_XDG_RUNTIME_DIR="${VOICE_XDG_RUNTIME_DIR:-/tmp/runtime-stream}"
+  export VOICE_PULSE_SINK="${VOICE_PULSE_SINK:-god-voice}"
+  export PULSE_COOKIE="${PULSE_COOKIE:-/home/stream/.config/pulse/cookie}"
+  local pulse_server="unix:${VOICE_XDG_RUNTIME_DIR}/pulse/native"
+
+  install -d -o stream -g stream -m 700 "$VOICE_XDG_RUNTIME_DIR"
+  install -d -o stream -g stream -m 700 "${VOICE_XDG_RUNTIME_DIR}/pulse"
+
+  if ! runuser -u stream -- env \
+    XDG_RUNTIME_DIR="$VOICE_XDG_RUNTIME_DIR" \
+    HOME=/home/stream \
+    PULSE_SERVER="$pulse_server" \
+    pactl info >/dev/null 2>&1; then
+    log "Starting PulseAudio for OBS voice sink"
+    rm -f "${VOICE_XDG_RUNTIME_DIR}/pulse/native" "${VOICE_XDG_RUNTIME_DIR}/pulse/pid" 2>/dev/null || true
+    runuser -u stream -- env \
+      XDG_RUNTIME_DIR="$VOICE_XDG_RUNTIME_DIR" \
+      HOME=/home/stream \
+      pulseaudio --start --exit-idle-time=-1 --log-target=syslog >/dev/null 2>&1 || true
+  fi
+
+  for _ in $(seq 1 20); do
+    if env \
+      XDG_RUNTIME_DIR="$VOICE_XDG_RUNTIME_DIR" \
+      PULSE_SERVER="$pulse_server" \
+      PULSE_COOKIE="$PULSE_COOKIE" \
+      pactl info >/dev/null 2>&1; then
+      break
+    fi
+    sleep 1
+  done
+
+  env \
+    XDG_RUNTIME_DIR="$VOICE_XDG_RUNTIME_DIR" \
+    PULSE_SERVER="$pulse_server" \
+    PULSE_COOKIE="$PULSE_COOKIE" \
+    pactl info >/dev/null 2>&1 || die "PulseAudio socket is not reachable by runtime"
+
+  if ! env \
+    XDG_RUNTIME_DIR="$VOICE_XDG_RUNTIME_DIR" \
+    PULSE_SERVER="$pulse_server" \
+    PULSE_COOKIE="$PULSE_COOKIE" \
+    pactl list short sinks | awk '{print $2}' | grep -qx "$VOICE_PULSE_SINK"; then
+    env \
+      XDG_RUNTIME_DIR="$VOICE_XDG_RUNTIME_DIR" \
+      PULSE_SERVER="$pulse_server" \
+      PULSE_COOKIE="$PULSE_COOKIE" \
+      pactl load-module module-null-sink \
+        "sink_name=${VOICE_PULSE_SINK}" \
+        "sink_properties=device.description=GOD_Voice" >/dev/null
+  fi
+
+  env \
+    XDG_RUNTIME_DIR="$VOICE_XDG_RUNTIME_DIR" \
+    PULSE_SERVER="$pulse_server" \
+    PULSE_COOKIE="$PULSE_COOKIE" \
+    pactl set-default-sink "$VOICE_PULSE_SINK" >/dev/null 2>&1 || true
+
+  python3 - "$REPO_DIR/.env.local" "$VOICE_PULSE_SINK" "$VOICE_XDG_RUNTIME_DIR" "$PULSE_COOKIE" <<'PY'
+from pathlib import Path
+import sys
+
+path = Path(sys.argv[1])
+updates = {
+    "VOICE_PULSE_SINK": sys.argv[2],
+    "VOICE_XDG_RUNTIME_DIR": sys.argv[3],
+    "PULSE_COOKIE": sys.argv[4],
+}
+text = path.read_text(encoding="utf-8", errors="ignore") if path.exists() else ""
+lines = []
+seen = set()
+for line in text.splitlines():
+    if "=" in line and not line.lstrip().startswith("#"):
+        key = line.split("=", 1)[0].strip()
+        if key in updates:
+            lines.append(f"{key}={updates[key]}")
+            seen.add(key)
+            continue
+    lines.append(line)
+for key, value in updates.items():
+    if key not in seen:
+        lines.append(f"{key}={value}")
+path.write_text("\n".join(lines).rstrip() + "\n", encoding="utf-8")
+PY
+
+  log "PulseAudio voice sink ready: ${VOICE_PULSE_SINK}.monitor"
+}
+
 ensure_xvfb_display() {
   local attempt
   for attempt in 1 2; do
@@ -1136,6 +1241,7 @@ run_observer_stage() {
 run_streaming_stage() {
   if streaming_launch_requested; then
     log "Preparing streaming capture stack..."
+    ensure_voice_audio
     start_firefox
     start_obs
   else
@@ -1144,6 +1250,7 @@ run_streaming_stage() {
 }
 
 run_runtime_stage() {
+  ensure_voice_audio
   start_runtime
   start_obs_stream
   youtube_go_live
