@@ -2242,7 +2242,7 @@ async def creator_one(
         bootstrap_line = (
             body.get("bootstrap_line")
             or body.get("speech")
-            or f"I am {row.get('current_name')}. This world has one voice now."
+            or "A B C D E F G H I J K L M N O P Q R S T U V W X Y Z."
         )
         await send_message(
             sender_soul_id=str(row["soul_id"]),

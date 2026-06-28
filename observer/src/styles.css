@@ -194,6 +194,40 @@ body {
   min-height: 100vh;
 }
 
+.one-caption {
+  position: fixed;
+  left: 50%;
+  bottom: 34px;
+  z-index: 30;
+  width: min(92vw, 1180px);
+  transform: translateX(-50%);
+  display: grid;
+  gap: 8px;
+  justify-items: center;
+  padding: 14px 18px;
+  border: 1px solid rgba(244, 201, 93, 0.24);
+  border-radius: 18px;
+  background: rgba(5, 7, 18, 0.78);
+  box-shadow: 0 18px 80px rgba(0, 0, 0, 0.42);
+  backdrop-filter: blur(10px);
+}
+
+.one-caption span {
+  color: var(--green);
+  font-size: 0.64rem;
+  font-weight: 800;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+}
+
+.one-caption strong {
+  color: var(--text);
+  font-size: clamp(1.2rem, 3vw, 2.5rem);
+  line-height: 1.12;
+  text-align: center;
+  letter-spacing: 0;
+}
+
 .world-shell { min-width: 0; min-height: 0; }
 .world-shell {
   position: relative;

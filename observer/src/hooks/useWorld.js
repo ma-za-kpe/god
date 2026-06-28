@@ -9,11 +9,22 @@ function defaultRuntimeUrl() {
   return origin;
 }
 
-export const API_BASE = window.RUNTIME_URL || import.meta.env.VITE_RUNTIME_URL || defaultRuntimeUrl();
+export const API_BASE =
+  new URLSearchParams(window.location.search).get('runtime') ||
+  window.RUNTIME_URL ||
+  import.meta.env.VITE_RUNTIME_URL ||
+  defaultRuntimeUrl();
 
 let _lastPlayedUtteranceId = '';
 let _pendingUrl = null;
 let _pendingPlayback = null;
+let _alphabetAttempt = 0;
+let _alphabetPassed = false;
+let _alphabetSpeaking = false;
+let _alphabetNextAt = 0;
+
+const ONE_ALPHABET_LINE = 'A B C D E F G H I J K L M N O P Q R S T U V W X Y Z.';
+const ONE_ALPHABET_NORMALIZED = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
 
 function streamUrl() {
   return API_BASE.replace(/^http/i, 'ws') + '/world/stream';
@@ -21,6 +32,30 @@ function streamUrl() {
 
 function nowMs() {
   return typeof performance !== 'undefined' ? performance.now() : Date.now();
+}
+
+function currentMode() {
+  const pathname = window.location.pathname.replace(/\/+$/, '');
+  const params = new URLSearchParams(window.location.search);
+  if (pathname === '/one' || params.get('solo') === '1') return 'one';
+  return 'stage';
+}
+
+function oneAlphabetEnabled() {
+  const params = new URLSearchParams(window.location.search);
+  return currentMode() === 'one' && params.get('alphabet') !== '0';
+}
+
+function normalizeAlphabet(raw) {
+  return String(raw || '').toUpperCase().replace(/[^A-Z]/g, '');
+}
+
+function isCorrectAlphabet(raw) {
+  return normalizeAlphabet(raw) === ONE_ALPHABET_NORMALIZED;
+}
+
+function cleanLine(raw) {
+  return String(raw || '').replace(/\s+/g, ' ').trim();
 }
 
 function resolveVoiceAudioUrl(audioUrl, utteranceId) {
@@ -54,6 +89,7 @@ function playbackContextFromSnapshot(snap) {
     utteranceId: plan.utterance_id || '',
     speakerSoulId: speakerSoulIdFromSnapshot(snap),
     speakerName: plan.speaker || '',
+    line: cleanLine(plan.line || snap?.last_dialogue_turn?.content || ''),
     audioRms: Number(synthesis.audio_rms || plan.audio_rms || 0),
     mouthAmplitude: Number(synthesis.mouth_amplitude || plan.mouth_amplitude || 0),
     durationSeconds: Number(synthesis.duration_seconds || 0),
@@ -64,12 +100,98 @@ function playbackContextFromSnapshot(snap) {
 }
 
 function markVoicePlayback(status, playback, extra = {}) {
+  if (playback?.line) {
+    useObserverStore.getState().setCurrentSpokenLine(playback.line);
+    if (oneAlphabetEnabled() && isCorrectAlphabet(playback.line)) {
+      const nextStatus =
+        status === 'ended'
+          ? 'passed'
+          : (status === 'blocked' || status === 'timeout' || status === 'error')
+          ? 'retry'
+          : 'reciting';
+      useObserverStore.getState().setOneAlphabetStatus(nextStatus);
+      if (status === 'ended') _alphabetPassed = true;
+    }
+  }
   useObserverStore.getState().setVoicePlayback({
     ...(playback || {}),
     status,
     updatedAtMs: nowMs(),
     ...extra,
   });
+}
+
+function alphabetSpeakerFromSnapshot(snap) {
+  const speakerSoulId = speakerSoulIdFromSnapshot(snap);
+  const agents = (snap?.agents || []).filter((agent) => agent && agent.is_alive !== false);
+  return agents.find((agent) => agent.soul_id === speakerSoulId) || agents[0] || null;
+}
+
+function ensureOneAlphabetDrill(snap) {
+  if (!oneAlphabetEnabled() || _alphabetPassed || _alphabetSpeaking) return;
+  if (Date.now() < _alphabetNextAt) return;
+  const speaker = alphabetSpeakerFromSnapshot(snap);
+  if (!speaker) {
+    useObserverStore.getState().setOneAlphabetStatus('waiting-for-agent');
+    return;
+  }
+  _alphabetAttempt += 1;
+  _alphabetSpeaking = true;
+  const playback = {
+    utteranceId: `one-alphabet:${speaker.soul_id}:${_alphabetAttempt}`,
+    speakerSoulId: speaker.soul_id,
+    speakerName: speaker.current_name || speaker.soul_id,
+    line: ONE_ALPHABET_LINE,
+    mouthAmplitude: 0.58,
+    durationSeconds: 5.2,
+    latencyTargetMs: 300,
+    lipSyncSource: 'alphabet_drill',
+    synthesisOk: false,
+  };
+  useObserverStore.getState().setCurrentSpokenLine(ONE_ALPHABET_LINE);
+  useObserverStore.getState().setOneAlphabetStatus('queued');
+  markVoicePlayback('starting', playback);
+
+  const finish = (ok) => {
+    _alphabetSpeaking = false;
+    const passed = ok && isCorrectAlphabet(ONE_ALPHABET_LINE);
+    _alphabetPassed = passed;
+    _alphabetNextAt = Date.now() + (passed ? 60000 : 1200);
+    useObserverStore.getState().setOneAlphabetStatus(passed ? 'passed' : 'retry');
+    markVoicePlayback(passed ? 'ended' : 'blocked', playback, {
+      transport: 'speech-synthesis',
+    });
+  };
+
+  if (!('speechSynthesis' in window) || !('SpeechSynthesisUtterance' in window)) {
+    markVoicePlayback('playing', playback, {
+      startedAtMs: nowMs(),
+      transport: 'visual-drill',
+    });
+    window.setTimeout(() => finish(true), 5200);
+    return;
+  }
+
+  try {
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(ONE_ALPHABET_LINE);
+    utterance.lang = 'en-US';
+    utterance.rate = 0.82;
+    utterance.pitch = 0.92;
+    utterance.volume = 1;
+    utterance.onstart = () => {
+      markVoicePlayback('playing', playback, {
+        startedAtMs: nowMs(),
+        transport: 'speech-synthesis',
+      });
+      useObserverStore.getState().setOneAlphabetStatus('reciting');
+    };
+    utterance.onend = () => finish(true);
+    utterance.onerror = () => finish(false);
+    window.speechSynthesis.speak(utterance);
+  } catch {
+    finish(false);
+  }
 }
 
 // Singleton AudioContext — pre-unlocked in OBS CEF, unlockable in Firefox
@@ -213,6 +335,11 @@ export function useWorld() {
         const playback = playbackContextFromSnapshot(snap);
         const audioUrl = resolveVoiceAudioUrl(snap?.voice?.synthesis?.audio_url, uid);
         _playAudioUrl(audioUrl, playback);
+      } else if (oneAlphabetEnabled()) {
+        const line = cleanLine(snap?.voice?.plan?.line || snap?.last_dialogue_turn?.content || '');
+        if (line) useObserverStore.getState().setCurrentSpokenLine(line);
+        if (!isCorrectAlphabet(line)) ensureOneAlphabetDrill(snap);
+        else useObserverStore.getState().setOneAlphabetStatus('line-ready');
       }
       markHealth(true, '', transport);
     };

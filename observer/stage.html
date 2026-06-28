@@ -324,7 +324,7 @@
     }
 
     .ensemble.solo .agent-tile {
-      width: min(100%, 760px);
+      width: min(100%, 980px);
       margin: 0 auto;
     }
 
@@ -507,6 +507,15 @@
         radial-gradient(circle at center, rgba(84,200,255,0.08), transparent 40%),
         rgba(255,255,255,0.015);
       overflow: hidden;
+    }
+
+    .ensemble.solo .agent-body {
+      min-height: min(62vh, 640px);
+    }
+
+    .ensemble.solo .agent-dialogue .text {
+      font-size: clamp(1rem, 2.1vw, 1.55rem);
+      line-height: 1.42;
     }
 
     .avatar-orb {
@@ -1464,8 +1473,16 @@
       fishSpeaking: false,
       fishSeenUtterances: new Set(),
       fishAudio: null,
-      voicePlayback: null
+      voicePlayback: null,
+      oneAlphabetAttempt: 0,
+      oneAlphabetPassed: false,
+      oneAlphabetNextAt: 0,
+      oneAlphabetLastLine: ''
     };
+    const ONE_ALPHABET_LINE = 'A B C D E F G H I J K L M N O P Q R S T U V W X Y Z.';
+    const ONE_ALPHABET_NORMALIZED = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    const ONE_ALPHABET_DRILL_ENABLED =
+      PAGE_MODE === 'one' && new URLSearchParams(location.search).get('alphabet') !== '0';
     const AGENT_COLORS = ['#4effb5', '#54c8ff', '#f4c95d', '#cc86ff', '#ff6b88', '#87a7ff', '#7df2e3', '#ffc66b'];
     const AVATAR_CID_FIELDS = ['cid', 'ipfs_cid', 'ipfsCid', 'asset_cid', 'assetCid', 'hash'];
     const AVATAR_URL_FIELDS = ['url', 'src', 'href', 'uri', 'path'];
@@ -1837,6 +1854,38 @@
         .trim();
     }
 
+    function normalizeAlphabetLine(raw) {
+      return String(raw || '').toUpperCase().replace(/[^A-Z]/g, '');
+    }
+
+    function isCorrectAlphabetLine(raw) {
+      return normalizeAlphabetLine(raw) === ONE_ALPHABET_NORMALIZED;
+    }
+
+    function setOneAlphabetStatus(status, line = '') {
+      if (!ONE_ALPHABET_DRILL_ENABLED) return;
+      document.body.dataset.oneAlphabetStatus = status;
+      document.body.dataset.oneAlphabetAttempt = String(STATE.oneAlphabetAttempt || 0);
+      document.body.dataset.oneAlphabetLine = line || STATE.oneAlphabetLastLine || '';
+    }
+
+    function setSpokenLineText(rawLine, speakerSoulId = '') {
+      const line = cleanDialogueText(rawLine);
+      if (!line) return;
+      const focusLine = document.getElementById('focus-line');
+      if (focusLine) focusLine.textContent = line;
+      const selector = speakerSoulId
+        ? `.agent-tile[data-agent-id="${CSS.escape(speakerSoulId)}"] .agent-dialogue .text`
+        : '.agent-tile.active .agent-dialogue .text';
+      const tileLine = document.querySelector(selector);
+      if (tileLine) tileLine.textContent = line;
+      document.body.dataset.currentSpokenLine = line;
+      if (ONE_ALPHABET_DRILL_ENABLED) {
+        STATE.oneAlphabetLastLine = line;
+        setOneAlphabetStatus(isCorrectAlphabetLine(line) ? 'line-ready' : 'line-mismatch', line);
+      }
+    }
+
     function splitDialogueSegments(text) {
       const cleaned = cleanDialogueText(text);
       if (!cleaned) return [];
@@ -1905,6 +1954,10 @@
       const leader = agents.find(a => (snap.stats?.top_earners || []).some(t => t.soul_id === a.soul_id));
       if (leader) return leader;
       return agents[0];
+    }
+
+    function pickSoloAgent(snap) {
+      return voiceSpeakerAgent(snap) || pickActiveAgent(snap);
     }
 
     function voiceSpeakerAgent(snap) {
@@ -2053,8 +2106,7 @@
         updatedAtMs: nowMs(),
       };
       _highlightDialogueTurn(playback.speaker, playback.recipient);
-      const focusLine = document.getElementById('focus-line');
-      if (focusLine && playback.body) focusLine.textContent = playback.body;
+      if (playback.body) setSpokenLineText(playback.body, playback.speakerSoulId);
       applyVoicePlaybackToDom();
 
       const audio = new Audio(audioUrl);
@@ -2242,8 +2294,7 @@
       _highlightDialogueTurn(item.sender, item.recipient);
 
       // Update focus line with actual body
-      const focusLine = document.getElementById('focus-line');
-      if (focusLine) focusLine.textContent = cleanDialogueText(item.body);
+      setSpokenLineText(item.body, item.sender?.soul_id || '');
 
       const agents = STATE.agents;
       const vp = item.sender ? agentVoiceParams(item.sender.soul_id, agents) : { pitch: 1, rate: 1 };
@@ -2253,7 +2304,13 @@
       const chosen = pool.length ? (pool[vp.voiceIndex % pool.length] || pool[0]) : null;
       const segments = splitDialogueSegments(item.body);
 
-      const _done = () => {
+      const _done = (ok = true) => {
+        if (meta.move === 'alphabet_drill') {
+          const passed = ok && isCorrectAlphabetLine(item.body);
+          STATE.oneAlphabetPassed = passed;
+          STATE.oneAlphabetNextAt = Date.now() + (passed ? 60000 : 1200);
+          setOneAlphabetStatus(passed ? 'passed' : 'retry', item.body);
+        }
         STATE.dialogueSpeaking = false;
         STATE.speechStartedAt = 0;
         STATE.currentSpeakerId = null;
@@ -2274,11 +2331,11 @@
         utterance.volume = 1;
         if (chosen) utterance.voice = chosen;
         utterance.onend = () => setTimeout(() => speakSegment(index + 1), cadencePauseMs(meta));
-        utterance.onerror = _done;
+        utterance.onerror = () => _done(false);
         try {
           window.speechSynthesis.speak(utterance);
         } catch {
-          _done();
+          _done(false);
         }
       };
 
@@ -2294,12 +2351,41 @@
           utterance.volume = 1;
           if (chosen) utterance.voice = chosen;
           utterance.onend = _done;
-          utterance.onerror = _done;
+          utterance.onerror = () => _done(false);
           window.speechSynthesis.speak(utterance);
         }
       } catch {
-        _done();
+        _done(false);
       }
+    }
+
+    function ensureOneAlphabetDrill(snap) {
+      if (!ONE_ALPHABET_DRILL_ENABLED) return;
+      if (STATE.oneAlphabetPassed) {
+        setOneAlphabetStatus('passed', STATE.oneAlphabetLastLine || ONE_ALPHABET_LINE);
+        return;
+      }
+      if (STATE.fishSpeaking || STATE.dialogueSpeaking || STATE.dialogueQueue.length) return;
+      if (Date.now() < STATE.oneAlphabetNextAt) return;
+      const speaker = pickSoloAgent(snap);
+      if (!speaker) {
+        setOneAlphabetStatus('waiting-for-agent');
+        return;
+      }
+      STATE.oneAlphabetAttempt += 1;
+      STATE.oneAlphabetLastLine = ONE_ALPHABET_LINE;
+      setOneAlphabetStatus('queued', ONE_ALPHABET_LINE);
+      STATE.dialogueQueue.unshift({
+        id: `one-alphabet:${speaker.soul_id}:${STATE.oneAlphabetAttempt}`,
+        body: ONE_ALPHABET_LINE,
+        sender: speaker,
+        recipient: null,
+        meta: {
+          move: 'alphabet_drill',
+          cadence: 'short',
+        },
+      });
+      drainDialogue();
     }
 
     function enqueueDialogue(events, agents) {
@@ -2348,7 +2434,7 @@
       const soloMode = PAGE_MODE === 'one' || agents.length === 1;
       if (shell) shell.classList.toggle('solo', soloMode);
       if (grid) grid.classList.toggle('solo', soloMode);
-      const active = pickActiveAgent(snap) || agents[0] || null;
+      const active = (soloMode ? pickSoloAgent(snap) : pickActiveAgent(snap)) || agents[0] || null;
       const previousActiveId = STATE.activeId;
       const activeChanged = previousActiveId !== (active?.soul_id || null);
       STATE.previousActiveId = previousActiveId;
@@ -2388,7 +2474,9 @@
       const pair = pickConversationPair(snap);
       const secondaryId = (pair.secondary && pair.secondary.soul_id !== STATE.activeId) ? pair.secondary.soul_id : null;
 
-      ordered.slice(0, soloMode ? 1 : 8).forEach((agent, index) => {
+      const visibleAgents = soloMode ? (active ? [active] : []) : ordered.slice(0, 8);
+
+      visibleAgents.forEach((agent, index) => {
         const isActive = agent.soul_id === STATE.activeId;
         const isSecondary = !isActive && agent.soul_id === secondaryId;
         const isAvatarSpeaker = avatarSpeakerId && agent.soul_id === avatarSpeakerId;
@@ -2489,10 +2577,10 @@
         if (soloMode && isActive) {
           tile.style.gridColumn = '1 / -1';
           tile.style.gridRow = '1 / -1';
-          tile.style.width = 'min(100%, 760px)';
+          tile.style.width = 'min(100%, 980px)';
           tile.style.margin = '0 auto';
-          tile.querySelector('.avatar-orb').style.width = '180px';
-          tile.querySelector('.avatar-orb').style.height = '180px';
+          tile.querySelector('.avatar-orb').style.width = 'min(54vh, 420px)';
+          tile.querySelector('.avatar-orb').style.height = 'min(54vh, 420px)';
           tile.querySelector('.agent-meta').innerHTML = tags.slice(0, 4).map(tag => `<span class="chip"><i></i>${fmt(tag)}</span>`).join('');
         }
         grid.appendChild(tile);
@@ -2683,6 +2771,7 @@
       renderArcTheme(snap);
       renderChatThread(snap);
       if (!fishHandled) enqueueDialogue(snap.events || [], snap.agents || []);
+      if (!fishHandled) ensureOneAlphabetDrill(snap);
       // Update focus panel from snapshot only when dialogue is quiet
       if (!STATE.dialogueSpeaking && !STATE.dialogueQueue.length) renderFocus(snap);
 
