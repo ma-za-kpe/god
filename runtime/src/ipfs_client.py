@@ -8,6 +8,7 @@ number of successful pins before treating the CID as durable.
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import os
 from dataclasses import dataclass, field
@@ -21,6 +22,7 @@ ENDPOINTS_RAW = os.getenv("IPFS_API_ENDPOINTS", DEFAULT_ENDPOINT)
 MIN_PINS = int(os.getenv("MIN_IPFS_PINS", "3"))
 PIN_RETRIES = int(os.getenv("IPFS_PIN_RETRIES", "3"))
 PIN_TIMEOUT_S = float(os.getenv("IPFS_PIN_TIMEOUT_S", "15"))
+MAX_ADD_RESPONSE_BYTES = int(os.getenv("IPFS_ADD_RESPONSE_MAX_BYTES", "1048576"))
 
 
 @dataclass(frozen=True)
@@ -38,22 +40,58 @@ def ipfs_endpoints() -> list[str]:
     return endpoints or [DEFAULT_ENDPOINT]
 
 
+def _cid_from_add_line(line: bytes, endpoint: str) -> str | None:
+    line = line.strip()
+    if not line:
+        return None
+    try:
+        body = json.loads(line.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError):
+        return None
+    if not isinstance(body, dict):
+        raise ValueError(f"unexpected add response from {endpoint}")
+    cid = body.get("Hash") or body.get("hash") or body.get("Cid") or body.get("cid")
+    if not cid:
+        raise ValueError(f"no CID in response from {endpoint}")
+    return str(cid)
+
+
 async def _pin_once(
     client: httpx.AsyncClient,
     endpoint: str,
     data: bytes,
     filename: str,
 ) -> str:
-    resp = await client.post(
-        f"{endpoint.rstrip('/')}/api/v0/add",
-        files={"file": (filename, data, "application/json")},
-    )
-    resp.raise_for_status()
-    body = resp.json()
-    cid = body.get("Hash") or body.get("cid")
-    if not cid:
-        raise ValueError(f"no CID in response from {endpoint}")
-    return cid
+    url = f"{endpoint.rstrip('/')}/api/v0/add"
+    buffer = b""
+
+    async with client.stream(
+        "POST",
+        url,
+        params={"pin": "true"},
+        files={"file": (filename, data, "application/octet-stream")},
+    ) as resp:
+        resp.raise_for_status()
+        async for chunk in resp.aiter_bytes():
+            buffer += chunk
+
+            while b"\n" in buffer:
+                line, buffer = buffer.split(b"\n", 1)
+                cid = _cid_from_add_line(line, endpoint)
+                if cid:
+                    return cid
+
+            cid = _cid_from_add_line(buffer, endpoint)
+            if cid:
+                return cid
+
+            if len(buffer) > MAX_ADD_RESPONSE_BYTES:
+                raise ValueError(f"add response from {endpoint} exceeded byte limit")
+
+    cid = _cid_from_add_line(buffer, endpoint)
+    if cid:
+        return cid
+    raise ValueError(f"no CID in response from {endpoint}")
 
 
 async def _verify_once(

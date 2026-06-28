@@ -4,7 +4,40 @@ import json
 from unittest.mock import patch
 
 import pytest
-from ipfs_client import ipfs_endpoints, pin_bytes
+from ipfs_client import _cid_from_add_line, _pin_once, ipfs_endpoints, pin_bytes
+
+
+class _StreamingAddResponse:
+    def __init__(self):
+        self.closed = False
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, exc_type, exc, tb):
+        self.closed = True
+
+    def raise_for_status(self):
+        return None
+
+    async def aiter_bytes(self):
+        yield b'{"Name":"voice.wav","Hash":"QmStreamCID123","Size":"42"}\n'
+        raise AssertionError("_pin_once should close after the first streamed CID")
+
+
+class _StreamingAddClient:
+    def __init__(self):
+        self.response = _StreamingAddResponse()
+        self.request = None
+
+    def stream(self, method, url, *, params, files):
+        self.request = {
+            "method": method,
+            "url": url,
+            "params": params,
+            "files": files,
+        }
+        return self.response
 
 
 @pytest.mark.asyncio
@@ -68,3 +101,24 @@ def test_endpoints_parses_comma_list():
     with patch("ipfs_client.ENDPOINTS_RAW", "http://a:5001, http://b:5001"):
         eps = ipfs_endpoints()
     assert eps == ["http://a:5001", "http://b:5001"]
+
+
+def test_add_response_parser_reads_kubo_hash_line():
+    line = b'{"Name":"avatar.png","Hash":"QmAvatarCID123","Size":"100"}\n'
+    assert _cid_from_add_line(line, "http://node-1") == "QmAvatarCID123"
+
+
+@pytest.mark.asyncio
+async def test_pin_once_returns_from_first_streamed_add_result():
+    client = _StreamingAddClient()
+
+    cid = await _pin_once(client, "http://node-1:5001", b"audio", "voice.wav")
+
+    assert cid == "QmStreamCID123"
+    assert client.response.closed
+    assert client.request == {
+        "method": "POST",
+        "url": "http://node-1:5001/api/v0/add",
+        "params": {"pin": "true"},
+        "files": {"file": ("voice.wav", b"audio", "application/octet-stream")},
+    }
