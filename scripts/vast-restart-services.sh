@@ -1040,9 +1040,11 @@ def ensure_section(data: str, section: str, key_values: dict[str, str]) -> str:
     return result
 
 simple_keys = {
+    "UseAdvanced": "true",
     "keyint_sec": "2",
     "KeyframeIntervalSec": "2",
     "KeyframeInterval": "2",
+    "x264Settings": "keyint=60 min-keyint=60 scenecut=0",
 }
 adv_keys = {
     "keyint_sec": "2",
