@@ -226,6 +226,9 @@ YOUTUBE_AUTO_GO_LIVE=false
 YOUTUBE_BROADCAST_ID=
 YOUTUBE_GO_LIVE_TIMEOUT_S=90
 YOUTUBE_GO_LIVE_POLL_S=5
+# Empty lets vast-restart-services.sh disable LTX/Wan/offline GPU jobs when
+# live streaming, and allow them during dry-run/offline validation.
+GPU_BACKGROUND_JOBS_ALLOWED=
 OBS_WEBSOCKET_URL=
 OBS_WEBSOCKET_PASSWORD=
 CREATOR_GENESIS_TOKEN=${CREATOR_GENESIS_TOKEN}
