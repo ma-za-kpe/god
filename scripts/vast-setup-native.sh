@@ -12,13 +12,13 @@
 #   SKIP_IPFS=1                — skip IPFS daemon (avatar CID pinning disabled)
 #   SKIP_OBS=1                 — skip OBS Studio install/start
 #   POSTGRES_PASSWORD=xxx      — custom DB password (default: random)
-#   REPO_BRANCH=main           — branch to deploy (default: feat/twitch-ne-mo-showrunner)
+#   REPO_BRANCH=<branch>       — branch to deploy (default: main)
 
 set -euo pipefail
 
 REPO_URL="https://github.com/ma-za-kpe/god.git"
 REPO_DIR="/workspace/god"
-REPO_BRANCH="${REPO_BRANCH:-feat/twitch-ne-mo-showrunner}"
+REPO_BRANCH="${REPO_BRANCH:-main}"
 OLLAMA_MODEL="${OLLAMA_MODEL:-llama3.1:8b}"
 SKIP_FISH="${SKIP_FISH:-0}"
 SKIP_COMFYUI="${SKIP_COMFYUI:-0}"

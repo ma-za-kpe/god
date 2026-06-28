@@ -203,7 +203,7 @@ ensure_repo() {
     log "Using legacy CREATOR_TOKEN as CREATOR_GENESIS_TOKEN"
   fi
 
-  REPO_BRANCH="${REPO_BRANCH:-feat/twitch-ne-mo-showrunner}"
+  REPO_BRANCH="${REPO_BRANCH:-main}"
   current_branch="$(git -C "$REPO_DIR" branch --show-current 2>/dev/null || true)"
   current_sha="$(git -C "$REPO_DIR" rev-parse --short HEAD 2>/dev/null || true)"
   if [ -z "$current_branch" ]; then

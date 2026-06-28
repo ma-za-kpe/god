@@ -17,8 +17,8 @@ set -euo pipefail
 
 REPO_URL="https://github.com/ma-za-kpe/god.git"
 REPO_DIR="/workspace/god"
-# Branch to deploy. Override with: REPO_BRANCH=main bash vast-setup.sh
-REPO_BRANCH="${REPO_BRANCH:-feat/twitch-ne-mo-showrunner}"
+# Branch to deploy. Override with: REPO_BRANCH=<branch> bash vast-setup.sh
+REPO_BRANCH="${REPO_BRANCH:-main}"
 OLLAMA_MODEL="${OLLAMA_MODEL:-llama3.1:8b}"
 SKIP_MODELS="${SKIP_MODELS:-0}"
 SKIP_FISH_MODELS="${SKIP_FISH_MODELS:-0}"
