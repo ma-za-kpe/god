@@ -39,7 +39,45 @@ def _load_runtime_main():
 
 
 @pytest.mark.asyncio
-async def test_ipfs_video_proxy_uses_video_limit_and_range(monkeypatch):
+async def test_ipfs_video_proxy_fetches_only_requested_range(monkeypatch):
+    main = _load_runtime_main()
+    payload = b"\x00\x00\x00\x18ftypmp42" + (b"v" * 64)
+    captured = {}
+
+    async def fail_full_fetch(cid: str, *, max_bytes: int):
+        raise AssertionError("range requests must not fetch the full IPFS object")
+
+    async def fake_size(cid: str):
+        captured["size_cid"] = cid
+        return len(payload)
+
+    async def fake_range_fetch(cid: str, *, offset: int, length: int):
+        captured["cid"] = cid
+        captured["offset"] = offset
+        captured["length"] = length
+        return 200, payload[offset : offset + length]
+
+    monkeypatch.setattr(main, "_fetch_public_ipfs", fail_full_fetch)
+    monkeypatch.setattr(main, "_fetch_public_ipfs_size", fake_size)
+    monkeypatch.setattr(main, "_fetch_public_ipfs_range", fake_range_fetch)
+
+    response = await main.ipfs_video_proxy("bafyvideo", range_header="bytes=4-11")
+
+    assert captured == {
+        "size_cid": "bafyvideo",
+        "cid": "bafyvideo",
+        "offset": 4,
+        "length": 8,
+    }
+    assert response.status_code == 206
+    assert response.body == payload[4:12]
+    assert response.headers["content-range"] == f"bytes 4-11/{len(payload)}"
+    assert response.headers["accept-ranges"] == "bytes"
+    assert response.media_type == "video/mp4"
+
+
+@pytest.mark.asyncio
+async def test_ipfs_video_proxy_without_range_uses_video_limit(monkeypatch):
     main = _load_runtime_main()
     payload = b"\x00\x00\x00\x18ftypmp42" + (b"v" * 64)
     captured = {}
@@ -51,16 +89,14 @@ async def test_ipfs_video_proxy_uses_video_limit_and_range(monkeypatch):
 
     monkeypatch.setattr(main, "_fetch_public_ipfs", fake_fetch)
 
-    response = await main.ipfs_video_proxy("bafyvideo", range_header="bytes=4-11")
+    response = await main.ipfs_video_proxy("bafyvideo", range_header=None)
 
     assert captured == {
         "cid": "bafyvideo",
         "max_bytes": main.PUBLIC_IPFS_VIDEO_MAX_BYTES,
     }
-    assert response.status_code == 206
-    assert response.body == payload[4:12]
-    assert response.headers["content-range"] == f"bytes 4-11/{len(payload)}"
-    assert response.headers["accept-ranges"] == "bytes"
+    assert response.status_code == 200
+    assert response.body == payload
     assert response.media_type == "video/mp4"
 
 

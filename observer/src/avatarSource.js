@@ -31,6 +31,21 @@ export function ipfsUrl(cid, runtimeBaseUrl = '') {
   return base ? `${base}/ipfs/${encodedPath}` : `/ipfs/${encodedPath}`;
 }
 
+function ipfsAssetUrl(cid, runtimeBaseUrl = '', kind = '') {
+  const value = trimString(cid);
+  if (!value) return '';
+  if (isUrl(value)) return value;
+  const stripped = value.replace(/^ipfs:\/\//i, '');
+  const base = normalizeRuntimeBaseUrl(runtimeBaseUrl);
+  const encodedPath = stripped
+    .split('/')
+    .filter(Boolean)
+    .map((part) => encodeURIComponent(part))
+    .join('/');
+  const prefix = kind === 'loop' || kind === 'cinematic' ? '/ipfs/video' : '/ipfs';
+  return base ? `${base}${prefix}/${encodedPath}` : `${prefix}/${encodedPath}`;
+}
+
 function valueAt(root, path) {
   let cursor = root;
   for (const key of path) {
@@ -75,7 +90,7 @@ function assetFromRef(value, runtimeBaseUrl, kind, label) {
     return {
       kind,
       label,
-      url: isUrl(stringValue) ? stringValue : ipfsUrl(stringValue, runtimeBaseUrl),
+      url: isUrl(stringValue) ? stringValue : ipfsAssetUrl(stringValue, runtimeBaseUrl, kind),
       cid: isUrl(stringValue) ? '' : stringValue.replace(/^ipfs:\/\//i, ''),
       mimeType: '',
     };
@@ -98,7 +113,7 @@ function assetFromRef(value, runtimeBaseUrl, kind, label) {
     return {
       kind,
       label,
-      url: ipfsUrl(cid, runtimeBaseUrl),
+      url: ipfsAssetUrl(cid, runtimeBaseUrl, kind),
       cid: cid.replace(/^ipfs:\/\//i, ''),
       mimeType: trimString(obj.mime_type || obj.mimeType || obj.type),
     };

@@ -35,6 +35,7 @@ Invoke-Checked { docker exec god-runtime sh -lc 'rm -rf /tmp/god-validation && m
 Invoke-Checked { docker cp \"\$root/runtime/src/.\" god-runtime:/tmp/god-validation/suite/src } 'copy runtime src'
 Invoke-Checked { docker cp \"\$root/runtime/seed_utterances\" god-runtime:/tmp/god-validation/suite/seed_utterances } 'copy seed utterances'
 Invoke-Checked { docker cp \"\$root/runtime/tests/.\" god-runtime:/tmp/god-validation/suite/runtime-tests } 'copy runtime tests'
+Invoke-Checked { docker cp \"\$root/scripts\" god-runtime:/tmp/god-validation/scripts } 'copy scripts'
 Invoke-Checked { docker cp \"\$root/observer/stage.html\" god-runtime:/tmp/god-validation/observer/stage.html } 'copy observer stage'
 try {
   docker exec -e PYTHONPATH=/tmp/god-validation/suite/src -e VOICE_SYNTHESIS_ENABLED=false god-runtime python -m pytest /tmp/god-validation/suite/runtime-tests

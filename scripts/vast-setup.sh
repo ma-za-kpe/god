@@ -110,6 +110,12 @@ CREATOR_PRIVATE_KEY=${CREATOR_PRIVATE_KEY}
 LLM_PROVIDER=ollama
 LLM_MODEL=${OLLAMA_MODEL}
 
+# IPFS - Vast single-node live-test profile.
+# This is not Law-2 durable replication; Compose remains the three-node profile.
+IPFS_API=http://localhost:5001
+IPFS_API_ENDPOINTS=http://localhost:5001
+MIN_IPFS_PINS=1
+
 # Avatar genesis — SDXL (no Flux, no custom nodes required)
 COMFYUI_PORTRAIT_TEMPLATE=sdxl_portrait.json
 COMFYUI_EXPRESSION_TEMPLATE=sdxl_expression.json
