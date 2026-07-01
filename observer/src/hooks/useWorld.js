@@ -330,16 +330,19 @@ export function useWorld() {
       // Play synthesized voice audio when a new utterance arrives
       const uid = snap?.voice?.plan?.utterance_id;
       const synthOk = snap?.voice?.synthesis?.ok;
-      if (uid && synthOk && uid !== _lastPlayedUtteranceId) {
+      if (oneAlphabetEnabled()) {
+        const line = cleanLine(snap?.voice?.plan?.line || snap?.last_dialogue_turn?.content || '');
+        if (isCorrectAlphabet(line)) {
+          useObserverStore.getState().setCurrentSpokenLine(line);
+          useObserverStore.getState().setOneAlphabetStatus('line-ready');
+        } else {
+          ensureOneAlphabetDrill(snap);
+        }
+      } else if (uid && synthOk && uid !== _lastPlayedUtteranceId) {
         _lastPlayedUtteranceId = uid;
         const playback = playbackContextFromSnapshot(snap);
         const audioUrl = resolveVoiceAudioUrl(snap?.voice?.synthesis?.audio_url, uid);
         _playAudioUrl(audioUrl, playback);
-      } else if (oneAlphabetEnabled()) {
-        const line = cleanLine(snap?.voice?.plan?.line || snap?.last_dialogue_turn?.content || '');
-        if (line) useObserverStore.getState().setCurrentSpokenLine(line);
-        if (!isCorrectAlphabet(line)) ensureOneAlphabetDrill(snap);
-        else useObserverStore.getState().setOneAlphabetStatus('line-ready');
       }
       markHealth(true, '', transport);
     };
