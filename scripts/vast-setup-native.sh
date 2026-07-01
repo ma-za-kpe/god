@@ -317,8 +317,7 @@ if [ "$SKIP_FISH" = "0" ]; then
   UV=$(find /opt/god-venv/bin /root/.local/bin -name uv -type f -print -quit 2>/dev/null || true)
   UV="${UV:-$(command -v uv)}"
   "$UV" python install 3.11 --quiet
-  "$UV" sync --python 3.11 --no-dev --quiet
-  "$UV" pip install --python .venv --quiet "torchaudio==2.4.1"
+  "$UV" sync --python 3.11 --extra cu128 --no-dev --quiet
 
   log "Downloading Fish Audio S2-Pro models (~11 GB)..."
   "$UV" pip install --python .venv --quiet "huggingface_hub[hf_xet]"

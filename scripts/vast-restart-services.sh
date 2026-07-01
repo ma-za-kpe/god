@@ -478,8 +478,7 @@ start_fish() {
   fi
   cd /opt/fish-speech
   "$UV" python install 3.11 --quiet
-  "$UV" sync --python 3.11 --no-dev --quiet
-  "$UV" pip install --python .venv --quiet "torchaudio==2.4.1"
+  "$UV" sync --python 3.11 --extra cu128 --no-dev --quiet
   cd "$REPO_DIR"
 
   local fish_launcher="/tmp/god-fish-speech-launch.sh"
