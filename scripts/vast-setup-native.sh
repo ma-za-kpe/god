@@ -70,6 +70,7 @@ apt-get install -y -qq \
   ffmpeg libsndfile1 \
   portaudio19-dev \
   nodejs npm \
+  nginx \
   obs-studio xvfb xauth dbus-x11
 
 # ── 2. NATS server ────────────────────────────────────────────────────────────

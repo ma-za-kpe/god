@@ -934,10 +934,12 @@ PY
 }
 
 start_nginx() {
-  if command -v nginx >/dev/null 2>&1 || [ -d /etc/nginx ]; then
-    log "Starting nginx..."
-    if [ -d /etc/nginx ]; then
-      cat >/etc/nginx/conf.d/god.conf <<'EOF'
+  if ! command -v nginx >/dev/null 2>&1 || [ ! -d /etc/nginx ]; then
+    die "nginx missing; rerun vast-setup-native.sh"
+  fi
+
+  log "Starting nginx..."
+  cat >/etc/nginx/conf.d/god.conf <<'EOF'
 server {
   listen 127.0.0.1:10515;
   server_name _;
@@ -974,11 +976,9 @@ server {
   }
 }
 EOF
-    fi
-    nginx -t >/dev/null 2>&1 || die "nginx configuration test failed"
-    service nginx start 2>/dev/null || true
-    wait_http "http://127.0.0.1:10517/stage" "nginx observer proxy" 60 2 || die "nginx observer proxy not responding"
-  fi
+  nginx -t >/dev/null 2>&1 || die "nginx configuration test failed"
+  service nginx start 2>/dev/null || true
+  wait_http "http://127.0.0.1:10517/stage" "nginx observer proxy" 60 2 || die "nginx observer proxy not responding"
 }
 
 start_obs() {

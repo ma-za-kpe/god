@@ -18,11 +18,14 @@ def _read(path: str) -> str:
 
 def test_vast_native_installs_restart_prerequisites():
     script = _read("scripts/vast-setup-native.sh")
+    restart = _read("scripts/vast-restart-services.sh")
 
     assert "zstd" in script
     assert "iproute2 psmisc" in script
+    assert "nginx" in script
     assert "ss -tlnp" in script
     assert "fuser -k" in script
+    assert 'die "nginx missing; rerun vast-setup-native.sh"' in restart
 
 
 def test_vast_fish_model_download_matches_native_launcher():
