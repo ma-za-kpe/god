@@ -61,8 +61,10 @@ def test_vast_uv_lookup_does_not_use_head_pipeline_under_pipefail():
 
 
 def test_vast_obs_browser_url_can_target_one_page():
+    native = _read("scripts/vast-setup-native.sh")
     restart = _read("scripts/vast-restart-services.sh")
 
+    assert "OBS_BROWSER_URL=http://localhost:10517/one" in native
     assert 'if [ -z "${OBS_BROWSER_URL:-}" ]; then' in restart
     assert "export OBS_BROWSER_URL=http://localhost:10517/stage" in restart
     assert 'wait_http "$browser_url" "OBS browser URL"' in restart
