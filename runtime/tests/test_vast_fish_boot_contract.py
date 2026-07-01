@@ -23,6 +23,7 @@ def test_vast_native_installs_restart_prerequisites():
     assert "zstd" in script
     assert "iproute2 psmisc" in script
     assert "nginx" in script
+    assert "xdotool" in script
     assert "ss -tlnp" in script
     assert "fuser -k" in script
     assert 'die "nginx missing; rerun vast-setup-native.sh"' in restart

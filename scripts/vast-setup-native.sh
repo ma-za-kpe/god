@@ -71,7 +71,7 @@ apt-get install -y -qq \
   portaudio19-dev \
   nodejs npm \
   nginx \
-  obs-studio xvfb xauth dbus-x11
+  obs-studio xvfb xauth dbus-x11 xdotool
 
 # ── 2. NATS server ────────────────────────────────────────────────────────────
 if ! command -v nats-server &>/dev/null; then
