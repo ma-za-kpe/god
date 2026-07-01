@@ -82,6 +82,9 @@ def test_vast_obs_browser_url_can_target_one_page():
     restart = _read("scripts/vast-restart-services.sh")
 
     assert "OBS_BROWSER_URL=http://localhost:10517/one" in native
+    assert "Building observer React app" in restart
+    assert "npm ci --silent" in restart
+    assert "npm run build --silent" in restart
     assert 'if [ -z "${OBS_BROWSER_URL:-}" ]; then' in restart
     assert "export OBS_BROWSER_URL=http://localhost:10517/stage" in restart
     assert 'wait_http "$browser_url" "OBS browser URL"' in restart

@@ -516,6 +516,14 @@ start_observer() {
     die "$REPO_DIR/observer missing"
   fi
 
+  cd "$REPO_DIR/observer"
+  if [ ! -f dist/index.html ] \
+    || [ -n "$(find src index.html package.json package-lock.json -newer dist/index.html -print -quit 2>/dev/null)" ]; then
+    log "Building observer React app..."
+    npm ci --silent
+    npm run build --silent
+  fi
+
   log "Starting observer static server on :3000..."
   if pgrep -f 'observer/serve.py' >/dev/null 2>&1; then
     log "Killing existing observer serve.py process"
@@ -523,7 +531,6 @@ start_observer() {
     sleep 2
   fi
   check_port 3000 "observer"
-  cd "$REPO_DIR/observer"
   nohup python3 serve.py >"$LOG_DIR/observer.log" 2>&1 &
   cd "$REPO_DIR"
   wait_http "http://localhost:3000/stage" "observer /stage" 120 3 || die "Observer not responding on /stage"
