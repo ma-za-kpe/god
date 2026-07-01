@@ -3,7 +3,7 @@
 #
 # What changes vs local:
 #   - ollama: added as a container (GPU-accelerated, replaces host.docker.internal:11434)
-#   - fish-speech: --device cuda (RTX 4090 handles 6.5 GB easily)
+#   - fish-speech: --device cuda with S2-Pro checkpoint layout
 #   - runtime: OLLAMA_BASE_URL → the ollama container; SDXL portrait templates
 #   - comfyui: WEB_ENABLE_AUTH=false (already in main compose, kept here for explicitness)
 
@@ -47,7 +47,7 @@ services:
     entrypoint:
       - "sh"
       - "-c"
-      - "cd /app && uv run tools/api_server.py --llama-checkpoint-path checkpoints --decoder-checkpoint-path checkpoints/codec.pth --decoder-config-name modded_dac_vq --device cuda --listen 0.0.0.0:7860"
+      - "cd /app && uv run tools/api_server.py --llama-checkpoint-path checkpoints/s2-pro --decoder-checkpoint-path checkpoints/s2-pro/codec.pth --decoder-config-name modded_dac_vq --device cuda --listen 0.0.0.0:7860"
 
   # ─── runtime: point LLM at the ollama container ──────────────────────────
   runtime:

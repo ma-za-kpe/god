@@ -16,10 +16,19 @@ def test_react_one_page_selects_voice_speaker():
     world_map = _read("observer/src/components/WorldMap.jsx")
 
     assert "function speakerSoulIdFromSnapshot(snapshot, voicePlayback)" in world_map
-    assert "function activeAgentFor(agents, snapshot, selectedSoulId, voicePlayback, mode)" in world_map
+    assert (
+        "function activeAgentFor(agents, snapshot, selectedSoulId, voicePlayback, mode)"
+        in world_map
+    )
     assert "if (mode === 'one')" in world_map
-    assert "return agents.find((agent) => agent.soul_id === speakerSoulId) || agents[0] || null;" in world_map
-    assert "const activeAgent = activeAgentFor(agents, snapshot, selectedSoulId, voicePlayback, mode);" in world_map
+    assert (
+        "return agents.find((agent) => agent.soul_id === speakerSoulId) || agents[0] || null;"
+        in world_map
+    )
+    assert (
+        "const activeAgent = activeAgentFor(agents, snapshot, selectedSoulId, voicePlayback, mode);"
+        in world_map
+    )
 
 
 def test_react_one_page_has_alphabet_caption_and_drill():

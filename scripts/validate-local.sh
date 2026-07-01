@@ -37,6 +37,7 @@ Invoke-Checked { docker cp \"\$root/runtime/workflows\" god-runtime:/tmp/god-val
 Invoke-Checked { docker cp \"\$root/runtime/seed_utterances\" god-runtime:/tmp/god-validation/suite/seed_utterances } 'copy seed utterances'
 Invoke-Checked { docker cp \"\$root/runtime/tests/.\" god-runtime:/tmp/god-validation/suite/runtime-tests } 'copy runtime tests'
 Invoke-Checked { docker cp \"\$root/scripts\" god-runtime:/tmp/god-validation/scripts } 'copy scripts'
+Invoke-Checked { docker cp \"\$root/docker-compose.vast.yml\" god-runtime:/tmp/god-validation/docker-compose.vast.yml } 'copy vast compose override'
 Invoke-Checked { docker cp \"\$root/observer/stage.html\" god-runtime:/tmp/god-validation/observer/stage.html } 'copy observer stage'
 Invoke-Checked { docker cp \"\$root/observer/src/.\" god-runtime:/tmp/god-validation/observer/src } 'copy observer src'
 try {

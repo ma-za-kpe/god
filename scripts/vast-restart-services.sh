@@ -462,7 +462,7 @@ start_fish() {
   UV=""
   for uv_dir in /opt/god-venv/bin /root/.local/bin; do
     if [ -d "$uv_dir" ]; then
-      UV=$(find "$uv_dir" -name uv -type f 2>/dev/null | head -1 || true)
+      UV=$(find "$uv_dir" -name uv -type f -print -quit 2>/dev/null || true)
       if [ -n "$UV" ]; then
         break
       fi

@@ -149,27 +149,27 @@ log ".env.local written"
 log "Pulling fishaudio/fish-speech:latest..."
 docker pull --quiet fishaudio/fish-speech:latest || log "WARNING: pull failed — compose will retry"
 
-# ── 6. Download fish-speech 1.5 models (~10.4 GB) ───────────────────────────
+# ── 6. Download Fish Audio S2-Pro models (~11 GB) ───────────────────────────
 if [ "$SKIP_MODELS" = "0" ] && [ "$SKIP_FISH_MODELS" = "0" ]; then
-  log "Downloading fish-speech 1.5 models into Docker volume (~10.4 GB, takes ~5 min)..."
+  log "Downloading Fish Audio S2-Pro models into Docker volume (~11 GB, takes ~5 min)..."
   # --network host: with bridge disabled, containers need host networking to reach HuggingFace
   docker run --rm \
     --network host \
     -v god_fish_speech_checkpoints:/checkpoints \
     python:3.11-slim \
     bash -c "
-      pip install -q huggingface_hub &&
+      pip install -q 'huggingface_hub[hf_xet]' &&
       python3 -c \"
 from huggingface_hub import snapshot_download
 snapshot_download(
-    repo_id='fishaudio/fish-speech-1.5',
-    local_dir='/checkpoints',
+    repo_id='fishaudio/s2-pro',
+    local_dir='/checkpoints/s2-pro',
     ignore_patterns=['*.gguf','*.onnx','*.txt','*.md','README*'],
 )
 print('Done')
 \"
     "
-  log "fish-speech models ready"
+  log "Fish Audio S2-Pro models ready"
 else
   log "Skipping fish-speech models (SKIP_FISH_MODELS=${SKIP_FISH_MODELS})"
 fi

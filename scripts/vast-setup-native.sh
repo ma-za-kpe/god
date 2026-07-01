@@ -60,6 +60,8 @@ log "Installing system packages..."
 apt-get update -qq
 apt-get install -y -qq \
   curl git openssl ca-certificates \
+  zstd \
+  iproute2 psmisc \
   postgresql postgresql-client \
   redis-server \
   python3-pip python3-venv python3-dev \
@@ -306,22 +308,22 @@ if [ "$SKIP_FISH" = "0" ]; then
     git clone --depth 1 https://github.com/fishaudio/fish-speech /opt/fish-speech
   fi
   cd /opt/fish-speech
-  UV=$(find /opt/god-venv/bin /root/.local/bin -name uv -type f 2>/dev/null | head -1)
+  UV=$(find /opt/god-venv/bin /root/.local/bin -name uv -type f -print -quit 2>/dev/null || true)
   UV="${UV:-$(command -v uv)}"
   "$UV" sync --no-dev --quiet
 
-  log "Downloading fish-speech 1.5 models (~10.4 GB)..."
-  pip install --quiet huggingface_hub
+  log "Downloading Fish Audio S2-Pro models (~11 GB)..."
+  pip install --quiet "huggingface_hub[hf_xet]"
   python3 -c "
 from huggingface_hub import snapshot_download
 import signal
 signal.alarm(900)  # 15-minute hard timeout
 snapshot_download(
-    repo_id='fishaudio/fish-speech-1.5',
-    local_dir='checkpoints',
+    repo_id='fishaudio/s2-pro',
+    local_dir='checkpoints/s2-pro',
     ignore_patterns=['*.gguf','*.onnx','*.txt','*.md','README*'],
 )
-print('fish-speech models ready')
+print('Fish Audio S2-Pro models ready')
 " || log "WARNING: fish-speech model download failed — voice synthesis will be skipped"
 
   log "Starting fish-speech on :7860..."

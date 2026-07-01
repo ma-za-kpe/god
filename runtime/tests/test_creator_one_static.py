@@ -6,9 +6,9 @@ import pathlib
 
 
 def _main_py() -> str:
-    return (
-        pathlib.Path(__file__).resolve().parents[1] / "src" / "main.py"
-    ).read_text(encoding="utf-8")
+    return (pathlib.Path(__file__).resolve().parents[1] / "src" / "main.py").read_text(
+        encoding="utf-8"
+    )
 
 
 def test_creator_one_defaults_to_alphabet_recitation():
