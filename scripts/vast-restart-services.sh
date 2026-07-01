@@ -471,6 +471,14 @@ start_fish() {
     fi
   done
   UV="${UV:-$(command -v uv 2>/dev/null || true)}"
+  if [ -z "$UV" ]; then
+    die "uv missing; fish-speech requires uv-managed Python 3.11"
+  fi
+  cd /opt/fish-speech
+  "$UV" python install 3.11 --quiet
+  "$UV" sync --python 3.11 --no-dev --quiet
+  cd "$REPO_DIR"
+
   local fish_launcher="/tmp/god-fish-speech-launch.sh"
   cat >"$fish_launcher" <<EOF
 #!/usr/bin/env bash
@@ -478,11 +486,7 @@ set -euo pipefail
 cd /opt/fish-speech
 exec >>"$LOG_DIR/fish-speech.log" 2>&1
 echo "[$(date -Is)] fish-speech launcher starting"
-$(if [ -n "${UV:-}" ]; then
-    printf 'exec "%s" run python tools/api_server.py --llama-checkpoint-path /opt/fish-speech/checkpoints/s2-pro --decoder-checkpoint-path /opt/fish-speech/checkpoints/s2-pro/codec.pth --decoder-config-name modded_dac_vq --device %s %s --listen 0.0.0.0:7860\n' "$UV" "$fish_device" "${fish_half_flag:-}"
-  else
-    printf 'source /opt/god-venv/bin/activate\nexec python3 tools/api_server.py --llama-checkpoint-path /opt/fish-speech/checkpoints/s2-pro --decoder-checkpoint-path /opt/fish-speech/checkpoints/s2-pro/codec.pth --decoder-config-name modded_dac_vq --device %s %s --listen 0.0.0.0:7860\n' "$fish_device" "${fish_half_flag:-}"
-  fi)
+$(printf 'exec "%s" run --python 3.11 python tools/api_server.py --llama-checkpoint-path /opt/fish-speech/checkpoints/s2-pro --decoder-checkpoint-path /opt/fish-speech/checkpoints/s2-pro/codec.pth --decoder-config-name modded_dac_vq --device %s %s --listen 0.0.0.0:7860\n' "$UV" "$fish_device" "${fish_half_flag:-}")
 EOF
   chmod +x "$fish_launcher"
 

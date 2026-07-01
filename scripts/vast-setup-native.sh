@@ -310,11 +310,12 @@ if [ "$SKIP_FISH" = "0" ]; then
   cd /opt/fish-speech
   UV=$(find /opt/god-venv/bin /root/.local/bin -name uv -type f -print -quit 2>/dev/null || true)
   UV="${UV:-$(command -v uv)}"
-  "$UV" sync --no-dev --quiet
+  "$UV" python install 3.11 --quiet
+  "$UV" sync --python 3.11 --no-dev --quiet
 
   log "Downloading Fish Audio S2-Pro models (~11 GB)..."
-  pip install --quiet "huggingface_hub[hf_xet]"
-  python3 -c "
+  "$UV" pip install --python .venv --quiet "huggingface_hub[hf_xet]"
+  "$UV" run --python 3.11 python -c "
 from huggingface_hub import snapshot_download
 import signal
 signal.alarm(900)  # 15-minute hard timeout
@@ -328,7 +329,7 @@ print('Fish Audio S2-Pro models ready')
 
   log "Starting fish-speech on :7860..."
   check_port 7860 "fish-speech"
-  nohup "$UV" run python tools/api_server.py \
+  nohup "$UV" run --python 3.11 python tools/api_server.py \
     --llama-checkpoint-path /opt/fish-speech/checkpoints/s2-pro \
     --decoder-checkpoint-path /opt/fish-speech/checkpoints/s2-pro/codec.pth \
     --decoder-config-name modded_dac_vq \

@@ -37,6 +37,15 @@ def test_vast_fish_model_download_matches_native_launcher():
     assert "/opt/fish-speech/checkpoints/s2-pro/codec.pth" in restart
     assert "repo_id='fishaudio/fish-speech-1.5'" not in setup
 
+    assert '"$UV" python install 3.11 --quiet' in setup
+    assert '"$UV" sync --python 3.11 --no-dev --quiet' in setup
+    assert '"$UV" run --python 3.11 python -c' in setup
+    assert '"$UV" run --python 3.11 python tools/api_server.py' in setup
+    assert 'die "uv missing; fish-speech requires uv-managed Python 3.11"' in restart
+    assert '"$UV" sync --python 3.11 --no-dev --quiet' in restart
+    assert "run --python 3.11 python tools/api_server.py" in restart
+    assert "exec python3 tools/api_server.py" not in restart
+
 
 def test_vast_docker_fish_model_download_matches_launcher():
     setup = _read("scripts/vast-setup.sh")
