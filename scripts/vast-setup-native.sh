@@ -76,6 +76,7 @@ node_major="$(node -p 'Number(process.versions.node.split(".")[0])' 2>/dev/null 
 if [ "$node_major" -lt 20 ]; then
   log "Installing Node.js 22 for observer build..."
   curl -fsSL https://deb.nodesource.com/setup_22.x | bash - >/dev/null
+  apt-get remove -y -qq npm nodejs nodejs-doc libnode-dev 2>/dev/null || true
   apt-get install -y -qq nodejs
 fi
 log "Node: $(node --version 2>/dev/null || echo missing)"

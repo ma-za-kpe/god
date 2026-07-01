@@ -25,6 +25,7 @@ def test_vast_native_installs_restart_prerequisites():
     assert "nginx" in script
     assert "xdotool" in script
     assert "https://deb.nodesource.com/setup_22.x" in script
+    assert "apt-get remove -y -qq npm nodejs nodejs-doc libnode-dev" in script
     assert "Installing Node.js 22 for observer build" in script
     assert "ss -tlnp" in script
     assert "fuser -k" in script
