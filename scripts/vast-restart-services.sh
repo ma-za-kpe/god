@@ -477,6 +477,7 @@ start_fish() {
   cd /opt/fish-speech
   "$UV" python install 3.11 --quiet
   "$UV" sync --python 3.11 --no-dev --quiet
+  "$UV" pip install --python .venv --quiet "torchaudio==2.4.1"
   cd "$REPO_DIR"
 
   local fish_launcher="/tmp/god-fish-speech-launch.sh"
@@ -486,7 +487,7 @@ set -euo pipefail
 cd /opt/fish-speech
 exec >>"$LOG_DIR/fish-speech.log" 2>&1
 echo "[$(date -Is)] fish-speech launcher starting"
-$(printf 'exec "%s" run --python 3.11 python tools/api_server.py --llama-checkpoint-path /opt/fish-speech/checkpoints/s2-pro --decoder-checkpoint-path /opt/fish-speech/checkpoints/s2-pro/codec.pth --decoder-config-name modded_dac_vq --device %s %s --listen 0.0.0.0:7860\n' "$UV" "$fish_device" "${fish_half_flag:-}")
+$(printf 'exec "%s" run --no-sync --python 3.11 python tools/api_server.py --llama-checkpoint-path /opt/fish-speech/checkpoints/s2-pro --decoder-checkpoint-path /opt/fish-speech/checkpoints/s2-pro/codec.pth --decoder-config-name modded_dac_vq --device %s %s --listen 0.0.0.0:7860\n' "$UV" "$fish_device" "${fish_half_flag:-}")
 EOF
   chmod +x "$fish_launcher"
 

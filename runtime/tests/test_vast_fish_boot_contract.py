@@ -39,11 +39,13 @@ def test_vast_fish_model_download_matches_native_launcher():
 
     assert '"$UV" python install 3.11 --quiet' in setup
     assert '"$UV" sync --python 3.11 --no-dev --quiet' in setup
-    assert '"$UV" run --python 3.11 python -c' in setup
-    assert '"$UV" run --python 3.11 python tools/api_server.py' in setup
+    assert '"$UV" pip install --python .venv --quiet "torchaudio==2.4.1"' in setup
+    assert '"$UV" run --no-sync --python 3.11 python -c' in setup
+    assert '"$UV" run --no-sync --python 3.11 python tools/api_server.py' in setup
     assert 'die "uv missing; fish-speech requires uv-managed Python 3.11"' in restart
     assert '"$UV" sync --python 3.11 --no-dev --quiet' in restart
-    assert "run --python 3.11 python tools/api_server.py" in restart
+    assert '"$UV" pip install --python .venv --quiet "torchaudio==2.4.1"' in restart
+    assert "run --no-sync --python 3.11 python tools/api_server.py" in restart
     assert "exec python3 tools/api_server.py" not in restart
 
 
