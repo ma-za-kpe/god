@@ -519,6 +519,10 @@ start_observer() {
   cd "$REPO_DIR/observer"
   if [ ! -f dist/index.html ] \
     || [ -n "$(find src index.html package.json package-lock.json -newer dist/index.html -print -quit 2>/dev/null)" ]; then
+    node_major="$(node -p 'Number(process.versions.node.split(".")[0])' 2>/dev/null || echo 0)"
+    if [ "$node_major" -lt 20 ]; then
+      die "Node.js 20+ required to build observer; rerun vast-setup-native.sh"
+    fi
     log "Building observer React app..."
     npm ci --silent
     npm run build --silent

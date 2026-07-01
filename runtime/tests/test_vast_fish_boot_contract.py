@@ -24,6 +24,8 @@ def test_vast_native_installs_restart_prerequisites():
     assert "iproute2 psmisc" in script
     assert "nginx" in script
     assert "xdotool" in script
+    assert "https://deb.nodesource.com/setup_22.x" in script
+    assert "Installing Node.js 22 for observer build" in script
     assert "ss -tlnp" in script
     assert "fuser -k" in script
     assert 'die "nginx missing; rerun vast-setup-native.sh"' in restart
@@ -83,6 +85,7 @@ def test_vast_obs_browser_url_can_target_one_page():
 
     assert "OBS_BROWSER_URL=http://localhost:10517/one" in native
     assert "Building observer React app" in restart
+    assert "Node.js 20+ required to build observer" in restart
     assert "npm ci --silent" in restart
     assert "npm run build --silent" in restart
     assert 'if [ -z "${OBS_BROWSER_URL:-}" ]; then' in restart

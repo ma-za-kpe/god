@@ -69,9 +69,16 @@ apt-get install -y -qq \
   build-essential libssl-dev libffi-dev \
   ffmpeg libsndfile1 \
   portaudio19-dev \
-  nodejs npm \
   nginx \
   obs-studio xvfb xauth dbus-x11 xdotool
+
+node_major="$(node -p 'Number(process.versions.node.split(".")[0])' 2>/dev/null || echo 0)"
+if [ "$node_major" -lt 20 ]; then
+  log "Installing Node.js 22 for observer build..."
+  curl -fsSL https://deb.nodesource.com/setup_22.x | bash - >/dev/null
+  apt-get install -y -qq nodejs
+fi
+log "Node: $(node --version 2>/dev/null || echo missing)"
 
 # ── 2. NATS server ────────────────────────────────────────────────────────────
 if ! command -v nats-server &>/dev/null; then
