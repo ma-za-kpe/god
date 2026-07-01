@@ -30,6 +30,9 @@ def test_vast_fish_model_download_matches_native_launcher():
     restart = _read("scripts/vast-restart-services.sh")
 
     assert "repo_id='fishaudio/s2-pro'" in setup
+    assert 'FISH_SPEECH_REF="${FISH_SPEECH_REF:-v2.0.0-beta}"' in setup
+    assert 'git checkout --force "$FISH_SPEECH_REF"' in setup
+    assert 'grep -q "fish_qwen3_omni"' in setup
     assert "local_dir='checkpoints/s2-pro'" in setup
     assert "/opt/fish-speech/checkpoints/s2-pro" in setup
     assert "/opt/fish-speech/checkpoints/s2-pro/codec.pth" in setup
@@ -46,6 +49,7 @@ def test_vast_fish_model_download_matches_native_launcher():
     assert '"$UV" sync --python 3.11 --no-dev --quiet' in restart
     assert '"$UV" pip install --python .venv --quiet "torchaudio==2.4.1"' in restart
     assert "run --no-sync --python 3.11 python tools/api_server.py" in restart
+    assert "rerun vast-setup-native.sh" in restart
     assert "exec python3 tools/api_server.py" not in restart
 
 

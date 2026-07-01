@@ -20,6 +20,7 @@ REPO_URL="https://github.com/ma-za-kpe/god.git"
 REPO_DIR="/workspace/god"
 REPO_BRANCH="${REPO_BRANCH:-main}"
 OLLAMA_MODEL="${OLLAMA_MODEL:-llama3.1:8b}"
+FISH_SPEECH_REF="${FISH_SPEECH_REF:-v2.0.0-beta}"
 SKIP_FISH="${SKIP_FISH:-0}"
 SKIP_COMFYUI="${SKIP_COMFYUI:-0}"
 SKIP_IPFS="${SKIP_IPFS:-0}"
@@ -305,9 +306,14 @@ if [ "$SKIP_FISH" = "0" ]; then
     pip install --quiet uv
   fi
   if [ ! -d /opt/fish-speech ]; then
-    git clone --depth 1 https://github.com/fishaudio/fish-speech /opt/fish-speech
+    git clone --depth 1 --branch "$FISH_SPEECH_REF" https://github.com/fishaudio/fish-speech /opt/fish-speech
   fi
   cd /opt/fish-speech
+  git fetch --tags --force origin >/dev/null 2>&1 || true
+  git checkout --force "$FISH_SPEECH_REF" >/dev/null 2>&1 \
+    || die "fish-speech ref ${FISH_SPEECH_REF} not available"
+  grep -q "fish_qwen3_omni" fish_speech/models/text2semantic/llama.py \
+    || die "fish-speech ref ${FISH_SPEECH_REF} does not support S2-Pro fish_qwen3_omni"
   UV=$(find /opt/god-venv/bin /root/.local/bin -name uv -type f -print -quit 2>/dev/null || true)
   UV="${UV:-$(command -v uv)}"
   "$UV" python install 3.11 --quiet

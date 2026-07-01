@@ -418,6 +418,8 @@ start_fish() {
   if [ ! -d /opt/fish-speech ]; then
     die "/opt/fish-speech missing; install fish-speech before running the stack"
   fi
+  grep -q "fish_qwen3_omni" /opt/fish-speech/fish_speech/models/text2semantic/llama.py \
+    || die "fish-speech checkout does not support S2-Pro fish_qwen3_omni; rerun vast-setup-native.sh"
 
   log "Starting fish-speech..."
   local min_free_vram_mb="${FISH_MIN_FREE_VRAM_MB:-3072}"
