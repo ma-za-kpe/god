@@ -216,9 +216,11 @@ ensure_repo() {
 }
 
 configure_streaming_mode() {
-  # Browser source is always /stage — hardcoded, no override.
+  # Default to /stage; set OBS_BROWSER_URL to stream a focused page like /one.
   export OBS_BROWSER_SOURCE=god-browser
-  export OBS_BROWSER_URL=http://localhost:10517/stage
+  if [ -z "${OBS_BROWSER_URL:-}" ]; then
+    export OBS_BROWSER_URL=http://localhost:10517/stage
+  fi
 
   if [ -z "${OBS_STREAM_SERVER:-}" ]; then
     export OBS_STREAM_SERVER=rtmp://a.rtmp.youtube.com/live2
@@ -251,7 +253,7 @@ configure_streaming_mode() {
     else
       log "GPU background job policy explicit: GPU_BACKGROUND_JOBS_ALLOWED=${GPU_BACKGROUND_JOBS_ALLOWED}"
     fi
-    log "Stream key present: YouTube + OBS live streaming enabled (streaming /stage)"
+    log "Stream key present: YouTube + OBS live streaming enabled (streaming ${OBS_BROWSER_URL})"
     return 0
   fi
 
@@ -730,6 +732,7 @@ JS
 
   log "Starting Firefox on Xvfb..."
   local browser_url="${OBS_BROWSER_URL:-http://localhost:10517/stage}"
+  wait_http "$browser_url" "OBS browser URL" 60 2 || die "OBS browser URL not responding: ${browser_url}"
   local launch_firefox
   launch_firefox() {
     nohup runuser -u stream -- env \
@@ -1368,6 +1371,7 @@ main() {
   log "  Ollama    http://${PUBLIC_IP}:11434"
   log "  fish TTS  http://${PUBLIC_IP}:7860"
   log "  Observer  http://${PUBLIC_IP}:10517/stage"
+  log "  OBS page  ${OBS_BROWSER_URL:-http://localhost:10517/stage}"
   log ""
   log "Genesis can run only after the stack is healthy:"
   if [ -n "${CREATOR_GENESIS_TOKEN:-}" ]; then
@@ -1394,6 +1398,7 @@ report = {
     "env": {
         "STREAMING_MODE": os.getenv("STREAMING_MODE", ""),
         "BROADCAST_ENABLED": os.getenv("BROADCAST_ENABLED", ""),
+        "OBS_BROWSER_URL": os.getenv("OBS_BROWSER_URL", ""),
         "YOUTUBE_ENABLED": os.getenv("YOUTUBE_ENABLED", ""),
         "LOCAL_DEV_MODE": os.getenv("LOCAL_DEV_MODE", ""),
     },
@@ -1416,7 +1421,7 @@ report = {
         "comfyui": "http://localhost:8188",
         "ollama": "http://localhost:11434",
         "fish": "http://localhost:7860",
-        "observer": "http://localhost:10517/stage",
+        "observer": os.getenv("OBS_BROWSER_URL", "http://localhost:10517/stage"),
         "obs_websocket": "ws://127.0.0.1:4444",
     },
     "logs": {
