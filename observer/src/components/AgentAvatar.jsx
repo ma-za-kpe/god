@@ -48,6 +48,14 @@ export function AgentAvatar({
   const [switchMs, setSwitchMs] = useState(0);
   const [mouthLatencyMs, setMouthLatencyMs] = useState(null);
   const phase = useMemo(() => stablePhase(agent?.soul_id || agent?.current_name), [agent?.current_name, agent?.soul_id]);
+  const frameWidth = minimal ? 380 : 170;
+  const frameHeight = minimal ? 470 : 210;
+  const mouthWidth = minimal ? 92 : 46;
+  const mouthHeight = minimal ? 14 : 7;
+  const barWidth = minimal ? 9 : 5;
+  const barGap = minimal ? 6 : 3;
+  const barHeight = minimal ? 34 : 22;
+  const barBottom = minimal ? -34 : -18;
 
   const playbackMatchesAgent = Boolean(
     voicePlayback?.status === 'playing' &&
@@ -178,7 +186,7 @@ export function AgentAvatar({
       <Html
         center
         position={[0, 1.1, 0]}
-        style={{ width: '170px', height: '210px', pointerEvents: 'none', userSelect: 'none' }}
+        style={{ width: `${frameWidth}px`, height: `${frameHeight}px`, pointerEvents: 'none', userSelect: 'none' }}
         occlude={false}
       >
         <div
@@ -195,16 +203,16 @@ export function AgentAvatar({
           data-voice-latency-target-ms={playbackMatchesAgent ? voicePlayback?.latencyTargetMs || 300 : ''}
           data-voice-lip-sync-source={playbackMatchesAgent ? voicePlayback?.lipSyncSource || 'audio_rms' : ''}
           style={{
-            width: '170px',
-            height: '210px',
+            width: `${frameWidth}px`,
+            height: `${frameHeight}px`,
             position: 'relative',
             '--glow-color': color,
           }}
         >
           {/* Portrait image */}
           <div style={{
-            width: '170px',
-            height: '210px',
+            width: `${frameWidth}px`,
+            height: `${frameHeight}px`,
             border: `2.5px solid ${isActiveSpeaker ? '#f4c95d' : (selected ? '#fff' : color)}`,
             boxShadow: isActiveSpeaker
               ? `0 0 24px ${color}, 0 0 10px #f4c95d`
@@ -297,8 +305,8 @@ export function AgentAvatar({
                 zIndex: 3,
                 left: '50%',
                 bottom: '22%',
-                width: '46px',
-                height: '7px',
+                width: `${mouthWidth}px`,
+                height: `${mouthHeight}px`,
                 borderRadius: '999px',
                 background: isActiveSpeaker ? '#2b1015' : 'rgba(244,247,255,0.2)',
                 boxShadow: `0 0 10px ${color}55`,
@@ -314,19 +322,24 @@ export function AgentAvatar({
           {isActiveSpeaker && (
             <div style={{
               position: 'absolute',
-              bottom: '-18px',
+              bottom: `${barBottom}px`,
               left: '50%',
               transform: 'translateX(-50%)',
               display: 'flex',
               alignItems: 'flex-end',
-              gap: '3px',
-              height: '22px',
+              gap: `${barGap}px`,
+              height: `${barHeight}px`,
             }}>
               {[1, 2, 3, 4, 5].map((i) => (
                 <span
                   key={i}
                   className="speaking-bar"
-                  style={{ animationDelay: `${(i - 1) * 0.1}s` }}
+                  style={{
+                    width: `${barWidth}px`,
+                    '--speak-bar-rest': minimal ? '7px' : '4px',
+                    '--speak-bar-peak': minimal ? '32px' : '18px',
+                    animationDelay: `${(i - 1) * 0.1}s`,
+                  }}
                 />
               ))}
             </div>
