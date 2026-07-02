@@ -78,6 +78,25 @@ test('prefers an explicit live speech-driven video source while speaking', () =>
   assert.equal(sourceStatusText(source), 'live');
 });
 
+test('keeps an explicit live speech-driven video source after the speaking window', () => {
+  const source = selectAvatarSource({
+    runtimeBaseUrl: 'http://runtime.local',
+    speaking: false,
+    agent: { current_name: 'Live', avatar_cid: 'bafyPortrait' },
+    avatarState: {
+      video_manifest: {
+        live_video: { url: 'http://localhost:7861/stream/live/u1.mp4', mime_type: 'video/mp4' },
+        loop: 'bafyIdleLoop',
+      },
+    },
+  });
+
+  assert.equal(source.activeKind, 'live');
+  assert.equal(source.video.url, 'http://localhost:7861/stream/live/u1.mp4');
+  assert.equal(source.video.mimeType, 'video/mp4');
+  assert.equal(sourceStatusText(source), 'live');
+});
+
 test('does not treat a live video CID as a live speech-driven stream', () => {
   const source = selectAvatarSource({
     runtimeBaseUrl: 'http://runtime.local',

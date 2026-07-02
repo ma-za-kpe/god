@@ -16,6 +16,7 @@ export const API_BASE =
   defaultRuntimeUrl();
 
 let _lastPlayedUtteranceId = '';
+let _pendingLiveVideoUtteranceId = '';
 let _pendingUrl = null;
 let _pendingPlayback = null;
 let _alphabetPassed = false;
@@ -23,6 +24,8 @@ let _alphabetSpeaking = false;
 let _alphabetNextAt = 0;
 
 const ONE_ALPHABET_NORMALIZED = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+const ONE_WAITING_VIDEO_STATUSES = new Set(['waiting-for-video', 'waiting-for-live-video']);
+const ONE_RETRY_STATUSES = new Set(['blocked', 'timeout', 'error', 'video-timeout']);
 
 function streamUrl() {
   return API_BASE.replace(/^http/i, 'ws') + '/world/stream';
@@ -67,6 +70,65 @@ function resolveVoiceAudioUrl(audioUrl, utteranceId) {
   return `${API_BASE}/voice/audio/${utteranceId}`;
 }
 
+function resolveAbsoluteUrl(rawUrl) {
+  if (!rawUrl) return '';
+  try {
+    return new URL(rawUrl, API_BASE).toString();
+  } catch {
+    return String(rawUrl);
+  }
+}
+
+function firstMediaUrl(value) {
+  if (!value) return '';
+  if (typeof value === 'string') return value.trim();
+  if (Array.isArray(value)) {
+    for (const entry of value) {
+      const url = firstMediaUrl(entry);
+      if (url) return url;
+    }
+    return '';
+  }
+  if (typeof value === 'object') {
+    for (const field of ['url', 'src', 'href', 'uri', 'path']) {
+      if (typeof value[field] === 'string' && value[field].trim()) return value[field].trim();
+    }
+    return firstMediaUrl(value.sources);
+  }
+  return '';
+}
+
+function liveVideoUrlFromSnapshot(snap) {
+  const avatar = snap?.avatar || {};
+  const candidates = [
+    avatar?.video_manifest?.live_video,
+    avatar?.video_manifest?.live,
+    avatar?.plan?.video_manifest?.live_video,
+    avatar?.plan?.video_manifest?.live,
+  ];
+  for (const candidate of candidates) {
+    const url = firstMediaUrl(candidate);
+    if (url) return resolveAbsoluteUrl(url);
+  }
+  return '';
+}
+
+async function waitForLiveVideo(url, timeoutMs = Number(import.meta.env.VITE_ONE_LIVE_VIDEO_WAIT_TIMEOUT_MS || 120000)) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), Math.max(1000, timeoutMs));
+  try {
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: { Range: 'bytes=0-0' },
+      cache: 'no-store',
+      signal: controller.signal,
+    });
+    return response.ok || response.status === 206;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 function speakerSoulIdFromSnapshot(snap) {
   const direct = snap?.last_dialogue_turn?.sender_soul_id || snap?.last_dialogue_turn?.sender_id || snap?.avatar?.speaker_soul_id;
   if (direct) return String(direct);
@@ -102,14 +164,16 @@ function markVoicePlayback(status, playback, extra = {}) {
     useObserverStore.getState().setCurrentSpokenLine(playback.line);
     if (oneAlphabetEnabled() && isCorrectAlphabet(playback.line)) {
       const nextStatus =
-        status === 'ended'
+        ONE_WAITING_VIDEO_STATUSES.has(status)
+          ? 'waiting-for-live-video'
+          : status === 'ended'
           ? 'passed'
-          : (status === 'blocked' || status === 'timeout' || status === 'error')
+          : ONE_RETRY_STATUSES.has(status)
           ? 'retry'
           : 'reciting';
       useObserverStore.getState().setOneAlphabetStatus(nextStatus);
       if (status === 'ended') _alphabetPassed = true;
-      if (status === 'ended' || status === 'blocked' || status === 'timeout' || status === 'error') {
+      if (status === 'ended' || ONE_WAITING_VIDEO_STATUSES.has(status) || ONE_RETRY_STATUSES.has(status)) {
         _alphabetSpeaking = false;
       } else {
         _alphabetSpeaking = true;
@@ -122,6 +186,62 @@ function markVoicePlayback(status, playback, extra = {}) {
     updatedAtMs: nowMs(),
     ...extra,
   });
+}
+
+function startVoicePlayback(playback, audioUrl, extra = {}) {
+  const nextPlayback = { ...(playback || {}), ...extra };
+  markVoicePlayback('starting', nextPlayback, {
+    audioUrl,
+    transport: extra.transport || 'fish-audio',
+    ...extra,
+  });
+  _playAudioUrl(audioUrl, nextPlayback);
+}
+
+function startOneAlphabetPlaybackWhenVideoReady({
+  uid,
+  playback,
+  audioUrl,
+  liveVideoUrl,
+  isAlive,
+}) {
+  if (_pendingLiveVideoUtteranceId === uid || _lastPlayedUtteranceId === uid) return;
+  _pendingLiveVideoUtteranceId = uid;
+  const livePlayback = { ...playback, liveVideoUrl };
+  markVoicePlayback('waiting-for-video', livePlayback, {
+    audioUrl,
+    liveVideoUrl,
+    transport: 'fish-audio+live-video',
+  });
+  waitForLiveVideo(liveVideoUrl)
+    .then((ready) => {
+      if (!isAlive() || _lastPlayedUtteranceId === uid) return;
+      _pendingLiveVideoUtteranceId = '';
+      if (!ready) {
+        _alphabetNextAt = Date.now() + 1200;
+        markVoicePlayback('video-timeout', livePlayback, {
+          audioUrl,
+          liveVideoUrl,
+          transport: 'fish-audio+live-video',
+        });
+        return;
+      }
+      _lastPlayedUtteranceId = uid;
+      startVoicePlayback(livePlayback, audioUrl, {
+        liveVideoUrl,
+        transport: 'fish-audio+live-video',
+      });
+    })
+    .catch(() => {
+      if (!isAlive()) return;
+      _pendingLiveVideoUtteranceId = '';
+      _alphabetNextAt = Date.now() + 1200;
+      markVoicePlayback('video-timeout', livePlayback, {
+        audioUrl,
+        liveVideoUrl,
+        transport: 'fish-audio+live-video',
+      });
+    });
 }
 
 // Singleton AudioContext — pre-unlocked in OBS CEF, unlockable in Firefox
@@ -268,11 +388,25 @@ export function useWorld() {
             useObserverStore.getState().setOneAlphabetStatus('line-ready');
           }
           if (uid && synthOk && uid !== _lastPlayedUtteranceId) {
-            _lastPlayedUtteranceId = uid;
             const playback = playbackContextFromSnapshot(snap);
             const audioUrl = resolveVoiceAudioUrl(snap?.voice?.synthesis?.audio_url, uid);
-            markVoicePlayback('starting', playback, { audioUrl, transport: 'fish-audio' });
-            _playAudioUrl(audioUrl, playback);
+            const liveVideoUrl = liveVideoUrlFromSnapshot(snap);
+            if (liveVideoUrl) {
+              startOneAlphabetPlaybackWhenVideoReady({
+                uid,
+                playback,
+                audioUrl,
+                liveVideoUrl,
+                isAlive: () => alive,
+              });
+            } else {
+              _alphabetSpeaking = false;
+              _alphabetNextAt = Date.now() + 1200;
+              markVoicePlayback('waiting-for-live-video', playback, {
+                audioUrl,
+                transport: 'fish-audio+live-video',
+              });
+            }
           } else if (!uid || !synthOk) {
             _alphabetSpeaking = false;
             _alphabetNextAt = Date.now() + 1200;

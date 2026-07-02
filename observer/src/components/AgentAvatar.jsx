@@ -41,6 +41,7 @@ export function AgentAvatar({
   const haloRef = useRef();
   const blinkRef = useRef();
   const mouthRef = useRef();
+  const videoRef = useRef();
   const sourceSwitchStartedAt = useRef(nowMs());
   const mouthLatencyRef = useRef(null);
   const [videoReady, setVideoReady] = useState(false);
@@ -70,6 +71,7 @@ export function AgentAvatar({
   const videoCandidate = minimal && avatarSource.video?.kind !== 'live' ? null : avatarSource.video;
   const videoUrl = videoCandidate?.url || '';
   const videoKind = videoCandidate?.kind || '';
+  const isLiveVideo = videoKind === 'live';
   const frameWidth = minimal ? 640 : 170;
   const frameHeight = minimal ? 360 : 210;
   const mouthWidth = minimal ? 92 : 46;
@@ -110,7 +112,15 @@ export function AgentAvatar({
     setVideoFailed(false);
     setVideoReady(true);
     setSwitchMs(Math.max(0, Math.round(nowMs() - sourceSwitchStartedAt.current)));
-    const play = event?.currentTarget?.play?.();
+    const element = event?.currentTarget;
+    if (isLiveVideo && !playbackMatchesAgent) {
+      element?.pause?.();
+      try {
+        if (element && element.currentTime > 0.15) element.currentTime = 0;
+      } catch {}
+      return;
+    }
+    const play = element?.play?.();
     if (play?.catch) play.catch(() => {});
   };
 
@@ -179,6 +189,23 @@ export function AgentAvatar({
       }
     }
   });
+
+  useEffect(() => {
+    const element = videoRef.current;
+    if (!element || !videoUrl || !isLiveVideo) return;
+    if (playbackMatchesAgent) {
+      try {
+        if (element.currentTime > 0.15 || element.ended) element.currentTime = 0;
+      } catch {}
+      const play = element.play?.();
+      if (play?.catch) play.catch(() => {});
+    } else {
+      element.pause?.();
+      try {
+        if (!element.ended && element.currentTime > 0.15) element.currentTime = 0;
+      } catch {}
+    }
+  }, [videoUrl, isLiveVideo, playbackMatchesAgent, voicePlayback?.utteranceId]);
 
   return (
     <group ref={groupRef} position={position}>
@@ -261,9 +288,10 @@ export function AgentAvatar({
             )}
             {videoUrl && !videoFailed && (
               <video
+                ref={videoRef}
                 src={videoUrl}
                 muted
-                autoPlay
+                autoPlay={!isLiveVideo}
                 loop={videoKind === 'loop'}
                 playsInline
                 preload="auto"
@@ -273,7 +301,7 @@ export function AgentAvatar({
                 onPlaying={markVideoReady}
                 onError={markVideoFailed}
                 onEnded={() => {
-                  if (videoKind !== 'loop') setVideoReady(false);
+                  if (videoKind !== 'loop' && videoKind !== 'live') setVideoReady(false);
                 }}
                 style={{
                   position: 'absolute',

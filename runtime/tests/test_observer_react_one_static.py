@@ -49,9 +49,14 @@ def test_react_one_page_has_alphabet_caption_and_fish_audio_gate():
     assert "if (uid && synthOk && uid !== _lastPlayedUtteranceId)" in hook
     assert "const playback = playbackContextFromSnapshot(snap);" in hook
     assert "const audioUrl = resolveVoiceAudioUrl(snap?.voice?.synthesis?.audio_url, uid);" in hook
-    assert "markVoicePlayback('starting', playback, { audioUrl, transport: 'fish-audio' });" in hook
+    assert "const liveVideoUrl = liveVideoUrlFromSnapshot(snap);" in hook
+    assert "startOneAlphabetPlaybackWhenVideoReady({" in hook
+    assert "waitForLiveVideo(liveVideoUrl)" in hook
+    assert "markVoicePlayback('waiting-for-live-video', playback" in hook
+    assert "transport: 'fish-audio+live-video'" in hook
     assert "} else if (!uid || !synthOk) {" in hook
     assert "waiting-for-fish-audio" in hook
+    assert "waiting-for-live-video" in hook
     assert "waiting-for-alphabet-line" in hook
     assert "speechSynthesis" not in hook
     assert "ensureOneAlphabetDrill" not in hook
@@ -78,6 +83,9 @@ def test_react_one_page_requires_live_lip_renderer_not_bundled_video():
     )
     assert "const liveLipRendererStatus = minimal" in avatar
     assert "data-live-lip-renderer-status={liveLipRendererStatus}" in avatar
+    assert "const isLiveVideo = videoKind === 'live';" in avatar
+    assert "autoPlay={!isLiveVideo}" in avatar
+    assert "if (videoKind !== 'loop' && videoKind !== 'live') setVideoReady(false);" in avatar
     assert "const frameWidth = minimal ? 640 : 170;" in avatar
     assert "const frameHeight = minimal ? 360 : 210;" in avatar
     assert "const showProceduralMouth = !minimal && !showVideo;" in avatar

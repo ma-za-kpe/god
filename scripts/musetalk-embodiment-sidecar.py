@@ -29,6 +29,7 @@ from types import SimpleNamespace
 from typing import Any
 
 from fastapi import FastAPI, Header, Request
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, Response
 
 
@@ -520,6 +521,19 @@ class MuseTalkRenderer:
 
 renderer = MuseTalkRenderer()
 app = FastAPI(title="GOD MuseTalk Embodiment Sidecar")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        origin.strip()
+        for origin in os.getenv(
+            "MUSETALK_CORS_ORIGINS",
+            "http://localhost:10517,http://127.0.0.1:10517,http://localhost:3000,http://127.0.0.1:3000",
+        ).split(",")
+        if origin.strip()
+    ],
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["*"],
+)
 
 
 @app.on_event("startup")
