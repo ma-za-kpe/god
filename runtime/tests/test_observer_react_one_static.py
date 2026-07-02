@@ -58,6 +58,25 @@ def test_react_one_page_has_alphabet_caption_and_drill():
     assert "} else if (!uid || !synthOk) {" in hook
     assert "} else if (uid && synthOk && uid !== _lastPlayedUtteranceId) {" in hook
     assert ".one-caption" in styles
-    assert "const frameWidth = minimal ? 380 : 170;" in avatar
-    assert "const frameHeight = minimal ? 470 : 210;" in avatar
+    assert "const frameWidth = videoIsPrimaryOneLoop ? 640 : (minimal ? 380 : 170);" in avatar
+    assert "const frameHeight = videoIsPrimaryOneLoop ? 360 : (minimal ? 470 : 210);" in avatar
     assert "--speak-bar-peak" in styles
+
+
+def test_react_one_page_has_bundled_continuous_video_fallback():
+    avatar = _read("observer/src/components/AgentAvatar.jsx")
+    asset = ROOT / "observer/assets/one-avatar-loop.mp4"
+
+    assert asset.is_file()
+    assert asset.stat().st_size > 1000
+    assert "import oneAvatarLoopUrl from '../../assets/one-avatar-loop.mp4';" in avatar
+    assert "const bundledOneLoopUrl = minimal ? oneAvatarLoopUrl : '';" in avatar
+    assert "const videoUrl = avatarSource.video?.url || bundledOneLoopUrl;" in avatar
+    assert (
+        "const videoIsPrimaryOneLoop = Boolean(minimal && bundledOneLoopUrl && !avatarSource.video?.url);"
+        in avatar
+    )
+    assert "const frameWidth = videoIsPrimaryOneLoop ? 640 : (minimal ? 380 : 170);" in avatar
+    assert "const frameHeight = videoIsPrimaryOneLoop ? 360 : (minimal ? 470 : 210);" in avatar
+    assert "const showProceduralMouth = !showVideo;" in avatar
+    assert "hidden={!showProceduralMouth}" in avatar
