@@ -52,6 +52,8 @@ export default function App() {
   const selectedSoulId = useObserverStore((s) => s.selectedSoulId);
   const observerHealth = useObserverStore((s) => s.observerHealth);
   const audioBlocked = useObserverStore((s) => s.audioBlocked);
+  const currentSpokenLine = useObserverStore((s) => s.currentSpokenLine);
+  const oneAlphabetStatus = useObserverStore((s) => s.oneAlphabetStatus);
   const ageMs = observerHealth.lastPollAt ? Date.now() - observerHealth.lastPollAt : Infinity;
   const live = observerHealth.ok && ageMs < 7000;
   const label = live ? 'observer live' : 'observer stale';
@@ -90,6 +92,13 @@ export default function App() {
               <WorldMap mode={mode} minimal />
             </Suspense>
           </ObserverErrorBoundary>
+          <div
+            className="one-caption"
+            data-one-alphabet-status={oneAlphabetStatus || 'waiting'}
+          >
+            <span>{oneAlphabetStatus || 'waiting'}</span>
+            <strong>{currentSpokenLine || 'A B C D E F G H I J K L M N O P Q R S T U V W X Y Z.'}</strong>
+          </div>
         </main>
       </div>
     );

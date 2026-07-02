@@ -9,6 +9,8 @@ export const useObserverStore = create((set) => ({
   selectedSoulId: null,
   audioBlocked: false,
   voicePlayback: null,
+  currentSpokenLine: '',
+  oneAlphabetStatus: '',
   setAgents: (agents) => set({ agents }),
   setEvents: (events) => set({ events }),
   setStats: (stats) => set({ stats }),
@@ -17,4 +19,6 @@ export const useObserverStore = create((set) => ({
   selectAgent: (selectedSoulId) => set({ selectedSoulId }),
   setAudioBlocked: (audioBlocked) => set({ audioBlocked }),
   setVoicePlayback: (voicePlayback) => set({ voicePlayback }),
+  setCurrentSpokenLine: (currentSpokenLine) => set({ currentSpokenLine }),
+  setOneAlphabetStatus: (oneAlphabetStatus) => set({ oneAlphabetStatus }),
 }));

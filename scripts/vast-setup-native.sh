@@ -20,6 +20,7 @@ REPO_URL="https://github.com/ma-za-kpe/god.git"
 REPO_DIR="/workspace/god"
 REPO_BRANCH="${REPO_BRANCH:-main}"
 OLLAMA_MODEL="${OLLAMA_MODEL:-llama3.1:8b}"
+FISH_SPEECH_REF="${FISH_SPEECH_REF:-v2.0.0-beta}"
 SKIP_FISH="${SKIP_FISH:-0}"
 SKIP_COMFYUI="${SKIP_COMFYUI:-0}"
 SKIP_IPFS="${SKIP_IPFS:-0}"
@@ -60,14 +61,26 @@ log "Installing system packages..."
 apt-get update -qq
 apt-get install -y -qq \
   curl git openssl ca-certificates \
+  zstd \
+  iproute2 psmisc iptables \
   postgresql postgresql-client \
   redis-server \
-  python3-pip python3-venv python3-dev \
+  python3-pip python3-venv python3-dev python3-websocket \
   build-essential libssl-dev libffi-dev \
   ffmpeg libsndfile1 \
   portaudio19-dev \
-  nodejs npm \
-  obs-studio xvfb xauth dbus-x11
+  pulseaudio pulseaudio-utils \
+  nginx \
+  obs-studio obs-websocket xvfb xauth dbus-x11 xdotool
+
+node_major="$(node -p 'Number(process.versions.node.split(".")[0])' 2>/dev/null || echo 0)"
+if [ "$node_major" -lt 20 ]; then
+  log "Installing Node.js 22 for observer build..."
+  curl -fsSL https://deb.nodesource.com/setup_22.x | bash - >/dev/null
+  apt-get remove -y -qq npm nodejs nodejs-doc libnode-dev 2>/dev/null || true
+  apt-get install -y -qq nodejs
+fi
+log "Node: $(node --version 2>/dev/null || echo missing)"
 
 # ── 2. NATS server ────────────────────────────────────────────────────────────
 if ! command -v nats-server &>/dev/null; then
@@ -238,7 +251,7 @@ ALLOW_INSECURE_LOCAL_ENDPOINTS=false
 BROADCAST_ENABLED=${BROADCAST_ENABLED_VALUE}
 BROADCAST_DRY_RUN=true
 OBS_BROWSER_SOURCE=god-browser
-OBS_BROWSER_URL=http://localhost:10517/stage
+OBS_BROWSER_URL=http://localhost:10517/one
 OBS_BROWSER_WIDTH=1920
 OBS_BROWSER_HEIGHT=1080
 OBS_AUTO_START_STREAM=false
@@ -303,30 +316,36 @@ if [ "$SKIP_FISH" = "0" ]; then
     pip install --quiet uv
   fi
   if [ ! -d /opt/fish-speech ]; then
-    git clone --depth 1 https://github.com/fishaudio/fish-speech /opt/fish-speech
+    git clone --depth 1 --branch "$FISH_SPEECH_REF" https://github.com/fishaudio/fish-speech /opt/fish-speech
   fi
   cd /opt/fish-speech
-  UV=$(find /opt/god-venv/bin /root/.local/bin -name uv -type f 2>/dev/null | head -1)
+  git fetch --tags --force origin >/dev/null 2>&1 || true
+  git checkout --force "$FISH_SPEECH_REF" >/dev/null 2>&1 \
+    || die "fish-speech ref ${FISH_SPEECH_REF} not available"
+  grep -q "fish_qwen3_omni" fish_speech/models/text2semantic/llama.py \
+    || die "fish-speech ref ${FISH_SPEECH_REF} does not support S2-Pro fish_qwen3_omni"
+  UV=$(find /opt/god-venv/bin /root/.local/bin -name uv -type f -print -quit 2>/dev/null || true)
   UV="${UV:-$(command -v uv)}"
-  "$UV" sync --no-dev --quiet
+  "$UV" python install 3.11 --quiet
+  "$UV" sync --python 3.11 --extra cu128 --no-dev --quiet
 
-  log "Downloading fish-speech 1.5 models (~10.4 GB)..."
-  pip install --quiet huggingface_hub
-  python3 -c "
+  log "Downloading Fish Audio S2-Pro models (~11 GB)..."
+  "$UV" pip install --python .venv --quiet "huggingface_hub[hf_xet]"
+  "$UV" run --no-sync --python 3.11 python -c "
 from huggingface_hub import snapshot_download
 import signal
 signal.alarm(900)  # 15-minute hard timeout
 snapshot_download(
-    repo_id='fishaudio/fish-speech-1.5',
-    local_dir='checkpoints',
+    repo_id='fishaudio/s2-pro',
+    local_dir='checkpoints/s2-pro',
     ignore_patterns=['*.gguf','*.onnx','*.txt','*.md','README*'],
 )
-print('fish-speech models ready')
+print('Fish Audio S2-Pro models ready')
 " || log "WARNING: fish-speech model download failed — voice synthesis will be skipped"
 
   log "Starting fish-speech on :7860..."
   check_port 7860 "fish-speech"
-  nohup "$UV" run python tools/api_server.py \
+  nohup "$UV" run --no-sync --python 3.11 python tools/api_server.py \
     --llama-checkpoint-path /opt/fish-speech/checkpoints/s2-pro \
     --decoder-checkpoint-path /opt/fish-speech/checkpoints/s2-pro/codec.pth \
     --decoder-config-name modded_dac_vq \

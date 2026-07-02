@@ -38,15 +38,39 @@ function activeIndexFor(agents, selectedSoulId) {
   return selected >= 0 ? selected : 0;
 }
 
+function speakerSoulIdFromSnapshot(snapshot, voicePlayback) {
+  const direct =
+    voicePlayback?.speakerSoulId ||
+    snapshot?.last_dialogue_turn?.sender_soul_id ||
+    snapshot?.last_dialogue_turn?.sender_id ||
+    snapshot?.avatar?.speaker_soul_id;
+  if (direct) return String(direct);
+  const speaker = String(snapshot?.voice?.plan?.speaker || '').toLowerCase();
+  const agent = (snapshot?.agents || []).find((item) => {
+    const name = String(item?.current_name || '').toLowerCase();
+    const soulId = String(item?.soul_id || '').toLowerCase();
+    return speaker && (name === speaker || soulId === speaker);
+  });
+  return agent?.soul_id || '';
+}
+
+function activeAgentFor(agents, snapshot, selectedSoulId, voicePlayback, mode) {
+  if (!agents.length) return null;
+  if (mode === 'one') {
+    const speakerSoulId = speakerSoulIdFromSnapshot(snapshot, voicePlayback);
+    return agents.find((agent) => agent.soul_id === speakerSoulId) || agents[0] || null;
+  }
+  return agents[activeIndexFor(agents, selectedSoulId || snapshot?.showrunner?.speaker)] || agents[0] || null;
+}
+
 export function WorldMap({ mode, minimal = false }) {
   const agents = useObserverStore((s) => s.agents).filter((a) => a && a.is_alive !== false);
   const snapshot = useObserverStore((s) => s.snapshot) || {};
   const selectedSoulId = useObserverStore((s) => s.selectedSoulId);
   const voicePlayback = useObserverStore((s) => s.voicePlayback);
-  const activeIndex = activeIndexFor(agents, selectedSoulId || snapshot?.showrunner?.speaker);
-  const activeAgent = agents[activeIndex] || agents[0] || null;
+  const activeAgent = activeAgentFor(agents, snapshot, selectedSoulId, voicePlayback, mode);
   const avatarState = snapshot.avatar || {};
-  const speakingId = snapshot.last_dialogue_turn?.sender_soul_id || snapshot.last_dialogue_turn?.sender_id || null;
+  const speakingId = speakerSoulIdFromSnapshot(snapshot, voicePlayback);
 
   const layout = useMemo(() => {
     if (mode === 'one' || agents.length <= 1) {
@@ -74,7 +98,8 @@ export function WorldMap({ mode, minimal = false }) {
           {layout.map(({ agent, pos }, index) => {
             if (!agent) return null;
             const isSelected = agent.soul_id === (selectedSoulId || activeAgent?.soul_id);
-            const isSpeaking = agent.soul_id === speakingId;
+            const isSpeaking = agent.soul_id === speakingId &&
+              (!voicePlayback?.status || ['starting', 'playing'].includes(voicePlayback.status));
             const modelUrl = agent.vrm_avatar_url || snapshot.avatar?.vrm_avatar_url || import.meta.env.VITE_DEFAULT_VRM_URL || '';
             const color = COLORS[index % COLORS.length];
             return (

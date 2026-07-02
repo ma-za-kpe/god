@@ -2237,19 +2237,18 @@ async def creator_one(
         }
 
     try:
-        from .messaging import send_message
+        from .messaging import send_broadcast
 
         bootstrap_line = (
             body.get("bootstrap_line")
             or body.get("speech")
-            or f"I am {row.get('current_name')}. This world has one voice now."
+            or "A B C D E F G H I J K L M N O P Q R S T U V W X Y Z."
         )
-        await send_message(
+        await send_broadcast(
             sender_soul_id=str(row["soul_id"]),
-            recipient_soul_id=str(row["soul_id"]),
             body=str(bootstrap_line),
             subject="solo bootstrap",
-            message_type="direct",
+            message_type="broadcast",
             metadata={"source": "creator_one", "solo": True},
         )
     except Exception as exc:

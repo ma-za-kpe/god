@@ -1240,6 +1240,31 @@ Current constraint:
 - Do not claim quality gains until a field benchmark attaches measured hardware/profile data and
   output review notes.
 
+### Issue #91 /one Live Design Re-Audit
+
+Date added: 2026-07-01
+
+Field report:
+
+- `field-reports/issue-91-one-live-design-audit-20260701.md`
+
+Confirmed from the live Vast run:
+
+- The `/one` feature should stay narrowly scoped to one visible avatar reciting the alphabet.
+- This baseline path must not depend on LTX, Wan, LipDub, or offline cinematic generation.
+- Vast native setup had boot-layer gaps that blocked proof before the observer could be captured:
+  missing `zstd`, missing `ss`/`fuser` packages, brittle `find | head -1` under `pipefail`, and
+  Fish setup downloading `fishaudio/fish-speech-1.5` while restart launched S2-Pro paths.
+- The corrected design is to align Vast setup and restart on Fish Audio S2-Pro:
+  download `fishaudio/s2-pro` into `checkpoints/s2-pro`, then launch with
+  `checkpoints/s2-pro/codec.pth`.
+
+Current status:
+
+- `/one` observer/runtime behavior has code and static tests.
+- Vast boot hardening has code and static tests.
+- Live proof remains open until a fresh S2-Pro run captures screenshot and video of `/one`.
+
 ### TODO Backlog
 
 Status legend: `todo`, `blocked`, `in_progress`, `done`.
