@@ -58,10 +58,19 @@ export function AgentAvatar({
         String(agent?.current_name || '').toLowerCase() === String(voicePlayback.speakerName).toLowerCase())
     )
   );
+  const browserPlaybackActive = Boolean(
+    !voicePlayback?.status || ['starting', 'playing'].includes(voicePlayback.status)
+  );
+  const snapshotSpeakerActive = Boolean(
+    avatarState?.speaker_soul_id &&
+    agent?.soul_id === avatarState.speaker_soul_id &&
+    avatarState?.speaking &&
+    browserPlaybackActive
+  );
   const isActiveSpeaker = Boolean(
     speaking ||
     playbackMatchesAgent ||
-    (avatarState?.speaker_soul_id && agent?.soul_id === avatarState.speaker_soul_id && avatarState?.speaking)
+    snapshotSpeakerActive
   );
   const avatarSource = useMemo(
     () => selectAvatarSource({ agent, avatarState, runtimeBaseUrl, speaking: isActiveSpeaker }),
@@ -301,7 +310,7 @@ export function AgentAvatar({
                 onPlaying={markVideoReady}
                 onError={markVideoFailed}
                 onEnded={() => {
-                  if (videoKind !== 'loop' && videoKind !== 'live') setVideoReady(false);
+                  if (videoKind !== 'loop') setVideoReady(false);
                 }}
                 style={{
                   position: 'absolute',

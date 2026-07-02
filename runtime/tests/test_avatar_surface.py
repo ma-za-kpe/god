@@ -215,6 +215,26 @@ def test_avatar_surface_keeps_live_video_available_after_speaking_window(monkeyp
     assert calls[0]["audio_url"] == "http://runtime.local/voice/audio/alphabet-1"
 
 
+def test_avatar_surface_does_not_keep_stale_turn_speaking(monkeypatch):
+    snapshot = _snapshot()
+    snapshot["epoch"] = 1_000
+    snapshot["last_dialogue_turn"] = {
+        "sender_name": "Beta",
+        "content": "A B C D E F G H I J K L M N O P Q R S T U V W X Y Z.",
+        "sent_at": 900,
+    }
+    snapshot["voice"] = {
+        "plan": {"speaker": "Beta", "utterance_id": "alphabet-1"},
+        "synthesis": {"ok": True, "audio_present": True, "duration_seconds": 8.0},
+    }
+
+    state = AvatarSurface(enabled=True, dry_run=True).compose(snapshot)
+
+    assert state.speaking is False
+    assert state.presentation_mode == "listening"
+    assert state.life["mouth_amplitude"] == 0.0
+
+
 def test_avatar_surface_requires_real_audio_before_live_video(monkeypatch):
     monkeypatch.setenv("LIVE_EMBODIMENT_ENABLED", "true")
     monkeypatch.setenv("LIVE_EMBODIMENT_ENDPOINT", "http://embodiment.local")

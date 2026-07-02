@@ -169,6 +169,33 @@ def _voice_audio_rms(voice_state: dict[str, Any], mouth_open: float) -> float:
     return max(0.0, min(1.0, float(mouth_open or 0.0)))
 
 
+def _turn_age_seconds(snapshot: dict[str, Any], turn: dict[str, Any]) -> float | None:
+    if not turn:
+        return None
+    try:
+        epoch = int(snapshot.get("epoch") or 0)
+        sent_at = int(turn.get("sent_at") or turn.get("timestamp") or 0)
+    except Exception:
+        return None
+    if not epoch or not sent_at:
+        return None
+    return max(0.0, float(epoch - sent_at))
+
+
+def _speaking_window_seconds(voice_state: dict[str, Any]) -> float:
+    synthesis = voice_state.get("synthesis") if isinstance(voice_state, dict) else {}
+    synthesis = synthesis if isinstance(synthesis, dict) else {}
+    try:
+        duration = float(synthesis.get("duration_seconds") or 0.0)
+    except Exception:
+        duration = 0.0
+    try:
+        grace = float(os.getenv("AVATAR_SPEAKING_GRACE_SECONDS", "2.0"))
+    except Exception:
+        grace = 2.0
+    return max(2.0, duration + max(0.0, grace))
+
+
 def _is_http_url(value: str) -> bool:
     parsed = urlparse(str(value or "").strip())
     return parsed.scheme in {"http", "https"} and bool(parsed.netloc)
@@ -258,9 +285,15 @@ class AvatarSurface:
         voice_plan = voice_state.get("plan") or {}
         last_turn = snapshot.get("last_dialogue_turn") or {}
         last_turn_speaker = str(last_turn.get("sender_name") or last_turn.get("sender_id") or "")
-        speaking = bool(last_turn.get("content")) and (
-            last_turn_speaker.lower() == active_name.lower()
-            or str(voice_plan.get("speaker") or "").lower() == active_name.lower()
+        turn_age = _turn_age_seconds(snapshot, last_turn)
+        turn_is_current = turn_age is None or turn_age <= _speaking_window_seconds(voice_state)
+        speaking = (
+            bool(last_turn.get("content"))
+            and turn_is_current
+            and (
+                last_turn_speaker.lower() == active_name.lower()
+                or str(voice_plan.get("speaker") or "").lower() == active_name.lower()
+            )
         )
 
         override = str(visual_state.get("expression_override") or "")

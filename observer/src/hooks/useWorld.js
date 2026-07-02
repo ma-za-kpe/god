@@ -19,6 +19,10 @@ let _lastPlayedUtteranceId = '';
 let _pendingLiveVideoUtteranceId = '';
 let _pendingUrl = null;
 let _pendingPlayback = null;
+let _activeAudio = null;
+let _activeAudioSource = null;
+let _activeAudioEnded = null;
+let _activeAudioTimer = null;
 let _alphabetPassed = false;
 let _alphabetSpeaking = false;
 let _alphabetNextAt = 0;
@@ -188,6 +192,22 @@ function markVoicePlayback(status, playback, extra = {}) {
   });
 }
 
+function clearActiveAudioTimer() {
+  if (_activeAudioTimer) {
+    clearTimeout(_activeAudioTimer);
+    _activeAudioTimer = null;
+  }
+}
+
+function armPlaybackEndedWatchdog(playback, extra = {}) {
+  clearActiveAudioTimer();
+  const durationMs = Number(playback?.durationSeconds || 0) * 1000;
+  if (!Number.isFinite(durationMs) || durationMs <= 0) return;
+  _activeAudioTimer = setTimeout(() => {
+    if (_activeAudioEnded) _activeAudioEnded();
+  }, Math.max(1500, durationMs + 1500));
+}
+
 function startVoicePlayback(playback, audioUrl, extra = {}) {
   const nextPlayback = { ...(playback || {}), ...extra };
   markVoicePlayback('starting', nextPlayback, {
@@ -257,6 +277,19 @@ function _playAudioUrl(url, playback = {}) {
   // Strategy 1: HTMLAudioElement (works when user has interacted or in OBS CEF)
   const audio = new Audio(url);
   let markedPlaying = false;
+  let markedDone = false;
+  _activeAudio = audio;
+  _activeAudioSource = null;
+  clearActiveAudioTimer();
+  const markDone = (status, extra = {}) => {
+    if (markedDone) return;
+    markedDone = true;
+    clearActiveAudioTimer();
+    if (_activeAudio === audio) _activeAudio = null;
+    if (_activeAudioEnded === markDone) _activeAudioEnded = null;
+    markVoicePlayback(status, playback, { audioUrl: url, transport: 'html-audio', ...extra });
+  };
+  _activeAudioEnded = () => markDone('ended');
   audio.volume = 1.0;
   audio.addEventListener('playing', () => {
     markedPlaying = true;
@@ -266,13 +299,14 @@ function _playAudioUrl(url, playback = {}) {
       transport: 'html-audio',
       startedAtMs: nowMs(),
     });
+    armPlaybackEndedWatchdog(playback);
   }, { once: true });
   audio.addEventListener('ended', () => {
-    markVoicePlayback('ended', playback, { audioUrl: url, transport: 'html-audio' });
+    markDone('ended');
   }, { once: true });
   audio.addEventListener('error', () => {
     if (!markedPlaying) {
-      markVoicePlayback('blocked', playback, { audioUrl: url, transport: 'html-audio' });
+      markDone('blocked');
     }
   }, { once: true });
   const p = audio.play();
@@ -296,17 +330,34 @@ function _playAudioUrl(url, playback = {}) {
               const src = ctx.createBufferSource();
               src.buffer = decoded;
               src.connect(ctx.destination);
-              src.onended = () => {
+              _activeAudio = null;
+              _activeAudioSource = src;
+              let sourceDone = false;
+              const markSourceDone = () => {
+                if (sourceDone) return;
+                sourceDone = true;
+                clearActiveAudioTimer();
+                if (_activeAudioSource === src) _activeAudioSource = null;
+                if (_activeAudioEnded === markSourceDone) _activeAudioEnded = null;
                 markVoicePlayback('ended', playback, { audioUrl: url, transport: 'audio-context' });
+              };
+              _activeAudioEnded = markSourceDone;
+              src.onended = () => {
+                markSourceDone();
               };
               src.start(0);
               useObserverStore.getState().setAudioBlocked(false);
+              const playbackWithDuration = {
+                ...playback,
+                durationSeconds: decoded.duration || playback.durationSeconds || 0,
+              };
               markVoicePlayback('playing', playback, {
                 audioUrl: url,
-                durationSeconds: decoded.duration || playback.durationSeconds || 0,
+                durationSeconds: playbackWithDuration.durationSeconds,
                 transport: 'audio-context',
                 startedAtMs: nowMs(),
               });
+              armPlaybackEndedWatchdog(playbackWithDuration);
             }, () => {
               _pendingUrl = url;
               _pendingPlayback = playback;

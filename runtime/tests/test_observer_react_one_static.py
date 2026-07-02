@@ -85,7 +85,9 @@ def test_react_one_page_requires_live_lip_renderer_not_bundled_video():
     assert "data-live-lip-renderer-status={liveLipRendererStatus}" in avatar
     assert "const isLiveVideo = videoKind === 'live';" in avatar
     assert "autoPlay={!isLiveVideo}" in avatar
-    assert "if (videoKind !== 'loop' && videoKind !== 'live') setVideoReady(false);" in avatar
+    assert "const snapshotSpeakerActive = Boolean(" in avatar
+    assert "browserPlaybackActive" in avatar
+    assert "if (videoKind !== 'loop') setVideoReady(false);" in avatar
     assert "const frameWidth = minimal ? 640 : 170;" in avatar
     assert "const frameHeight = minimal ? 360 : 210;" in avatar
     assert "const showProceduralMouth = !minimal && !showVideo;" in avatar
