@@ -27,6 +27,24 @@ Primary references:
 - https://github.com/limbonaut/limboai
 - https://github.com/GDQuest/godot-steering-ai-framework
 
+## Current Code Leverage
+
+Godot should receive the same state that the current observer already uses:
+
+- `observer/src/components/WorldMap.jsx` selects the `/one` speaking agent and keeps the solo camera/proof surface simple.
+- `observer/src/hooks/useWorld.js` turns runtime snapshots and Fish synthesis results into browser playback state.
+- `observer/src/components/ControlledAvatar.jsx` defines renderer-neutral controls: mouth amplitude, viseme weights, blink, breath, head sway, speaking status, and proof telemetry.
+- `observer/src/lipSync.js` already gives deterministic alphabet timing for the A-Z benchmark.
+- Existing proof capture can compare Godot output against the browser rig with the same utterance and command log.
+
+## Features To Capitalize On
+
+- MIT license and permissive export/distribution model.
+- Real-time scene graph, nodes, signals, cameras, animation trees, physics, input, and export tooling.
+- LimboAI behavior trees, hierarchical state machines, blackboards, custom tasks, and visual debugging for Godot 4.
+- Steering/path behavior libraries for movement, following, facing, and group blocking.
+- Deterministic scene replay potential through logged command streams.
+
 ## Unique Use Case
 
 The full live show stage: controllable actors, camera cuts, podiums, props, reactions, walks, interruptions, audience-facing blocking, behavior trees, and deterministic replay logs.
