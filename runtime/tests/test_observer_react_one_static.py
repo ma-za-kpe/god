@@ -31,7 +31,7 @@ def test_react_one_page_selects_voice_speaker():
     )
 
 
-def test_react_one_page_has_alphabet_caption_and_drill():
+def test_react_one_page_has_alphabet_caption_and_fish_audio_gate():
     app = _read("observer/src/App.jsx")
     avatar = _read("observer/src/components/AgentAvatar.jsx")
     hook = _read("observer/src/hooks/useWorld.js")
@@ -44,18 +44,20 @@ def test_react_one_page_has_alphabet_caption_and_drill():
     assert 'className="one-caption"' in app
     assert "data-one-alphabet-status={oneAlphabetStatus || 'waiting'}" in app
     assert alphabet in app
-    assert f"const ONE_ALPHABET_LINE = '{alphabet}';" in hook
     assert "new URLSearchParams(window.location.search).get('runtime')" in hook
-    assert "function ensureOneAlphabetDrill(snap)" in hook
-    assert "function ensureOneAlphabetVisualLoop(snap)" in hook
-    assert "const ONE_ALPHABET_VISUAL_MS = 8200;" in hook
-    assert "transport: 'fish-audio-loop'" in hook
-    assert "new SpeechSynthesisUtterance(ONE_ALPHABET_LINE)" in hook
     assert "if (oneAlphabetEnabled()) {" in hook
     assert "if (uid && synthOk && uid !== _lastPlayedUtteranceId)" in hook
     assert "const playback = playbackContextFromSnapshot(snap);" in hook
     assert "const audioUrl = resolveVoiceAudioUrl(snap?.voice?.synthesis?.audio_url, uid);" in hook
+    assert "markVoicePlayback('starting', playback, { audioUrl, transport: 'fish-audio' });" in hook
     assert "} else if (!uid || !synthOk) {" in hook
+    assert "waiting-for-fish-audio" in hook
+    assert "waiting-for-alphabet-line" in hook
+    assert "speechSynthesis" not in hook
+    assert "ensureOneAlphabetDrill" not in hook
+    assert "ensureOneAlphabetVisualLoop" not in hook
+    assert "fish-audio-loop" not in hook
+    assert "visual-drill" not in hook
     assert "} else if (uid && synthOk && uid !== _lastPlayedUtteranceId) {" in hook
     assert ".one-caption" in styles
     assert "const frameWidth = minimal ? 640 : 170;" in avatar

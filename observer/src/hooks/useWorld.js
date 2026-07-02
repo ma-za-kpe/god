@@ -18,16 +18,11 @@ export const API_BASE =
 let _lastPlayedUtteranceId = '';
 let _pendingUrl = null;
 let _pendingPlayback = null;
-let _alphabetAttempt = 0;
 let _alphabetPassed = false;
 let _alphabetSpeaking = false;
 let _alphabetNextAt = 0;
-let _alphabetVisualTimer = null;
 
-const ONE_ALPHABET_LINE = 'A B C D E F G H I J K L M N O P Q R S T U V W X Y Z.';
 const ONE_ALPHABET_NORMALIZED = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-const ONE_ALPHABET_VISUAL_MS = 8200;
-const ONE_ALPHABET_LOOP_GAP_MS = 2000;
 
 function streamUrl() {
   return API_BASE.replace(/^http/i, 'ws') + '/world/stream';
@@ -114,6 +109,11 @@ function markVoicePlayback(status, playback, extra = {}) {
           : 'reciting';
       useObserverStore.getState().setOneAlphabetStatus(nextStatus);
       if (status === 'ended') _alphabetPassed = true;
+      if (status === 'ended' || status === 'blocked' || status === 'timeout' || status === 'error') {
+        _alphabetSpeaking = false;
+      } else {
+        _alphabetSpeaking = true;
+      }
     }
   }
   useObserverStore.getState().setVoicePlayback({
@@ -122,115 +122,6 @@ function markVoicePlayback(status, playback, extra = {}) {
     updatedAtMs: nowMs(),
     ...extra,
   });
-}
-
-function alphabetSpeakerFromSnapshot(snap) {
-  const speakerSoulId = speakerSoulIdFromSnapshot(snap);
-  const agents = (snap?.agents || []).filter((agent) => agent && agent.is_alive !== false);
-  return agents.find((agent) => agent.soul_id === speakerSoulId) || agents[0] || null;
-}
-
-function oneAlphabetPlayback(snap, speaker, transport) {
-  const plan = snap?.voice?.plan || {};
-  _alphabetAttempt += 1;
-  return {
-    utteranceId: `${plan.utterance_id || 'one-alphabet'}:${transport}:${_alphabetAttempt}`,
-    speakerSoulId: speaker.soul_id,
-    speakerName: speaker.current_name || speaker.soul_id,
-    line: ONE_ALPHABET_LINE,
-    mouthAmplitude: 0.68,
-    durationSeconds: 8.08,
-    latencyTargetMs: 300,
-    lipSyncSource: transport,
-    synthesisOk: true,
-  };
-}
-
-function ensureOneAlphabetVisualLoop(snap) {
-  if (!oneAlphabetEnabled()) return;
-  const now = Date.now();
-  if (_alphabetSpeaking || now < _alphabetNextAt) return;
-  const speaker = alphabetSpeakerFromSnapshot(snap);
-  if (!speaker) {
-    useObserverStore.getState().setOneAlphabetStatus('waiting-for-agent');
-    return;
-  }
-  const playback = oneAlphabetPlayback(snap, speaker, 'fish-audio-loop');
-  _alphabetSpeaking = true;
-  _alphabetPassed = true;
-  _alphabetNextAt = now + ONE_ALPHABET_VISUAL_MS + ONE_ALPHABET_LOOP_GAP_MS;
-  useObserverStore.getState().setCurrentSpokenLine(ONE_ALPHABET_LINE);
-  useObserverStore.getState().setOneAlphabetStatus('reciting');
-  markVoicePlayback('playing', playback, {
-    startedAtMs: nowMs(),
-    transport: 'fish-audio-loop',
-  });
-
-  if (_alphabetVisualTimer) window.clearTimeout(_alphabetVisualTimer);
-  _alphabetVisualTimer = window.setTimeout(() => {
-    _alphabetSpeaking = false;
-    useObserverStore.getState().setOneAlphabetStatus('passed');
-    markVoicePlayback('ended', playback, {
-      transport: 'fish-audio-loop',
-    });
-    _alphabetVisualTimer = null;
-  }, ONE_ALPHABET_VISUAL_MS);
-}
-
-function ensureOneAlphabetDrill(snap) {
-  if (!oneAlphabetEnabled() || _alphabetPassed || _alphabetSpeaking) return;
-  if (Date.now() < _alphabetNextAt) return;
-  const speaker = alphabetSpeakerFromSnapshot(snap);
-  if (!speaker) {
-    useObserverStore.getState().setOneAlphabetStatus('waiting-for-agent');
-    return;
-  }
-  _alphabetSpeaking = true;
-  const playback = oneAlphabetPlayback(snap, speaker, 'alphabet_drill');
-  useObserverStore.getState().setCurrentSpokenLine(ONE_ALPHABET_LINE);
-  useObserverStore.getState().setOneAlphabetStatus('queued');
-  markVoicePlayback('starting', playback);
-
-  const finish = (ok) => {
-    _alphabetSpeaking = false;
-    const passed = ok && isCorrectAlphabet(ONE_ALPHABET_LINE);
-    _alphabetPassed = passed;
-    _alphabetNextAt = Date.now() + (passed ? 60000 : 1200);
-    useObserverStore.getState().setOneAlphabetStatus(passed ? 'passed' : 'retry');
-    markVoicePlayback(passed ? 'ended' : 'blocked', playback, {
-      transport: 'speech-synthesis',
-    });
-  };
-
-  if (!('speechSynthesis' in window) || !('SpeechSynthesisUtterance' in window)) {
-    markVoicePlayback('playing', playback, {
-      startedAtMs: nowMs(),
-      transport: 'visual-drill',
-    });
-    window.setTimeout(() => finish(true), 5200);
-    return;
-  }
-
-  try {
-    window.speechSynthesis.cancel();
-    const utterance = new SpeechSynthesisUtterance(ONE_ALPHABET_LINE);
-    utterance.lang = 'en-US';
-    utterance.rate = 0.82;
-    utterance.pitch = 0.92;
-    utterance.volume = 1;
-    utterance.onstart = () => {
-      markVoicePlayback('playing', playback, {
-        startedAtMs: nowMs(),
-        transport: 'speech-synthesis',
-      });
-      useObserverStore.getState().setOneAlphabetStatus('reciting');
-    };
-    utterance.onend = () => finish(true);
-    utterance.onerror = () => finish(false);
-    window.speechSynthesis.speak(utterance);
-  } catch {
-    finish(false);
-  }
 }
 
 // Singleton AudioContext — pre-unlocked in OBS CEF, unlockable in Firefox
@@ -373,20 +264,26 @@ export function useWorld() {
         const line = cleanLine(snap?.voice?.plan?.line || snap?.last_dialogue_turn?.content || '');
         if (isCorrectAlphabet(line)) {
           useObserverStore.getState().setCurrentSpokenLine(line);
-          if (!_alphabetSpeaking) {
+          if (!_alphabetSpeaking && !_alphabetPassed) {
             useObserverStore.getState().setOneAlphabetStatus('line-ready');
           }
           if (uid && synthOk && uid !== _lastPlayedUtteranceId) {
             _lastPlayedUtteranceId = uid;
             const playback = playbackContextFromSnapshot(snap);
             const audioUrl = resolveVoiceAudioUrl(snap?.voice?.synthesis?.audio_url, uid);
+            markVoicePlayback('starting', playback, { audioUrl, transport: 'fish-audio' });
             _playAudioUrl(audioUrl, playback);
           } else if (!uid || !synthOk) {
-            ensureOneAlphabetDrill(snap);
+            _alphabetSpeaking = false;
+            _alphabetNextAt = Date.now() + 1200;
+            useObserverStore.getState().setOneAlphabetStatus('waiting-for-fish-audio');
           }
-          ensureOneAlphabetVisualLoop(snap);
         } else {
-          ensureOneAlphabetDrill(snap);
+          _alphabetSpeaking = false;
+          if (Date.now() >= _alphabetNextAt) {
+            useObserverStore.getState().setOneAlphabetStatus('waiting-for-alphabet-line');
+            _alphabetNextAt = Date.now() + 1200;
+          }
         }
       } else if (uid && synthOk && uid !== _lastPlayedUtteranceId) {
         _lastPlayedUtteranceId = uid;
