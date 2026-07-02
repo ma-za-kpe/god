@@ -97,12 +97,27 @@ The implementation should keep command validation deterministic and reject unkno
 
 ## Implementation Plan
 
-1. Add an AI4AnimationPy evaluation harness outside the blocking `/one` route.
-2. Load a tiny test motion asset and prove deterministic pose-stream export.
-3. Add a runtime adapter that turns GOD action plans into AI4AnimationPy commands.
-4. Render the output through the existing browser scene using a simple GLB/VRM target.
-5. Add a `/one?runtime=ai4animationpy` or equivalent local proof path only after the pose stream is stable.
-6. Run the alphabet proof with screenshots and video.
+1. Add the GOD-side command and pose-stream contract.
+2. Wire the observer to consume the contract through a deterministic sampler.
+3. Apply the sampled root and joint motion to the procedural rig and VRM rig path.
+4. Add an AI4AnimationPy evaluation harness outside the blocking `/one` route.
+5. Load a tiny test motion asset and prove deterministic pose-stream export.
+6. Replace the deterministic sampler with sidecar output behind the same contract.
+7. Add a `/one?runtime=ai4animationpy` or equivalent local proof path only after the sidecar stream is stable.
+8. Run the alphabet proof with screenshots and video.
+
+## Implemented Slice
+
+This branch now includes the first non-heavy implementation slice:
+
+- `runtime/src/avatar/body_motion.py` defines the AI4AnimationPy-targeted body-motion contract.
+- `AvatarState` and `AvatarPlan` expose `body_motion` to the observer.
+- `AvatarSurface.compose()` publishes a deterministic alphabet movement plan for speaking snapshots and an idle plan for listening snapshots.
+- `observer/src/avatarMotion.js` validates/samples the same command contract into root position, root rotation, joint rotations, contacts, and gesture labels.
+- `ControlledAvatar.jsx` applies the sampled motion to the procedural rig and the VRM rig path.
+- The procedural fallback now has visible arms and legs, so root movement and gestures can show up in proof captures.
+
+This does not claim AI4AnimationPy model inference yet. It creates the stable command/pose boundary and visible live proof path that the real sidecar must satisfy.
 
 ## Validation
 

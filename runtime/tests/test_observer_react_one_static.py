@@ -75,9 +75,13 @@ def test_react_one_page_has_alphabet_caption_and_fish_audio_gate():
     assert "return <ControlledAvatar {...props} />;" in avatar
     assert "buildAlphabetVisemeTrack" in rig
     assert "sampleVisemeTrack" in rig
+    assert "resolveBodyMotionPlan" in rig
+    assert "sampleBodyMotionPlan" in rig
     assert "const kind = vrmUrl ? 'vrm-rig' : 'procedural-rig';" in rig
     assert 'data-avatar-control-mode="speech-driven-rig"' in rig
     assert 'data-avatar-video-mode="disabled-for-one"' in rig
+    assert "data-body-motion-source" in rig
+    assert "data-body-motion-target-runtime" in rig
     assert "VRMLoaderPlugin" in rig
     assert "expressionManager" in rig
     assert "buildAlphabetVisemeTrack(line, durationSeconds = 0)" in lip_sync
@@ -103,6 +107,7 @@ def test_react_one_page_uses_controllable_rig_not_bundled_video():
     assert 'data-live-lip-renderer-status="not-required"' in rig
     assert 'data-avatar-control-mode="speech-driven-rig"' in rig
     assert 'data-avatar-video-mode="disabled-for-one"' in rig
+    assert "data-body-motion-source" in rig
     assert "procedural-speech-controlled" in rig
     assert "vrm-speech-controlled" in rig
     assert "createMediaElementSource(audio)" in hook

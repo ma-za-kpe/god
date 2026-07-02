@@ -25,6 +25,7 @@ class AvatarPlan:
     notes: tuple[str, ...] = field(default_factory=tuple)
     rigged_avatar_cid: str = ""
     vrm_avatar_url: str = ""
+    body_motion: dict[str, Any] = field(default_factory=dict)
     video_manifest: dict[str, Any] = field(default_factory=dict)
     live_embodiment: dict[str, Any] = field(default_factory=dict)
 
@@ -52,6 +53,7 @@ class AvatarState:
     presentation_mode: str = "standard"
     rigged_avatar_cid: str = ""
     vrm_avatar_url: str = ""
+    body_motion: dict[str, Any] = field(default_factory=dict)
     video_manifest: dict[str, Any] = field(default_factory=dict)
     live_embodiment: dict[str, Any] = field(default_factory=dict)
 
