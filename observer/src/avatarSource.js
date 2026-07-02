@@ -87,6 +87,7 @@ function assetFromRef(value, runtimeBaseUrl, kind, label) {
   const source = firstSourceEntry(value);
   const stringValue = trimString(source);
   if (stringValue) {
+    if (kind === 'live' && !isUrl(stringValue)) return null;
     return {
       kind,
       label,
@@ -109,6 +110,7 @@ function assetFromRef(value, runtimeBaseUrl, kind, label) {
   }
 
   const cid = firstString(obj, CID_FIELDS);
+  if (kind === 'live' && cid) return null;
   if (cid) {
     return {
       kind,
@@ -172,6 +174,18 @@ const PORTRAIT_PATHS = [
   ['sources', 'portrait'],
 ];
 
+const LIVE_VIDEO_PATHS = [
+  ['live'],
+  ['live_video'],
+  ['live_lip_sync'],
+  ['speech_driven_video'],
+  ['embodiment_stream'],
+  ['assets', 'live'],
+  ['videos', 'live'],
+  ['video', 'live'],
+  ['sources', 'live'],
+];
+
 const LOOP_PATHS = [
   ['speaking_loop'],
   ['talking_loop'],
@@ -226,6 +240,15 @@ const DIRECT_LOOP_FIELDS = [
   'speaking_loop_cid',
 ];
 
+const DIRECT_LIVE_VIDEO_FIELDS = [
+  'live_video_url',
+  'live_lip_url',
+  'live_lip_sync_url',
+  'speech_driven_video_url',
+  'embodiment_stream_url',
+  'embodiment_video_url',
+];
+
 const DIRECT_CINEMATIC_FIELDS = [
   'cinematic_clip_url',
   'cinematic_clip_cid',
@@ -265,6 +288,13 @@ export function selectAvatarSource({
     pickFromManifests(manifests, PORTRAIT_PATHS, runtimeBaseUrl, 'portrait') ||
     pickDirect(directContainers, DIRECT_PORTRAIT_FIELDS, runtimeBaseUrl, 'portrait');
 
+  const live = speaking
+    ? (
+      pickFromManifests(manifests, LIVE_VIDEO_PATHS, runtimeBaseUrl, 'live') ||
+      pickDirect(directContainers, DIRECT_LIVE_VIDEO_FIELDS, runtimeBaseUrl, 'live')
+    )
+    : null;
+
   const cinematic = preferCinematic && speaking
     ? (
       pickFromManifests(manifests, CINEMATIC_PATHS, runtimeBaseUrl, 'cinematic') ||
@@ -276,7 +306,7 @@ export function selectAvatarSource({
     pickFromManifests(manifests, LOOP_PATHS, runtimeBaseUrl, 'loop') ||
     pickDirect(directContainers, DIRECT_LOOP_FIELDS, runtimeBaseUrl, 'loop');
 
-  const video = cinematic || loop;
+  const video = live || cinematic || loop;
   const fallback = portrait || generatedFallback(agent);
   const active = video || fallback;
   const status = video
@@ -299,6 +329,7 @@ export function selectAvatarSource({
 
 export function sourceStatusText(source) {
   if (!source) return 'unknown';
+  if (source.video?.kind === 'live') return 'live';
   if (source.video?.kind === 'cinematic') return 'cinematic';
   if (source.video?.kind === 'loop') return 'loop';
   if (source.portrait?.url) return 'portrait';

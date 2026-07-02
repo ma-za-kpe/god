@@ -58,25 +58,25 @@ def test_react_one_page_has_alphabet_caption_and_drill():
     assert "} else if (!uid || !synthOk) {" in hook
     assert "} else if (uid && synthOk && uid !== _lastPlayedUtteranceId) {" in hook
     assert ".one-caption" in styles
-    assert "const frameWidth = videoIsPrimaryOneLoop ? 640 : (minimal ? 380 : 170);" in avatar
-    assert "const frameHeight = videoIsPrimaryOneLoop ? 360 : (minimal ? 470 : 210);" in avatar
+    assert "const frameWidth = minimal ? 640 : 170;" in avatar
+    assert "const frameHeight = minimal ? 360 : 210;" in avatar
     assert "--speak-bar-peak" in styles
 
 
-def test_react_one_page_has_bundled_continuous_video_fallback():
+def test_react_one_page_requires_live_lip_renderer_not_bundled_video():
     avatar = _read("observer/src/components/AgentAvatar.jsx")
     asset = ROOT / "observer/assets/one-avatar-loop.mp4"
 
-    assert asset.is_file()
-    assert asset.stat().st_size > 1000
-    assert "import oneAvatarLoopUrl from '../../assets/one-avatar-loop.mp4';" in avatar
-    assert "const bundledOneLoopUrl = minimal ? oneAvatarLoopUrl : '';" in avatar
-    assert "const videoUrl = avatarSource.video?.url || bundledOneLoopUrl;" in avatar
+    assert not asset.exists()
+    assert "one-avatar-loop.mp4" not in avatar
+    assert "bundledOneLoopUrl" not in avatar
     assert (
-        "const videoIsPrimaryOneLoop = Boolean(minimal && bundledOneLoopUrl && !avatarSource.video?.url);"
+        "const videoCandidate = minimal && avatarSource.video?.kind !== 'live' ? null : avatarSource.video;"
         in avatar
     )
-    assert "const frameWidth = videoIsPrimaryOneLoop ? 640 : (minimal ? 380 : 170);" in avatar
-    assert "const frameHeight = videoIsPrimaryOneLoop ? 360 : (minimal ? 470 : 210);" in avatar
-    assert "const showProceduralMouth = !showVideo;" in avatar
+    assert "const liveLipRendererStatus = minimal" in avatar
+    assert "data-live-lip-renderer-status={liveLipRendererStatus}" in avatar
+    assert "const frameWidth = minimal ? 640 : 170;" in avatar
+    assert "const frameHeight = minimal ? 360 : 210;" in avatar
+    assert "const showProceduralMouth = !minimal && !showVideo;" in avatar
     assert "hidden={!showProceduralMouth}" in avatar
