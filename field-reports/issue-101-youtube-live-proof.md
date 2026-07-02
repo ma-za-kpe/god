@@ -2,7 +2,7 @@
 
 Date: 2026-06-27
 Parent: #91
-Status: Vast OBS/Fish proof captured, YouTube VOD link still pending
+Status: YouTube `/one` live proof captured
 
 ## Scope
 
@@ -141,4 +141,49 @@ Remaining caveat:
   already busy generating speech. Later proof/readiness probes intermittently fell back to
   `voice_fallback` while Fish completed long TTS requests. Treat this as a #101 field
   stability issue; it does not block #99/#100 video asset acceptance.
-- The issue still needs a linked 5-10 minute YouTube VOD and benchmark notes before closure.
+
+## YouTube `/one` Live Proof - 2026-07-02
+
+Instance: Vast.ai `43411625`, RTX PRO 6000 S.
+
+Merged code:
+
+- PR #148 merged into `main` at `cf44033`.
+- Vast checkout synced to `main` at `cf44033`.
+
+Live broadcast:
+
+- YouTube video ID: `xiypwf59Ho0`.
+- Watch URL: `https://www.youtube.com/watch?v=xiypwf59Ho0`.
+- Studio URL: `https://studio.youtube.com/video/xiypwf59Ho0/livestreaming`.
+- YouTube API state at final check: `lifeCycleStatus=live`.
+- Bound stream state at final check: `streamStatus=active`.
+- OBS status at final check: `streaming=true`, stream timecode over `00:22:00`.
+
+Live `/one` proof:
+
+- Runtime `/ready`: `ok=true`; Fish, ComfyUI, IPFS, OBS dependencies healthy.
+- Voice plan line: `A B C D E F G H I J K L M N O P Q R S T U V W X Y Z.`
+- Fish synthesis evidence: `audio_byte_count=712748`, `duration_seconds=8.080544`,
+  `audio_rms=0.155328`.
+- Final Pulse/OBS proof clip audio: `mean_volume=-19.5 dB`, `max_volume=-2.8 dB`.
+- Final OBS scene: `god-display` XSHM display capture rendered, `god-audio` PulseAudio
+  monitor rendered, stale `god-browser` xcomposite source hidden.
+
+Proof artifacts:
+
+- Final screenshot:
+  `field-reports/assets/2026-07-02-one-live-proof/one-youtube-live-final-clean-audio.png`
+- Final 12 second capture:
+  `field-reports/assets/2026-07-02-one-live-proof/one-youtube-live-final-clean-audio.mp4`
+
+Observed fixes from this run:
+
+- The original broadcast ID was already `complete`; YouTube rejected it as not
+  transitionable. A fresh broadcast was created and bound to the active default stream.
+- A fresh broadcast created while OBS was already ingesting remained stuck at `ready`.
+  The successful sequence was: stop OBS ingest, wait for the stream to become inactive,
+  create and bind the broadcast, restart OBS ingest, wait for active ingest, then
+  transition the broadcast live.
+- Firefox's sandbox-disabled browser chrome warning was removed from the live capture by
+  launching the Vast Firefox profile without `MOZ_DISABLE_CONTENT_SANDBOX=1`.
