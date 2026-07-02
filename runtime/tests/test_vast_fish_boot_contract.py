@@ -100,6 +100,7 @@ def test_vast_obs_browser_url_can_target_one_page():
     assert "export OBS_AUDIO_SOURCE_NAME=god-audio" in restart
     assert '--kiosk "$browser_url"' in restart
     assert "PULSE_SERVER=unix:/tmp/runtime-stream/pulse/native" in restart
+    assert "MOZ_DISABLE_CONTENT_SANDBOX=1" not in restart
     assert 'wait_http "$browser_url" "OBS browser URL"' in restart
     assert "streaming ${OBS_BROWSER_URL}" in restart
     assert "write_obs_websocket_config" in restart

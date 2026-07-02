@@ -763,7 +763,6 @@ JS
       XDG_RUNTIME_DIR=/tmp/runtime-stream \
       PULSE_SERVER=unix:/tmp/runtime-stream/pulse/native \
       PULSE_COOKIE=/home/stream/.config/pulse/cookie \
-      MOZ_DISABLE_CONTENT_SANDBOX=1 \
       MOZ_WEBRENDER=0 \
       /opt/firefox/firefox --new-instance --no-remote --profile /tmp/firefox-profile --kiosk "$browser_url" \
       >"$LOG_DIR/firefox.log" 2>&1 &
