@@ -20,11 +20,13 @@ except ImportError:  # pragma: no cover - flat test path
 
 try:  # pragma: no cover - runtime package import path
     from .life_signals import LifeSignals
+    from .live_embodiment import LiveEmbodimentClient
     from .scene_composer import SceneComposer
     from .state import AvatarPlan, AvatarState
     from .visual_reactor import VisualReactor
 except ImportError:  # pragma: no cover - flat test path
     from avatar.life_signals import LifeSignals
+    from avatar.live_embodiment import LiveEmbodimentClient
     from avatar.scene_composer import SceneComposer
     from avatar.state import AvatarPlan, AvatarState
     from avatar.visual_reactor import VisualReactor
@@ -178,6 +180,7 @@ class AvatarSurface:
         self._visual_reactor = VisualReactor()
         self._scene_composer = SceneComposer()
         self._life_signals = LifeSignals()
+        self._live_embodiment = LiveEmbodimentClient()
         self._last_scene_layout: dict[str, Any] | None = None
 
     def compose(self, snapshot: dict[str, Any]) -> AvatarState:
@@ -308,6 +311,17 @@ class AvatarSurface:
         life_payload = life.to_dict()
         if speaking:
             mouth_open = max(mouth_open, float(life_payload.get("mouth_amplitude") or 0.0))
+        utterance_id = str(voice_plan.get("utterance_id") or "")
+        live_embodiment = self._live_embodiment.status()
+        live_video_asset = (
+            self._live_embodiment.live_video_asset(
+                soul_id=agent_id,
+                utterance_id=utterance_id,
+            )
+            if speaking and agent_id
+            else {}
+        )
+        video_manifest = {"live_video": live_video_asset} if live_video_asset else {}
         visual_state["speaking"] = speaking
         visual_state["mouth_open"] = mouth_open
         visual_state["life"] = life_payload
@@ -331,6 +345,8 @@ class AvatarSurface:
             presentation_mode=presentation_mode,
             rigged_avatar_cid=rigged_avatar_cid,
             vrm_avatar_url=vrm_avatar_url,
+            video_manifest=video_manifest,
+            live_embodiment=live_embodiment,
             notes=tuple(
                 filter(
                     None,
@@ -365,6 +381,8 @@ class AvatarSurface:
             presentation_mode=presentation_mode,
             rigged_avatar_cid=rigged_avatar_cid,
             vrm_avatar_url=vrm_avatar_url,
+            video_manifest=video_manifest,
+            live_embodiment=live_embodiment,
         )
 
     def _build_scene_context(self, snapshot: dict[str, Any]) -> SceneContextData:
@@ -410,6 +428,7 @@ class AvatarSurface:
 
 def build_avatar_status() -> dict[str, Any]:
     endpoint = avatar_health_url()
+    live_embodiment = LiveEmbodimentClient().status()
     return {
         "enabled": _env_bool("AVATAR_ENABLED") or bool(os.getenv("AVATAR_ASSET")) or bool(endpoint),
         "dry_run": _env_bool("AVATAR_DRY_RUN", "true"),
@@ -422,6 +441,7 @@ def build_avatar_status() -> dict[str, Any]:
             "AVATAR_LIP_SYNC_SOURCE", os.getenv("LIP_SYNC_SOURCE", "audio")
         ),
         "render_target": os.getenv("AVATAR_RENDER_TARGET", "obs-virtual-camera"),
+        "live_embodiment": live_embodiment,
         "transport": os.getenv("AVATAR_TRANSPORT", "local-avatar"),
         "health": probe_url(endpoint, timeout=1.5),
     }
