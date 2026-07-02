@@ -22,9 +22,12 @@ let _alphabetAttempt = 0;
 let _alphabetPassed = false;
 let _alphabetSpeaking = false;
 let _alphabetNextAt = 0;
+let _alphabetVisualTimer = null;
 
 const ONE_ALPHABET_LINE = 'A B C D E F G H I J K L M N O P Q R S T U V W X Y Z.';
 const ONE_ALPHABET_NORMALIZED = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+const ONE_ALPHABET_VISUAL_MS = 8200;
+const ONE_ALPHABET_LOOP_GAP_MS = 2000;
 
 function streamUrl() {
   return API_BASE.replace(/^http/i, 'ws') + '/world/stream';
@@ -127,6 +130,53 @@ function alphabetSpeakerFromSnapshot(snap) {
   return agents.find((agent) => agent.soul_id === speakerSoulId) || agents[0] || null;
 }
 
+function oneAlphabetPlayback(snap, speaker, transport) {
+  const plan = snap?.voice?.plan || {};
+  _alphabetAttempt += 1;
+  return {
+    utteranceId: `${plan.utterance_id || 'one-alphabet'}:${transport}:${_alphabetAttempt}`,
+    speakerSoulId: speaker.soul_id,
+    speakerName: speaker.current_name || speaker.soul_id,
+    line: ONE_ALPHABET_LINE,
+    mouthAmplitude: 0.68,
+    durationSeconds: 8.08,
+    latencyTargetMs: 300,
+    lipSyncSource: transport,
+    synthesisOk: true,
+  };
+}
+
+function ensureOneAlphabetVisualLoop(snap) {
+  if (!oneAlphabetEnabled()) return;
+  const now = Date.now();
+  if (_alphabetSpeaking || now < _alphabetNextAt) return;
+  const speaker = alphabetSpeakerFromSnapshot(snap);
+  if (!speaker) {
+    useObserverStore.getState().setOneAlphabetStatus('waiting-for-agent');
+    return;
+  }
+  const playback = oneAlphabetPlayback(snap, speaker, 'fish-audio-loop');
+  _alphabetSpeaking = true;
+  _alphabetPassed = true;
+  _alphabetNextAt = now + ONE_ALPHABET_VISUAL_MS + ONE_ALPHABET_LOOP_GAP_MS;
+  useObserverStore.getState().setCurrentSpokenLine(ONE_ALPHABET_LINE);
+  useObserverStore.getState().setOneAlphabetStatus('reciting');
+  markVoicePlayback('playing', playback, {
+    startedAtMs: nowMs(),
+    transport: 'fish-audio-loop',
+  });
+
+  if (_alphabetVisualTimer) window.clearTimeout(_alphabetVisualTimer);
+  _alphabetVisualTimer = window.setTimeout(() => {
+    _alphabetSpeaking = false;
+    useObserverStore.getState().setOneAlphabetStatus('passed');
+    markVoicePlayback('ended', playback, {
+      transport: 'fish-audio-loop',
+    });
+    _alphabetVisualTimer = null;
+  }, ONE_ALPHABET_VISUAL_MS);
+}
+
 function ensureOneAlphabetDrill(snap) {
   if (!oneAlphabetEnabled() || _alphabetPassed || _alphabetSpeaking) return;
   if (Date.now() < _alphabetNextAt) return;
@@ -135,19 +185,8 @@ function ensureOneAlphabetDrill(snap) {
     useObserverStore.getState().setOneAlphabetStatus('waiting-for-agent');
     return;
   }
-  _alphabetAttempt += 1;
   _alphabetSpeaking = true;
-  const playback = {
-    utteranceId: `one-alphabet:${speaker.soul_id}:${_alphabetAttempt}`,
-    speakerSoulId: speaker.soul_id,
-    speakerName: speaker.current_name || speaker.soul_id,
-    line: ONE_ALPHABET_LINE,
-    mouthAmplitude: 0.58,
-    durationSeconds: 5.2,
-    latencyTargetMs: 300,
-    lipSyncSource: 'alphabet_drill',
-    synthesisOk: false,
-  };
+  const playback = oneAlphabetPlayback(snap, speaker, 'alphabet_drill');
   useObserverStore.getState().setCurrentSpokenLine(ONE_ALPHABET_LINE);
   useObserverStore.getState().setOneAlphabetStatus('queued');
   markVoicePlayback('starting', playback);
@@ -334,7 +373,9 @@ export function useWorld() {
         const line = cleanLine(snap?.voice?.plan?.line || snap?.last_dialogue_turn?.content || '');
         if (isCorrectAlphabet(line)) {
           useObserverStore.getState().setCurrentSpokenLine(line);
-          useObserverStore.getState().setOneAlphabetStatus('line-ready');
+          if (!_alphabetSpeaking) {
+            useObserverStore.getState().setOneAlphabetStatus('line-ready');
+          }
           if (uid && synthOk && uid !== _lastPlayedUtteranceId) {
             _lastPlayedUtteranceId = uid;
             const playback = playbackContextFromSnapshot(snap);
@@ -343,6 +384,7 @@ export function useWorld() {
           } else if (!uid || !synthOk) {
             ensureOneAlphabetDrill(snap);
           }
+          ensureOneAlphabetVisualLoop(snap);
         } else {
           ensureOneAlphabetDrill(snap);
         }

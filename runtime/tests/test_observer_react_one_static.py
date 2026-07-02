@@ -33,6 +33,7 @@ def test_react_one_page_selects_voice_speaker():
 
 def test_react_one_page_has_alphabet_caption_and_drill():
     app = _read("observer/src/App.jsx")
+    avatar = _read("observer/src/components/AgentAvatar.jsx")
     hook = _read("observer/src/hooks/useWorld.js")
     store = _read("observer/src/store.js")
     styles = _read("observer/src/styles.css")
@@ -46,6 +47,9 @@ def test_react_one_page_has_alphabet_caption_and_drill():
     assert f"const ONE_ALPHABET_LINE = '{alphabet}';" in hook
     assert "new URLSearchParams(window.location.search).get('runtime')" in hook
     assert "function ensureOneAlphabetDrill(snap)" in hook
+    assert "function ensureOneAlphabetVisualLoop(snap)" in hook
+    assert "const ONE_ALPHABET_VISUAL_MS = 8200;" in hook
+    assert "transport: 'fish-audio-loop'" in hook
     assert "new SpeechSynthesisUtterance(ONE_ALPHABET_LINE)" in hook
     assert "if (oneAlphabetEnabled()) {" in hook
     assert "if (uid && synthOk && uid !== _lastPlayedUtteranceId)" in hook
@@ -54,3 +58,6 @@ def test_react_one_page_has_alphabet_caption_and_drill():
     assert "} else if (!uid || !synthOk) {" in hook
     assert "} else if (uid && synthOk && uid !== _lastPlayedUtteranceId) {" in hook
     assert ".one-caption" in styles
+    assert "const frameWidth = minimal ? 380 : 170;" in avatar
+    assert "const frameHeight = minimal ? 470 : 210;" in avatar
+    assert "--speak-bar-peak" in styles
