@@ -17,3 +17,6 @@ def test_creator_one_defaults_to_alphabet_recitation():
     assert '@app.post("/creator/one")' in source
     assert '@app.post("/one")' in source
     assert '"A B C D E F G H I J K L M N O P Q R S T U V W X Y Z."' in source
+    assert "from .messaging import send_broadcast" in source
+    assert "await send_broadcast(" in source
+    assert 'message_type="broadcast"' in source

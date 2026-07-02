@@ -30,6 +30,7 @@ _SEND_NARRATIVE_RE = re.compile(
 _AGENT_PREFIX_RE = re.compile(r"^[A-Za-z]+-[A-Za-z0-9]+-[A-Za-z0-9]+\s*\([^)]+\):\s*")
 # "Name action..." — strip bare leading agent name (e.g. "Elder-Hook-6A4A pays rent")
 _AGENT_BARE_NAME_RE = re.compile(r"^[A-Za-z]+-[A-Za-z0-9]+-[A-Za-z0-9]+\s+")
+_ONE_ALPHABET_NORMALIZED = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 
 try:  # pragma: no cover - runtime package import path
     from ..health_checks import probe_url
@@ -263,6 +264,11 @@ def _utterance_id(snapshot: dict[str, Any], speaker: str, line: str) -> str:
     scene = str((snapshot.get("showrunner") or {}).get("scene") or "")
     payload = f"{scene}|{speaker}|{line}".encode("utf-8")
     return hashlib.sha256(payload).hexdigest()[:16]
+
+
+def _is_one_alphabet_line(line: str) -> bool:
+    normalized = re.sub(r"[^A-Za-z]", "", str(line or "")).upper()
+    return normalized == _ONE_ALPHABET_NORMALIZED
 
 
 def _turn_age_seconds(snapshot: dict[str, Any], turn: dict[str, Any]) -> float | None:
@@ -670,9 +676,14 @@ class VoiceSurface:
         last_turn = snapshot.get("last_dialogue_turn") or {}
         max_dialogue_age = float(os.getenv("VOICE_DIALOGUE_MAX_AGE_SECONDS", "20"))
         dialogue_age = _turn_age_seconds(snapshot, last_turn)
-        if last_turn.get("content") and (dialogue_age is None or dialogue_age <= max_dialogue_age):
+        last_turn_content = str(last_turn.get("content") or "")
+        if last_turn_content and (
+            _is_one_alphabet_line(last_turn_content)
+            or dialogue_age is None
+            or dialogue_age <= max_dialogue_age
+        ):
             speaker = str(last_turn.get("sender_name") or showrunner.get("speaker") or "Narrator")
-            raw_line = str(last_turn["content"])
+            raw_line = last_turn_content
         else:
             speaker = str(
                 showrunner.get("speaker") or broadcast.get("scene", {}).get("speaker") or "Narrator"

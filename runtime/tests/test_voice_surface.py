@@ -118,6 +118,22 @@ def test_voice_surface_falls_back_when_dialogue_is_stale():
     assert state.plan.line == "Watch the exchange."
 
 
+def test_voice_surface_keeps_stale_one_alphabet_drill():
+    surface = VoiceSurface(enabled=True, dry_run=True)
+    snapshot = _snapshot()
+    snapshot["epoch"] = 999
+    snapshot["last_dialogue_turn"] = {
+        "content": "A B C D E F G H I J K L M N O P Q R S T U V W X Y Z.",
+        "sender_name": "Alpha",
+        "sent_at": 1,
+    }
+
+    state = surface.compose(snapshot)
+
+    assert state.plan.speaker == "Alpha"
+    assert state.plan.line == "A B C D E F G H I J K L M N O P Q R S T U V W X Y Z."
+
+
 def test_voice_surface_synthesizes_when_tts_is_available(monkeypatch):
     _clear_voice_caches()
     surface = VoiceSurface(enabled=True, dry_run=False)
