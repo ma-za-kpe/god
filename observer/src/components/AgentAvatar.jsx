@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Billboard, Html, Text } from '@react-three/drei';
 import { useFrame } from '@react-three/fiber';
 import { selectAvatarSource, sourceStatusText } from '../avatarSource';
+import { ControlledAvatar } from './ControlledAvatar';
 
 function clamp(value, lower, upper) {
   return Math.max(lower, Math.min(upper, value));
@@ -25,16 +26,23 @@ function nowMs() {
   return typeof performance !== 'undefined' ? performance.now() : Date.now();
 }
 
-export function AgentAvatar({
+export function AgentAvatar(props) {
+  if (props.minimal) {
+    return <ControlledAvatar {...props} />;
+  }
+  return <PortraitAgentAvatar {...props} />;
+}
+
+function PortraitAgentAvatar({
   agent,
   avatarState,
   selected,
   speaking,
+  vrmUrl: _vrmUrl,
   runtimeBaseUrl,
   position,
   color,
   voicePlayback,
-  minimal = false,
 }) {
   const groupRef = useRef();
   const avatarRootRef = useRef();
@@ -77,30 +85,26 @@ export function AgentAvatar({
     [agent, avatarState, runtimeBaseUrl, isActiveSpeaker]
   );
   const portraitUrl = avatarSource.fallback?.url || '';
-  const videoCandidate = minimal && avatarSource.video?.kind !== 'live' ? null : avatarSource.video;
+  const videoCandidate = avatarSource.video;
   const videoUrl = videoCandidate?.url || '';
   const videoKind = videoCandidate?.kind || '';
   const isLiveVideo = videoKind === 'live';
-  const frameWidth = minimal ? 960 : 170;
-  const frameHeight = minimal ? 540 : 210;
-  const mouthWidth = minimal ? 92 : 46;
-  const mouthHeight = minimal ? 14 : 7;
-  const barWidth = minimal ? 9 : 5;
-  const barGap = minimal ? 6 : 3;
-  const barHeight = minimal ? 34 : 22;
-  const barBottom = minimal ? -34 : -18;
+  const frameWidth = 170;
+  const frameHeight = 210;
+  const mouthWidth = 46;
+  const mouthHeight = 7;
+  const barWidth = 5;
+  const barGap = 3;
+  const barHeight = 22;
+  const barBottom = -18;
   const fallbackInitial = avatarSource.fallback?.initial || (agent?.current_name || agent?.soul_id || '?').slice(0, 1).toUpperCase();
-  const liveLipRendererStatus = minimal
-    ? (videoCandidate?.kind === 'live' && videoCandidate?.url ? 'ready' : 'unavailable')
-    : 'not-required';
+  const liveLipRendererStatus = 'not-required';
   const sourceLabel = videoCandidate ? sourceStatusText({ ...avatarSource, video: videoCandidate }) : sourceStatusText(avatarSource);
   const sourceStatus = videoFailed
     ? 'video-error-fallback'
-    : (minimal && liveLipRendererStatus !== 'ready'
-      ? 'live-lip-renderer-unavailable'
-      : (videoUrl ? `${sourceLabel}-${videoReady ? 'ready' : 'preloading'}` : avatarSource.status));
+    : (videoUrl ? `${sourceLabel}-${videoReady ? 'ready' : 'preloading'}` : avatarSource.status);
   const showVideo = Boolean(videoUrl && videoReady && !videoFailed);
-  const showProceduralMouth = !minimal && !showVideo;
+  const showProceduralMouth = !showVideo;
   const usesSnapshotLife = Boolean(!avatarState?.speaker_soul_id || agent?.soul_id === avatarState.speaker_soul_id || selected);
   const life = avatarState?.life || {};
   const basePosition = position || [0, 0, 0];
@@ -236,7 +240,7 @@ export function AgentAvatar({
         <div
           ref={avatarRootRef}
           className={isActiveSpeaker ? 'speaking-avatar' : ''}
-          data-avatar-source-kind={videoCandidate?.kind || (minimal ? 'live-required' : avatarSource.activeKind)}
+          data-avatar-source-kind={videoCandidate?.kind || avatarSource.activeKind}
           data-avatar-source-status={sourceStatus}
           data-avatar-fallback-kind={avatarSource.fallbackKind}
           data-live-lip-renderer-status={liveLipRendererStatus}
@@ -383,8 +387,8 @@ export function AgentAvatar({
                   className="speaking-bar"
                   style={{
                     width: `${barWidth}px`,
-                    '--speak-bar-rest': minimal ? '7px' : '4px',
-                    '--speak-bar-peak': minimal ? '32px' : '18px',
+                    '--speak-bar-rest': '4px',
+                    '--speak-bar-peak': '18px',
                     animationDelay: `${(i - 1) * 0.1}s`,
                   }}
                 />
@@ -395,7 +399,7 @@ export function AgentAvatar({
       </Html>
 
       {/* Name label */}
-      {!minimal && (
+      {(
         <Billboard position={[0, 2.65, 0]}>
           <Text
             fontSize={0.28}

@@ -73,10 +73,6 @@ export default function App() {
   if (mode === 'one') {
     return (
       <div className="observer-app one minimal">
-        <div className={`stream-badge ${live ? 'live' : 'stale'}`}>
-          <span>{label}</span>
-          <span>{observerHealth.lastError || (live ? 'runtime healthy' : 'waiting for runtime')}</span>
-        </div>
         <main className="observer-main minimal">
           <ObserverErrorBoundary>
             <Suspense

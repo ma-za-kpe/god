@@ -85,7 +85,8 @@ export function WorldMap({ mode, minimal = false }) {
   return (
     <div className="world-shell">
       <Canvas
-        camera={{ position: [0, 8.5, 18], fov: 42 }}
+        camera={minimal ? { position: [0, 3.0, 12], fov: 36 } : { position: [0, 8.5, 18], fov: 42 }}
+        gl={minimal ? { preserveDrawingBuffer: true } : undefined}
         shadows
         legacy
       >

@@ -16,20 +16,21 @@ export const API_BASE =
   defaultRuntimeUrl();
 
 let _lastPlayedUtteranceId = '';
-let _pendingLiveVideoUtteranceId = '';
 let _pendingUrl = null;
 let _pendingPlayback = null;
 let _activeAudio = null;
 let _activeAudioSource = null;
 let _activeAudioEnded = null;
 let _activeAudioTimer = null;
+let _voiceMeterFrame = null;
+let _voiceMeterLastUpdate = 0;
+let _voiceMeterData = null;
 let _alphabetPassed = false;
 let _alphabetSpeaking = false;
 let _alphabetNextAt = 0;
 
 const ONE_ALPHABET_NORMALIZED = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-const ONE_WAITING_VIDEO_STATUSES = new Set(['waiting-for-video', 'waiting-for-live-video']);
-const ONE_RETRY_STATUSES = new Set(['blocked', 'timeout', 'error', 'video-timeout']);
+const ONE_RETRY_STATUSES = new Set(['blocked', 'timeout', 'error']);
 
 function streamUrl() {
   return API_BASE.replace(/^http/i, 'ws') + '/world/stream';
@@ -74,65 +75,6 @@ function resolveVoiceAudioUrl(audioUrl, utteranceId) {
   return `${API_BASE}/voice/audio/${utteranceId}`;
 }
 
-function resolveAbsoluteUrl(rawUrl) {
-  if (!rawUrl) return '';
-  try {
-    return new URL(rawUrl, API_BASE).toString();
-  } catch {
-    return String(rawUrl);
-  }
-}
-
-function firstMediaUrl(value) {
-  if (!value) return '';
-  if (typeof value === 'string') return value.trim();
-  if (Array.isArray(value)) {
-    for (const entry of value) {
-      const url = firstMediaUrl(entry);
-      if (url) return url;
-    }
-    return '';
-  }
-  if (typeof value === 'object') {
-    for (const field of ['url', 'src', 'href', 'uri', 'path']) {
-      if (typeof value[field] === 'string' && value[field].trim()) return value[field].trim();
-    }
-    return firstMediaUrl(value.sources);
-  }
-  return '';
-}
-
-function liveVideoUrlFromSnapshot(snap) {
-  const avatar = snap?.avatar || {};
-  const candidates = [
-    avatar?.video_manifest?.live_video,
-    avatar?.video_manifest?.live,
-    avatar?.plan?.video_manifest?.live_video,
-    avatar?.plan?.video_manifest?.live,
-  ];
-  for (const candidate of candidates) {
-    const url = firstMediaUrl(candidate);
-    if (url) return resolveAbsoluteUrl(url);
-  }
-  return '';
-}
-
-async function waitForLiveVideo(url, timeoutMs = Number(import.meta.env.VITE_ONE_LIVE_VIDEO_WAIT_TIMEOUT_MS || 120000)) {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), Math.max(1000, timeoutMs));
-  try {
-    const response = await fetch(url, {
-      method: 'GET',
-      headers: { Range: 'bytes=0-0' },
-      cache: 'no-store',
-      signal: controller.signal,
-    });
-    return response.ok || response.status === 206;
-  } finally {
-    clearTimeout(timer);
-  }
-}
-
 function speakerSoulIdFromSnapshot(snap) {
   const direct = snap?.last_dialogue_turn?.sender_soul_id || snap?.last_dialogue_turn?.sender_id || snap?.avatar?.speaker_soul_id;
   if (direct) return String(direct);
@@ -168,16 +110,14 @@ function markVoicePlayback(status, playback, extra = {}) {
     useObserverStore.getState().setCurrentSpokenLine(playback.line);
     if (oneAlphabetEnabled() && isCorrectAlphabet(playback.line)) {
       const nextStatus =
-        ONE_WAITING_VIDEO_STATUSES.has(status)
-          ? 'waiting-for-live-video'
-          : status === 'ended'
+        status === 'ended'
           ? 'passed'
           : ONE_RETRY_STATUSES.has(status)
           ? 'retry'
           : 'reciting';
       useObserverStore.getState().setOneAlphabetStatus(nextStatus);
       if (status === 'ended') _alphabetPassed = true;
-      if (status === 'ended' || ONE_WAITING_VIDEO_STATUSES.has(status) || ONE_RETRY_STATUSES.has(status)) {
+      if (status === 'ended' || ONE_RETRY_STATUSES.has(status)) {
         _alphabetSpeaking = false;
       } else {
         _alphabetSpeaking = true;
@@ -199,6 +139,82 @@ function clearActiveAudioTimer() {
   }
 }
 
+function scheduleVoiceMeter(callback) {
+  if (typeof requestAnimationFrame !== 'undefined') return requestAnimationFrame(callback);
+  return setTimeout(() => callback(nowMs()), 33);
+}
+
+function cancelVoiceMeter(frame) {
+  if (!frame) return;
+  if (typeof cancelAnimationFrame !== 'undefined') cancelAnimationFrame(frame);
+  else clearTimeout(frame);
+}
+
+function stopVoiceMeter() {
+  if (_voiceMeterFrame) {
+    cancelVoiceMeter(_voiceMeterFrame);
+    _voiceMeterFrame = null;
+  }
+  _voiceMeterLastUpdate = 0;
+  _voiceMeterData = null;
+}
+
+function audioRmsFromAnalyser(analyser) {
+  if (!_voiceMeterData || _voiceMeterData.length !== analyser.fftSize) {
+    _voiceMeterData = new Uint8Array(analyser.fftSize);
+  }
+  analyser.getByteTimeDomainData(_voiceMeterData);
+  let sum = 0;
+  for (let index = 0; index < _voiceMeterData.length; index += 1) {
+    const centered = (_voiceMeterData[index] - 128) / 128;
+    sum += centered * centered;
+  }
+  return Math.sqrt(sum / _voiceMeterData.length);
+}
+
+function updateVoiceMouthAmplitude(playback, mouthAmplitude, lipSyncSource = 'audio_analyser+viseme_track') {
+  const current = useObserverStore.getState().voicePlayback || {};
+  if (playback?.utteranceId && current?.utteranceId && playback.utteranceId !== current.utteranceId) return;
+  useObserverStore.getState().setVoicePlayback({
+    ...current,
+    mouthAmplitude,
+    lipSyncSource,
+    updatedAtMs: nowMs(),
+  });
+}
+
+function startVoiceMeterFromAnalyser(analyser, playback, lipSyncSource = 'audio_analyser+viseme_track') {
+  stopVoiceMeter();
+  analyser.fftSize = 512;
+  analyser.smoothingTimeConstant = 0.42;
+  const tick = (timestamp) => {
+    const rms = audioRmsFromAnalyser(analyser);
+    const mouthAmplitude = Math.max(0, Math.min(1, (rms - 0.012) * 8.8));
+    if (!_voiceMeterLastUpdate || timestamp - _voiceMeterLastUpdate >= 33) {
+      _voiceMeterLastUpdate = timestamp;
+      updateVoiceMouthAmplitude(playback, mouthAmplitude, lipSyncSource);
+    }
+    _voiceMeterFrame = scheduleVoiceMeter(tick);
+  };
+  _voiceMeterFrame = scheduleVoiceMeter(tick);
+}
+
+function startVoiceMeterFromElement(audio, playback) {
+  try {
+    const ctx = _getCtx();
+    const resume = ctx.state === 'suspended' ? ctx.resume() : Promise.resolve();
+    resume.then(() => {
+      try {
+        const source = ctx.createMediaElementSource(audio);
+        const analyser = ctx.createAnalyser();
+        source.connect(analyser);
+        analyser.connect(ctx.destination);
+        startVoiceMeterFromAnalyser(analyser, playback);
+      } catch {}
+    }).catch(() => {});
+  } catch {}
+}
+
 function armPlaybackEndedWatchdog(playback, extra = {}) {
   clearActiveAudioTimer();
   const durationMs = Number(playback?.durationSeconds || 0) * 1000;
@@ -218,52 +234,6 @@ function startVoicePlayback(playback, audioUrl, extra = {}) {
   _playAudioUrl(audioUrl, nextPlayback);
 }
 
-function startOneAlphabetPlaybackWhenVideoReady({
-  uid,
-  playback,
-  audioUrl,
-  liveVideoUrl,
-  isAlive,
-}) {
-  if (_pendingLiveVideoUtteranceId === uid || _lastPlayedUtteranceId === uid) return;
-  _pendingLiveVideoUtteranceId = uid;
-  const livePlayback = { ...playback, liveVideoUrl };
-  markVoicePlayback('waiting-for-video', livePlayback, {
-    audioUrl,
-    liveVideoUrl,
-    transport: 'fish-audio+live-video',
-  });
-  waitForLiveVideo(liveVideoUrl)
-    .then((ready) => {
-      if (!isAlive() || _lastPlayedUtteranceId === uid) return;
-      _pendingLiveVideoUtteranceId = '';
-      if (!ready) {
-        _alphabetNextAt = Date.now() + 1200;
-        markVoicePlayback('video-timeout', livePlayback, {
-          audioUrl,
-          liveVideoUrl,
-          transport: 'fish-audio+live-video',
-        });
-        return;
-      }
-      _lastPlayedUtteranceId = uid;
-      startVoicePlayback(livePlayback, audioUrl, {
-        liveVideoUrl,
-        transport: 'fish-audio+live-video',
-      });
-    })
-    .catch(() => {
-      if (!isAlive()) return;
-      _pendingLiveVideoUtteranceId = '';
-      _alphabetNextAt = Date.now() + 1200;
-      markVoicePlayback('video-timeout', livePlayback, {
-        audioUrl,
-        liveVideoUrl,
-        transport: 'fish-audio+live-video',
-      });
-    });
-}
-
 // Singleton AudioContext — pre-unlocked in OBS CEF, unlockable in Firefox
 let _audioCtx = null;
 function _getCtx() {
@@ -275,7 +245,9 @@ function _getCtx() {
 
 function _playAudioUrl(url, playback = {}) {
   // Strategy 1: HTMLAudioElement (works when user has interacted or in OBS CEF)
-  const audio = new Audio(url);
+  const audio = new Audio();
+  audio.crossOrigin = 'anonymous';
+  audio.src = url;
   let markedPlaying = false;
   let markedDone = false;
   _activeAudio = audio;
@@ -284,6 +256,7 @@ function _playAudioUrl(url, playback = {}) {
   const markDone = (status, extra = {}) => {
     if (markedDone) return;
     markedDone = true;
+    stopVoiceMeter();
     clearActiveAudioTimer();
     if (_activeAudio === audio) _activeAudio = null;
     if (_activeAudioEnded === markDone) _activeAudioEnded = null;
@@ -299,6 +272,7 @@ function _playAudioUrl(url, playback = {}) {
       transport: 'html-audio',
       startedAtMs: nowMs(),
     });
+    startVoiceMeterFromElement(audio, playback);
     armPlaybackEndedWatchdog(playback);
   }, { once: true });
   audio.addEventListener('ended', () => {
@@ -328,14 +302,17 @@ function _playAudioUrl(url, playback = {}) {
             }
             ctx.decodeAudioData(buf, (decoded) => {
               const src = ctx.createBufferSource();
+              const analyser = ctx.createAnalyser();
               src.buffer = decoded;
-              src.connect(ctx.destination);
+              src.connect(analyser);
+              analyser.connect(ctx.destination);
               _activeAudio = null;
               _activeAudioSource = src;
               let sourceDone = false;
               const markSourceDone = () => {
                 if (sourceDone) return;
                 sourceDone = true;
+                stopVoiceMeter();
                 clearActiveAudioTimer();
                 if (_activeAudioSource === src) _activeAudioSource = null;
                 if (_activeAudioEnded === markSourceDone) _activeAudioEnded = null;
@@ -357,6 +334,7 @@ function _playAudioUrl(url, playback = {}) {
                 transport: 'audio-context',
                 startedAtMs: nowMs(),
               });
+              startVoiceMeterFromAnalyser(analyser, playbackWithDuration);
               armPlaybackEndedWatchdog(playbackWithDuration);
             }, () => {
               _pendingUrl = url;
@@ -441,23 +419,10 @@ export function useWorld() {
           if (uid && synthOk && uid !== _lastPlayedUtteranceId) {
             const playback = playbackContextFromSnapshot(snap);
             const audioUrl = resolveVoiceAudioUrl(snap?.voice?.synthesis?.audio_url, uid);
-            const liveVideoUrl = liveVideoUrlFromSnapshot(snap);
-            if (liveVideoUrl) {
-              startOneAlphabetPlaybackWhenVideoReady({
-                uid,
-                playback,
-                audioUrl,
-                liveVideoUrl,
-                isAlive: () => alive,
-              });
-            } else {
-              _alphabetSpeaking = false;
-              _alphabetNextAt = Date.now() + 1200;
-              markVoicePlayback('waiting-for-live-video', playback, {
-                audioUrl,
-                transport: 'fish-audio+live-video',
-              });
-            }
+            _lastPlayedUtteranceId = uid;
+            startVoicePlayback(playback, audioUrl, {
+              transport: 'fish-audio+rigged-avatar',
+            });
           } else if (!uid || !synthOk) {
             _alphabetSpeaking = false;
             _alphabetNextAt = Date.now() + 1200;
