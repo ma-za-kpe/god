@@ -229,10 +229,16 @@ configure_streaming_mode() {
     export OBS_WEBSOCKET_URL=ws://localhost:4444
   fi
   if [ -z "${OBS_CAPTURE_MODE:-}" ]; then
-    export OBS_CAPTURE_MODE=window
+    export OBS_CAPTURE_MODE=display
+  fi
+  if [ -z "${OBS_CAPTURE_SOURCE_NAME:-}" ]; then
+    export OBS_CAPTURE_SOURCE_NAME=god-display
   fi
   if [ -z "${OBS_CAPTURE_SOURCE_KIND:-}" ]; then
-    export OBS_CAPTURE_SOURCE_KIND=xcomposite_input
+    export OBS_CAPTURE_SOURCE_KIND=xshm_input
+  fi
+  if [ -z "${OBS_AUDIO_SOURCE_NAME:-}" ]; then
+    export OBS_AUDIO_SOURCE_NAME=god-audio
   fi
   if [ -z "${OBS_CAPTURE_WINDOW_CLASS:-}" ]; then
     export OBS_CAPTURE_WINDOW_CLASS=Firefox
@@ -755,9 +761,11 @@ JS
     nohup runuser -u stream -- env \
       DISPLAY=:99 \
       XDG_RUNTIME_DIR=/tmp/runtime-stream \
+      PULSE_SERVER=unix:/tmp/runtime-stream/pulse/native \
+      PULSE_COOKIE=/home/stream/.config/pulse/cookie \
       MOZ_DISABLE_CONTENT_SANDBOX=1 \
       MOZ_WEBRENDER=0 \
-      /opt/firefox/firefox --new-instance --no-remote --profile /tmp/firefox-profile --width 1920 --height 1080 "$browser_url" \
+      /opt/firefox/firefox --new-instance --no-remote --profile /tmp/firefox-profile --kiosk "$browser_url" \
       >"$LOG_DIR/firefox.log" 2>&1 &
   }
 
@@ -834,7 +842,7 @@ PY
 
   export OBS_CAPTURE_WINDOW_ID="$window_id"
   log "Firefox window id: ${OBS_CAPTURE_WINDOW_ID}"
-  timeout 5s env DISPLAY=:99 xdotool windowfocus "$window_id" key Return 2>/dev/null || true
+  timeout 5s env DISPLAY=:99 xdotool windowmove "$window_id" 0 0 windowsize "$window_id" 1920 1080 windowraise "$window_id" windowfocus "$window_id" key Return 2>/dev/null || true
 
   python3 - <<'PY'
 from pathlib import Path
@@ -845,19 +853,30 @@ SOURCE_NAME = os.getenv("OBS_CAPTURE_SOURCE_NAME", "god-browser")
 SOURCE_KIND = os.getenv("OBS_CAPTURE_SOURCE_KIND", "xshm_input")
 window_id = os.environ["OBS_CAPTURE_WINDOW_ID"]
 
-capture_settings = {
-    "capture_window": window_id,
-    "CaptureCursor": 0,
-    "include_border": 0,
-    "exclude_alpha": 0,
-    "lock_x": 0,
-    "swap_redblue": 0,
-    "AdvancedSettings": 0,
-    "CropTop": 0,
-    "CropLeft": 0,
-    "CropRight": 0,
-    "CropBottom": 0,
-}
+if SOURCE_KIND == "xshm_input":
+    capture_settings = {
+        "screen": 0,
+        "show_cursor": False,
+        "advanced": False,
+        "cut_top": 0,
+        "cut_left": 0,
+        "cut_right": 0,
+        "cut_bot": 0,
+    }
+else:
+    capture_settings = {
+        "capture_window": window_id,
+        "CaptureCursor": 0,
+        "include_border": 0,
+        "exclude_alpha": 0,
+        "lock_x": 0,
+        "swap_redblue": 0,
+        "AdvancedSettings": 0,
+        "CropTop": 0,
+        "CropLeft": 0,
+        "CropRight": 0,
+        "CropBottom": 0,
+    }
 
 scene_path = Path("/home/stream/.config/obs-studio/basic/scenes/Untitled.json")
 scene_path.parent.mkdir(parents=True, exist_ok=True)
@@ -907,6 +926,15 @@ else:
     }
 
 scene_path.write_text(json.dumps(data, separators=(",", ":"), ensure_ascii=False), encoding="utf-8")
+try:
+    import pwd
+    import grp
+
+    uid = pwd.getpwnam("stream").pw_uid
+    gid = grp.getgrnam("stream").gr_gid
+    os.chown(scene_path, uid, gid)
+except Exception:
+    pass
 print(f"OBS scene written: {SOURCE_NAME} -> window {window_id}")
 
 # If OBS is already running, update the live source via websocket
@@ -936,7 +964,7 @@ try:
         print(f"OBS source type mismatch: {current_type} -> {SOURCE_KIND}; restart required")
     else:
         r = _call("SetSourceSettings", sourceName=SOURCE_NAME,
-            sourceSettings={"capture_window": window_id, "CaptureCursor": 0})
+            sourceSettings=capture_settings)
         print(f"OBS live source update: {r.get('status')}")
     ws2.close()
 except Exception as e:
@@ -992,6 +1020,209 @@ EOF
   wait_http "http://127.0.0.1:10517/stage" "nginx observer proxy" 60 2 || die "nginx observer proxy not responding"
 }
 
+focus_stream_browser() {
+  if ! streaming_launch_requested; then
+    return 0
+  fi
+  if ! command -v xdotool >/dev/null 2>&1; then
+    return 0
+  fi
+
+  local window_id="${OBS_CAPTURE_WINDOW_ID:-}"
+  if [ -z "${window_id:-}" ]; then
+    window_id="$(env DISPLAY=:99 xdotool search --onlyvisible --class Firefox 2>/dev/null | tail -1 || true)"
+  fi
+  if [ -n "${window_id:-}" ]; then
+    env DISPLAY=:99 xdotool windowmove "$window_id" 0 0 windowsize "$window_id" 1920 1080 windowraise "$window_id" windowfocus "$window_id" key Return >/dev/null 2>&1 || true
+  fi
+
+  local obs_window
+  for obs_window in $(env DISPLAY=:99 xdotool search --onlyvisible --class obs 2>/dev/null || true); do
+    env DISPLAY=:99 xdotool windowminimize "$obs_window" >/dev/null 2>&1 || true
+  done
+  if [ -n "${window_id:-}" ]; then
+    env DISPLAY=:99 xdotool windowraise "$window_id" windowfocus "$window_id" >/dev/null 2>&1 || true
+  fi
+}
+
+write_obs_websocket_config() {
+  python3 - <<'PY'
+from pathlib import Path
+import os
+import pwd
+import grp
+
+path = Path("/home/stream/.config/obs-studio/global.ini")
+path.parent.mkdir(parents=True, exist_ok=True)
+text = path.read_text(encoding="utf-8", errors="ignore") if path.exists() else ""
+
+def ensure_section(data: str, section: str, key_values: dict[str, str]) -> str:
+    marker = f"[{section}]"
+    if marker not in data:
+        block = "\n".join([marker, *[f"{k}={v}" for k, v in key_values.items()], ""])
+        return data.rstrip() + "\n\n" + block
+
+    lines = data.splitlines()
+    out = []
+    in_section = False
+    seen = set()
+    inserted = False
+    for line in lines:
+        if line.startswith("[") and line.endswith("]"):
+            if in_section and not inserted:
+                for key, value in key_values.items():
+                    if key not in seen:
+                        out.append(f"{key}={value}")
+                inserted = True
+            in_section = line[1:-1] == section
+            seen = set()
+            out.append(line)
+            continue
+        if in_section and "=" in line and not line.lstrip().startswith(";"):
+            key = line.split("=", 1)[0].strip()
+            if key in key_values:
+                out.append(f"{key}={key_values[key]}")
+                seen.add(key)
+                continue
+        out.append(line)
+    if in_section and not inserted:
+        for key, value in key_values.items():
+            if key not in seen:
+                out.append(f"{key}={value}")
+    result = "\n".join(out)
+    if not result.endswith("\n"):
+        result += "\n"
+    return result
+
+updated = ensure_section(text, "WebsocketAPI", {
+    "ServerEnabled": "true",
+    "ServerPort": "4444",
+    "AuthRequired": "false",
+    "AuthSetupPrompted": "true",
+})
+path.write_text(updated, encoding="utf-8")
+try:
+    uid = pwd.getpwnam("stream").pw_uid
+    gid = grp.getgrnam("stream").gr_gid
+    os.chown(path, uid, gid)
+except Exception:
+    pass
+PY
+}
+
+restrict_obs_websocket_loopback() {
+  if command -v iptables >/dev/null 2>&1; then
+    iptables -C INPUT -p tcp --dport 4444 ! -s 127.0.0.1/32 -j DROP >/dev/null 2>&1 \
+      || iptables -I INPUT -p tcp --dport 4444 ! -s 127.0.0.1/32 -j DROP >/dev/null 2>&1 || true
+  else
+    log "iptables missing; OBS websocket should not be exposed outside the Vast host"
+  fi
+}
+
+ensure_obs_live_scene() {
+  python3 - <<'PY'
+import json
+import os
+from websocket import create_connection
+
+SCENE = os.getenv("OBS_SCENE_NAME", "Scene")
+VIDEO_SOURCE = os.getenv("OBS_CAPTURE_SOURCE_NAME", "god-display")
+VIDEO_KIND = os.getenv("OBS_CAPTURE_SOURCE_KIND", "xshm_input")
+AUDIO_SOURCE = os.getenv("OBS_AUDIO_SOURCE_NAME", "god-audio")
+VOICE_SINK = os.getenv("VOICE_PULSE_SINK", "god-voice")
+WINDOW_ID = os.getenv("OBS_CAPTURE_WINDOW_ID", "")
+
+if VIDEO_KIND == "xshm_input":
+    video_settings = {
+        "screen": 0,
+        "show_cursor": False,
+        "advanced": False,
+        "cut_top": 0,
+        "cut_left": 0,
+        "cut_right": 0,
+        "cut_bot": 0,
+    }
+else:
+    video_settings = {
+        "capture_window": WINDOW_ID,
+        "CaptureCursor": 0,
+        "include_border": 0,
+        "exclude_alpha": 0,
+        "lock_x": 0,
+        "swap_redblue": 0,
+        "AdvancedSettings": 0,
+        "CropTop": 0,
+        "CropLeft": 0,
+        "CropRight": 0,
+        "CropBottom": 0,
+    }
+
+audio_settings = {"device_id": f"{VOICE_SINK}.monitor"}
+ws = create_connection("ws://127.0.0.1:4444", timeout=8)
+mid = 0
+
+def call(request_type, **kwargs):
+    global mid
+    mid += 1
+    payload = {"request-type": request_type, "message-id": str(mid)}
+    payload.update(kwargs)
+    ws.send(json.dumps(payload))
+    for _ in range(40):
+        response = json.loads(ws.recv())
+        if response.get("message-id") == str(mid):
+            return response
+    return {}
+
+scenes = call("GetSceneList")
+if not any(scene.get("name") == SCENE for scene in scenes.get("scenes", [])):
+    created = call("CreateScene", sceneName=SCENE)
+    if created.get("status") != "ok":
+        raise SystemExit(f"failed to create OBS scene: {created}")
+call("SetCurrentScene", **{"scene-name": SCENE})
+
+sources = call("GetSourcesList").get("sources", [])
+by_name = {source.get("name"): source for source in sources}
+if VIDEO_SOURCE not in by_name:
+    created = call(
+        "CreateSource",
+        sceneName=SCENE,
+        sourceName=VIDEO_SOURCE,
+        sourceKind=VIDEO_KIND,
+        sourceSettings=video_settings,
+    )
+    if created.get("status") != "ok":
+        raise SystemExit(f"failed to create OBS video source: {created}")
+else:
+    current_kind = by_name[VIDEO_SOURCE].get("typeId")
+    if current_kind != VIDEO_KIND:
+        raise SystemExit(f"OBS source {VIDEO_SOURCE} is {current_kind}, expected {VIDEO_KIND}")
+    call("SetSourceSettings", sourceName=VIDEO_SOURCE, sourceSettings=video_settings)
+
+call("SetSceneItemRender", **{"scene-name": SCENE, "source": VIDEO_SOURCE, "render": True})
+if VIDEO_SOURCE != "god-browser" and "god-browser" in by_name:
+    call("SetSceneItemRender", **{"scene-name": SCENE, "source": "god-browser", "render": False})
+
+sources = call("GetSourcesList").get("sources", [])
+by_name = {source.get("name"): source for source in sources}
+if AUDIO_SOURCE not in by_name:
+    created = call(
+        "CreateSource",
+        sceneName=SCENE,
+        sourceName=AUDIO_SOURCE,
+        sourceKind="pulse_output_capture",
+        sourceSettings=audio_settings,
+    )
+    if created.get("status") != "ok":
+        raise SystemExit(f"failed to create OBS audio source: {created}")
+else:
+    call("SetSourceSettings", sourceName=AUDIO_SOURCE, sourceSettings=audio_settings)
+
+call("SetSceneItemRender", **{"scene-name": SCENE, "source": AUDIO_SOURCE, "render": True})
+ws.close()
+print(f"OBS live scene ready: video={VIDEO_SOURCE}/{VIDEO_KIND} audio={AUDIO_SOURCE}/{VOICE_SINK}.monitor")
+PY
+}
+
 start_obs() {
   if ! streaming_launch_requested; then
     log "Streaming launch not requested; skipping OBS startup"
@@ -1014,6 +1245,14 @@ start_obs() {
 
   mkdir -p /tmp/xdg-runtime-root
   chmod 700 /tmp/xdg-runtime-root 2>/dev/null || true
+  install -d -o stream -g stream -m 700 /home/stream/.config /home/stream/.config/obs-studio
+  install -d -o stream -g stream -m 755 \
+    /home/stream/.config/obs-studio/logs \
+    /home/stream/.config/obs-studio/basic \
+    /home/stream/.config/obs-studio/basic/scenes \
+    /home/stream/.config/obs-studio/basic/profiles \
+    /home/stream/.config/obs-studio/basic/profiles/Untitled
+  chown -R stream:stream /home/stream/.config/obs-studio
 
   force_obs_keyframes() {
     local profile_dir profile_file
@@ -1092,6 +1331,8 @@ PY
   }
 
   force_obs_keyframes
+  write_obs_websocket_config
+  restrict_obs_websocket_loopback
 
   if pgrep -x obs >/dev/null 2>&1; then
     if [ -f /tmp/god-obs-restart-required ]; then
@@ -1101,12 +1342,16 @@ PY
       fuser -k 4444/tcp 2>/dev/null || true
       sleep 5
     elif obs_websocket_ready; then
+      ensure_obs_live_scene
+      focus_stream_browser
       log "OBS already running and websocket responsive"
       return 0
     fi
     log "OBS process present but websocket not ready yet; waiting before restart"
     for _ in $(seq 1 30); do
       if obs_websocket_ready; then
+        ensure_obs_live_scene
+        focus_stream_browser
         log "OBS websocket became responsive"
         return 0
       fi
@@ -1124,6 +1369,8 @@ PY
     >"$LOG_DIR/obs.log" 2>&1 &
   for _ in $(seq 1 60); do
     if obs_websocket_ready; then
+      ensure_obs_live_scene
+      focus_stream_browser
       log "OBS websocket ready"
       return 0
     fi
@@ -1149,6 +1396,9 @@ start_obs_stream() {
   if ! obs_websocket_ready; then
     die "OBS websocket is not responsive; cannot start stream"
   fi
+
+  ensure_obs_live_scene
+  focus_stream_browser
 
   if python3 - <<'PY'
 import json

@@ -62,15 +62,16 @@ apt-get update -qq
 apt-get install -y -qq \
   curl git openssl ca-certificates \
   zstd \
-  iproute2 psmisc \
+  iproute2 psmisc iptables \
   postgresql postgresql-client \
   redis-server \
-  python3-pip python3-venv python3-dev \
+  python3-pip python3-venv python3-dev python3-websocket \
   build-essential libssl-dev libffi-dev \
   ffmpeg libsndfile1 \
   portaudio19-dev \
+  pulseaudio pulseaudio-utils \
   nginx \
-  obs-studio xvfb xauth dbus-x11 xdotool
+  obs-studio obs-websocket xvfb xauth dbus-x11 xdotool
 
 node_major="$(node -p 'Number(process.versions.node.split(".")[0])' 2>/dev/null || echo 0)"
 if [ "$node_major" -lt 20 ]; then

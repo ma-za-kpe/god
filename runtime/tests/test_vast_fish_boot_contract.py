@@ -21,9 +21,12 @@ def test_vast_native_installs_restart_prerequisites():
     restart = _read("scripts/vast-restart-services.sh")
 
     assert "zstd" in script
-    assert "iproute2 psmisc" in script
+    assert "iproute2 psmisc iptables" in script
     assert "nginx" in script
     assert "xdotool" in script
+    assert "python3-pip python3-venv python3-dev python3-websocket" in script
+    assert "pulseaudio pulseaudio-utils" in script
+    assert "obs-studio obs-websocket" in script
     assert "https://deb.nodesource.com/setup_22.x" in script
     assert "apt-get remove -y -qq npm nodejs nodejs-doc libnode-dev" in script
     assert "Installing Node.js 22 for observer build" in script
@@ -91,6 +94,22 @@ def test_vast_obs_browser_url_can_target_one_page():
     assert "npm run build --silent" in restart
     assert 'if [ -z "${OBS_BROWSER_URL:-}" ]; then' in restart
     assert "export OBS_BROWSER_URL=http://localhost:10517/stage" in restart
+    assert "export OBS_CAPTURE_MODE=display" in restart
+    assert "export OBS_CAPTURE_SOURCE_NAME=god-display" in restart
+    assert "export OBS_CAPTURE_SOURCE_KIND=xshm_input" in restart
+    assert "export OBS_AUDIO_SOURCE_NAME=god-audio" in restart
+    assert '--kiosk "$browser_url"' in restart
+    assert "PULSE_SERVER=unix:/tmp/runtime-stream/pulse/native" in restart
     assert 'wait_http "$browser_url" "OBS browser URL"' in restart
     assert "streaming ${OBS_BROWSER_URL}" in restart
+    assert "write_obs_websocket_config" in restart
+    assert "restrict_obs_websocket_loopback" in restart
+    assert "iptables -C INPUT -p tcp --dport 4444 ! -s 127.0.0.1/32 -j DROP" in restart
+    assert "ensure_obs_live_scene" in restart
+    assert '"pulse_output_capture"' in restart
+    assert '"device_id": f"{VOICE_SINK}.monitor"' in restart
+    assert 'call("SetSceneItemRender"' in restart
+    assert '"screen": 0' in restart
+    assert '"show_cursor": False' in restart
+    assert "focus_stream_browser" in restart
     assert "Browser source is always /stage" not in restart

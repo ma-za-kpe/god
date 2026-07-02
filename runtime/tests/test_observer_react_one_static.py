@@ -48,5 +48,9 @@ def test_react_one_page_has_alphabet_caption_and_drill():
     assert "function ensureOneAlphabetDrill(snap)" in hook
     assert "new SpeechSynthesisUtterance(ONE_ALPHABET_LINE)" in hook
     assert "if (oneAlphabetEnabled()) {" in hook
+    assert "if (uid && synthOk && uid !== _lastPlayedUtteranceId)" in hook
+    assert "const playback = playbackContextFromSnapshot(snap);" in hook
+    assert "const audioUrl = resolveVoiceAudioUrl(snap?.voice?.synthesis?.audio_url, uid);" in hook
+    assert "} else if (!uid || !synthOk) {" in hook
     assert "} else if (uid && synthOk && uid !== _lastPlayedUtteranceId) {" in hook
     assert ".one-caption" in styles

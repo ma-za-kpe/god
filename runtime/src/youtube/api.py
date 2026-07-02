@@ -169,6 +169,22 @@ def _bound_stream_id(item: dict[str, Any] | None) -> str:
     return str(((item or {}).get("contentDetails") or {}).get("boundStreamId") or "")
 
 
+def _youtube_error_reasons(result: dict[str, Any]) -> set[str]:
+    error = result.get("error") or {}
+    if not isinstance(error, dict):
+        return set()
+    detail = error.get("error") if isinstance(error.get("error"), dict) else error
+    reasons: set[str] = set()
+    for item in detail.get("errors") or []:
+        if isinstance(item, dict) and item.get("reason"):
+            reasons.add(str(item["reason"]))
+    if detail.get("reason"):
+        reasons.add(str(detail["reason"]))
+    if error.get("reason"):
+        reasons.add(str(error["reason"]))
+    return reasons
+
+
 async def get_live_broadcast(broadcast_id: str) -> dict[str, Any]:
     """Fetch one YouTube live broadcast by id."""
     broadcast_id = (broadcast_id or "").strip()
@@ -348,6 +364,18 @@ async def ensure_broadcast_live(
 
     transition = await transition_live_broadcast(broadcast_id, "live")
     if not transition.get("ok"):
+        if "redundantTransition" in _youtube_error_reasons(transition):
+            current = await get_live_broadcast(broadcast_id)
+            lifecycle = str(current.get("lifeCycleStatus") or "")
+            if current.get("ok") and lifecycle in ("live", "liveStarting"):
+                return {
+                    "ok": True,
+                    "reason": "already_live_redundant_transition",
+                    "broadcast_id": broadcast_id,
+                    "lifeCycleStatus": lifecycle,
+                    "streamStatus": stream_ready.get("streamStatus", ""),
+                    "transition": transition,
+                }
         return transition
 
     for _ in range(12):

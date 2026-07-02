@@ -105,6 +105,72 @@ async def test_ensure_broadcast_live_transitions_after_active_ingest(monkeypatch
 
 
 @pytest.mark.asyncio
+async def test_ensure_broadcast_live_accepts_redundant_transition_when_live(monkeypatch):
+    _set_oauth_env(monkeypatch)
+    monkeypatch.setenv("YOUTUBE_BROADCAST_ID", "broadcast-1")
+    state = {"broadcast_reads": 0}
+
+    class FakeClient:
+        def __init__(self, timeout: float):
+            self.timeout = timeout
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *args):
+            return None
+
+        async def request(self, method: str, url: str, **kwargs):
+            if url.endswith("/liveStreams"):
+                return _FakeResponse(
+                    200,
+                    {
+                        "items": [
+                            {
+                                "id": "stream-1",
+                                "status": {"streamStatus": "active"},
+                            }
+                        ]
+                    },
+                )
+            if url.endswith("/liveBroadcasts/transition"):
+                return _FakeResponse(
+                    403,
+                    {
+                        "error": {
+                            "code": 403,
+                            "errors": [{"reason": "redundantTransition"}],
+                        }
+                    },
+                )
+            if url.endswith("/liveBroadcasts"):
+                state["broadcast_reads"] += 1
+                lifecycle = "live" if state["broadcast_reads"] >= 2 else "testing"
+                return _FakeResponse(
+                    200,
+                    {
+                        "items": [
+                            {
+                                "id": "broadcast-1",
+                                "contentDetails": {"boundStreamId": "stream-1"},
+                                "status": {"lifeCycleStatus": lifecycle},
+                            }
+                        ]
+                    },
+                )
+            raise AssertionError(url)
+
+    monkeypatch.setattr(api.httpx, "AsyncClient", FakeClient)
+
+    result = await api.ensure_broadcast_live(timeout_s=0, poll_s=0)
+
+    assert result["ok"] is True
+    assert result["reason"] == "already_live_redundant_transition"
+    assert result["lifeCycleStatus"] == "live"
+    assert result["streamStatus"] == "active"
+
+
+@pytest.mark.asyncio
 async def test_wait_for_bound_stream_active_reports_inactive(monkeypatch):
     _set_oauth_env(monkeypatch)
 

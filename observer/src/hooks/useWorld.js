@@ -335,6 +335,14 @@ export function useWorld() {
         if (isCorrectAlphabet(line)) {
           useObserverStore.getState().setCurrentSpokenLine(line);
           useObserverStore.getState().setOneAlphabetStatus('line-ready');
+          if (uid && synthOk && uid !== _lastPlayedUtteranceId) {
+            _lastPlayedUtteranceId = uid;
+            const playback = playbackContextFromSnapshot(snap);
+            const audioUrl = resolveVoiceAudioUrl(snap?.voice?.synthesis?.audio_url, uid);
+            _playAudioUrl(audioUrl, playback);
+          } else if (!uid || !synthOk) {
+            ensureOneAlphabetDrill(snap);
+          }
         } else {
           ensureOneAlphabetDrill(snap);
         }
