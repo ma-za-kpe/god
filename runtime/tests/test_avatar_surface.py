@@ -171,6 +171,50 @@ def test_avatar_surface_queues_live_embodiment_for_fish_audio(monkeypatch):
     assert payload["blocking"] is False
 
 
+def test_avatar_surface_keeps_live_video_available_after_speaking_window(monkeypatch):
+    from avatar import live_embodiment
+
+    live_embodiment._ENSURE_CACHE.clear()
+    monkeypatch.setenv("LIVE_EMBODIMENT_ENABLED", "true")
+    monkeypatch.setenv("LIVE_EMBODIMENT_ENDPOINT", "http://embodiment.local")
+    monkeypatch.setenv(
+        "LIVE_EMBODIMENT_STREAM_URL_TEMPLATE",
+        "http://embodiment.local/stream/{soul_id}/{utterance_id}.mp4",
+    )
+    monkeypatch.setenv("LIVE_EMBODIMENT_RUNTIME_BASE_URL", "http://runtime.local")
+    monkeypatch.setenv("LIVE_EMBODIMENT_ENSURE_INLINE", "true")
+    monkeypatch.setenv("LIVE_EMBODIMENT_ENSURE_TTL_S", "0")
+
+    def fake_probe(url, timeout=1.5):
+        return {
+            "ok": True,
+            "url": url,
+            "body": {"ready": True, "status": "ready", "model_loaded": True},
+        }
+
+    calls = []
+
+    def fake_post_json(url, payload, timeout):
+        calls.append(payload)
+        return {"ok": True, "status": 202, "body": {"ok": True}}
+
+    monkeypatch.setattr("avatar.live_embodiment.probe_url", fake_probe)
+    monkeypatch.setattr("avatar.live_embodiment.post_json", fake_post_json)
+    snapshot = _snapshot()
+    snapshot["last_dialogue_turn"] = {}
+    snapshot["voice"] = {
+        "plan": {"speaker": "Beta", "utterance_id": "alphabet-1"},
+        "synthesis": {"ok": True, "audio_present": True},
+    }
+
+    state = AvatarSurface(enabled=True, dry_run=True).compose(snapshot)
+
+    assert state.speaking is False
+    assert state.video_manifest["live_video"]["kind"] == "live"
+    assert state.video_manifest["live_video"]["url"].endswith("/s-beta/alphabet-1.mp4")
+    assert calls[0]["audio_url"] == "http://runtime.local/voice/audio/alphabet-1"
+
+
 def test_avatar_surface_requires_real_audio_before_live_video(monkeypatch):
     monkeypatch.setenv("LIVE_EMBODIMENT_ENABLED", "true")
     monkeypatch.setenv("LIVE_EMBODIMENT_ENDPOINT", "http://embodiment.local")

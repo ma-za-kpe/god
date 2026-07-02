@@ -357,14 +357,9 @@ class AvatarSurface:
         voice_synthesis = voice_state.get("synthesis") if isinstance(voice_state, dict) else {}
         voice_synthesis = voice_synthesis if isinstance(voice_synthesis, dict) else {}
         voice_synthesis_ready = bool(voice_synthesis.get("ok"))
+        live_voice_ready = bool(agent_id and utterance_id and voice_synthesis_ready)
         live_embodiment = self._live_embodiment.status()
-        if (
-            speaking
-            and agent_id
-            and utterance_id
-            and live_embodiment.get("ready")
-            and voice_synthesis_ready
-        ):
+        if live_voice_ready and live_embodiment.get("ready"):
             self._live_embodiment.ensure_stream(
                 soul_id=agent_id,
                 utterance_id=utterance_id,
@@ -381,7 +376,7 @@ class AvatarSurface:
                 utterance_id=utterance_id,
                 status=live_embodiment,
             )
-            if speaking and agent_id and voice_synthesis_ready
+            if live_voice_ready
             else {}
         )
         video_manifest = {"live_video": live_video_asset} if live_video_asset else {}
