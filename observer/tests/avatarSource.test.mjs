@@ -57,6 +57,45 @@ test('prefers a speaking cinematic clip over an idle loop', () => {
   assert.equal(source.fallback.url, 'http://runtime.local/ipfs/bafyPortrait');
 });
 
+test('prefers an explicit live speech-driven video source while speaking', () => {
+  const source = selectAvatarSource({
+    runtimeBaseUrl: 'http://runtime.local',
+    speaking: true,
+    agent: { current_name: 'Live', avatar_cid: 'bafyPortrait' },
+    avatarState: {
+      video_manifest: {
+        live_video: { url: '/avatar/live/live-agent.m3u8', mime_type: 'application/vnd.apple.mpegurl' },
+        loop: 'bafyIdleLoop',
+        cinematic_clip: { cid: 'bafySpeakingClip' },
+      },
+    },
+  });
+
+  assert.equal(source.activeKind, 'live');
+  assert.equal(source.video.url, '/avatar/live/live-agent.m3u8');
+  assert.equal(source.video.mimeType, 'application/vnd.apple.mpegurl');
+  assert.equal(source.fallback.url, 'http://runtime.local/ipfs/bafyPortrait');
+  assert.equal(sourceStatusText(source), 'live');
+});
+
+test('does not treat a live video CID as a live speech-driven stream', () => {
+  const source = selectAvatarSource({
+    runtimeBaseUrl: 'http://runtime.local',
+    speaking: true,
+    agent: { current_name: 'CID', avatar_cid: 'bafyPortrait' },
+    avatarState: {
+      video_manifest: {
+        live_video: 'bafyNotLive',
+        loop: 'bafyIdleLoop',
+      },
+    },
+  });
+
+  assert.equal(source.activeKind, 'loop');
+  assert.equal(source.video.url, 'http://runtime.local/ipfs/video/bafyIdleLoop');
+  assert.equal(sourceStatusText(source), 'loop');
+});
+
 test('routes loop CIDs through the video IPFS proxy while portraits use portrait proxy', () => {
   const source = selectAvatarSource({
     runtimeBaseUrl: 'http://runtime.local',

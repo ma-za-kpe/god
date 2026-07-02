@@ -2,7 +2,6 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Billboard, Html, Text } from '@react-three/drei';
 import { useFrame } from '@react-three/fiber';
 import { selectAvatarSource, sourceStatusText } from '../avatarSource';
-import oneAvatarLoopUrl from '../../assets/one-avatar-loop.mp4';
 
 function clamp(value, lower, upper) {
   return Math.max(lower, Math.min(upper, value));
@@ -68,12 +67,11 @@ export function AgentAvatar({
     [agent, avatarState, runtimeBaseUrl, isActiveSpeaker]
   );
   const portraitUrl = avatarSource.fallback?.url || '';
-  const bundledOneLoopUrl = minimal ? oneAvatarLoopUrl : '';
-  const videoUrl = avatarSource.video?.url || bundledOneLoopUrl;
-  const videoKind = avatarSource.video?.kind || (bundledOneLoopUrl ? 'loop' : '');
-  const videoIsPrimaryOneLoop = Boolean(minimal && bundledOneLoopUrl && !avatarSource.video?.url);
-  const frameWidth = videoIsPrimaryOneLoop ? 640 : (minimal ? 380 : 170);
-  const frameHeight = videoIsPrimaryOneLoop ? 360 : (minimal ? 470 : 210);
+  const videoCandidate = minimal && avatarSource.video?.kind !== 'live' ? null : avatarSource.video;
+  const videoUrl = videoCandidate?.url || '';
+  const videoKind = videoCandidate?.kind || '';
+  const frameWidth = minimal ? 640 : 170;
+  const frameHeight = minimal ? 360 : 210;
   const mouthWidth = minimal ? 92 : 46;
   const mouthHeight = minimal ? 14 : 7;
   const barWidth = minimal ? 9 : 5;
@@ -81,12 +79,17 @@ export function AgentAvatar({
   const barHeight = minimal ? 34 : 22;
   const barBottom = minimal ? -34 : -18;
   const fallbackInitial = avatarSource.fallback?.initial || (agent?.current_name || agent?.soul_id || '?').slice(0, 1).toUpperCase();
-  const sourceLabel = avatarSource.video ? sourceStatusText(avatarSource) : (bundledOneLoopUrl ? 'loop' : sourceStatusText(avatarSource));
+  const liveLipRendererStatus = minimal
+    ? (videoCandidate?.kind === 'live' && videoCandidate?.url ? 'ready' : 'unavailable')
+    : 'not-required';
+  const sourceLabel = videoCandidate ? sourceStatusText({ ...avatarSource, video: videoCandidate }) : sourceStatusText(avatarSource);
   const sourceStatus = videoFailed
     ? 'video-error-fallback'
-    : (videoUrl ? `${sourceLabel}-${videoReady ? 'ready' : 'preloading'}` : avatarSource.status);
+    : (minimal && liveLipRendererStatus !== 'ready'
+      ? 'live-lip-renderer-unavailable'
+      : (videoUrl ? `${sourceLabel}-${videoReady ? 'ready' : 'preloading'}` : avatarSource.status));
   const showVideo = Boolean(videoUrl && videoReady && !videoFailed);
-  const showProceduralMouth = !showVideo;
+  const showProceduralMouth = !minimal && !showVideo;
   const usesSnapshotLife = Boolean(!avatarState?.speaker_soul_id || agent?.soul_id === avatarState.speaker_soul_id || selected);
   const life = avatarState?.life || {};
   const basePosition = position || [0, 0, 0];
@@ -197,9 +200,10 @@ export function AgentAvatar({
         <div
           ref={avatarRootRef}
           className={isActiveSpeaker ? 'speaking-avatar' : ''}
-          data-avatar-source-kind={avatarSource.activeKind}
+          data-avatar-source-kind={videoCandidate?.kind || (minimal ? 'live-required' : avatarSource.activeKind)}
           data-avatar-source-status={sourceStatus}
           data-avatar-fallback-kind={avatarSource.fallbackKind}
+          data-live-lip-renderer-status={liveLipRendererStatus}
           data-avatar-source-switch-ms={switchMs}
           data-avatar-black-frame-ms="0"
           data-voice-playback-status={playbackMatchesAgent ? voicePlayback?.status || '' : ''}
@@ -260,7 +264,7 @@ export function AgentAvatar({
                 src={videoUrl}
                 muted
                 autoPlay
-                loop={videoKind !== 'cinematic'}
+                loop={videoKind === 'loop'}
                 playsInline
                 preload="auto"
                 crossOrigin="anonymous"
@@ -269,7 +273,7 @@ export function AgentAvatar({
                 onPlaying={markVideoReady}
                 onError={markVideoFailed}
                 onEnded={() => {
-                  if (avatarSource.video?.kind === 'cinematic') setVideoReady(false);
+                  if (videoKind !== 'loop') setVideoReady(false);
                 }}
                 style={{
                   position: 'absolute',
