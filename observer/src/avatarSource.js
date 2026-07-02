@@ -288,12 +288,9 @@ export function selectAvatarSource({
     pickFromManifests(manifests, PORTRAIT_PATHS, runtimeBaseUrl, 'portrait') ||
     pickDirect(directContainers, DIRECT_PORTRAIT_FIELDS, runtimeBaseUrl, 'portrait');
 
-  const live = speaking
-    ? (
-      pickFromManifests(manifests, LIVE_VIDEO_PATHS, runtimeBaseUrl, 'live') ||
-      pickDirect(directContainers, DIRECT_LIVE_VIDEO_FIELDS, runtimeBaseUrl, 'live')
-    )
-    : null;
+  const live =
+    pickFromManifests(manifests, LIVE_VIDEO_PATHS, runtimeBaseUrl, 'live') ||
+    pickDirect(directContainers, DIRECT_LIVE_VIDEO_FIELDS, runtimeBaseUrl, 'live');
 
   const cinematic = preferCinematic && speaking
     ? (

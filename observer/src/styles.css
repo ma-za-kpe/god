@@ -92,6 +92,10 @@ body {
   grid-template-rows: 1fr;
 }
 
+.observer-app.one .stream-badge {
+  display: none;
+}
+
 .stream-badge {
   position: fixed;
   z-index: 20;

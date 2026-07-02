@@ -134,6 +134,30 @@ def test_voice_surface_keeps_stale_one_alphabet_drill():
     assert state.plan.line == "A B C D E F G H I J K L M N O P Q R S T U V W X Y Z."
 
 
+def test_voice_surface_uses_turn_timestamp_in_utterance_id():
+    surface = VoiceSurface(enabled=True, dry_run=True)
+    first_snapshot = _snapshot()
+    first_snapshot["epoch"] = 200
+    first_snapshot["last_dialogue_turn"] = {
+        "content": "A B C D E F G H I J K L M N O P Q R S T U V W X Y Z.",
+        "sender_name": "Alpha",
+        "sent_at": 199,
+    }
+    second_snapshot = _snapshot()
+    second_snapshot["epoch"] = 260
+    second_snapshot["last_dialogue_turn"] = {
+        "content": "A B C D E F G H I J K L M N O P Q R S T U V W X Y Z.",
+        "sender_name": "Alpha",
+        "sent_at": 259,
+    }
+
+    first = surface.compose(first_snapshot)
+    second = surface.compose(second_snapshot)
+
+    assert first.plan.line == second.plan.line
+    assert first.plan.utterance_id != second.plan.utterance_id
+
+
 def test_voice_surface_synthesizes_when_tts_is_available(monkeypatch):
     _clear_voice_caches()
     surface = VoiceSurface(enabled=True, dry_run=False)

@@ -18,16 +18,19 @@ export const API_BASE =
 let _lastPlayedUtteranceId = '';
 let _pendingUrl = null;
 let _pendingPlayback = null;
-let _alphabetAttempt = 0;
+let _activeAudio = null;
+let _activeAudioSource = null;
+let _activeAudioEnded = null;
+let _activeAudioTimer = null;
+let _voiceMeterFrame = null;
+let _voiceMeterLastUpdate = 0;
+let _voiceMeterData = null;
 let _alphabetPassed = false;
 let _alphabetSpeaking = false;
 let _alphabetNextAt = 0;
-let _alphabetVisualTimer = null;
 
-const ONE_ALPHABET_LINE = 'A B C D E F G H I J K L M N O P Q R S T U V W X Y Z.';
 const ONE_ALPHABET_NORMALIZED = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-const ONE_ALPHABET_VISUAL_MS = 8200;
-const ONE_ALPHABET_LOOP_GAP_MS = 2000;
+const ONE_RETRY_STATUSES = new Set(['blocked', 'timeout', 'error']);
 
 function streamUrl() {
   return API_BASE.replace(/^http/i, 'ws') + '/world/stream';
@@ -109,11 +112,16 @@ function markVoicePlayback(status, playback, extra = {}) {
       const nextStatus =
         status === 'ended'
           ? 'passed'
-          : (status === 'blocked' || status === 'timeout' || status === 'error')
+          : ONE_RETRY_STATUSES.has(status)
           ? 'retry'
           : 'reciting';
       useObserverStore.getState().setOneAlphabetStatus(nextStatus);
       if (status === 'ended') _alphabetPassed = true;
+      if (status === 'ended' || ONE_RETRY_STATUSES.has(status)) {
+        _alphabetSpeaking = false;
+      } else {
+        _alphabetSpeaking = true;
+      }
     }
   }
   useObserverStore.getState().setVoicePlayback({
@@ -124,113 +132,106 @@ function markVoicePlayback(status, playback, extra = {}) {
   });
 }
 
-function alphabetSpeakerFromSnapshot(snap) {
-  const speakerSoulId = speakerSoulIdFromSnapshot(snap);
-  const agents = (snap?.agents || []).filter((agent) => agent && agent.is_alive !== false);
-  return agents.find((agent) => agent.soul_id === speakerSoulId) || agents[0] || null;
-}
-
-function oneAlphabetPlayback(snap, speaker, transport) {
-  const plan = snap?.voice?.plan || {};
-  _alphabetAttempt += 1;
-  return {
-    utteranceId: `${plan.utterance_id || 'one-alphabet'}:${transport}:${_alphabetAttempt}`,
-    speakerSoulId: speaker.soul_id,
-    speakerName: speaker.current_name || speaker.soul_id,
-    line: ONE_ALPHABET_LINE,
-    mouthAmplitude: 0.68,
-    durationSeconds: 8.08,
-    latencyTargetMs: 300,
-    lipSyncSource: transport,
-    synthesisOk: true,
-  };
-}
-
-function ensureOneAlphabetVisualLoop(snap) {
-  if (!oneAlphabetEnabled()) return;
-  const now = Date.now();
-  if (_alphabetSpeaking || now < _alphabetNextAt) return;
-  const speaker = alphabetSpeakerFromSnapshot(snap);
-  if (!speaker) {
-    useObserverStore.getState().setOneAlphabetStatus('waiting-for-agent');
-    return;
+function clearActiveAudioTimer() {
+  if (_activeAudioTimer) {
+    clearTimeout(_activeAudioTimer);
+    _activeAudioTimer = null;
   }
-  const playback = oneAlphabetPlayback(snap, speaker, 'fish-audio-loop');
-  _alphabetSpeaking = true;
-  _alphabetPassed = true;
-  _alphabetNextAt = now + ONE_ALPHABET_VISUAL_MS + ONE_ALPHABET_LOOP_GAP_MS;
-  useObserverStore.getState().setCurrentSpokenLine(ONE_ALPHABET_LINE);
-  useObserverStore.getState().setOneAlphabetStatus('reciting');
-  markVoicePlayback('playing', playback, {
-    startedAtMs: nowMs(),
-    transport: 'fish-audio-loop',
+}
+
+function scheduleVoiceMeter(callback) {
+  if (typeof requestAnimationFrame !== 'undefined') return requestAnimationFrame(callback);
+  return setTimeout(() => callback(nowMs()), 33);
+}
+
+function cancelVoiceMeter(frame) {
+  if (!frame) return;
+  if (typeof cancelAnimationFrame !== 'undefined') cancelAnimationFrame(frame);
+  else clearTimeout(frame);
+}
+
+function stopVoiceMeter() {
+  if (_voiceMeterFrame) {
+    cancelVoiceMeter(_voiceMeterFrame);
+    _voiceMeterFrame = null;
+  }
+  _voiceMeterLastUpdate = 0;
+  _voiceMeterData = null;
+}
+
+function audioRmsFromAnalyser(analyser) {
+  if (!_voiceMeterData || _voiceMeterData.length !== analyser.fftSize) {
+    _voiceMeterData = new Uint8Array(analyser.fftSize);
+  }
+  analyser.getByteTimeDomainData(_voiceMeterData);
+  let sum = 0;
+  for (let index = 0; index < _voiceMeterData.length; index += 1) {
+    const centered = (_voiceMeterData[index] - 128) / 128;
+    sum += centered * centered;
+  }
+  return Math.sqrt(sum / _voiceMeterData.length);
+}
+
+function updateVoiceMouthAmplitude(playback, mouthAmplitude, lipSyncSource = 'audio_analyser+viseme_track') {
+  const current = useObserverStore.getState().voicePlayback || {};
+  if (playback?.utteranceId && current?.utteranceId && playback.utteranceId !== current.utteranceId) return;
+  useObserverStore.getState().setVoicePlayback({
+    ...current,
+    mouthAmplitude,
+    lipSyncSource,
+    updatedAtMs: nowMs(),
   });
-
-  if (_alphabetVisualTimer) window.clearTimeout(_alphabetVisualTimer);
-  _alphabetVisualTimer = window.setTimeout(() => {
-    _alphabetSpeaking = false;
-    useObserverStore.getState().setOneAlphabetStatus('passed');
-    markVoicePlayback('ended', playback, {
-      transport: 'fish-audio-loop',
-    });
-    _alphabetVisualTimer = null;
-  }, ONE_ALPHABET_VISUAL_MS);
 }
 
-function ensureOneAlphabetDrill(snap) {
-  if (!oneAlphabetEnabled() || _alphabetPassed || _alphabetSpeaking) return;
-  if (Date.now() < _alphabetNextAt) return;
-  const speaker = alphabetSpeakerFromSnapshot(snap);
-  if (!speaker) {
-    useObserverStore.getState().setOneAlphabetStatus('waiting-for-agent');
-    return;
-  }
-  _alphabetSpeaking = true;
-  const playback = oneAlphabetPlayback(snap, speaker, 'alphabet_drill');
-  useObserverStore.getState().setCurrentSpokenLine(ONE_ALPHABET_LINE);
-  useObserverStore.getState().setOneAlphabetStatus('queued');
-  markVoicePlayback('starting', playback);
-
-  const finish = (ok) => {
-    _alphabetSpeaking = false;
-    const passed = ok && isCorrectAlphabet(ONE_ALPHABET_LINE);
-    _alphabetPassed = passed;
-    _alphabetNextAt = Date.now() + (passed ? 60000 : 1200);
-    useObserverStore.getState().setOneAlphabetStatus(passed ? 'passed' : 'retry');
-    markVoicePlayback(passed ? 'ended' : 'blocked', playback, {
-      transport: 'speech-synthesis',
-    });
+function startVoiceMeterFromAnalyser(analyser, playback, lipSyncSource = 'audio_analyser+viseme_track') {
+  stopVoiceMeter();
+  analyser.fftSize = 512;
+  analyser.smoothingTimeConstant = 0.42;
+  const tick = (timestamp) => {
+    const rms = audioRmsFromAnalyser(analyser);
+    const mouthAmplitude = Math.max(0, Math.min(1, (rms - 0.012) * 8.8));
+    if (!_voiceMeterLastUpdate || timestamp - _voiceMeterLastUpdate >= 33) {
+      _voiceMeterLastUpdate = timestamp;
+      updateVoiceMouthAmplitude(playback, mouthAmplitude, lipSyncSource);
+    }
+    _voiceMeterFrame = scheduleVoiceMeter(tick);
   };
+  _voiceMeterFrame = scheduleVoiceMeter(tick);
+}
 
-  if (!('speechSynthesis' in window) || !('SpeechSynthesisUtterance' in window)) {
-    markVoicePlayback('playing', playback, {
-      startedAtMs: nowMs(),
-      transport: 'visual-drill',
-    });
-    window.setTimeout(() => finish(true), 5200);
-    return;
-  }
-
+function startVoiceMeterFromElement(audio, playback) {
   try {
-    window.speechSynthesis.cancel();
-    const utterance = new SpeechSynthesisUtterance(ONE_ALPHABET_LINE);
-    utterance.lang = 'en-US';
-    utterance.rate = 0.82;
-    utterance.pitch = 0.92;
-    utterance.volume = 1;
-    utterance.onstart = () => {
-      markVoicePlayback('playing', playback, {
-        startedAtMs: nowMs(),
-        transport: 'speech-synthesis',
-      });
-      useObserverStore.getState().setOneAlphabetStatus('reciting');
-    };
-    utterance.onend = () => finish(true);
-    utterance.onerror = () => finish(false);
-    window.speechSynthesis.speak(utterance);
-  } catch {
-    finish(false);
-  }
+    const ctx = _getCtx();
+    const resume = ctx.state === 'suspended' ? ctx.resume() : Promise.resolve();
+    resume.then(() => {
+      try {
+        const source = ctx.createMediaElementSource(audio);
+        const analyser = ctx.createAnalyser();
+        source.connect(analyser);
+        analyser.connect(ctx.destination);
+        startVoiceMeterFromAnalyser(analyser, playback);
+      } catch {}
+    }).catch(() => {});
+  } catch {}
+}
+
+function armPlaybackEndedWatchdog(playback, extra = {}) {
+  clearActiveAudioTimer();
+  const durationMs = Number(playback?.durationSeconds || 0) * 1000;
+  if (!Number.isFinite(durationMs) || durationMs <= 0) return;
+  _activeAudioTimer = setTimeout(() => {
+    if (_activeAudioEnded) _activeAudioEnded();
+  }, Math.max(1500, durationMs + 1500));
+}
+
+function startVoicePlayback(playback, audioUrl, extra = {}) {
+  const nextPlayback = { ...(playback || {}), ...extra };
+  markVoicePlayback('starting', nextPlayback, {
+    audioUrl,
+    transport: extra.transport || 'fish-audio',
+    ...extra,
+  });
+  _playAudioUrl(audioUrl, nextPlayback);
 }
 
 // Singleton AudioContext — pre-unlocked in OBS CEF, unlockable in Firefox
@@ -244,8 +245,24 @@ function _getCtx() {
 
 function _playAudioUrl(url, playback = {}) {
   // Strategy 1: HTMLAudioElement (works when user has interacted or in OBS CEF)
-  const audio = new Audio(url);
+  const audio = new Audio();
+  audio.crossOrigin = 'anonymous';
+  audio.src = url;
   let markedPlaying = false;
+  let markedDone = false;
+  _activeAudio = audio;
+  _activeAudioSource = null;
+  clearActiveAudioTimer();
+  const markDone = (status, extra = {}) => {
+    if (markedDone) return;
+    markedDone = true;
+    stopVoiceMeter();
+    clearActiveAudioTimer();
+    if (_activeAudio === audio) _activeAudio = null;
+    if (_activeAudioEnded === markDone) _activeAudioEnded = null;
+    markVoicePlayback(status, playback, { audioUrl: url, transport: 'html-audio', ...extra });
+  };
+  _activeAudioEnded = () => markDone('ended');
   audio.volume = 1.0;
   audio.addEventListener('playing', () => {
     markedPlaying = true;
@@ -255,13 +272,15 @@ function _playAudioUrl(url, playback = {}) {
       transport: 'html-audio',
       startedAtMs: nowMs(),
     });
+    startVoiceMeterFromElement(audio, playback);
+    armPlaybackEndedWatchdog(playback);
   }, { once: true });
   audio.addEventListener('ended', () => {
-    markVoicePlayback('ended', playback, { audioUrl: url, transport: 'html-audio' });
+    markDone('ended');
   }, { once: true });
   audio.addEventListener('error', () => {
     if (!markedPlaying) {
-      markVoicePlayback('blocked', playback, { audioUrl: url, transport: 'html-audio' });
+      markDone('blocked');
     }
   }, { once: true });
   const p = audio.play();
@@ -283,19 +302,40 @@ function _playAudioUrl(url, playback = {}) {
             }
             ctx.decodeAudioData(buf, (decoded) => {
               const src = ctx.createBufferSource();
+              const analyser = ctx.createAnalyser();
               src.buffer = decoded;
-              src.connect(ctx.destination);
-              src.onended = () => {
+              src.connect(analyser);
+              analyser.connect(ctx.destination);
+              _activeAudio = null;
+              _activeAudioSource = src;
+              let sourceDone = false;
+              const markSourceDone = () => {
+                if (sourceDone) return;
+                sourceDone = true;
+                stopVoiceMeter();
+                clearActiveAudioTimer();
+                if (_activeAudioSource === src) _activeAudioSource = null;
+                if (_activeAudioEnded === markSourceDone) _activeAudioEnded = null;
                 markVoicePlayback('ended', playback, { audioUrl: url, transport: 'audio-context' });
+              };
+              _activeAudioEnded = markSourceDone;
+              src.onended = () => {
+                markSourceDone();
               };
               src.start(0);
               useObserverStore.getState().setAudioBlocked(false);
+              const playbackWithDuration = {
+                ...playback,
+                durationSeconds: decoded.duration || playback.durationSeconds || 0,
+              };
               markVoicePlayback('playing', playback, {
                 audioUrl: url,
-                durationSeconds: decoded.duration || playback.durationSeconds || 0,
+                durationSeconds: playbackWithDuration.durationSeconds,
                 transport: 'audio-context',
                 startedAtMs: nowMs(),
               });
+              startVoiceMeterFromAnalyser(analyser, playbackWithDuration);
+              armPlaybackEndedWatchdog(playbackWithDuration);
             }, () => {
               _pendingUrl = url;
               _pendingPlayback = playback;
@@ -373,20 +413,27 @@ export function useWorld() {
         const line = cleanLine(snap?.voice?.plan?.line || snap?.last_dialogue_turn?.content || '');
         if (isCorrectAlphabet(line)) {
           useObserverStore.getState().setCurrentSpokenLine(line);
-          if (!_alphabetSpeaking) {
+          if (!_alphabetSpeaking && !_alphabetPassed) {
             useObserverStore.getState().setOneAlphabetStatus('line-ready');
           }
           if (uid && synthOk && uid !== _lastPlayedUtteranceId) {
-            _lastPlayedUtteranceId = uid;
             const playback = playbackContextFromSnapshot(snap);
             const audioUrl = resolveVoiceAudioUrl(snap?.voice?.synthesis?.audio_url, uid);
-            _playAudioUrl(audioUrl, playback);
+            _lastPlayedUtteranceId = uid;
+            startVoicePlayback(playback, audioUrl, {
+              transport: 'fish-audio+rigged-avatar',
+            });
           } else if (!uid || !synthOk) {
-            ensureOneAlphabetDrill(snap);
+            _alphabetSpeaking = false;
+            _alphabetNextAt = Date.now() + 1200;
+            useObserverStore.getState().setOneAlphabetStatus('waiting-for-fish-audio');
           }
-          ensureOneAlphabetVisualLoop(snap);
         } else {
-          ensureOneAlphabetDrill(snap);
+          _alphabetSpeaking = false;
+          if (Date.now() >= _alphabetNextAt) {
+            useObserverStore.getState().setOneAlphabetStatus('waiting-for-alphabet-line');
+            _alphabetNextAt = Date.now() + 1200;
+          }
         }
       } else if (uid && synthOk && uid !== _lastPlayedUtteranceId) {
         _lastPlayedUtteranceId = uid;

@@ -262,7 +262,11 @@ def _dialogue_speed(snapshot: dict[str, Any], line: str) -> float:
 
 def _utterance_id(snapshot: dict[str, Any], speaker: str, line: str) -> str:
     scene = str((snapshot.get("showrunner") or {}).get("scene") or "")
-    payload = f"{scene}|{speaker}|{line}".encode("utf-8")
+    turn = snapshot.get("last_dialogue_turn") or {}
+    turn_key = ""
+    if isinstance(turn, dict) and str(turn.get("content") or "").strip():
+        turn_key = str(turn.get("message_id") or turn.get("sent_at") or turn.get("timestamp") or "")
+    payload = f"{scene}|{speaker}|{line}|{turn_key}".encode("utf-8")
     return hashlib.sha256(payload).hexdigest()[:16]
 
 
