@@ -85,6 +85,25 @@ def avatar_health_url(explicit: str | None = None) -> str:
     return health or avatar_base_url()
 
 
+def embodiment_base_url(explicit: str | None = None) -> str:
+    return _first_url(
+        explicit,
+        os.getenv("EMBODIMENT_ENDPOINT"),
+        os.getenv("LIVE_EMBODIMENT_ENDPOINT"),
+        os.getenv("EMBODIMENT_HEALTH_URL"),
+        os.getenv("LIVE_EMBODIMENT_HEALTH_URL"),
+    )
+
+
+def embodiment_health_url(explicit: str | None = None) -> str:
+    health = (
+        _health_url(explicit, "/health")
+        or _health_url(os.getenv("LIVE_EMBODIMENT_HEALTH_URL"), "/health")
+        or _health_url(os.getenv("EMBODIMENT_HEALTH_URL"), "/health")
+    )
+    return health or endpoint_path(embodiment_base_url(), "/health")
+
+
 def tts_base_url(explicit: str | None = None) -> str:
     return _first_url(
         explicit,

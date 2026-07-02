@@ -30,6 +30,7 @@ from .embodiment_benchmark import (
 from .evolution_engine import EvolutionEngine, EvolutionEvent
 from .genesis_pipeline import GenesisPipeline, PipelineResult
 from .life_signals import LifeSignals, LifeState, generate_life_state
+from .live_embodiment import LiveEmbodimentClient
 from .portrait_generator import PortraitGenerator
 from .scene_composer import ElderLayout, SceneComposer, SceneLayout
 from .state import AvatarPlan, AvatarState
@@ -81,6 +82,7 @@ __all__ = [
     "LTXLoopRequest",
     "LifeSignals",
     "LifeState",
+    "LiveEmbodimentClient",
     "MOVE_EXPRESSION_MAP",
     "PipelineResult",
     "PortraitGenerator",
