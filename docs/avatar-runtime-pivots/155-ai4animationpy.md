@@ -27,6 +27,25 @@ Primary references:
 - https://github.com/facebookresearch/ai4animationpy
 - https://facebookresearch.github.io/ai4animationpy/
 
+## Current Code Leverage
+
+The current repo already has the live speech and renderer surface this track should reuse:
+
+- `observer/src/hooks/useWorld.js` starts Fish audio for `/one` with `transport: 'fish-audio+rigged-avatar'` and updates `voicePlayback.mouthAmplitude` from a Web Audio analyser.
+- `observer/src/lipSync.js` builds the alphabet viseme track and samples it efficiently with binary search.
+- `observer/src/components/ControlledAvatar.jsx` consumes `voicePlayback`, `mouthAmplitude`, and alphabet visemes, then drives a procedural rig or VRM model.
+- `observer/src/components/WorldMap.jsx` selects the active `/one` speaker and passes `vrm_avatar_url` into the avatar component.
+- `/one` proof plumbing already includes telemetry attributes, screenshot/video capture, and `preserveDrawingBuffer`.
+
+## Features To Capitalize On
+
+- Python + NumPy/PyTorch runtime fit for a sidecar near the existing Python services.
+- Headless/manual execution modes for server-side motion generation.
+- ECS-style update loops that map cleanly to agent action components.
+- Inverse kinematics for pointing, reaching, foot placement, and body reactions.
+- GLB/FBX/BVH import and internal joint quaternion data for normalizing authored or captured motion.
+- Root and joint trajectory modules for walking, pacing, dancing, and stage blocking.
+
 ## Unique Use Case
 
 Full-world body movement: walking to a podium, turning to face another agent, pacing while speaking, dancing, cheering, reacting physically to interruptions, and producing believable body timing beyond mouth movement.
