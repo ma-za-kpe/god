@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Billboard, Html, Text } from '@react-three/drei';
 import { useFrame } from '@react-three/fiber';
 import { selectAvatarSource, sourceStatusText } from '../avatarSource';
+import oneAvatarLoopUrl from '../../assets/one-avatar-loop.mp4';
 
 function clamp(value, lower, upper) {
   return Math.max(lower, Math.min(upper, value));
@@ -48,14 +49,6 @@ export function AgentAvatar({
   const [switchMs, setSwitchMs] = useState(0);
   const [mouthLatencyMs, setMouthLatencyMs] = useState(null);
   const phase = useMemo(() => stablePhase(agent?.soul_id || agent?.current_name), [agent?.current_name, agent?.soul_id]);
-  const frameWidth = minimal ? 380 : 170;
-  const frameHeight = minimal ? 470 : 210;
-  const mouthWidth = minimal ? 92 : 46;
-  const mouthHeight = minimal ? 14 : 7;
-  const barWidth = minimal ? 9 : 5;
-  const barGap = minimal ? 6 : 3;
-  const barHeight = minimal ? 34 : 22;
-  const barBottom = minimal ? -34 : -18;
 
   const playbackMatchesAgent = Boolean(
     voicePlayback?.status === 'playing' &&
@@ -75,13 +68,25 @@ export function AgentAvatar({
     [agent, avatarState, runtimeBaseUrl, isActiveSpeaker]
   );
   const portraitUrl = avatarSource.fallback?.url || '';
-  const videoUrl = avatarSource.video?.url || '';
+  const bundledOneLoopUrl = minimal ? oneAvatarLoopUrl : '';
+  const videoUrl = avatarSource.video?.url || bundledOneLoopUrl;
+  const videoKind = avatarSource.video?.kind || (bundledOneLoopUrl ? 'loop' : '');
+  const videoIsPrimaryOneLoop = Boolean(minimal && bundledOneLoopUrl && !avatarSource.video?.url);
+  const frameWidth = videoIsPrimaryOneLoop ? 640 : (minimal ? 380 : 170);
+  const frameHeight = videoIsPrimaryOneLoop ? 360 : (minimal ? 470 : 210);
+  const mouthWidth = minimal ? 92 : 46;
+  const mouthHeight = minimal ? 14 : 7;
+  const barWidth = minimal ? 9 : 5;
+  const barGap = minimal ? 6 : 3;
+  const barHeight = minimal ? 34 : 22;
+  const barBottom = minimal ? -34 : -18;
   const fallbackInitial = avatarSource.fallback?.initial || (agent?.current_name || agent?.soul_id || '?').slice(0, 1).toUpperCase();
-  const sourceLabel = sourceStatusText(avatarSource);
+  const sourceLabel = avatarSource.video ? sourceStatusText(avatarSource) : (bundledOneLoopUrl ? 'loop' : sourceStatusText(avatarSource));
   const sourceStatus = videoFailed
     ? 'video-error-fallback'
     : (videoUrl ? `${sourceLabel}-${videoReady ? 'ready' : 'preloading'}` : avatarSource.status);
   const showVideo = Boolean(videoUrl && videoReady && !videoFailed);
+  const showProceduralMouth = !showVideo;
   const usesSnapshotLife = Boolean(!avatarState?.speaker_soul_id || agent?.soul_id === avatarState.speaker_soul_id || selected);
   const life = avatarState?.life || {};
   const basePosition = position || [0, 0, 0];
@@ -255,7 +260,7 @@ export function AgentAvatar({
                 src={videoUrl}
                 muted
                 autoPlay
-                loop={avatarSource.video?.kind !== 'cinematic'}
+                loop={videoKind !== 'cinematic'}
                 playsInline
                 preload="auto"
                 crossOrigin="anonymous"
@@ -300,6 +305,7 @@ export function AgentAvatar({
             </div>
             <div
               ref={mouthRef}
+              hidden={!showProceduralMouth}
               style={{
                 position: 'absolute',
                 zIndex: 3,
