@@ -81,8 +81,8 @@ export function AgentAvatar({
   const videoUrl = videoCandidate?.url || '';
   const videoKind = videoCandidate?.kind || '';
   const isLiveVideo = videoKind === 'live';
-  const frameWidth = minimal ? 640 : 170;
-  const frameHeight = minimal ? 360 : 210;
+  const frameWidth = minimal ? 960 : 170;
+  const frameHeight = minimal ? 540 : 210;
   const mouthWidth = minimal ? 92 : 46;
   const mouthHeight = minimal ? 14 : 7;
   const barWidth = minimal ? 9 : 5;

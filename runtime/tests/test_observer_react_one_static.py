@@ -65,8 +65,8 @@ def test_react_one_page_has_alphabet_caption_and_fish_audio_gate():
     assert "visual-drill" not in hook
     assert "} else if (uid && synthOk && uid !== _lastPlayedUtteranceId) {" in hook
     assert ".one-caption" in styles
-    assert "const frameWidth = minimal ? 640 : 170;" in avatar
-    assert "const frameHeight = minimal ? 360 : 210;" in avatar
+    assert "const frameWidth = minimal ? 960 : 170;" in avatar
+    assert "const frameHeight = minimal ? 540 : 210;" in avatar
     assert "--speak-bar-peak" in styles
 
 
@@ -88,7 +88,7 @@ def test_react_one_page_requires_live_lip_renderer_not_bundled_video():
     assert "const snapshotSpeakerActive = Boolean(" in avatar
     assert "browserPlaybackActive" in avatar
     assert "if (videoKind !== 'loop') setVideoReady(false);" in avatar
-    assert "const frameWidth = minimal ? 640 : 170;" in avatar
-    assert "const frameHeight = minimal ? 360 : 210;" in avatar
+    assert "const frameWidth = minimal ? 960 : 170;" in avatar
+    assert "const frameHeight = minimal ? 540 : 210;" in avatar
     assert "const showProceduralMouth = !minimal && !showVideo;" in avatar
     assert "hidden={!showProceduralMouth}" in avatar
