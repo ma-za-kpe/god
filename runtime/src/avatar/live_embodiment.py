@@ -54,6 +54,8 @@ def post_json(url: str, payload: dict[str, Any], *, timeout: float) -> dict[str,
     Kept as a module helper so tests can patch the network boundary without
     exercising threads or a live sidecar.
     """
+    if not _valid_live_url(url):
+        raise ValueError("invalid_live_embodiment_url")
     body = json.dumps(payload).encode("utf-8")
     request = urllib.request.Request(
         url,
@@ -61,7 +63,7 @@ def post_json(url: str, payload: dict[str, Any], *, timeout: float) -> dict[str,
         headers={"Content-Type": "application/json", "Accept": "application/json"},
         method="POST",
     )
-    with urllib.request.urlopen(request, timeout=timeout) as response:
+    with urllib.request.urlopen(request, timeout=timeout) as response:  # nosec B310 - URL scheme is validated above.
         raw = response.read(4096)
         try:
             parsed = json.loads(raw.decode("utf-8")) if raw else {}
