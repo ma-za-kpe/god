@@ -5,13 +5,14 @@ from __future__ import annotations
 import os
 import time
 from typing import Any
+from urllib.parse import quote, urlparse
 
 try:  # pragma: no cover - runtime package import path
     from ..health_checks import probe_url
-    from ..runtime_endpoints import avatar_health_url
+    from ..runtime_endpoints import avatar_health_url, endpoint_path
 except ImportError:  # pragma: no cover - flat test path
     from health_checks import probe_url
-    from runtime_endpoints import avatar_health_url
+    from runtime_endpoints import avatar_health_url, endpoint_path
 
 try:  # pragma: no cover - runtime package import path
     from ..banter.types import Beat, PairState, SceneContextData
@@ -168,6 +169,47 @@ def _voice_audio_rms(voice_state: dict[str, Any], mouth_open: float) -> float:
     return max(0.0, min(1.0, float(mouth_open or 0.0)))
 
 
+def _is_http_url(value: str) -> bool:
+    parsed = urlparse(str(value or "").strip())
+    return parsed.scheme in {"http", "https"} and bool(parsed.netloc)
+
+
+def _public_runtime_base_url() -> str:
+    return (
+        os.getenv("LIVE_EMBODIMENT_RUNTIME_BASE_URL")
+        or os.getenv("RUNTIME_BASE_URL")
+        or "http://localhost:8888"
+    ).strip()
+
+
+def _runtime_public_path(path: str) -> str:
+    return endpoint_path(_public_runtime_base_url(), path)
+
+
+def _live_audio_url(utterance_id: str, synthesis: dict[str, Any]) -> str:
+    explicit = str(synthesis.get("audio_url") or "").strip()
+    if _is_http_url(explicit):
+        return explicit
+    if explicit.startswith("/"):
+        return _runtime_public_path(explicit)
+    if not utterance_id:
+        return ""
+    return _runtime_public_path(f"/voice/audio/{quote(utterance_id, safe='')}")
+
+
+def _portrait_url_from_asset(avatar_asset: str) -> str:
+    value = str(avatar_asset or "").strip()
+    if not value:
+        return ""
+    if _is_http_url(value):
+        return value
+    cid = value.replace("ipfs://", "").strip("/")
+    if not cid or any(ch in cid for ch in "\\?&#"):
+        return ""
+    encoded = "/".join(quote(part, safe="") for part in cid.split("/") if part)
+    return _runtime_public_path(f"/ipfs/{encoded}") if encoded else ""
+
+
 class AvatarSurface:
     """Compose an avatar render plan from the live world snapshot."""
 
@@ -312,13 +354,34 @@ class AvatarSurface:
         if speaking:
             mouth_open = max(mouth_open, float(life_payload.get("mouth_amplitude") or 0.0))
         utterance_id = str(voice_plan.get("utterance_id") or "")
+        voice_synthesis = voice_state.get("synthesis") if isinstance(voice_state, dict) else {}
+        voice_synthesis = voice_synthesis if isinstance(voice_synthesis, dict) else {}
+        voice_synthesis_ready = bool(voice_synthesis.get("ok"))
         live_embodiment = self._live_embodiment.status()
+        if (
+            speaking
+            and agent_id
+            and utterance_id
+            and live_embodiment.get("ready")
+            and voice_synthesis_ready
+        ):
+            self._live_embodiment.ensure_stream(
+                soul_id=agent_id,
+                utterance_id=utterance_id,
+                audio_url=_live_audio_url(utterance_id, voice_synthesis),
+                portrait_url=_portrait_url_from_asset(avatar_asset),
+                portrait_cid=avatar_asset
+                if avatar_asset and not _is_http_url(avatar_asset)
+                else "",
+                status=live_embodiment,
+            )
         live_video_asset = (
             self._live_embodiment.live_video_asset(
                 soul_id=agent_id,
                 utterance_id=utterance_id,
+                status=live_embodiment,
             )
-            if speaking and agent_id
+            if speaking and agent_id and voice_synthesis_ready
             else {}
         )
         video_manifest = {"live_video": live_video_asset} if live_video_asset else {}

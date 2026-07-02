@@ -110,7 +110,8 @@ def test_avatar_surface_exposes_live_embodiment_stream_only_when_ready(monkeypat
             "speaker": "Beta",
             "utterance_id": "alphabet-1",
             "audio_rms": 0.3,
-        }
+        },
+        "synthesis": {"ok": True, "audio_present": True},
     }
 
     state = AvatarSurface(enabled=True, dry_run=True).compose(snapshot)
@@ -120,6 +121,75 @@ def test_avatar_surface_exposes_live_embodiment_stream_only_when_ready(monkeypat
     assert live_video["provider"] == "musetalk"
     assert live_video["url"] == "http://embodiment.local/stream/s-beta/alphabet-1.m3u8"
     assert state.plan.video_manifest == state.video_manifest
+    assert state.live_embodiment["ready"] is True
+
+
+def test_avatar_surface_queues_live_embodiment_for_fish_audio(monkeypatch):
+    from avatar import live_embodiment
+
+    live_embodiment._ENSURE_CACHE.clear()
+    monkeypatch.setenv("LIVE_EMBODIMENT_ENABLED", "true")
+    monkeypatch.setenv("LIVE_EMBODIMENT_ENDPOINT", "http://embodiment.local")
+    monkeypatch.setenv("LIVE_EMBODIMENT_RUNTIME_BASE_URL", "http://runtime.local")
+    monkeypatch.setenv("LIVE_EMBODIMENT_ENSURE_INLINE", "true")
+    monkeypatch.setenv("LIVE_EMBODIMENT_ENSURE_TTL_S", "0")
+
+    def fake_probe(url, timeout=1.5):
+        return {
+            "ok": True,
+            "url": url,
+            "body": {"ready": True, "status": "ready", "model_loaded": True},
+        }
+
+    calls = []
+
+    def fake_post_json(url, payload, timeout):
+        calls.append((url, payload, timeout))
+        return {"ok": True, "status": 202, "body": {"ok": True}}
+
+    monkeypatch.setattr("avatar.live_embodiment.probe_url", fake_probe)
+    monkeypatch.setattr("avatar.live_embodiment.post_json", fake_post_json)
+    snapshot = _snapshot()
+    snapshot["last_dialogue_turn"] = {"sender_name": "Beta", "content": "A B C."}
+    snapshot["voice"] = {
+        "plan": {"speaker": "Beta", "utterance_id": "alphabet-1"},
+        "synthesis": {"ok": True, "audio_present": True},
+    }
+
+    state = AvatarSurface(enabled=True, dry_run=True).compose(snapshot)
+
+    assert state.video_manifest["live_video"]["kind"] == "live"
+    assert len(calls) == 1
+    url, payload, timeout = calls[0]
+    assert url == "http://embodiment.local/embody"
+    assert timeout == 1.5
+    assert payload["soul_id"] == "s-beta"
+    assert payload["utterance_id"] == "alphabet-1"
+    assert payload["audio_url"] == "http://runtime.local/voice/audio/alphabet-1"
+    assert payload["portrait_url"] == "http://runtime.local/ipfs/bafy-avatar"
+    assert payload["portrait_cid"] == "bafy-avatar"
+    assert payload["blocking"] is False
+
+
+def test_avatar_surface_requires_real_audio_before_live_video(monkeypatch):
+    monkeypatch.setenv("LIVE_EMBODIMENT_ENABLED", "true")
+    monkeypatch.setenv("LIVE_EMBODIMENT_ENDPOINT", "http://embodiment.local")
+
+    def fake_probe(url, timeout=1.5):
+        return {
+            "ok": True,
+            "url": url,
+            "body": {"ready": True, "status": "ready", "model_loaded": True},
+        }
+
+    monkeypatch.setattr("avatar.live_embodiment.probe_url", fake_probe)
+    snapshot = _snapshot()
+    snapshot["last_dialogue_turn"] = {"sender_name": "Beta", "content": "A B C."}
+    snapshot["voice"] = {"plan": {"speaker": "Beta", "utterance_id": "alphabet-1"}}
+
+    state = AvatarSurface(enabled=True, dry_run=True).compose(snapshot)
+
+    assert state.video_manifest == {}
     assert state.live_embodiment["ready"] is True
 
 
