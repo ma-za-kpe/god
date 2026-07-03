@@ -73,6 +73,18 @@ def test_build_pose_stream_from_arrays_accepts_common_ai4animationpy_aliases():
     assert stream.frames[0].joint_rotations["joint_1"][3] < 1.0
 
 
+def test_load_npz_pose_stream_accepts_ai4animationpy_quaternion_export(tmp_path: Path):
+    motion_path = _write_ai4animationpy_motion_npz(tmp_path / "ai4animationpy_motion.npz")
+
+    stream = load_npz_pose_stream(motion_path, agent_id="upstream-demo", max_frames=3)
+
+    assert stream.agent_id == "upstream-demo"
+    assert stream.frames[1].timestamp_ms == 17
+    assert stream.frames[2].timestamp_ms == 33
+    assert stream.frames[2].root_position == (0.2, 0.0, 0.0)
+    assert stream.frames[0].joint_rotations["joint_1"][3] < 1.0
+
+
 def test_normalize_pose_stream_rejects_malformed_sidecar_output():
     valid = {
         "frames": [
@@ -246,6 +258,73 @@ def _write_motion_npz(path: Path) -> Path:
                 descr="|b1",
             ),
         )
+    return path
+
+
+def _write_ai4animationpy_motion_npz(path: Path) -> Path:
+    with zipfile.ZipFile(path, "w") as archive:
+        archive.writestr("framerate.npy", _npy_bytes([60.0], shape=(), descr="<f8"))
+        archive.writestr(
+            "positions.npy",
+            _npy_bytes(
+                [
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.5,
+                    0.0,
+                    0.1,
+                    0.0,
+                    0.0,
+                    0.1,
+                    0.5,
+                    0.0,
+                    0.2,
+                    0.0,
+                    0.0,
+                    0.2,
+                    0.5,
+                    0.0,
+                ],
+                shape=(3, 2, 3),
+                descr="<f8",
+            ),
+        )
+        archive.writestr(
+            "quaternions.npy",
+            _npy_bytes(
+                [
+                    0,
+                    0,
+                    0,
+                    1,
+                    0,
+                    0.1,
+                    0,
+                    1,
+                    0,
+                    0,
+                    0,
+                    1,
+                    0,
+                    0.2,
+                    0,
+                    1,
+                    0,
+                    0,
+                    0,
+                    1,
+                    0,
+                    0.3,
+                    0,
+                    1,
+                ],
+                shape=(3, 2, 4),
+                descr="<f8",
+            ),
+        )
+        archive.writestr("parent_names.npy", b"unsupported object metadata is ignored")
     return path
 
 

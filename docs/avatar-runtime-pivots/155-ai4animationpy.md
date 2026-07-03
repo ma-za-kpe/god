@@ -246,6 +246,37 @@ This branch now also includes the optional motion-export evaluation slice:
 
 This still does not make AI4AnimationPy production-ready. It proves that a motion import or sidecar output can be checked against GOD's contract before any browser/runtime integration.
 
+## Source-Backed Eval Proof
+
+The eval harness has now been run against a real upstream AI4AnimationPy demo export without vendoring the source asset:
+
+- Upstream path: `facebookresearch/ai4animationpy@main:Demos/MotionImport/BVH/WalkingStickLeft_BR.npz`
+- Upstream blob SHA: `90d06b48e1c790c24088b4c6ec794fae17ae4610`
+- Local proof-file SHA-256: `0b70056faa08b576fe19b0f5b089591d4f1928c7b9ca2c7092c7f1cb75197fdb`
+- Command: `python scripts/eval-ai4animationpy-motion.py --npz C:\tmp\god-ai4animationpy-proof\WalkingStickLeft_BR.npz --agent-id upstream-walking-stick --max-frames 120 --stride 30 --format summary`
+
+Observed summary:
+
+```json
+{
+  "agent_id": "upstream-walking-stick",
+  "contact_count": 0,
+  "duration_seconds": 59.501,
+  "frame_count": 120,
+  "joint_count": 23,
+  "last_timestamp_ms": 59501,
+  "license_profile": "optional-research-noncommercial",
+  "root_bounds": {
+    "max": [0.902579, 0.885022, 0.672077],
+    "min": [-1.497222, 0.810247, -3.224509]
+  },
+  "source": "ai4animationpy-eval",
+  "target_runtime": "ai4animationpy"
+}
+```
+
+The first attempt exposed a real adapter gap: upstream `Motion.SaveToNPZ(...)` emits `positions`, `quaternions`, `framerate`, `bone_names`, `parent_names`, and `parent_indices`, while the initial GOD loader only accepted `joint_rotations`/`rotations` and tried to load every NPZ member with `allow_pickle=False`. The harness now recognizes `quaternions`, uses source `framerate` for generated timestamps, and loads only relevant safe members so pickle-only metadata cannot break the eval path.
+
 ## Validation
 
 - Unit test command validation and pose-stream normalization.

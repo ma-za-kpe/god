@@ -33,6 +33,7 @@ _JOINT_ROTATION_KEYS = (
     "joint_rotations",
     "local_rotations",
     "bone_rotations",
+    "quaternions",
     "rotations",
 )
 _ROOT_POSITION_KEYS = ("root_position", "root_positions", "root_translation", "root_translations")
@@ -42,6 +43,24 @@ _TIMESTAMP_MS_KEYS = ("timestamps_ms", "time_ms", "frame_times_ms")
 _TIMESTAMP_SECOND_KEYS = ("timestamps", "times", "time_seconds")
 _JOINT_NAME_KEYS = ("joint_names", "bone_names", "names")
 _CONTACT_NAME_KEYS = ("contact_names", "contacts_names")
+_FRAMERATE_KEYS = ("framerate", "fps")
+_RELEVANT_NPZ_KEYS = frozenset(
+    (
+        *_JOINT_ROTATION_KEYS,
+        *_ROOT_POSITION_KEYS,
+        *_ROOT_ROTATION_KEYS,
+        *_POSITION_KEYS,
+        *_TIMESTAMP_MS_KEYS,
+        *_TIMESTAMP_SECOND_KEYS,
+        *_JOINT_NAME_KEYS,
+        *_CONTACT_NAME_KEYS,
+        *_FRAMERATE_KEYS,
+        "contacts",
+        "contact_states",
+        "gesture_label",
+        "gesture_labels",
+    )
+)
 
 
 @dataclass(frozen=True)
@@ -138,7 +157,7 @@ def build_pose_stream_from_arrays(
         raise ValueError("pose_stream_npz_has_no_arrays")
     stride = max(1, int(stride))
     max_frames = max(1, min(int(max_frames), MAX_POSE_FRAMES))
-    fps = _finite_float(fps, field="fps")
+    fps = _resolve_fps(arrays, fallback=fps)
     if fps <= 0:
         raise ValueError("pose_stream_fps_must_be_positive")
 
@@ -369,8 +388,18 @@ def _load_npz_arrays(path: Path) -> dict[str, Any]:
     except ModuleNotFoundError:
         return _load_npz_arrays_without_numpy(path)
 
+    arrays: dict[str, Any] = {}
     with np.load(path, allow_pickle=False) as data:
-        return {name: data[name].tolist() for name in data.files}
+        for name in data.files:
+            key = Path(name).stem
+            if key not in _RELEVANT_NPZ_KEYS:
+                continue
+            try:
+                arrays[key] = data[name].tolist()
+            except ValueError as exc:
+                if "Object arrays cannot be loaded" not in str(exc):
+                    raise
+    return arrays
 
 
 def _load_npz_arrays_without_numpy(path: Path) -> dict[str, Any]:
@@ -380,7 +409,13 @@ def _load_npz_arrays_without_numpy(path: Path) -> dict[str, Any]:
             if not member.endswith(".npy"):
                 continue
             key = Path(member).stem
-            arrays[key] = _read_npy_subset(archive.read(member))
+            if key not in _RELEVANT_NPZ_KEYS:
+                continue
+            try:
+                arrays[key] = _read_npy_subset(archive.read(member))
+            except ValueError as exc:
+                if "pose_stream_npy_dtype_not_supported" not in str(exc):
+                    raise
     return arrays
 
 
@@ -496,6 +531,16 @@ def _resolve_timestamps(arrays: dict[str, Any], *, total_frames: int, fps: float
     if len(values) != total_frames:
         raise ValueError("pose_stream_timestamps_must_match_frames")
     return values
+
+
+def _resolve_fps(arrays: dict[str, Any], *, fallback: float) -> float:
+    source_fps = _first_present(arrays, _FRAMERATE_KEYS)
+    if source_fps is None:
+        return _finite_float(fallback, field="fps")
+    values = _as_sequence(source_fps)
+    if not values:
+        return _finite_float(fallback, field="fps")
+    return _finite_float(values[0], field="framerate")
 
 
 def _resolve_root_positions(arrays: dict[str, Any], *, total_frames: int) -> list[Any]:
