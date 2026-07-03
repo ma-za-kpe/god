@@ -3,6 +3,7 @@ import { Html, Text } from '@react-three/drei';
 import { useFrame, useLoader } from '@react-three/fiber';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { VRMLoaderPlugin, VRMUtils } from '@pixiv/three-vrm';
+import { resolveBodyMotionPlan, sampleBodyMotionPlan } from '../avatarMotion';
 import { buildAlphabetVisemeTrack, sampleVisemeTrack, scaleVisemeSample, VRM_VISEMES } from '../lipSync';
 
 function clamp(value, lower, upper) {
@@ -27,6 +28,12 @@ function stablePhase(value) {
   return (Math.abs(hash) % 6283) / 1000;
 }
 
+function playbackElapsedSeconds({ voicePlayback, playbackMatchesAgent, clock, phase }) {
+  return playbackMatchesAgent && voicePlayback?.startedAtMs
+    ? Math.max(0, (nowMs() - voicePlayback.startedAtMs) / 1000)
+    : (clock.getElapsedTime() + phase) % Math.max(3.8, Number(voicePlayback?.durationSeconds || 0) || 3.8);
+}
+
 function voiceMatchesAgent(agent, voicePlayback) {
   return Boolean(
     voicePlayback?.status === 'playing' &&
@@ -45,13 +52,12 @@ function rigState({
   isActiveSpeaker,
   playbackMatchesAgent,
   track,
+  bodyMotionPlan,
   phase,
   clock,
 }) {
   const life = avatarState?.life || {};
-  const elapsed = playbackMatchesAgent && voicePlayback?.startedAtMs
-    ? Math.max(0, (nowMs() - voicePlayback.startedAtMs) / 1000)
-    : (clock.getElapsedTime() + phase) % Math.max(3.8, Number(voicePlayback?.durationSeconds || 0) || 3.8);
+  const elapsed = playbackElapsedSeconds({ voicePlayback, playbackMatchesAgent, clock, phase });
   const snapshotMouth = lifeNumber(life, 'mouth_amplitude');
   const playbackMouth = playbackMatchesAgent ? Number(voicePlayback?.mouthAmplitude || 0) : Number.NaN;
   const baseAmplitude = isActiveSpeaker
@@ -78,6 +84,7 @@ function rigState({
     z: Math.sin(clock.getElapsedTime() * 1.25 + phase) * (isActiveSpeaker ? 0.035 : 0.018),
   };
   const blink = clamp(Math.pow(Math.max(0, Math.sin(clock.getElapsedTime() * 0.74 + phase) - 0.9) * 10, 2), 0, 1);
+  const bodyMotion = sampleBodyMotionPlan(bodyMotionPlan, elapsed);
 
   return {
     ...sample,
@@ -87,6 +94,7 @@ function rigState({
     blink,
     speaking: isActiveSpeaker,
     mouth: clamp(sample.jaw + baseAmplitude * 0.38, 0, 1),
+    bodyMotion,
   };
 }
 
@@ -112,6 +120,7 @@ function RigTelemetry({
   isActiveSpeaker,
   playbackMatchesAgent,
   voicePlayback,
+  bodyMotionPlan,
 }) {
   return (
     <Html
@@ -133,6 +142,9 @@ function RigTelemetry({
         data-live-lip-renderer-status="not-required"
         data-avatar-control-mode="speech-driven-rig"
         data-avatar-video-mode="disabled-for-one"
+        data-body-motion-source={bodyMotionPlan?.source || ''}
+        data-body-motion-target-runtime={bodyMotionPlan?.targetRuntime || ''}
+        data-body-motion-status={bodyMotionPlan?.status || ''}
         data-voice-playback-status={playbackMatchesAgent ? voicePlayback?.status || '' : ''}
         data-voice-mouth-amplitude={playbackMatchesAgent ? Number(voicePlayback?.mouthAmplitude || 0).toFixed(4) : '0.0000'}
         data-voice-lip-sync-source={playbackMatchesAgent ? voicePlayback?.lipSyncSource || 'audio_analyser+viseme_track' : ''}
@@ -150,6 +162,7 @@ function ProceduralRig({
   playbackMatchesAgent,
   color,
   track,
+  bodyMotionPlan,
   phase,
 }) {
   const rootRef = useRef();
@@ -163,6 +176,12 @@ function ProceduralRig({
   const browLeftRef = useRef();
   const browRightRef = useRef();
   const haloRef = useRef();
+  const leftUpperArmRef = useRef();
+  const leftLowerArmRef = useRef();
+  const rightUpperArmRef = useRef();
+  const rightLowerArmRef = useRef();
+  const leftUpperLegRef = useRef();
+  const rightUpperLegRef = useRef();
 
   useFrame(({ clock }) => {
     const state = rigState({
@@ -172,22 +191,66 @@ function ProceduralRig({
       isActiveSpeaker,
       playbackMatchesAgent,
       track,
+      bodyMotionPlan,
       phase,
       clock,
     });
+    const motion = state.bodyMotion || {};
+    const rootMotion = motion.root || { position: [0, 0, 0], rotation: [0, 0, 0] };
+    const joints = motion.joints || {};
 
     if (rootRef.current) {
-      rootRef.current.position.y = -1.05 + (state.breath - 0.5) * 0.22;
-      rootRef.current.rotation.y = state.headSway.y;
-      rootRef.current.rotation.z = state.headSway.z;
+      rootRef.current.position.x = rootMotion.position?.[0] || 0;
+      rootRef.current.position.y = -1.05 + (rootMotion.position?.[1] || 0) + (state.breath - 0.5) * 0.22;
+      rootRef.current.position.z = rootMotion.position?.[2] || 0;
+      rootRef.current.rotation.y = state.headSway.y + (rootMotion.rotation?.[1] || 0);
+      rootRef.current.rotation.z = state.headSway.z + (rootMotion.rotation?.[2] || 0);
     }
     if (torsoRef.current) {
       torsoRef.current.scale.y = 1 + (state.breath - 0.5) * 0.035;
+      torsoRef.current.rotation.x = joints.spine?.[0] || 0;
+      torsoRef.current.rotation.y = joints.spine?.[1] || 0;
+      torsoRef.current.rotation.z = joints.spine?.[2] || 0;
     }
     if (headRef.current) {
-      headRef.current.rotation.x = state.headSway.x;
-      headRef.current.rotation.y = state.headSway.y * 0.55;
+      headRef.current.rotation.x = state.headSway.x + (joints.head?.[0] || 0);
+      headRef.current.rotation.y = state.headSway.y * 0.55 + (joints.head?.[1] || 0);
+      headRef.current.rotation.z = joints.head?.[2] || 0;
       headRef.current.position.y = state.mouth * 0.025;
+    }
+    if (leftUpperArmRef.current) {
+      leftUpperArmRef.current.rotation.set(
+        -0.18 + (joints.leftUpperArm?.[0] || 0),
+        joints.leftUpperArm?.[1] || 0,
+        0.36 + (joints.leftUpperArm?.[2] || 0)
+      );
+    }
+    if (rightUpperArmRef.current) {
+      rightUpperArmRef.current.rotation.set(
+        -0.18 + (joints.rightUpperArm?.[0] || 0),
+        joints.rightUpperArm?.[1] || 0,
+        -0.36 + (joints.rightUpperArm?.[2] || 0)
+      );
+    }
+    if (leftLowerArmRef.current) {
+      leftLowerArmRef.current.rotation.set(
+        -0.1 + (joints.leftLowerArm?.[0] || 0),
+        joints.leftLowerArm?.[1] || 0,
+        joints.leftLowerArm?.[2] || 0
+      );
+    }
+    if (rightLowerArmRef.current) {
+      rightLowerArmRef.current.rotation.set(
+        -0.1 + (joints.rightLowerArm?.[0] || 0),
+        joints.rightLowerArm?.[1] || 0,
+        joints.rightLowerArm?.[2] || 0
+      );
+    }
+    if (leftUpperLegRef.current) {
+      leftUpperLegRef.current.rotation.x = joints.leftUpperLeg?.[0] || 0;
+    }
+    if (rightUpperLegRef.current) {
+      rightUpperLegRef.current.rotation.x = joints.rightUpperLeg?.[0] || 0;
     }
     if (jawRef.current) {
       jawRef.current.position.y = -state.mouth * 0.18;
@@ -239,6 +302,42 @@ function ProceduralRig({
           <cylinderGeometry args={[0.28, 0.34, 0.42, 24]} />
           <meshStandardMaterial color="#b97857" roughness={0.62} />
         </mesh>
+        <group ref={leftUpperArmRef} position={[-0.78, 1.75, 0.08]}>
+          <mesh position={[0, -0.46, 0]} rotation={[0, 0, 0.08]}>
+            <capsuleGeometry args={[0.105, 0.62, 8, 16]} />
+            <meshStandardMaterial color="#b97857" roughness={0.62} />
+          </mesh>
+          <group ref={leftLowerArmRef} position={[0, -0.86, 0]}>
+            <mesh position={[0, -0.36, 0]}>
+              <capsuleGeometry args={[0.09, 0.52, 8, 16]} />
+              <meshStandardMaterial color="#b97857" roughness={0.62} />
+            </mesh>
+          </group>
+        </group>
+        <group ref={rightUpperArmRef} position={[0.78, 1.75, 0.08]}>
+          <mesh position={[0, -0.46, 0]} rotation={[0, 0, -0.08]}>
+            <capsuleGeometry args={[0.105, 0.62, 8, 16]} />
+            <meshStandardMaterial color="#b97857" roughness={0.62} />
+          </mesh>
+          <group ref={rightLowerArmRef} position={[0, -0.86, 0]}>
+            <mesh position={[0, -0.36, 0]}>
+              <capsuleGeometry args={[0.09, 0.52, 8, 16]} />
+              <meshStandardMaterial color="#b97857" roughness={0.62} />
+            </mesh>
+          </group>
+        </group>
+        <group ref={leftUpperLegRef} position={[-0.31, 0.62, 0]}>
+          <mesh position={[0, -0.45, 0]}>
+            <capsuleGeometry args={[0.14, 0.72, 8, 16]} />
+            <meshStandardMaterial color="#26385a" roughness={0.72} />
+          </mesh>
+        </group>
+        <group ref={rightUpperLegRef} position={[0.31, 0.62, 0]}>
+          <mesh position={[0, -0.45, 0]}>
+            <capsuleGeometry args={[0.14, 0.72, 8, 16]} />
+            <meshStandardMaterial color="#26385a" roughness={0.72} />
+          </mesh>
+        </group>
       </group>
 
       <group ref={headRef}>
@@ -320,6 +419,7 @@ function LoadedVrmRig({
   isActiveSpeaker,
   playbackMatchesAgent,
   track,
+  bodyMotionPlan,
   phase,
 }) {
   const gltf = useLoader(GLTFLoader, vrmUrl, (loader) => {
@@ -344,9 +444,13 @@ function LoadedVrmRig({
       isActiveSpeaker,
       playbackMatchesAgent,
       track,
+      bodyMotionPlan,
       phase,
       clock,
     });
+    const motion = state.bodyMotion || {};
+    const rootMotion = motion.root || { position: [0, 0, 0], rotation: [0, 0, 0] };
+    const joints = motion.joints || {};
     const manager = vrm.expressionManager;
     if (manager) {
       for (const name of VRM_VISEMES) {
@@ -356,11 +460,31 @@ function LoadedVrmRig({
     }
     const head = vrm.humanoid?.getNormalizedBoneNode?.('head');
     if (head) {
-      head.rotation.x = state.headSway.x;
-      head.rotation.y = state.headSway.y;
-      head.rotation.z = state.headSway.z;
+      head.rotation.x = state.headSway.x + (joints.head?.[0] || 0);
+      head.rotation.y = state.headSway.y + (joints.head?.[1] || 0);
+      head.rotation.z = state.headSway.z + (joints.head?.[2] || 0);
     }
-    vrm.scene.position.y = -1.35 + (state.breath - 0.5) * 0.12;
+    for (const [boneName, rotation] of Object.entries({
+      spine: joints.spine,
+      chest: joints.chest,
+      leftUpperArm: joints.leftUpperArm,
+      leftLowerArm: joints.leftLowerArm,
+      rightUpperArm: joints.rightUpperArm,
+      rightLowerArm: joints.rightLowerArm,
+      leftUpperLeg: joints.leftUpperLeg,
+      rightUpperLeg: joints.rightUpperLeg,
+    })) {
+      const bone = vrm.humanoid?.getNormalizedBoneNode?.(boneName);
+      if (bone && rotation) {
+        bone.rotation.x = rotation[0] || 0;
+        bone.rotation.y = rotation[1] || 0;
+        bone.rotation.z = rotation[2] || 0;
+      }
+    }
+    vrm.scene.position.x = rootMotion.position?.[0] || 0;
+    vrm.scene.position.y = -1.35 + (rootMotion.position?.[1] || 0) + (state.breath - 0.5) * 0.12;
+    vrm.scene.position.z = rootMotion.position?.[2] || 0;
+    vrm.scene.rotation.y = rootMotion.rotation?.[1] || 0;
     vrm.update(delta);
   });
 
@@ -391,6 +515,27 @@ export function ControlledAvatar({
     () => buildAlphabetVisemeTrack(voicePlayback?.line || '', voicePlayback?.durationSeconds || 0),
     [voicePlayback?.durationSeconds, voicePlayback?.line, voicePlayback?.utteranceId]
   );
+  const bodyMotionPlan = useMemo(
+    () => resolveBodyMotionPlan(
+      avatarState?.body_motion || avatarState?.plan?.body_motion || {},
+      {
+        agentId: agent?.soul_id || agent?.current_name || '',
+        line: voicePlayback?.line || '',
+        durationSeconds: voicePlayback?.durationSeconds || 0,
+        speaking: isActiveSpeaker,
+      }
+    ),
+    [
+      avatarState?.body_motion,
+      avatarState?.plan?.body_motion,
+      agent?.current_name,
+      agent?.soul_id,
+      isActiveSpeaker,
+      voicePlayback?.durationSeconds,
+      voicePlayback?.line,
+      voicePlayback?.utteranceId,
+    ]
+  );
   const kind = vrmUrl ? 'vrm-rig' : 'procedural-rig';
   const status = vrmUrl ? 'vrm-speech-controlled' : 'procedural-speech-controlled';
   const fallbackRig = (
@@ -402,6 +547,7 @@ export function ControlledAvatar({
       playbackMatchesAgent={playbackMatchesAgent}
       color={color}
       track={track}
+      bodyMotionPlan={bodyMotionPlan}
       phase={phase}
     />
   );
@@ -414,6 +560,7 @@ export function ControlledAvatar({
         isActiveSpeaker={isActiveSpeaker}
         playbackMatchesAgent={playbackMatchesAgent}
         voicePlayback={voicePlayback}
+        bodyMotionPlan={bodyMotionPlan}
       />
       {vrmUrl ? (
         <RigErrorBoundary fallback={fallbackRig}>
@@ -426,6 +573,7 @@ export function ControlledAvatar({
               isActiveSpeaker={isActiveSpeaker}
               playbackMatchesAgent={playbackMatchesAgent}
               track={track}
+              bodyMotionPlan={bodyMotionPlan}
               phase={phase}
             />
           </Suspense>

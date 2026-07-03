@@ -60,6 +60,9 @@ def test_avatar_state_layers_from_snapshot():
         "eye_focus_y",
     }
     assert state["plan"]["life"] == state["life"]
+    assert state["body_motion"]["source"] == "ai4animationpy-contract"
+    assert state["body_motion"]["target_runtime"] == "ai4animationpy"
+    assert state["plan"]["body_motion"] == state["body_motion"]
 
 
 def test_avatar_surface_compose_is_stable():
@@ -69,6 +72,35 @@ def test_avatar_surface_compose_is_stable():
     assert state.enabled is True
     assert state.plan.speaker == "Beta"
     assert 0.0 <= state.life["breathing_phase"] <= 1.0
+    assert state.body_motion["source"] == "ai4animationpy-contract"
+    assert state.body_motion["status"] == "idle"
+    assert any(command.get("name") == "idle_shift" for command in state.body_motion["commands"])
+
+
+def test_avatar_surface_body_motion_tracks_speaking_alphabet():
+    snapshot = _snapshot()
+    snapshot["last_dialogue_turn"] = {
+        "sender_name": "Beta",
+        "content": "A B C D E F G H I J K L M N O P Q R S T U V W X Y Z.",
+    }
+    snapshot["voice"] = {
+        "plan": {
+            "speaker": "Beta",
+            "utterance_id": "alphabet-1",
+            "line": "A B C D E F G H I J K L M N O P Q R S T U V W X Y Z.",
+        },
+        "synthesis": {"ok": True, "duration_seconds": 6.0},
+    }
+
+    state = AvatarSurface(enabled=True, dry_run=True).compose(snapshot)
+
+    assert state.speaking is True
+    assert state.body_motion["source"] == "ai4animationpy-contract"
+    assert state.body_motion["status"] == "ready"
+    assert any(command["type"] == "walk_to" for command in state.body_motion["commands"])
+    assert any(
+        command.get("name") == "counting_left_hand" for command in state.body_motion["commands"]
+    )
 
 
 def test_avatar_surface_does_not_use_voice_model_as_visual_fallback(monkeypatch):

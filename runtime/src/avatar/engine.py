@@ -20,12 +20,14 @@ except ImportError:  # pragma: no cover - flat test path
     from banter.types import Beat, PairState, SceneContextData
 
 try:  # pragma: no cover - runtime package import path
+    from .body_motion import build_alphabet_body_motion_plan
     from .life_signals import LifeSignals
     from .live_embodiment import LiveEmbodimentClient
     from .scene_composer import SceneComposer
     from .state import AvatarPlan, AvatarState
     from .visual_reactor import VisualReactor
 except ImportError:  # pragma: no cover - flat test path
+    from avatar.body_motion import build_alphabet_body_motion_plan
     from avatar.life_signals import LifeSignals
     from avatar.live_embodiment import LiveEmbodimentClient
     from avatar.scene_composer import SceneComposer
@@ -413,6 +415,12 @@ class AvatarSurface:
             else {}
         )
         video_manifest = {"live_video": live_video_asset} if live_video_asset else {}
+        body_motion = build_alphabet_body_motion_plan(
+            agent_id=agent_id,
+            line=str(voice_plan.get("line") or last_turn.get("content") or ""),
+            duration_seconds=voice_synthesis.get("duration_seconds"),
+            speaking=speaking,
+        ).to_dict()
         visual_state["speaking"] = speaking
         visual_state["mouth_open"] = mouth_open
         visual_state["life"] = life_payload
@@ -436,6 +444,7 @@ class AvatarSurface:
             presentation_mode=presentation_mode,
             rigged_avatar_cid=rigged_avatar_cid,
             vrm_avatar_url=vrm_avatar_url,
+            body_motion=body_motion,
             video_manifest=video_manifest,
             live_embodiment=live_embodiment,
             notes=tuple(
@@ -472,6 +481,7 @@ class AvatarSurface:
             presentation_mode=presentation_mode,
             rigged_avatar_cid=rigged_avatar_cid,
             vrm_avatar_url=vrm_avatar_url,
+            body_motion=body_motion,
             video_manifest=video_manifest,
             live_embodiment=live_embodiment,
         )
