@@ -66,6 +66,61 @@ The upstream code paths that matter most for our sidecar are:
 
 Important constraint: AI4AnimationPy is source-available under CC BY-NC 4.0, not a permissive production dependency. This branch can evaluate it, learn from it, and run non-commercial proof harnesses. A production merge that vendors or depends on it requires either a licensing decision, an isolated optional research profile, or a replacement with a permissive runtime that satisfies the same GOD pose-stream contract.
 
+## Upstream Feature Status
+
+The upstream README feature matrix matters because several tempting capabilities are not implemented yet. Treat these as verified upstream status, not GOD assumptions:
+
+| Feature | Upstream status | GOD interpretation |
+| --- | --- | --- |
+| Entity-Component-System | Present | Good fit for agent action components and sidecar lifecycle. |
+| Update loop (`Update` / `Draw` / `GUI`) | Present | Useful in harnesses; GOD production should prefer headless/manual output over a standalone renderer loop. |
+| Math library | Present | Valuable for FK, quaternions, axis-angle, matrices, mirroring, and pose normalization. |
+| Neural networks | Present | MLP, Autoencoder, and Codebook Matching are useful for research/runtime inference experiments. |
+| Real-time renderer | Present | Useful for local visual inspection, but GOD should keep browser/OBS as the live renderer. |
+| Skinned mesh rendering | Present | Useful for harness proof and rig inspection, not required in the browser speaking path. |
+| Inverse kinematics | Present | FABRIK should be evaluated for foot locking, pointing, reaching, and gesture correction. |
+| Animation modules | Present | Joint contacts plus root/joint trajectory modules map directly to GOD's pose-stream fields. |
+| Camera system | Present | Useful for local demo recording; not part of the runtime sidecar contract. |
+| Motion import | Present | GLB, FBX, BVH import is the first real implementation target. |
+| Execution modes | Present | Standalone, Headless, and Manual support make a server-side evaluation harness plausible. |
+| Physics simulation | Planned | Do not design live collision/rigid-body behavior around AI4AnimationPy yet. |
+| Path planning and spline tooling | Planned | GOD must supply path/stage planning for now. |
+| Audio support | Planned | AI4AnimationPy does not solve speech, TTS, or lip audio. Fish/live audio remains separate. |
+
+## Motion Import And Datasets
+
+AI4AnimationPy's motion import is the most practical bridge into GOD. The upstream README documents:
+
+```python
+from ai4animation import Motion
+
+motion = Motion.LoadFromGLB("character.glb")
+motion = Motion.LoadFromFBX("character.fbx")
+motion = Motion.LoadFromBVH("character.bvh", scale=0.01)
+motion.SaveToNPZ("character")
+```
+
+It also documents the internal `.npz` motion format as 3D positions and 4D quaternions for each skeleton joint per frame, plus a batch conversion CLI:
+
+```bash
+convert --input_dir path/to/motions --output_dir path/to/output
+```
+
+Public dataset leads from upstream:
+
+| Dataset | Character | Formats |
+| --- | --- | --- |
+| Cranberry | Cranberry | FBX, GLB |
+| 100Style retargeted | Geno | BVH, FBX |
+| LaFan | Ubisoft LaFan | BVH |
+| LaFan resolved | Geno | BVH, FBX |
+| ZeroEggs retargeted | Geno | BVH, FBX |
+| Motorica retargeted | Geno | BVH, FBX |
+| NSM | Anubis | BVH |
+| MANN | Dog | BVH |
+
+Implementation implication: start with a tiny BVH/NPZ clip because it gives us deterministic root/joint samples without needing the standalone renderer, physics, path planning, or audio.
+
 ## Current Code Leverage
 
 The current repo already has the live speech and renderer surface this track should reuse:
@@ -86,6 +141,7 @@ The current repo already has the live speech and renderer surface this track sho
 - Root and joint trajectory modules for walking, pacing, dancing, and stage blocking.
 - Dataset/module structure for cataloging reusable gesture clips and guidance templates.
 - `FeedTensor`/`ReadTensor` inference boundary for swapping deterministic commands with learned pose prediction behind the same output schema.
+- Optional renderer/skinned-mesh/camera stack for local diagnostics and proof recording, while production remains browser-rendered.
 
 ## Sidecar Design Lessons From The Tutorials
 
