@@ -235,9 +235,21 @@ This branch now includes the first non-heavy implementation slice:
 
 This does not claim AI4AnimationPy model inference yet. It creates the stable command/pose boundary and visible live proof path that the real sidecar must satisfy.
 
+This branch now also includes the optional motion-export evaluation slice:
+
+- `runtime/src/avatar/pose_stream.py` defines GOD's neutral pose-stream schema and validation.
+- `scripts/eval-ai4animationpy-motion.py` loads an AI4AnimationPy-style NPZ export and emits summary, JSON, or NDJSON.
+- The loader accepts common aliases such as `rotations`, `positions`, and `times`, while preserving the canonical GOD fields.
+- The validator rejects non-monotonic timestamps, non-finite transforms, zero quaternions, missing joints, malformed contacts, and out-of-stage root movement.
+- The fallback NPZ reader supports CI/runtime environments without NumPy, so the harness does not add AI4AnimationPy, PyTorch, renderer, or model dependencies to `/one`.
+- The stream metadata carries `license_profile: optional-research-noncommercial` to make the CC BY-NC 4.0 boundary visible in generated proof artifacts.
+
+This still does not make AI4AnimationPy production-ready. It proves that a motion import or sidecar output can be checked against GOD's contract before any browser/runtime integration.
+
 ## Validation
 
 - Unit test command validation and pose-stream normalization.
+- Unit test NPZ motion import, alias normalization, NDJSON export, and the CLI summary path.
 - Local browser proof must show visible non-mouth body motion.
 - Proof artifacts must include screenshot and video.
 - No generated/prerecorded avatar video may drive the speaking result.
