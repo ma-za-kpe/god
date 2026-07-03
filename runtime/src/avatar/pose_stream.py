@@ -271,7 +271,9 @@ def normalize_pose_stream_frame(raw: dict[str, Any] | None) -> PoseStreamFrame:
         for index, (name, value) in enumerate(contacts_raw.items())
     }
 
-    gesture_label = _safe_name(raw.get("gesture_label") or "motion_import", fallback="motion_import")
+    gesture_label = _safe_name(
+        raw.get("gesture_label") or "motion_import", fallback="motion_import"
+    )
     return PoseStreamFrame(
         timestamp_ms=timestamp_ms,
         root_position=root_position,
@@ -466,7 +468,9 @@ def _reshape(values: list[Any], shape: tuple[int, ...]) -> Any:
     if len(shape) == 1:
         return values[: shape[0]]
     step = math.prod(shape[1:])
-    return [_reshape(values[index : index + step], shape[1:]) for index in range(0, len(values), step)]
+    return [
+        _reshape(values[index : index + step], shape[1:]) for index in range(0, len(values), step)
+    ]
 
 
 def _first_present(arrays: dict[str, Any], keys: tuple[str, ...]) -> Any:
@@ -500,7 +504,9 @@ def _resolve_root_positions(arrays: dict[str, Any], *, total_frames: int) -> lis
         values = _as_nested_list(root_positions)
     else:
         positions = _first_present(arrays, _POSITION_KEYS)
-        values = [frame[0] for frame in _as_nested_list(positions)] if positions is not None else None
+        values = (
+            [frame[0] for frame in _as_nested_list(positions)] if positions is not None else None
+        )
     if values is None:
         values = [[0.0, 0.0, 0.0] for _ in range(total_frames)]
     if len(values) != total_frames:
@@ -512,7 +518,11 @@ def _resolve_root_rotations(
     arrays: dict[str, Any], joint_rotations: list[Any], *, total_frames: int
 ) -> list[Any]:
     root_rotations = _first_present(arrays, _ROOT_ROTATION_KEYS)
-    values = _as_nested_list(root_rotations) if root_rotations is not None else [frame[0] for frame in joint_rotations]
+    values = (
+        _as_nested_list(root_rotations)
+        if root_rotations is not None
+        else [frame[0] for frame in joint_rotations]
+    )
     if len(values) != total_frames:
         raise ValueError("pose_stream_root_rotations_must_match_frames")
     return values
@@ -531,7 +541,10 @@ def _resolve_gesture_labels(arrays: dict[str, Any], *, total_frames: int) -> lis
 
 
 def _names_for_count(raw_names: Any, count: int, prefix: str) -> list[str]:
-    names = [_safe_name(name, fallback=f"{prefix}_{index}") for index, name in enumerate(_as_sequence(raw_names))]
+    names = [
+        _safe_name(name, fallback=f"{prefix}_{index}")
+        for index, name in enumerate(_as_sequence(raw_names))
+    ]
     if not names:
         names = [f"{prefix}_{index}" for index in range(count)]
     if len(names) != count:

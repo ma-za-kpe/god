@@ -126,7 +126,9 @@ def test_load_npz_pose_stream_rejects_oversized_member_count(tmp_path: Path):
 def test_load_npz_pose_stream_rejects_duplicate_members(tmp_path: Path):
     motion_path = tmp_path / "duplicate_members.npz"
     with zipfile.ZipFile(motion_path, "w") as archive:
-        archive.writestr("joint_rotations.npy", _npy_bytes([0, 0, 0, 1], shape=(1, 1, 4), descr="<f8"))
+        archive.writestr(
+            "joint_rotations.npy", _npy_bytes([0, 0, 0, 1], shape=(1, 1, 4), descr="<f8")
+        )
         with pytest.warns(UserWarning, match="Duplicate name"):
             archive.writestr(
                 "joint_rotations.npy",
