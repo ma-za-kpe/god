@@ -27,6 +27,45 @@ Primary references:
 - https://github.com/facebookresearch/ai4animationpy
 - https://facebookresearch.github.io/ai4animationpy/
 
+## Tutorial And Demo Inventory
+
+Official tutorial pages reviewed:
+
+- Demo Programs: https://facebookresearch.github.io/ai4animationpy/tutorials/demos/
+- Custom Component: https://facebookresearch.github.io/ai4animationpy/tutorials/custom-component/
+- Custom Module: https://facebookresearch.github.io/ai4animationpy/tutorials/custom-module/
+- Training a Network: https://facebookresearch.github.io/ai4animationpy/tutorials/training-network/
+
+The demo index and repo tree map into these GOD-relevant slices:
+
+| Upstream tutorial/demo | What it proves | GOD use |
+| --- | --- | --- |
+| `Empty` | Minimal `Program` bootstrap. | Harness smoke test with no rendering assumptions. |
+| `ECS` | Entity hierarchy, parent-child transforms, custom `Component` lifecycle. | Agent action components for stage blocking, idle behavior, reactive gestures. |
+| `Actor` | GLB character loading and `Actor.SyncFromScene()`. | Rig-loading adapter for a GOD avatar body. |
+| `MotionImport/GLB` | `Motion.LoadFromGLB(...)` then `Actor.SetTransforms(...)`. | Convert authored GLB animation clips into our neutral pose stream. |
+| `MotionImport/FBX` | `Motion.LoadFromFBX(...)`, `RootModule`, per-frame transforms. | Import larger mocap/action libraries for gestures and motion primitives. |
+| `MotionImport/BVH` | `Motion.LoadFromBVH(..., scale=0.01)`, optional NPZ conversion. | BVH is the fastest evaluation path because the demo ships a BVH sample and calls `GetBoneTransformations`. |
+| `MotionEditor` | `Dataset`, `RootModule`, `MotionModule`, `ContactModule`, `GuidanceModule`, `MirrorModule`. | Offline motion browser for picking walk, idle, emphasis, and dance primitives. |
+| `InverseKinematics` | `FABRIK` over actor bone chains, target entity, `Actor.SyncToScene(...)`. | Reaching, pointing, foot locking, hand-on-podium, and body reactions. |
+| `Locomotion/Biped` | Neural locomotion with `Network.pt`, `PostProcessor.pt`, `FeedTensor`, `ReadTensor`, `TimeSeries`, guidance templates, contacts, and leg IK. | The closest match for full-body live world movement, but it currently assumes keyboard/gamepad control and standalone rendering. |
+| `Locomotion/Quadruped` | Similar inference loop with gait/action guidance and contact-aware IK. | Not for humanoid `/one`, but useful as proof that guidance/action states can control style and gait. |
+| `AI/ToyExample` | Minimal PyTorch training loop. | CI-safe training smoke only, not avatar runtime. |
+| `AI/Autoencoder` | Motion-feature autoencoder training. | Later compression/embedding of motion clips, not a live dependency. |
+| `AI/SequencePrediction` | `DataSampler`, `FeedTensor`, future root/motion prediction, `ReadTensor` output decoding. | Template for predicting short future pose windows from current actor state. |
+| `AI/MotionGrounding` | Learns pose from smoothed trajectory windows and reconstructs bone transforms. | Candidate for grounding LLM intent/trajectory into a full-body pose. |
+
+The upstream code paths that matter most for our sidecar are:
+
+- `Actor.SetTransforms(...)`, `Actor.SetPositions(...)`, `Actor.SetRotations(...)`, and `Actor.SyncToScene(...)` for writing sampled poses.
+- `Motion.GetBoneTransformations(...)`, `Motion.GetBonePositions(...)`, and `Motion.GetBoneVelocities(...)` for turning BVH/FBX/GLB/NPZ clips into our pose stream.
+- `RootModule.Series` and `MotionModule.Series` for splitting trajectory/root motion from per-bone motion.
+- `GuidanceModule.Guidance` for style/action templates such as idle, big steps, zombie, star, walk, trot, and sit.
+- `FeedTensor` and `ReadTensor` for the neural inference boundary: structured features in, root/joint predictions out.
+- `FABRIK` and the demo `LegIK` wrappers for foot/hand contact correction.
+
+Important constraint: AI4AnimationPy is source-available under CC BY-NC 4.0, not a permissive production dependency. This branch can evaluate it, learn from it, and run non-commercial proof harnesses. A production merge that vendors or depends on it requires either a licensing decision, an isolated optional research profile, or a replacement with a permissive runtime that satisfies the same GOD pose-stream contract.
+
 ## Current Code Leverage
 
 The current repo already has the live speech and renderer surface this track should reuse:
@@ -45,6 +84,25 @@ The current repo already has the live speech and renderer surface this track sho
 - Inverse kinematics for pointing, reaching, foot placement, and body reactions.
 - GLB/FBX/BVH import and internal joint quaternion data for normalizing authored or captured motion.
 - Root and joint trajectory modules for walking, pacing, dancing, and stage blocking.
+- Dataset/module structure for cataloging reusable gesture clips and guidance templates.
+- `FeedTensor`/`ReadTensor` inference boundary for swapping deterministic commands with learned pose prediction behind the same output schema.
+
+## Sidecar Design Lessons From The Tutorials
+
+The sidecar should not start by running the full biped demo unchanged. That demo is valuable, but it is a standalone interactive program with keyboard/gamepad input, bundled model files, guidance templates, and an internal `Sequence` object. GOD needs a narrower server contract:
+
+1. Import or load one tiny BVH/NPZ motion clip and prove deterministic pose extraction.
+2. Normalize each frame into the existing GOD schema: timestamp, root transform, joint rotations, contacts, gesture label.
+3. Expose a headless/manual evaluation entrypoint that can be called by tests without opening a renderer.
+4. Add a biped adapter only after the import path works. Its first input should be a programmatic velocity/facing/guidance vector, not raylib keyboard state.
+5. Keep AI4AnimationPy output as data. The browser remains the live renderer and Fish/audio remains the live speech source.
+
+This means the next real #155 code should be an evaluation harness, not a larger React change:
+
+- `scripts/eval-ai4animationpy-motion.py` or equivalent optional tool.
+- Inputs: demo BVH/NPZ path, bone map, command plan.
+- Outputs: JSON/NDJSON pose stream plus a short diagnostic summary.
+- Tests: schema validation, monotonic timestamps, finite transforms, bounded root movement, non-empty contacts when available, and license-gated optional execution.
 
 ## Unique Use Case
 
@@ -101,10 +159,12 @@ The implementation should keep command validation deterministic and reject unkno
 2. Wire the observer to consume the contract through a deterministic sampler.
 3. Apply the sampled root and joint motion to the procedural rig and VRM rig path.
 4. Add an AI4AnimationPy evaluation harness outside the blocking `/one` route.
-5. Load a tiny test motion asset and prove deterministic pose-stream export.
-6. Replace the deterministic sampler with sidecar output behind the same contract.
-7. Add a `/one?runtime=ai4animationpy` or equivalent local proof path only after the sidecar stream is stable.
-8. Run the alphabet proof with screenshots and video.
+5. Start with the BVH import demo path because it is the smallest source-backed pose export surface.
+6. Load a tiny test motion asset and prove deterministic pose-stream export without launching the standalone renderer.
+7. Add a biped locomotion adapter by replacing raylib keyboard/gamepad input with GOD command vectors: velocity, facing, guidance style, and action.
+8. Replace the deterministic sampler with sidecar output behind the same contract.
+9. Add a `/one?runtime=ai4animationpy` or equivalent local proof path only after the sidecar stream is stable.
+10. Run the alphabet proof with screenshots and video.
 
 ## Implemented Slice
 
@@ -130,3 +190,10 @@ This does not claim AI4AnimationPy model inference yet. It creates the stable co
 ## Merge Gate
 
 Merge only if the branch proves a real-time controllable motion sidecar and does not weaken the live speaking goal. If another track supplies the face/lip layer, this track may still merge later as the body-motion layer rather than the primary avatar runtime.
+
+Because upstream is CC BY-NC 4.0, a production merge must not silently make AI4AnimationPy a mandatory dependency. Acceptable merge shapes are:
+
+- optional non-commercial research profile;
+- sidecar contract and tests only, with no vendored upstream code/models;
+- separate licensing approval;
+- or a permissive reimplementation/replacement that honors the same pose-stream contract.
