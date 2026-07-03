@@ -1,4 +1,5 @@
 export const BODY_MOTION_SOURCE = 'ai4animationpy-contract';
+export const POSE_STREAM_SOURCE = 'ai4animationpy-eval';
 
 const ALLOWED_COMMANDS = new Set(['idle', 'look_at', 'walk_to', 'turn_to', 'gesture', 'dance']);
 const ALLOWED_GESTURES = new Set([
@@ -7,6 +8,22 @@ const ALLOWED_GESTURES = new Set([
   'emphasis_right_hand',
   'alphabet_sweep',
   'idle_shift',
+]);
+const AI4ANIMATIONPY_JOINT_MAP = new Map([
+  ['spine', 'spine'],
+  ['spine1', 'chest'],
+  ['spine2', 'chest'],
+  ['spine3', 'chest'],
+  ['neck', 'neck'],
+  ['head', 'head'],
+  ['leftarm', 'leftUpperArm'],
+  ['leftforearm', 'leftLowerArm'],
+  ['rightarm', 'rightUpperArm'],
+  ['rightforearm', 'rightLowerArm'],
+  ['leftupleg', 'leftUpperLeg'],
+  ['leftleg', 'leftLowerLeg'],
+  ['rightupleg', 'rightUpperLeg'],
+  ['rightleg', 'rightLowerLeg'],
 ]);
 
 function clamp(value, lower, upper) {
@@ -34,7 +51,9 @@ function emptyJoints() {
     rightUpperArm: [0, 0, 0],
     rightLowerArm: [0, 0, 0],
     leftUpperLeg: [0, 0, 0],
+    leftLowerLeg: [0, 0, 0],
     rightUpperLeg: [0, 0, 0],
+    rightLowerLeg: [0, 0, 0],
   };
 }
 
@@ -45,6 +64,185 @@ function addRotation(target, name, rotation, weight = 1) {
     current[1] + rotation[1] * weight,
     current[2] + rotation[2] * weight,
   ];
+}
+
+function vector3(value, fallback = [0, 0, 0]) {
+  if (!Array.isArray(value) || value.length !== 3) return [...fallback];
+  const parsed = value.map((item, index) => number(item, fallback[index] || 0));
+  return parsed.every((item) => Number.isFinite(item)) ? parsed : [...fallback];
+}
+
+function normalizeQuaternion(value) {
+  if (!Array.isArray(value) || value.length !== 4) return null;
+  const parsed = value.map((item) => number(item, Number.NaN));
+  if (!parsed.every((item) => Number.isFinite(item))) return null;
+  const length = Math.hypot(parsed[0], parsed[1], parsed[2], parsed[3]);
+  if (length <= 0.000001) return null;
+  return parsed.map((item) => item / length);
+}
+
+function lerp(left, right, alpha) {
+  return left + (right - left) * clamp(alpha, 0, 1);
+}
+
+function lerpVector3(left, right, alpha) {
+  return [
+    lerp(left[0], right[0], alpha),
+    lerp(left[1], right[1], alpha),
+    lerp(left[2], right[2], alpha),
+  ];
+}
+
+function lerpQuaternion(left, right, alpha) {
+  let target = right;
+  const dot = left[0] * right[0] + left[1] * right[1] + left[2] * right[2] + left[3] * right[3];
+  if (dot < 0) target = right.map((item) => -item);
+  return normalizeQuaternion([
+    lerp(left[0], target[0], alpha),
+    lerp(left[1], target[1], alpha),
+    lerp(left[2], target[2], alpha),
+    lerp(left[3], target[3], alpha),
+  ]) || [0, 0, 0, 1];
+}
+
+function quaternionToEuler(quaternion) {
+  const [x, y, z, w] = quaternion;
+  const sinrCosp = 2 * (w * x + y * z);
+  const cosrCosp = 1 - 2 * (x * x + y * y);
+  const roll = Math.atan2(sinrCosp, cosrCosp);
+
+  const sinp = 2 * (w * y - z * x);
+  const pitch = Math.abs(sinp) >= 1 ? Math.sign(sinp) * Math.PI / 2 : Math.asin(sinp);
+
+  const sinyCosp = 2 * (w * z + x * y);
+  const cosyCosp = 1 - 2 * (y * y + z * z);
+  const yaw = Math.atan2(sinyCosp, cosyCosp);
+  return [roll, pitch, yaw];
+}
+
+function clampEuler(rotation, limit = 1.45) {
+  return rotation.map((item) => clamp(number(item), -limit, limit));
+}
+
+function mappedJointName(name) {
+  return AI4ANIMATIONPY_JOINT_MAP.get(String(name || '').replace(/[^a-zA-Z0-9]/g, '').toLowerCase());
+}
+
+function normalizePoseFrame(raw = {}) {
+  if (!raw || typeof raw !== 'object') return null;
+  const timestampMs = Math.max(0, Math.round(number(raw.timestamp_ms ?? raw.timestampMs, Number.NaN)));
+  if (!Number.isFinite(timestampMs)) return null;
+  const rootRotation = normalizeQuaternion(raw.root_rotation ?? raw.rootRotation) || [0, 0, 0, 1];
+  const jointRotationsRaw = raw.joint_rotations ?? raw.jointRotations;
+  if (!jointRotationsRaw || typeof jointRotationsRaw !== 'object') return null;
+  const jointRotations = {};
+  for (const [name, rotation] of Object.entries(jointRotationsRaw)) {
+    const quaternion = normalizeQuaternion(rotation);
+    if (quaternion) jointRotations[name] = quaternion;
+  }
+  if (!Object.keys(jointRotations).length) return null;
+  const contactsRaw = raw.contacts && typeof raw.contacts === 'object' ? raw.contacts : {};
+  return {
+    timestampMs,
+    rootPosition: vector3(raw.root_position ?? raw.rootPosition),
+    rootRotation,
+    jointRotations,
+    contacts: Object.fromEntries(Object.entries(contactsRaw).map(([name, value]) => [name, Boolean(value)])),
+    gestureLabel: String(raw.gesture_label || raw.gestureLabel || 'motion_import'),
+  };
+}
+
+function isNormalizedPoseStream(stream) {
+  return Boolean(
+    stream &&
+    typeof stream === 'object' &&
+    Array.isArray(stream.frames) &&
+    Array.isArray(stream.rootOrigin) &&
+    stream.frames.every((frame, index) => (
+      frame &&
+      Number.isFinite(frame.timestampMs) &&
+      Array.isArray(frame.rootPosition) &&
+      Array.isArray(frame.rootRotation) &&
+      frame.jointRotations &&
+      typeof frame.jointRotations === 'object' &&
+      (index === 0 || frame.timestampMs > stream.frames[index - 1].timestampMs)
+    ))
+  );
+}
+
+export function normalizePoseStream(raw = {}) {
+  const stream = raw && typeof raw === 'object' ? raw : {};
+  if (isNormalizedPoseStream(stream)) return stream;
+  const frames = Array.isArray(stream.frames)
+    ? stream.frames.map((frame) => normalizePoseFrame(frame)).filter(Boolean)
+    : [];
+  if (!frames.length) return null;
+  const monotonic = frames.every((frame, index) => index === 0 || frame.timestampMs > frames[index - 1].timestampMs);
+  if (!monotonic) return null;
+  const durationSeconds = Math.max(
+    number(stream.duration_seconds ?? stream.durationSeconds, 0),
+    frames[frames.length - 1].timestampMs / 1000
+  );
+  return {
+    schemaVersion: Number(stream.schema_version || stream.schemaVersion || 1),
+    source: String(stream.source || POSE_STREAM_SOURCE),
+    provider: String(stream.provider || 'external-pose-stream'),
+    targetRuntime: String(stream.target_runtime || stream.targetRuntime || 'ai4animationpy'),
+    durationSeconds: clamp(durationSeconds || 1, 0.1, 120),
+    rootOrigin: frames[0].rootPosition,
+    frames,
+  };
+}
+
+function poseFramePair(stream, elapsedSeconds) {
+  const durationMs = Math.max(1, Math.round(stream.durationSeconds * 1000));
+  const tMs = clamp(Math.round(number(elapsedSeconds, 0) * 1000), 0, durationMs);
+  let lower = stream.frames[0];
+  let upper = stream.frames[stream.frames.length - 1];
+  for (let index = 0; index < stream.frames.length; index += 1) {
+    const current = stream.frames[index];
+    if (current.timestampMs <= tMs) lower = current;
+    if (current.timestampMs >= tMs) {
+      upper = current;
+      break;
+    }
+  }
+  const span = Math.max(1, upper.timestampMs - lower.timestampMs);
+  return { lower, upper, alpha: clamp((tMs - lower.timestampMs) / span, 0, 1), timestampMs: tMs };
+}
+
+export function samplePoseStream(stream, elapsedSeconds = 0) {
+  const normalized = normalizePoseStream(stream);
+  if (!normalized) return null;
+  const { lower, upper, alpha, timestampMs } = poseFramePair(normalized, elapsedSeconds);
+  const rootPosition = lerpVector3(lower.rootPosition, upper.rootPosition, alpha).map(
+    (value, index) => clamp(value - normalized.rootOrigin[index], -2.5, 2.5)
+  );
+  const rootRotation = clampEuler(quaternionToEuler(lerpQuaternion(lower.rootRotation, upper.rootRotation, alpha)), 1.2);
+  const joints = emptyJoints();
+  const jointNames = new Set([...Object.keys(lower.jointRotations), ...Object.keys(upper.jointRotations)]);
+  for (const name of jointNames) {
+    const target = mappedJointName(name);
+    if (!target) continue;
+    const left = lower.jointRotations[name] || upper.jointRotations[name];
+    const right = upper.jointRotations[name] || left;
+    const euler = clampEuler(quaternionToEuler(lerpQuaternion(left, right, alpha)));
+    addRotation(joints, target, euler, target === 'chest' ? 0.35 : 0.55);
+  }
+  return {
+    schemaVersion: normalized.schemaVersion,
+    source: normalized.source,
+    provider: normalized.provider,
+    targetRuntime: normalized.targetRuntime,
+    timestampMs,
+    root: {
+      position: rootPosition,
+      rotation: rootRotation,
+    },
+    joints,
+    contacts: { ...lower.contacts, ...upper.contacts },
+    gestureLabel: upper.gestureLabel || lower.gestureLabel || 'motion_import',
+  };
 }
 
 export function normalizeMotionCommand(raw = {}) {
@@ -185,21 +383,23 @@ export function buildAlphabetBodyMotionPlan({
 
 export function normalizeBodyMotionPlan(raw = {}, fallback = {}) {
   const plan = raw && typeof raw === 'object' ? raw : {};
+  const poseStream = normalizePoseStream(plan.pose_stream || plan.poseStream || (Array.isArray(plan.frames) ? plan : null));
   const commands = Array.isArray(plan.commands)
     ? plan.commands.map((command) => normalizeMotionCommand(command)).filter(Boolean)
     : [];
-  if (!commands.length) {
+  if (!commands.length && !poseStream) {
     return normalizeBodyMotionPlan(buildAlphabetBodyMotionPlan(fallback));
   }
   return {
     schemaVersion: Number(plan.schema_version || plan.schemaVersion || 1),
-    source: String(plan.source || BODY_MOTION_SOURCE),
+    source: String(plan.source || poseStream?.source || BODY_MOTION_SOURCE),
     provider: String(plan.provider || 'external'),
-    targetRuntime: String(plan.target_runtime || plan.targetRuntime || 'ai4animationpy'),
+    targetRuntime: String(plan.target_runtime || plan.targetRuntime || poseStream?.targetRuntime || 'ai4animationpy'),
     status: String(plan.status || 'ready'),
     agentId: String(plan.agent_id || plan.agentId || fallback.agentId || ''),
-    durationSeconds: safeDurationSeconds(plan.duration_seconds ?? plan.durationSeconds, fallback.line || ''),
+    durationSeconds: poseStream?.durationSeconds || safeDurationSeconds(plan.duration_seconds ?? plan.durationSeconds, fallback.line || ''),
     commands: commands.sort((left, right) => left.atMs - right.atMs),
+    poseStream,
   };
 }
 
@@ -249,6 +449,9 @@ function applyGesture(target, name, progress) {
 
 export function sampleBodyMotionPlan(rawPlan, elapsedSeconds = 0) {
   const plan = normalizeBodyMotionPlan(rawPlan);
+  if (plan.poseStream) {
+    return samplePoseStream(plan.poseStream, elapsedSeconds);
+  }
   const durationMs = Math.max(1, Math.round(plan.durationSeconds * 1000));
   const tMs = clamp(Math.round(number(elapsedSeconds, 0) * 1000), 0, durationMs);
   const t = tMs / 1000;

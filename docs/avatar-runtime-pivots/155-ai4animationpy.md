@@ -277,6 +277,13 @@ Observed summary:
 
 The first attempt exposed a real adapter gap: upstream `Motion.SaveToNPZ(...)` emits `positions`, `quaternions`, `framerate`, `bone_names`, `parent_names`, and `parent_indices`, while the initial GOD loader only accepted `joint_rotations`/`rotations` and tried to load every NPZ member with `allow_pickle=False`. The harness now recognizes `quaternions`, uses source `framerate` for generated timestamps, and loads only relevant safe members so pickle-only metadata cannot break the eval path.
 
+Local visual proof artifacts were generated from the same upstream export without committing the asset:
+
+- `C:\tmp\god-ai4animationpy-proof\walking-stick-pose-proof.png`
+- `C:\tmp\god-ai4animationpy-proof\walking-stick-pose-proof.gif`
+
+These artifacts prove the observer sampler can turn the upstream pose stream into visible root movement and mapped rig joints. They are proof artifacts only; they do not satisfy the final `/one` live YouTube proof gate.
+
 ## Validation
 
 - Unit test command validation and pose-stream normalization.
