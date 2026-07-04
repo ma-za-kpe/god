@@ -9,11 +9,22 @@ function defaultRuntimeUrl() {
   return origin;
 }
 
-export const API_BASE =
-  new URLSearchParams(window.location.search).get('runtime') ||
-  window.RUNTIME_URL ||
-  import.meta.env.VITE_RUNTIME_URL ||
-  defaultRuntimeUrl();
+function runtimeUrl() {
+  const { hostname, pathname, search } = window.location;
+  const params = new URLSearchParams(search);
+  const explicit = params.get('runtime');
+  if (explicit) return explicit;
+  if (
+    (hostname === 'localhost' || hostname === '127.0.0.1') &&
+    pathname.replace(/\/+$/, '') === '/one' &&
+    params.get('control') === '1'
+  ) {
+    return 'http://localhost:8787';
+  }
+  return window.RUNTIME_URL || import.meta.env.VITE_RUNTIME_URL || defaultRuntimeUrl();
+}
+
+export const API_BASE = runtimeUrl();
 
 let _lastPlayedUtteranceId = '';
 let _pendingUrl = null;
@@ -49,7 +60,7 @@ function currentMode() {
 
 function oneAlphabetEnabled() {
   const params = new URLSearchParams(window.location.search);
-  return currentMode() === 'one' && params.get('alphabet') !== '0';
+  return currentMode() === 'one' && params.get('alphabet') === '1';
 }
 
 function normalizeAlphabet(raw) {
@@ -157,6 +168,26 @@ function stopVoiceMeter() {
   }
   _voiceMeterLastUpdate = 0;
   _voiceMeterData = null;
+}
+
+function stopActiveAudioPlayback() {
+  clearActiveAudioTimer();
+  stopVoiceMeter();
+  if (_activeAudio) {
+    try {
+      _activeAudio.pause();
+    } catch {}
+  }
+  if (_activeAudioSource) {
+    try {
+      _activeAudioSource.stop();
+    } catch {}
+  }
+  _activeAudio = null;
+  _activeAudioSource = null;
+  _activeAudioEnded = null;
+  _pendingUrl = null;
+  _pendingPlayback = null;
 }
 
 function audioRmsFromAnalyser(analyser) {
@@ -406,6 +437,40 @@ export function useWorld() {
       setSnapshot(snap);
       if (Array.isArray(snap.agents)) setAgents(snap.agents);
       if (Array.isArray(snap.events)) setEvents(snap.events);
+      const avatarControl = snap?.avatar || {};
+      const localControlMode = currentMode() === 'one' && Boolean(
+        avatarControl.control_mode === 'llm-avatar-control' ||
+        avatarControl.controlMode === 'llm-avatar-control' ||
+        avatarControl.body_motion ||
+        avatarControl.motion_plan ||
+        avatarControl.control_plan
+      );
+      if (localControlMode) {
+        stopActiveAudioPlayback();
+        const motion =
+          avatarControl.body_motion ||
+          avatarControl.motion_plan ||
+          avatarControl.control_plan ||
+          {};
+        const label =
+          avatarControl.control_label ||
+          avatarControl.controlLabel ||
+          motion.control_label ||
+          motion.controlLabel ||
+          'avatar-control';
+        const caption = cleanLine(avatarControl.caption || label);
+        useObserverStore.getState().setCurrentSpokenLine(caption);
+        useObserverStore.getState().setOneAlphabetStatus(label);
+        useObserverStore.getState().setVoicePlayback({
+          status: 'disabled',
+          transport: 'local-llm-avatar-control',
+          mouthAmplitude: 0,
+          lipSyncSource: 'manual-expression-commands',
+          updatedAtMs: nowMs(),
+        });
+        markHealth(true, '', transport);
+        return;
+      }
       // Play synthesized voice audio when a new utterance arrives
       const uid = snap?.voice?.plan?.utterance_id;
       const synthOk = snap?.voice?.synthesis?.ok;
