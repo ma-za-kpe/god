@@ -27,6 +27,13 @@ from .neo4j import (
     neo4j_schema_statements,
     neo4j_validation_queries,
 )
+from .render_projection import (
+    ANATOMY_RENDER_SCHEMA_VERSION,
+    AnatomyRenderLayer,
+    AnatomyRenderPrimitive,
+    AnatomyRenderProjection,
+    build_anatomy_render_projection,
+)
 from .retrieval import (
     ActionBundle,
     ActionBundleNode,
@@ -61,6 +68,11 @@ __all__ = [
     "neo4j_lod_retrieval_cypher",
     "neo4j_schema_statements",
     "neo4j_validation_queries",
+    "ANATOMY_RENDER_SCHEMA_VERSION",
+    "AnatomyRenderLayer",
+    "AnatomyRenderPrimitive",
+    "AnatomyRenderProjection",
+    "build_anatomy_render_projection",
     "parse_anatomy_control_response",
     "validate_anatomy_control_plan",
     "ActionBundle",

@@ -1,5 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
-import { buildMorphChannels, summarizeAnatomyMilestone } from '../anatomyMilestone';
+import {
+  buildMorphChannels,
+  getAnatomyRenderProjection,
+  summarizeAnatomyMilestone,
+} from '../anatomyMilestone';
 
 const ASSET_URL = '/assets/anatomy/latest-graph.json';
 
@@ -30,6 +34,7 @@ export function AnatomyMilestoneLab() {
 
   const summary = useMemo(() => summarizeAnatomyMilestone(payload || {}), [payload]);
   const morph = useMemo(() => buildMorphChannels(summary), [summary]);
+  const renderProjection = useMemo(() => getAnatomyRenderProjection(payload || {}), [payload]);
   const workingSet = Array.isArray(payload?.focus_nodes) && payload.focus_nodes.length
     ? payload.focus_nodes
     : (Array.isArray(payload?.forehead_working_set) ? payload.forehead_working_set : []);
@@ -46,6 +51,7 @@ export function AnatomyMilestoneLab() {
     '--graph-pulse': morph.graphPulse,
     '--lod-pulse': morph.lodPulse,
     '--contract-pulse': morph.contractPulse,
+    '--render-pulse': morph.renderPulse,
   };
 
   return (
@@ -135,6 +141,27 @@ export function AnatomyMilestoneLab() {
               <circle className="anatomy-toe-pulse" cx="278" cy="690" r="10" />
             </g>
           </g>
+          <g
+            className="anatomy-render-projection"
+            data-testid="anatomy-inspection-renderer"
+            aria-hidden="true"
+          >
+            {renderProjection.layers.map((layer) => (
+              <g
+                key={layer.id}
+                className={`anatomy-inspection-layer anatomy-inspection-${layer.id}`}
+                data-layer={layer.id}
+                data-status={layer.status}
+              >
+                {layer.primitives.map((primitive) => (
+                  <RenderProjectionPrimitive
+                    key={`${layer.id}:${primitive.node_id}:${primitive.shape}`}
+                    primitive={primitive}
+                  />
+                ))}
+              </g>
+            ))}
+          </g>
           <g className="anatomy-annotations" aria-hidden="true">
             <path className="anatomy-leader" d="M342 514 L326 538" />
             <text className="anatomy-node-label" x="346" y="514">right hand</text>
@@ -158,6 +185,9 @@ export function AnatomyMilestoneLab() {
           {summary.actionBundleCount > 0 && <span>lod bundles {summary.actionBundleCount}</span>}
           {summary.controlPlanCount > 0 && <span>control plan {summary.controlPlanCount}</span>}
           {summary.controlRejectionCount > 0 && <span>rejected {summary.controlRejectionCount}</span>}
+          {summary.renderLayerCount > 0 && <span>render layers {summary.renderLayerCount}</span>}
+          {summary.renderPrimitiveCount > 0 && <span>mapped {summary.renderPrimitiveCount}</span>}
+          {summary.renderMissingMappingCount > 0 && <span>degraded {summary.renderMissingMappingCount}</span>}
         </div>
       </section>
       <aside className="anatomy-panel">
@@ -188,7 +218,44 @@ export function AnatomyMilestoneLab() {
           {summary.controlRejectionCount > 0 && (
             <div><strong>{summary.controlRejectionCount}</strong><span>rejected controls</span></div>
           )}
+          {summary.renderLayerCount > 0 && (
+            <div><strong>{summary.renderLayerCount}</strong><span>render layers</span></div>
+          )}
+          {summary.renderPrimitiveCount > 0 && (
+            <div><strong>{summary.renderPrimitiveCount}</strong><span>mapped nodes</span></div>
+          )}
+          {summary.renderMissingMappingCount > 0 && (
+            <div><strong>{summary.renderMissingMappingCount}</strong><span>degraded maps</span></div>
+          )}
         </div>
+        {renderProjection.layers.length > 0 && (
+          <section>
+            <h2>Inspection Layers</h2>
+            <ul>
+              {renderProjection.layers.map((layer) => (
+                <li key={layer.id}>
+                  <strong>{layer.label}</strong>
+                  <span>
+                    {layer.mappedNodeIds.length}/{layer.targetNodeIds.length} mapped / {layer.status}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+        {renderProjection.diagnostics.length > 0 && (
+          <section>
+            <h2>Renderer Diagnostics</h2>
+            <ul>
+              {renderProjection.diagnostics.slice(0, 8).map((diagnostic) => (
+                <li key={diagnostic}>
+                  <strong>{diagnostic}</strong>
+                  <span>projection diagnostic</span>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
         <section>
           <h2>Working Set</h2>
           <ul>
@@ -213,5 +280,62 @@ export function AnatomyMilestoneLab() {
         </section>
       </aside>
     </main>
+  );
+}
+
+function RenderProjectionPrimitive({ primitive }) {
+  const geometry = primitive.geometry && typeof primitive.geometry === 'object'
+    ? primitive.geometry
+    : {};
+  const className = [
+    'anatomy-render-primitive',
+    `anatomy-render-${primitive.layer_id}`,
+    `anatomy-render-${primitive.class_name || primitive.shape}`,
+  ].join(' ');
+  const common = {
+    className,
+    'data-node-id': primitive.node_id,
+  };
+  const title = <title>{primitive.label}</title>;
+  const label = primitive.label_anchor ? (
+    <text
+      className="anatomy-render-label"
+      x={primitive.label_anchor.x}
+      y={primitive.label_anchor.y}
+    >
+      {primitive.label}
+    </text>
+  ) : null;
+
+  let shape = null;
+  if (primitive.shape === 'path') {
+    shape = <path {...common} d={geometry.d || ''}>{title}</path>;
+  } else if (primitive.shape === 'circle') {
+    shape = <circle {...common} cx={geometry.cx} cy={geometry.cy} r={geometry.r}>{title}</circle>;
+  } else if (primitive.shape === 'ellipse') {
+    shape = (
+      <ellipse {...common} cx={geometry.cx} cy={geometry.cy} rx={geometry.rx} ry={geometry.ry}>
+        {title}
+      </ellipse>
+    );
+  } else if (primitive.shape === 'line') {
+    shape = (
+      <line
+        {...common}
+        x1={geometry.x1}
+        y1={geometry.y1}
+        x2={geometry.x2}
+        y2={geometry.y2}
+      >
+        {title}
+      </line>
+    );
+  }
+
+  return (
+    <g className="anatomy-render-node" data-node-id={primitive.node_id}>
+      {shape}
+      {label}
+    </g>
   );
 }

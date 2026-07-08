@@ -2,6 +2,7 @@ import pytest
 
 from anatomy import (
     ANATOMY_CONTROL_SCHEMA_VERSION,
+    ANATOMY_RENDER_SCHEMA_VERSION,
     AnatomyEdge,
     AnatomyGraph,
     AnatomyGraphValidationError,
@@ -13,6 +14,7 @@ from anatomy import (
     ActionLOD,
     AnatomyActionRequest,
     anatomy_control_json_schema,
+    build_anatomy_render_projection,
     build_m01_reference_graph,
     build_m02_reference_graph,
     build_anatomy_control_messages,
@@ -574,6 +576,53 @@ def test_m05_parses_model_payload_and_does_not_create_fake_controls():
     assert plan.controls[0].node_id == "region:right_hand"
     assert "rejected_unknown_node:bone:made_up" in plan.diagnostics
     assert "empty_valid_controls" not in plan.diagnostics
+
+
+def test_m06_render_projection_exposes_graph_derived_inspection_layers():
+    graph = build_m02_reference_graph()
+
+    projection = build_anatomy_render_projection(graph)
+    payload = projection.to_dict()
+    layer_by_id = {layer["id"]: layer for layer in payload["layers"]}
+
+    assert payload["schema"] == ANATOMY_RENDER_SCHEMA_VERSION
+    assert set(layer_by_id) == {"body", "systems", "head", "knee", "toe"}
+    assert layer_by_id["body"]["mapped_node_ids"] == ["body:human"]
+    assert "bone:skull" in layer_by_id["head"]["mapped_node_ids"]
+    assert "organ:brain" in layer_by_id["head"]["mapped_node_ids"]
+    assert "joint:right_knee" in layer_by_id["knee"]["mapped_node_ids"]
+    assert "digit:right_hallux" in layer_by_id["toe"]["mapped_node_ids"]
+    assert payload["primitive_count"] >= 20
+
+
+def test_m06_render_projection_never_invents_nodes_or_unsourced_primitives():
+    graph = build_m02_reference_graph()
+
+    projection = build_anatomy_render_projection(graph).to_dict()
+    primitive_node_ids = {primitive["node_id"] for primitive in projection["primitives"]}
+
+    assert primitive_node_ids
+    assert primitive_node_ids.issubset(graph.nodes)
+    assert all(primitive["source_ids"] for primitive in projection["primitives"])
+    assert "bone:made_up" not in primitive_node_ids
+
+
+def test_m06_render_projection_reports_real_missing_mappings_as_degraded():
+    graph = build_m02_reference_graph()
+
+    projection = build_anatomy_render_projection(graph).to_dict()
+    diagnostics = projection["diagnostics"]
+    prefix = "missing_render_mapping:systems:"
+    missing_system_ids = {
+        diagnostic.removeprefix(prefix)
+        for diagnostic in diagnostics
+        if diagnostic.startswith(prefix)
+    }
+
+    assert projection["status"] == "degraded"
+    assert projection["missing_mapping_count"] == len(diagnostics)
+    assert "system:muscular" in missing_system_ids
+    assert missing_system_ids.issubset(graph.nodes)
 
 
 def _m05_wave_bundle():

@@ -19,6 +19,7 @@ from anatomy import (  # noqa: E402
     build_m02_reference_graph,
     ActionLOD,
     AnatomyActionRequest,
+    build_anatomy_render_projection,
     build_ollama_anatomy_control_request,
     compile_lod_action_bundle,
     neo4j_schema_statements,
@@ -62,15 +63,28 @@ def _milestone_payload(milestone: str) -> dict:
             "digit:right_hallux",
             "skin:forehead",
         )
-    elif milestone in {"M04", "M05"}:
+    elif milestone in {"M04", "M05", "M06"}:
         graph = build_m02_reference_graph()
         focus_ids = (
+            "body:human",
+            "system:integumentary",
+            "system:skeletal",
+            "system:nervous",
+            "system:cardiovascular",
+            "region:head",
+            "bone:skull",
+            "organ:brain",
             "region:right_hand",
             "digit:right_pollex",
             "digit:right_index_finger",
             "joint:right_knee",
+            "bone:right_femur",
+            "bone:right_tibia",
+            "bone:right_patella",
             "digit:right_hallux",
+            "skin:right_hallux",
             "skin:forehead",
+            "population:scalp_hair_follicles",
             "population:forehead_eccrine_sweat_glands",
             "render:forehead_sweat_proxy",
         )
@@ -92,84 +106,14 @@ def _milestone_payload(milestone: str) -> dict:
 
     action_bundles = []
     control_contract = {}
-    if milestone in {"M04", "M05"}:
+    render_projection = {}
+    if milestone in {"M04", "M05", "M06"}:
         compiled_bundles = _compile_reference_action_bundles(graph)
         action_bundles = [bundle.to_dict() for bundle in compiled_bundles]
-        if milestone == "M05":
-            wave_bundle = compiled_bundles[0]
-            ollama_request = build_ollama_anatomy_control_request(
-                model="llama3.1:8b",
-                bundle=wave_bundle,
-                user_goal="Wave with the right hand while keeping unsupported anatomy explicit.",
-            )
-            plan = validate_anatomy_control_plan(
-                {
-                    "schema": ANATOMY_CONTROL_SCHEMA_VERSION,
-                    "action": "wave",
-                    "controls": [
-                        {
-                            "node_id": "region:right_hand",
-                            "capability": "open_close",
-                            "value": 0.82,
-                            "weight": 0.9,
-                            "duration_ms": 900,
-                            "rationale": "open the right hand for the visible wave",
-                        },
-                        {
-                            "node_id": "region:right_hand",
-                            "capability": "finger_curl",
-                            "value": 0.18,
-                            "weight": 0.65,
-                            "duration_ms": 900,
-                            "rationale": "keep fingers relaxed rather than clenched",
-                        },
-                        {
-                            "node_id": "digit:right_pollex",
-                            "capability": "opposition",
-                            "value": 0.35,
-                            "weight": 0.45,
-                            "duration_ms": 700,
-                            "rationale": "thumb participates subtly",
-                        },
-                        {
-                            "node_id": "joint:right_knee",
-                            "capability": "flexion_extension",
-                            "value": 1,
-                            "weight": 1,
-                            "duration_ms": 900,
-                        },
-                        {
-                            "node_id": "bone:made_up",
-                            "capability": "rotate_joint",
-                            "value": 1,
-                            "weight": 1,
-                            "duration_ms": 900,
-                        },
-                    ],
-                    "diagnostic_expectations": [
-                        "right hand opens and curls within the source-backed wave bundle",
-                        "unsupported knee and invented bone controls are rejected",
-                    ],
-                },
-                wave_bundle,
-            )
-            control_contract = {
-                "schema": ANATOMY_CONTROL_SCHEMA_VERSION,
-                "validated_plan": plan.to_dict(),
-                "ollama": {
-                    "endpoint": "/api/chat",
-                    "model": ollama_request["model"],
-                    "stream": ollama_request["stream"],
-                    "format_type": ollama_request["format"]["type"],
-                    "temperature": ollama_request["options"]["temperature"],
-                    "message_count": len(ollama_request["messages"]),
-                    "allowed_node_count": len(
-                        ollama_request["format"]["properties"]["controls"]["items"]["properties"][
-                            "node_id"
-                        ]["enum"]
-                    ),
-                },
-            }
+        if milestone in {"M05", "M06"}:
+            control_contract = _build_reference_control_contract(compiled_bundles[0])
+        if milestone == "M06":
+            render_projection = build_anatomy_render_projection(graph).to_dict()
 
     return {
         "milestone": milestone,
@@ -198,6 +142,9 @@ def _milestone_payload(milestone: str) -> dict:
                     if diagnostic.startswith("rejected_")
                 ]
             ),
+            "render_layer_count": len(render_projection.get("layers", [])),
+            "render_primitive_count": len(render_projection.get("primitives", [])),
+            "render_missing_mapping_count": render_projection.get("missing_mapping_count", 0),
         },
         "nodes": [
             {
@@ -224,6 +171,7 @@ def _milestone_payload(milestone: str) -> dict:
         "focus_nodes": focus_nodes,
         "action_bundles": action_bundles,
         "control_contract": control_contract,
+        "render_projection": render_projection,
         "neo4j": {
             "node_records": len(graph.to_neo4j_nodes()),
             "relationship_records": len(graph.to_neo4j_relationships()),
@@ -237,12 +185,12 @@ def _milestone_payload(milestone: str) -> dict:
 def main() -> int:
     output_dir = ROOT / "observer" / "public" / "assets" / "anatomy"
     output_dir.mkdir(parents=True, exist_ok=True)
-    for milestone in ("M01", "M02", "M03", "M04", "M05"):
+    for milestone in ("M01", "M02", "M03", "M04", "M05", "M06"):
         payload = _milestone_payload(milestone)
         output = output_dir / f"{milestone.lower()}-graph.json"
         output.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
         print(output)
-        if milestone == "M05":
+        if milestone == "M06":
             latest = output_dir / "latest-graph.json"
             latest.write_text(
                 json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8"
@@ -298,6 +246,82 @@ def _compile_reference_action_bundles(graph):
             ),
         ),
     ]
+
+
+def _build_reference_control_contract(wave_bundle):
+    ollama_request = build_ollama_anatomy_control_request(
+        model="llama3.1:8b",
+        bundle=wave_bundle,
+        user_goal="Wave with the right hand while keeping unsupported anatomy explicit.",
+    )
+    plan = validate_anatomy_control_plan(
+        {
+            "schema": ANATOMY_CONTROL_SCHEMA_VERSION,
+            "action": "wave",
+            "controls": [
+                {
+                    "node_id": "region:right_hand",
+                    "capability": "open_close",
+                    "value": 0.82,
+                    "weight": 0.9,
+                    "duration_ms": 900,
+                    "rationale": "open the right hand for the visible wave",
+                },
+                {
+                    "node_id": "region:right_hand",
+                    "capability": "finger_curl",
+                    "value": 0.18,
+                    "weight": 0.65,
+                    "duration_ms": 900,
+                    "rationale": "keep fingers relaxed rather than clenched",
+                },
+                {
+                    "node_id": "digit:right_pollex",
+                    "capability": "opposition",
+                    "value": 0.35,
+                    "weight": 0.45,
+                    "duration_ms": 700,
+                    "rationale": "thumb participates subtly",
+                },
+                {
+                    "node_id": "joint:right_knee",
+                    "capability": "flexion_extension",
+                    "value": 1,
+                    "weight": 1,
+                    "duration_ms": 900,
+                },
+                {
+                    "node_id": "bone:made_up",
+                    "capability": "rotate_joint",
+                    "value": 1,
+                    "weight": 1,
+                    "duration_ms": 900,
+                },
+            ],
+            "diagnostic_expectations": [
+                "right hand opens and curls within the source-backed wave bundle",
+                "unsupported knee and invented bone controls are rejected",
+            ],
+        },
+        wave_bundle,
+    )
+    return {
+        "schema": ANATOMY_CONTROL_SCHEMA_VERSION,
+        "validated_plan": plan.to_dict(),
+        "ollama": {
+            "endpoint": "/api/chat",
+            "model": ollama_request["model"],
+            "stream": ollama_request["stream"],
+            "format_type": ollama_request["format"]["type"],
+            "temperature": ollama_request["options"]["temperature"],
+            "message_count": len(ollama_request["messages"]),
+            "allowed_node_count": len(
+                ollama_request["format"]["properties"]["controls"]["items"]["properties"][
+                    "node_id"
+                ]["enum"]
+            ),
+        },
+    }
 
 
 if __name__ == "__main__":

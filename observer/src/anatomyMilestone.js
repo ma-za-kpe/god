@@ -30,6 +30,9 @@ export function summarizeAnatomyMilestone(payload = {}) {
     controlPlanCount: Number(payload.summary?.control_plan_count || validatedPlan.control_count || 0),
     controlRejectionCount: Number(payload.summary?.control_rejection_count || 0),
     controlSchema: controlContract.schema || '',
+    renderLayerCount: Number(payload.summary?.render_layer_count || 0),
+    renderPrimitiveCount: Number(payload.summary?.render_primitive_count || 0),
+    renderMissingMappingCount: Number(payload.summary?.render_missing_mapping_count || 0),
     byKind,
     hasForeheadSkin: nodes.some((node) => node.id === 'skin:forehead'),
     hasSweatProxy: nodes.some((node) => node.id === 'render:forehead_sweat_proxy'),
@@ -63,5 +66,43 @@ export function buildMorphChannels(summary = {}) {
     contractPulse: summary.controlPlanCount
       ? Math.min(1, (summary.controlPlanCount + summary.controlRejectionCount) / 8)
       : 0,
+    renderPulse: summary.renderPrimitiveCount
+      ? Math.min(1, summary.renderPrimitiveCount / Math.max(1, summary.nodeCount))
+      : 0,
+  };
+}
+
+export function getAnatomyRenderProjection(payload = {}) {
+  const projection = payload.render_projection && typeof payload.render_projection === 'object'
+    ? payload.render_projection
+    : {};
+  const layers = Array.isArray(projection.layers) ? projection.layers : [];
+  const primitives = Array.isArray(projection.primitives) ? projection.primitives : [];
+  const diagnostics = Array.isArray(projection.diagnostics) ? projection.diagnostics : [];
+  const nodeById = new Map((Array.isArray(payload.nodes) ? payload.nodes : []).map((node) => [node.id, node]));
+  return {
+    schema: projection.schema || '',
+    status: projection.status || 'unknown',
+    diagnostics,
+    layers: layers.map((layer) => {
+      const targetNodeIds = Array.isArray(layer.target_node_ids) ? layer.target_node_ids : [];
+      const mappedNodeIds = Array.isArray(layer.mapped_node_ids) ? layer.mapped_node_ids : [];
+      const missingNodeIds = Array.isArray(layer.missing_node_ids) ? layer.missing_node_ids : [];
+      return {
+        id: String(layer.id || ''),
+        label: String(layer.label || layer.id || ''),
+        targetNodeIds,
+        mappedNodeIds,
+        missingNodeIds,
+        primitives: primitives
+          .filter((primitive) => primitive.layer_id === layer.id && nodeById.has(primitive.node_id))
+          .map((primitive) => ({
+            ...primitive,
+            label: nodeById.get(primitive.node_id)?.label || primitive.node_id,
+            kind: nodeById.get(primitive.node_id)?.kind || 'unknown',
+          })),
+        status: missingNodeIds.length ? 'degraded' : 'complete',
+      };
+    }),
   };
 }

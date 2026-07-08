@@ -768,6 +768,7 @@ body {
   --graph-pulse: 0;
   --lod-pulse: 0;
   --contract-pulse: 0;
+  --render-pulse: 0;
   position: relative;
   min-width: 0;
   min-height: 0;
@@ -841,6 +842,137 @@ body {
   stroke-dasharray: 3 13;
   transform-origin: 210px 430px;
   animation: anatomyContractPulse 1.8s ease-in-out infinite;
+}
+
+.anatomy-render-projection {
+  pointer-events: none;
+  opacity: calc(0.68 + var(--render-pulse) * 0.28);
+}
+
+.anatomy-render-node {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: anatomyRenderNodePulse 2.1s ease-in-out infinite;
+}
+
+.anatomy-render-primitive {
+  vector-effect: non-scaling-stroke;
+}
+
+.anatomy-render-body-outline {
+  fill: rgba(98, 116, 255, 0.04);
+  stroke: rgba(126, 146, 255, 0.42);
+  stroke-width: 2;
+  stroke-dasharray: 10 10;
+}
+
+.anatomy-render-system-integumentary {
+  fill: rgba(255, 162, 136, 0.12);
+  stroke: rgba(255, 162, 136, 0.6);
+  stroke-width: 3;
+}
+
+.anatomy-render-system-skeletal {
+  fill: none;
+  stroke: rgba(238, 244, 246, 0.86);
+  stroke-width: 4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.anatomy-render-system-nervous,
+.anatomy-render-head-brain {
+  fill: rgba(204, 134, 255, 0.24);
+  stroke: rgba(216, 162, 255, 0.86);
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.anatomy-render-system-cardiovascular {
+  fill: rgba(255, 91, 124, 0.24);
+  stroke: rgba(255, 107, 136, 0.88);
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.anatomy-render-head-region {
+  fill: rgba(84, 200, 255, 0.08);
+  stroke: rgba(84, 200, 255, 0.55);
+  stroke-width: 2;
+}
+
+.anatomy-render-head-skull {
+  fill: rgba(238, 244, 246, 0.08);
+  stroke: rgba(238, 244, 246, 0.94);
+  stroke-width: 2.5;
+  stroke-dasharray: 4 5;
+}
+
+.anatomy-render-head-forehead {
+  fill: rgba(255, 189, 123, 0.36);
+  stroke: rgba(255, 226, 170, 0.7);
+  stroke-width: 2;
+}
+
+.anatomy-render-head-hair-population {
+  fill: rgba(35, 42, 54, 0.72);
+  stroke: rgba(150, 211, 183, 0.65);
+  stroke-width: 2;
+}
+
+.anatomy-render-head-sweat-population {
+  fill: rgba(92, 201, 255, 0.48);
+  stroke: rgba(210, 244, 255, 0.9);
+  stroke-width: 2;
+}
+
+.anatomy-render-knee-joint {
+  fill: rgba(244, 201, 93, 0.22);
+  stroke: rgba(244, 201, 93, 0.95);
+  stroke-width: 3;
+}
+
+.anatomy-render-knee-bone,
+.anatomy-render-toe-bone {
+  stroke: rgba(238, 244, 246, 0.95);
+  stroke-width: 7;
+  stroke-linecap: round;
+}
+
+.anatomy-render-knee-patella {
+  fill: rgba(238, 244, 246, 0.9);
+  stroke: rgba(244, 201, 93, 0.86);
+  stroke-width: 2;
+}
+
+.anatomy-render-knee-ligament {
+  stroke: rgba(78, 255, 181, 0.88);
+  stroke-width: 3;
+  stroke-linecap: round;
+}
+
+.anatomy-render-toe-digit {
+  fill: rgba(84, 200, 255, 0.22);
+  stroke: rgba(84, 200, 255, 0.95);
+  stroke-width: 3;
+}
+
+.anatomy-render-toe-skin {
+  fill: rgba(255, 162, 136, 0.16);
+  stroke: rgba(255, 184, 144, 0.82);
+  stroke-width: 2;
+}
+
+.anatomy-render-label {
+  fill: rgba(238, 244, 246, 0.92);
+  stroke: rgba(8, 16, 23, 0.9);
+  stroke-width: 3;
+  paint-order: stroke;
+  font-size: 13px;
+  font-weight: 760;
+  letter-spacing: 0;
 }
 
 .anatomy-figure {
@@ -1162,6 +1294,11 @@ body {
 @keyframes anatomyContractPulse {
   0%, 100% { transform: scale(0.97); opacity: calc(0.14 + var(--contract-pulse) * 0.26); }
   50% { transform: scale(calc(1 + var(--contract-pulse) * 0.05)); opacity: calc(0.5 + var(--contract-pulse) * 0.35); }
+}
+
+@keyframes anatomyRenderNodePulse {
+  0%, 100% { opacity: calc(0.58 + var(--render-pulse) * 0.2); }
+  50% { opacity: 1; }
 }
 
 @media (max-width: 860px) {

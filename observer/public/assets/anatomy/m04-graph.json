@@ -540,6 +540,54 @@
   "control_contract": {},
   "focus_nodes": [
     {
+      "id": "body:human",
+      "kind": "body",
+      "label": "Human body",
+      "materialization": "canonical"
+    },
+    {
+      "id": "system:integumentary",
+      "kind": "system",
+      "label": "Integumentary system",
+      "materialization": "canonical"
+    },
+    {
+      "id": "system:skeletal",
+      "kind": "system",
+      "label": "Skeletal system",
+      "materialization": "canonical"
+    },
+    {
+      "id": "system:nervous",
+      "kind": "system",
+      "label": "Nervous system",
+      "materialization": "canonical"
+    },
+    {
+      "id": "system:cardiovascular",
+      "kind": "system",
+      "label": "Cardiovascular system",
+      "materialization": "canonical"
+    },
+    {
+      "id": "region:head",
+      "kind": "region",
+      "label": "Head",
+      "materialization": "canonical"
+    },
+    {
+      "id": "bone:skull",
+      "kind": "bone",
+      "label": "Skull",
+      "materialization": "canonical"
+    },
+    {
+      "id": "organ:brain",
+      "kind": "organ",
+      "label": "Brain",
+      "materialization": "canonical"
+    },
+    {
       "id": "region:right_hand",
       "kind": "region",
       "label": "Right hand",
@@ -564,16 +612,46 @@
       "materialization": "canonical"
     },
     {
+      "id": "bone:right_femur",
+      "kind": "bone",
+      "label": "Right femur",
+      "materialization": "canonical"
+    },
+    {
+      "id": "bone:right_tibia",
+      "kind": "bone",
+      "label": "Right tibia",
+      "materialization": "canonical"
+    },
+    {
+      "id": "bone:right_patella",
+      "kind": "bone",
+      "label": "Right patella",
+      "materialization": "canonical"
+    },
+    {
       "id": "digit:right_hallux",
       "kind": "structure",
       "label": "Right great toe",
       "materialization": "canonical"
     },
     {
+      "id": "skin:right_hallux",
+      "kind": "skin",
+      "label": "Skin of right great toe",
+      "materialization": "aggregate"
+    },
+    {
       "id": "skin:forehead",
       "kind": "skin",
       "label": "Skin of forehead",
       "materialization": "aggregate"
+    },
+    {
+      "id": "population:scalp_hair_follicles",
+      "kind": "population_template",
+      "label": "Scalp hair follicle population",
+      "materialization": "population_template"
     },
     {
       "id": "population:forehead_eccrine_sweat_glands",
@@ -1572,16 +1650,20 @@
       ]
     }
   ],
+  "render_projection": {},
   "status": "complete",
   "summary": {
     "action_bundle_count": 3,
     "control_plan_count": 0,
     "control_rejection_count": 0,
     "edge_count": 68,
-    "focus_node_count": 8,
+    "focus_node_count": 21,
     "llm_handle_count": 13,
     "max_action_bundle_node_count": 14,
     "node_count": 60,
+    "render_layer_count": 0,
+    "render_missing_mapping_count": 0,
+    "render_primitive_count": 0,
     "working_set_node_count": 3,
     "working_set_root": "skin:forehead"
   }
