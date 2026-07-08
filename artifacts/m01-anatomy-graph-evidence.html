@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>M01 Anatomy Graph Evidence</title>
+<style>
+body { font-family: Arial, sans-serif; margin: 32px; color: #172026; background: #f7f8fa; }
+h1 { margin: 0 0 8px; font-size: 30px; }
+section { background: white; border: 1px solid #d8dde4; border-radius: 8px; padding: 18px; margin: 18px 0; }
+.grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+.metric { border: 1px solid #dde3ea; border-radius: 6px; padding: 12px; background: #fbfcfd; }
+.metric strong { display: block; font-size: 26px; color: #0f5f7a; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th, td { text-align: left; padding: 8px; border-bottom: 1px solid #e4e8ee; vertical-align: top; }
+th { background: #eef3f6; }
+.pass { color: #17633a; font-weight: 700; }
+code { background: #eef3f6; padding: 2px 4px; border-radius: 4px; }
+</style>
+</head>
+<body>
+<h1>M01 Anatomy Graph Contract Evidence</h1>
+<p class="pass">PASS: graph provenance, validation, working-set compilation, Neo4j export shape, and LLM registry are green.</p>
+<section class="grid">
+<div class="metric"><strong>21</strong>source-cited nodes</div>
+<div class="metric"><strong>23</strong>source-cited edges</div>
+<div class="metric"><strong>5</strong>LLM-safe handles</div>
+<div class="metric"><strong>3</strong>forehead working-set nodes</div>
+</section>
+<section>
+<h2>Validated Gates</h2>
+<ul>
+<li>Every node and edge has source provenance.</li>
+<li>Render proxies must map from real anatomy nodes.</li>
+<li>Population templates are addressable without eager virtual-instance expansion.</li>
+<li>Neo4j records and constraints are exportable.</li>
+<li>The LLM registry exposes bounded control channels only.</li>
+</ul>
+</section>
+<section>
+<h2>Forehead Working Set</h2>
+<table><thead><tr><th>ID</th><th>Label</th><th>Kind</th><th>Materialization</th></tr></thead><tbody><tr><td>population:forehead_eccrine_sweat_glands</td><td>Forehead eccrine sweat gland population</td><td>population_template</td><td>population_template</td></tr>
+<tr><td>render:forehead_sweat_proxy</td><td>Forehead sweat droplet render proxy</td><td>render_proxy</td><td>render_proxy</td></tr>
+<tr><td>skin:forehead</td><td>Skin of forehead</td><td>skin</td><td>aggregate</td></tr></tbody></table>
+</section>
+<section>
+<h2>LLM Control Registry</h2>
+<table><thead><tr><th>ID</th><th>Kind</th><th>Controls</th><th>Sources</th></tr></thead><tbody><tr><td>population:forehead_eccrine_sweat_glands</td><td>population_template</td><td>sweat_emission, materialize_visible_instances</td><td>fipat-ta2-2019, hra-kg-v2.2-paper</td></tr>
+<tr><td>population:scalp_hair_follicles</td><td>population_template</td><td>bend_proxy, sway_proxy, materialize_visible_instances</td><td>fipat-ta2-2019, hra-kg-v2.2-paper</td></tr>
+<tr><td>region:head</td><td>region</td><td>camera_focus, anatomy_layer, pose_focus</td><td>fipat-ta2-2019</td></tr>
+<tr><td>render:forehead_sweat_proxy</td><td>render_proxy</td><td>opacity, droplet_rate</td><td>hra-kg-v2.2-paper</td></tr>
+<tr><td>skin:forehead</td><td>skin</td><td>sweat, flush, detail_lod</td><td>fipat-ta2-2019</td></tr></tbody></table>
+</section>
+<section>
+<h2>Neo4j Export</h2>
+<p><code>21</code> node records, <code>23</code> relationship records, <code>3</code> constraints/indexes.</p>
+</section>
+</body>
+</html>
