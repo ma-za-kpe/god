@@ -1,6 +1,7 @@
 import pytest
 
 from anatomy import (
+    ANATOMY_CONTROL_SCHEMA_VERSION,
     AnatomyEdge,
     AnatomyGraph,
     AnatomyGraphValidationError,
@@ -11,9 +12,14 @@ from anatomy import (
     SourceRef,
     ActionLOD,
     AnatomyActionRequest,
+    anatomy_control_json_schema,
     build_m01_reference_graph,
     build_m02_reference_graph,
+    build_anatomy_control_messages,
+    build_ollama_anatomy_control_request,
     compile_lod_action_bundle,
+    parse_anatomy_control_response,
+    validate_anatomy_control_plan,
     neo4j_lod_retrieval_cypher,
     neo4j_cypher_script,
     neo4j_load_statements,
@@ -448,3 +454,137 @@ def test_m04_neo4j_lod_cypher_uses_bounded_graph_traversal():
     assert "interior.kind IN ['body', 'system']" in cypher
     assert "PART_OF" in cypher
     assert "PROJECTS_TO_RENDER" in cypher
+
+
+def test_m05_control_schema_limits_nodes_to_bundle_handles():
+    bundle = _m05_wave_bundle()
+
+    schema = anatomy_control_json_schema(bundle)
+    control_schema = schema["properties"]["controls"]["items"]["properties"]
+
+    assert schema["properties"]["schema"]["const"] == ANATOMY_CONTROL_SCHEMA_VERSION
+    assert schema["properties"]["action"]["enum"] == ["wave"]
+    assert "region:right_hand" in control_schema["node_id"]["enum"]
+    assert "joint:right_knee" not in control_schema["node_id"]["enum"]
+    assert "finger_curl" in control_schema["capability"]["enum"]
+    assert control_schema["value"]["minimum"] == -1
+    assert control_schema["value"]["maximum"] == 1
+
+
+def test_m05_prompt_gives_llm_only_source_backed_bundle_controls():
+    bundle = _m05_wave_bundle()
+
+    messages = build_anatomy_control_messages(bundle, user_goal="Wave with the right hand.")
+    joined = "\n".join(message["content"] for message in messages)
+
+    assert messages[0]["role"] == "system"
+    assert "Return exactly one JSON object" in messages[0]["content"]
+    assert "Do not invent anatomy nodes" in messages[0]["content"]
+    assert "region:right_hand" in joined
+    assert "source_ids" in joined
+    assert "joint:right_knee" not in joined
+    assert ANATOMY_CONTROL_SCHEMA_VERSION in joined
+
+
+def test_m05_ollama_request_uses_structured_schema_format():
+    bundle = _m05_wave_bundle()
+
+    request = build_ollama_anatomy_control_request(
+        model="llama3.1:8b",
+        bundle=bundle,
+        user_goal="Wave with the right hand.",
+    )
+
+    assert request["model"] == "llama3.1:8b"
+    assert request["stream"] is False
+    assert request["format"]["type"] == "object"
+    assert request["format"]["properties"]["schema"]["const"] == ANATOMY_CONTROL_SCHEMA_VERSION
+    assert request["options"]["temperature"] == 0
+    assert request["options"]["num_predict"] <= 500
+
+
+def test_m05_validates_clamps_and_keeps_source_ids_on_controls():
+    bundle = _m05_wave_bundle()
+    raw_plan = {
+        "schema": ANATOMY_CONTROL_SCHEMA_VERSION,
+        "action": "wave",
+        "controls": [
+            {
+                "node_id": "region:right_hand",
+                "capability": "finger_curl",
+                "value": 2,
+                "weight": 3,
+                "duration_ms": 24000,
+                "rationale": "curl fingers for the wave",
+            }
+        ],
+        "diagnostic_expectations": ["right hand visibly participates"],
+    }
+
+    plan = validate_anatomy_control_plan(raw_plan, bundle)
+
+    assert len(plan.controls) == 1
+    assert plan.controls[0].node_id == "region:right_hand"
+    assert plan.controls[0].capability == "finger_curl"
+    assert plan.controls[0].value == 1
+    assert plan.controls[0].weight == 1
+    assert plan.controls[0].duration_ms == 12000
+    assert plan.controls[0].source_ids == ("openstax-ap-2e-8.2", "fipat-ta2-2019")
+    assert "right hand visibly participates" in plan.diagnostic_expectations
+
+
+def test_m05_rejects_invented_nodes_and_unsupported_capabilities():
+    bundle = _m05_wave_bundle()
+    raw_plan = {
+        "schema": ANATOMY_CONTROL_SCHEMA_VERSION,
+        "action": "wave",
+        "controls": [
+            {"node_id": "joint:right_knee", "capability": "flexion_extension", "value": 1},
+            {"node_id": "digit:right_pollex", "capability": "finger_curl", "value": 1},
+            {"node_id": "region:right_hand", "capability": "finger_curl", "value": 0.5},
+        ],
+        "diagnostic_expectations": [],
+    }
+
+    plan = validate_anatomy_control_plan(raw_plan, bundle)
+
+    assert [control.node_id for control in plan.controls] == ["region:right_hand"]
+    assert "rejected_unknown_node:joint:right_knee" in plan.diagnostics
+    assert "rejected_unsupported_capability:digit:right_pollex:finger_curl" in plan.diagnostics
+
+
+def test_m05_parses_model_payload_and_does_not_create_fake_controls():
+    bundle = _m05_wave_bundle()
+    payload = {
+        "message": {
+            "content": (
+                "Here is the JSON: "
+                '{"schema":"god.body_control.v1","action":"wave","controls":['
+                '{"node_id":"region:right_hand","capability":"open_close","value":0.75,'
+                '"weight":0.9,"duration_ms":800},'
+                '{"node_id":"bone:made_up","capability":"rotate_joint","value":1}'
+                '],"diagnostic_expectations":["hand opens and closes"]}'
+            )
+        }
+    }
+
+    plan = parse_anatomy_control_response(payload, bundle)
+
+    assert len(plan.controls) == 1
+    assert plan.controls[0].node_id == "region:right_hand"
+    assert "rejected_unknown_node:bone:made_up" in plan.diagnostics
+    assert "empty_valid_controls" not in plan.diagnostics
+
+
+def _m05_wave_bundle():
+    graph = build_m02_reference_graph()
+    return compile_lod_action_bundle(
+        graph,
+        AnatomyActionRequest(
+            action="wave",
+            seed_node_ids=("region:right_hand", "digit:right_pollex", "digit:right_index_finger"),
+            lod=ActionLOD.MESO,
+            max_nodes=16,
+            requested_capabilities=("open_close", "finger_curl"),
+        ),
+    )

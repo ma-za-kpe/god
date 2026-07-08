@@ -11,6 +11,16 @@ from .graph import (
     SourceRef,
     ValidationError,
 )
+from .control import (
+    ANATOMY_CONTROL_SCHEMA_VERSION,
+    AnatomyControl,
+    AnatomyControlPlan,
+    anatomy_control_json_schema,
+    build_anatomy_control_messages,
+    build_ollama_anatomy_control_request,
+    parse_anatomy_control_response,
+    validate_anatomy_control_plan,
+)
 from .neo4j import (
     neo4j_cypher_script,
     neo4j_load_statements,
@@ -38,6 +48,12 @@ __all__ = [
     "MaterializationState",
     "SourceRef",
     "ValidationError",
+    "ANATOMY_CONTROL_SCHEMA_VERSION",
+    "AnatomyControl",
+    "AnatomyControlPlan",
+    "anatomy_control_json_schema",
+    "build_anatomy_control_messages",
+    "build_ollama_anatomy_control_request",
     "build_m01_reference_graph",
     "build_m02_reference_graph",
     "neo4j_cypher_script",
@@ -45,6 +61,8 @@ __all__ = [
     "neo4j_lod_retrieval_cypher",
     "neo4j_schema_statements",
     "neo4j_validation_queries",
+    "parse_anatomy_control_response",
+    "validate_anatomy_control_plan",
     "ActionBundle",
     "ActionBundleNode",
     "ActionLOD",

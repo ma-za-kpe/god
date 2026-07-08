@@ -3,6 +3,14 @@ export function summarizeAnatomyMilestone(payload = {}) {
   const registry = Array.isArray(payload.llm_registry) ? payload.llm_registry : [];
   const focusNodes = Array.isArray(payload.focus_nodes) ? payload.focus_nodes : [];
   const actionBundles = Array.isArray(payload.action_bundles) ? payload.action_bundles : [];
+  const controlContract =
+    payload.control_contract && typeof payload.control_contract === 'object'
+      ? payload.control_contract
+      : {};
+  const validatedPlan =
+    controlContract.validated_plan && typeof controlContract.validated_plan === 'object'
+      ? controlContract.validated_plan
+      : {};
   const workingSet = Array.isArray(payload.forehead_working_set) ? payload.forehead_working_set : [];
   const byKind = nodes.reduce((summary, node) => {
     const kind = node?.kind || 'unknown';
@@ -19,6 +27,9 @@ export function summarizeAnatomyMilestone(payload = {}) {
     focusNodeCount: Number(payload.summary?.focus_node_count || focusNodes.length || 0),
     actionBundleCount: Number(payload.summary?.action_bundle_count || actionBundles.length || 0),
     maxActionBundleNodeCount: Number(payload.summary?.max_action_bundle_node_count || 0),
+    controlPlanCount: Number(payload.summary?.control_plan_count || validatedPlan.control_count || 0),
+    controlRejectionCount: Number(payload.summary?.control_rejection_count || 0),
+    controlSchema: controlContract.schema || '',
     byKind,
     hasForeheadSkin: nodes.some((node) => node.id === 'skin:forehead'),
     hasSweatProxy: nodes.some((node) => node.id === 'render:forehead_sweat_proxy'),
@@ -49,5 +60,8 @@ export function buildMorphChannels(summary = {}) {
     toePulse: summary.hasRightHallux ? 1 : 0,
     graphPulse: summary.neo4jSchemaStatementCount ? 1 : 0,
     lodPulse: summary.actionBundleCount ? Math.min(1, summary.maxActionBundleNodeCount / 20) : 0,
+    contractPulse: summary.controlPlanCount
+      ? Math.min(1, (summary.controlPlanCount + summary.controlRejectionCount) / 8)
+      : 0,
   };
 }

@@ -14,6 +14,8 @@ test('summarizes anatomy milestone graph evidence for the browser morph gate', (
       working_set_node_count: 3,
       action_bundle_count: 3,
       max_action_bundle_node_count: 14,
+      control_plan_count: 3,
+      control_rejection_count: 2,
     },
     neo4j: {
       node_records: 21,
@@ -26,6 +28,13 @@ test('summarizes anatomy milestone graph evidence for the browser morph gate', (
       { action: 'run', node_count: 14 },
       { action: 'sweat_forehead', node_count: 8 },
     ],
+    control_contract: {
+      schema: 'god.body_control.v1',
+      validated_plan: {
+        control_count: 3,
+        diagnostics: ['rejected_unknown_node:bone:made_up'],
+      },
+    },
     nodes: [
       { id: 'skin:forehead', kind: 'skin' },
       { id: 'render:forehead_sweat_proxy', kind: 'render_proxy' },
@@ -63,6 +72,9 @@ test('summarizes anatomy milestone graph evidence for the browser morph gate', (
   assert.equal(summary.neo4jValidationQueryCount, 5);
   assert.equal(summary.actionBundleCount, 3);
   assert.equal(summary.maxActionBundleNodeCount, 14);
+  assert.equal(summary.controlPlanCount, 3);
+  assert.equal(summary.controlRejectionCount, 2);
+  assert.equal(summary.controlSchema, 'god.body_control.v1');
 });
 
 test('builds visible morph channels from sourced anatomy graph features', () => {
@@ -80,6 +92,8 @@ test('builds visible morph channels from sourced anatomy graph features', () => 
     neo4jSchemaStatementCount: 20,
     actionBundleCount: 3,
     maxActionBundleNodeCount: 14,
+    controlPlanCount: 3,
+    controlRejectionCount: 2,
   });
 
   assert.equal(channels.headTiltDegrees, 11);
@@ -92,4 +106,5 @@ test('builds visible morph channels from sourced anatomy graph features', () => 
   assert.equal(channels.toePulse, 1);
   assert.equal(channels.graphPulse, 1);
   assert.equal(channels.lodPulse, 0.7);
+  assert.equal(channels.contractPulse, 0.625);
 });

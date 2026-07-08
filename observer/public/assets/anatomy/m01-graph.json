@@ -1,5 +1,6 @@
 {
   "action_bundles": [],
+  "control_contract": {},
   "focus_nodes": [
     {
       "id": "skin:forehead",
@@ -400,6 +401,8 @@
   "status": "complete",
   "summary": {
     "action_bundle_count": 0,
+    "control_plan_count": 0,
+    "control_rejection_count": 0,
     "edge_count": 23,
     "focus_node_count": 3,
     "llm_handle_count": 5,

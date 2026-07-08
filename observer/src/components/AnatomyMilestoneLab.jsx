@@ -45,6 +45,7 @@ export function AnatomyMilestoneLab() {
     '--toe-pulse': morph.toePulse,
     '--graph-pulse': morph.graphPulse,
     '--lod-pulse': morph.lodPulse,
+    '--contract-pulse': morph.contractPulse,
   };
 
   return (
@@ -86,6 +87,9 @@ export function AnatomyMilestoneLab() {
           </g>
           <g className="anatomy-lod-ring" aria-hidden="true">
             <ellipse cx="210" cy="430" rx="166" ry="294" />
+          </g>
+          <g className="anatomy-contract-ring" aria-hidden="true">
+            <ellipse cx="210" cy="430" rx="190" ry="318" />
           </g>
           <g className="anatomy-figure">
             <g className="anatomy-head">
@@ -152,6 +156,8 @@ export function AnatomyMilestoneLab() {
           {summary.neo4jSchemaStatementCount > 0 && <span>neo4j schema {summary.neo4jSchemaStatementCount}</span>}
           {summary.neo4jValidationQueryCount > 0 && <span>cypher checks {summary.neo4jValidationQueryCount}</span>}
           {summary.actionBundleCount > 0 && <span>lod bundles {summary.actionBundleCount}</span>}
+          {summary.controlPlanCount > 0 && <span>control plan {summary.controlPlanCount}</span>}
+          {summary.controlRejectionCount > 0 && <span>rejected {summary.controlRejectionCount}</span>}
         </div>
       </section>
       <aside className="anatomy-panel">
@@ -175,6 +181,12 @@ export function AnatomyMilestoneLab() {
           )}
           {summary.maxActionBundleNodeCount > 0 && (
             <div><strong>{summary.maxActionBundleNodeCount}</strong><span>max bundle</span></div>
+          )}
+          {summary.controlPlanCount > 0 && (
+            <div><strong>{summary.controlPlanCount}</strong><span>accepted controls</span></div>
+          )}
+          {summary.controlRejectionCount > 0 && (
+            <div><strong>{summary.controlRejectionCount}</strong><span>rejected controls</span></div>
           )}
         </div>
         <section>

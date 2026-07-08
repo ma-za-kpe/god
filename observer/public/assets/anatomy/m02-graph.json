@@ -1,5 +1,6 @@
 {
   "action_bundles": [],
+  "control_contract": {},
   "focus_nodes": [
     {
       "id": "region:head",
@@ -1061,6 +1062,8 @@
   "status": "complete",
   "summary": {
     "action_bundle_count": 0,
+    "control_plan_count": 0,
+    "control_rejection_count": 0,
     "edge_count": 68,
     "focus_node_count": 12,
     "llm_handle_count": 13,
