@@ -762,6 +762,9 @@ body {
   --sweat-pulse: 0;
   --hair-sway: 0;
   --registry-reach: 0;
+  --hand-reach: 0;
+  --knee-flex: 0;
+  --toe-pulse: 0;
   position: relative;
   min-width: 0;
   min-height: 0;
@@ -849,6 +852,15 @@ body {
   animation: anatomyForeheadPulse 1.5s ease-in-out infinite;
 }
 
+.anatomy-skull {
+  fill: rgba(238, 244, 246, 0.14);
+  stroke: rgba(238, 244, 246, 0.82);
+  stroke-width: 2;
+  stroke-dasharray: 4 5;
+  transform-origin: 210px 115px;
+  animation: anatomySkullPulse 1.8s ease-in-out infinite;
+}
+
 .anatomy-sweat circle {
   fill: rgba(92, 201, 255, calc(0.25 + var(--sweat-pulse) * 0.75));
   animation: anatomySweatDrop 1.15s ease-in-out infinite;
@@ -907,6 +919,33 @@ body {
 .anatomy-leg-right {
   transform-origin: 246px 454px;
   animation: anatomyRightLeg 2.6s ease-in-out infinite;
+}
+
+.anatomy-node-label {
+  fill: rgba(238, 244, 246, 0.9);
+  stroke: none;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0;
+  paint-order: stroke;
+}
+
+.anatomy-annotations {
+  pointer-events: none;
+}
+
+.anatomy-leader {
+  fill: none;
+  stroke: rgba(238, 244, 246, 0.55);
+  stroke-width: 1.5;
+  stroke-dasharray: 3 4;
+}
+
+.anatomy-toe-pulse {
+  fill: rgba(84, 200, 255, calc(0.18 + var(--toe-pulse) * 0.52));
+  stroke: rgba(238, 244, 246, 0.82);
+  stroke-width: 2;
+  animation: anatomyToePulse 1.25s ease-in-out infinite;
 }
 
 .anatomy-arm circle,
@@ -1046,6 +1085,11 @@ body {
   50% { transform: scale(calc(1 + var(--registry-reach) * 0.08)); }
 }
 
+@keyframes anatomySkullPulse {
+  0%, 100% { opacity: calc(0.28 + var(--hand-reach) * 0.2); }
+  50% { opacity: 0.95; }
+}
+
 @keyframes anatomySweatDrop {
   0%, 100% { transform: translateY(0); opacity: calc(0.2 + var(--sweat-pulse) * 0.55); }
   50% { transform: translateY(calc(var(--sweat-pulse) * 12px)); opacity: 1; }
@@ -1058,7 +1102,7 @@ body {
 
 @keyframes anatomyRightArm {
   0%, 100% { transform: rotate(4deg); }
-  50% { transform: rotate(calc(18deg * var(--registry-reach))); }
+  50% { transform: rotate(calc(8deg + 22deg * var(--hand-reach))); }
 }
 
 @keyframes anatomyLeftLeg {
@@ -1068,7 +1112,12 @@ body {
 
 @keyframes anatomyRightLeg {
   0%, 100% { transform: rotate(0deg); }
-  50% { transform: rotate(3deg); }
+  50% { transform: rotate(calc(3deg + 7deg * var(--knee-flex))); }
+}
+
+@keyframes anatomyToePulse {
+  0%, 100% { transform: scale(0.8); opacity: calc(0.3 + var(--toe-pulse) * 0.35); }
+  50% { transform: scale(calc(1 + var(--toe-pulse) * 0.42)); opacity: 1; }
 }
 
 @media (max-width: 860px) {

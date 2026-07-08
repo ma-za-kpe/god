@@ -11,7 +11,7 @@ from .graph import (
     SourceRef,
     ValidationError,
 )
-from .seeds import build_m01_reference_graph
+from .seeds import build_m01_reference_graph, build_m02_reference_graph
 
 __all__ = [
     "AnatomyEdge",
@@ -24,4 +24,5 @@ __all__ = [
     "SourceRef",
     "ValidationError",
     "build_m01_reference_graph",
+    "build_m02_reference_graph",
 ]

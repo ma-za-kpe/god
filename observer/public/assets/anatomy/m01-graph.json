@@ -1,4 +1,24 @@
 {
+  "focus_nodes": [
+    {
+      "id": "skin:forehead",
+      "kind": "skin",
+      "label": "Skin of forehead",
+      "materialization": "aggregate"
+    },
+    {
+      "id": "population:forehead_eccrine_sweat_glands",
+      "kind": "population_template",
+      "label": "Forehead eccrine sweat gland population",
+      "materialization": "population_template"
+    },
+    {
+      "id": "render:forehead_sweat_proxy",
+      "kind": "render_proxy",
+      "label": "Forehead sweat droplet render proxy",
+      "materialization": "render_proxy"
+    }
+  ],
   "forehead_working_set": [
     {
       "id": "population:forehead_eccrine_sweat_glands",
@@ -360,6 +380,7 @@
   "status": "complete",
   "summary": {
     "edge_count": 23,
+    "focus_node_count": 3,
     "llm_handle_count": 5,
     "node_count": 21,
     "working_set_node_count": 3,

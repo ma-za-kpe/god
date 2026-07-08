@@ -17,6 +17,14 @@ test('summarizes anatomy milestone graph evidence for the browser morph gate', (
       { id: 'skin:forehead', kind: 'skin' },
       { id: 'render:forehead_sweat_proxy', kind: 'render_proxy' },
       { id: 'population:scalp_hair_follicles', kind: 'population_template' },
+      { id: 'region:right_hand', kind: 'region' },
+      { id: 'joint:right_knee', kind: 'joint' },
+      { id: 'digit:right_hallux', kind: 'structure' },
+      { id: 'bone:skull', kind: 'bone' },
+    ],
+    focus_nodes: [
+      { id: 'region:right_hand' },
+      { id: 'joint:right_knee' },
     ],
     llm_registry: [
       { id: 'skin:forehead', control_channels: ['sweat'] },
@@ -31,6 +39,11 @@ test('summarizes anatomy milestone graph evidence for the browser morph gate', (
   assert.equal(summary.hasForeheadSkin, true);
   assert.equal(summary.hasSweatProxy, true);
   assert.equal(summary.hasHairPopulation, true);
+  assert.equal(summary.hasRightHand, true);
+  assert.equal(summary.hasRightKnee, true);
+  assert.equal(summary.hasRightHallux, true);
+  assert.equal(summary.hasSkull, true);
+  assert.equal(summary.focusNodeCount, 2);
 });
 
 test('builds visible morph channels from sourced anatomy graph features', () => {
@@ -41,11 +54,18 @@ test('builds visible morph channels from sourced anatomy graph features', () => 
     hasForeheadSkin: true,
     hasSweatProxy: true,
     hasHairPopulation: true,
+    hasRightHand: true,
+    hasRightKnee: true,
+    hasRightHallux: true,
+    hasSkull: true,
   });
 
-  assert.equal(channels.headTiltDegrees, 7);
+  assert.equal(channels.headTiltDegrees, 11);
   assert.equal(channels.sweatPulse, 0.5);
   assert.equal(channels.hairSway, 0.625);
   assert.equal(channels.bodyScale > 1, true);
   assert.equal(channels.registryReach > 0, true);
+  assert.equal(channels.handReach, 1);
+  assert.equal(channels.kneeFlex, 1);
+  assert.equal(channels.toePulse, 1);
 });

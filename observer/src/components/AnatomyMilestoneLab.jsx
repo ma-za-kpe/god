@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { buildMorphChannels, summarizeAnatomyMilestone } from '../anatomyMilestone';
 
-const ASSET_URL = '/assets/anatomy/m01-graph.json';
+const ASSET_URL = '/assets/anatomy/latest-graph.json';
 
 export function AnatomyMilestoneLab() {
   const [payload, setPayload] = useState(null);
@@ -30,7 +30,9 @@ export function AnatomyMilestoneLab() {
 
   const summary = useMemo(() => summarizeAnatomyMilestone(payload || {}), [payload]);
   const morph = useMemo(() => buildMorphChannels(summary), [summary]);
-  const workingSet = Array.isArray(payload?.forehead_working_set) ? payload.forehead_working_set : [];
+  const workingSet = Array.isArray(payload?.focus_nodes) && payload.focus_nodes.length
+    ? payload.focus_nodes
+    : (Array.isArray(payload?.forehead_working_set) ? payload.forehead_working_set : []);
   const registry = Array.isArray(payload?.llm_registry) ? payload.llm_registry : [];
   const morphStyle = {
     '--body-scale': morph.bodyScale,
@@ -38,6 +40,9 @@ export function AnatomyMilestoneLab() {
     '--sweat-pulse': morph.sweatPulse,
     '--hair-sway': morph.hairSway,
     '--registry-reach': morph.registryReach,
+    '--hand-reach': morph.handReach,
+    '--knee-flex': morph.kneeFlex,
+    '--toe-pulse': morph.toePulse,
   };
 
   return (
@@ -78,6 +83,7 @@ export function AnatomyMilestoneLab() {
             <g className="anatomy-head">
               <path className="anatomy-hair" d="M165 108 C166 55 254 54 257 109 C242 86 185 84 165 108 Z" />
               <circle className="anatomy-skin" cx="210" cy="119" r="52" />
+              <path className="anatomy-skull" d="M174 115 C174 73 246 73 246 115 C246 154 174 154 174 115 Z" />
               <path className="anatomy-forehead" d="M176 101 C188 76 233 76 246 101 C228 92 194 92 176 101 Z" />
               <g className="anatomy-sweat">
                 <circle cx="190" cy="96" r="5" />
@@ -87,6 +93,7 @@ export function AnatomyMilestoneLab() {
               <circle className="anatomy-eye" cx="193" cy="121" r="4" />
               <circle className="anatomy-eye" cx="228" cy="121" r="4" />
               <path className="anatomy-mouth" d="M194 143 Q210 153 227 143" />
+              <text className="anatomy-node-label" x="252" y="111">skull</text>
             </g>
             <path className="anatomy-neck" d="M190 167 L230 167 L238 210 L181 210 Z" />
             <path className="anatomy-torso" d="M149 210 C169 187 250 187 271 210 L291 433 C256 467 165 467 129 433 Z" />
@@ -113,14 +120,27 @@ export function AnatomyMilestoneLab() {
               <path d="M246 454 C259 528 270 605 278 685" />
               <circle className="anatomy-knee" cx="267" cy="560" r="18" />
               <path d="M278 685 C290 699 261 707 239 696" />
+              <circle className="anatomy-toe-pulse" cx="278" cy="690" r="10" />
             </g>
+          </g>
+          <g className="anatomy-annotations" aria-hidden="true">
+            <path className="anatomy-leader" d="M342 514 L326 538" />
+            <text className="anatomy-node-label" x="346" y="514">right hand</text>
+            <path className="anatomy-leader" d="M314 588 L274 562" />
+            <text className="anatomy-node-label" x="318" y="592">right knee</text>
+            <path className="anatomy-leader" d="M310 716 L280 694" />
+            <text className="anatomy-node-label" x="314" y="720">hallux</text>
           </g>
         </svg>
         <div className="anatomy-morph-readout" data-testid="anatomy-morph-readout">
           <span>morph active</span>
+          <span>{summary.milestone}</span>
           <span>skin:forehead</span>
           <span>forehead sweat proxy</span>
           <span>scalp hair population</span>
+          {summary.hasRightHand && <span>right hand</span>}
+          {summary.hasRightKnee && <span>right knee</span>}
+          {summary.hasRightHallux && <span>right hallux</span>}
         </div>
       </section>
       <aside className="anatomy-panel">
@@ -132,7 +152,7 @@ export function AnatomyMilestoneLab() {
           <div><strong>{summary.nodeCount}</strong><span>nodes</span></div>
           <div><strong>{summary.edgeCount}</strong><span>edges</span></div>
           <div><strong>{summary.llmHandleCount}</strong><span>LLM handles</span></div>
-          <div><strong>{summary.workingSetNodeCount}</strong><span>active set</span></div>
+          <div><strong>{summary.focusNodeCount || summary.workingSetNodeCount}</strong><span>focus nodes</span></div>
         </div>
         <section>
           <h2>Working Set</h2>

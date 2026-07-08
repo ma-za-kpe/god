@@ -10,6 +10,7 @@ from anatomy import (
     MaterializationState,
     SourceRef,
     build_m01_reference_graph,
+    build_m02_reference_graph,
 )
 
 
@@ -184,3 +185,104 @@ def test_validation_rejects_proxy_without_anatomy_projection():
     errors = graph.validate()
 
     assert any(error.code == "ORPHAN_RENDER_PROXY" for error in errors)
+
+
+def test_m02_seed_graph_expands_head_knee_hand_and_toe_with_sources():
+    graph = build_m02_reference_graph()
+
+    graph.assert_valid()
+
+    expected_nodes = {
+        "bone:skull",
+        "aggregate:brain_case_bones",
+        "aggregate:facial_bones",
+        "region:right_hand",
+        "aggregate:right_carpals",
+        "digit:right_pollex",
+        "joint:right_knee",
+        "bone:right_femur",
+        "bone:right_tibia",
+        "bone:right_patella",
+        "bone:right_fibula",
+        "region:right_foot",
+        "digit:right_hallux",
+        "skin:right_hallux",
+    }
+    assert expected_nodes.issubset(graph.nodes)
+    assert all(graph.node(node_id).sources for node_id in expected_nodes)
+
+
+def test_m02_knee_model_does_not_make_fibula_part_of_knee_joint():
+    graph = build_m02_reference_graph()
+
+    fibula_edges = [
+        edge
+        for edge in graph.edges
+        if edge.from_id == "bone:right_fibula" and edge.to_id == "joint:right_knee"
+    ]
+
+    assert [edge.kind for edge in fibula_edges] == [EdgeKind.ADJACENT_TO]
+    assert any(
+        edge.from_id == "bone:right_femur"
+        and edge.to_id == "joint:right_knee"
+        and edge.kind == EdgeKind.CONNECTS_TO
+        for edge in graph.edges
+    )
+    assert any(
+        edge.from_id == "bone:right_tibia"
+        and edge.to_id == "joint:right_knee"
+        and edge.kind == EdgeKind.CONNECTS_TO
+        for edge in graph.edges
+    )
+    assert any(
+        edge.from_id == "bone:right_patella"
+        and edge.to_id == "joint:right_knee"
+        and edge.kind == EdgeKind.CONNECTS_TO
+        for edge in graph.edges
+    )
+
+
+def test_m02_hand_and_hallux_special_cases_have_two_phalanges_each():
+    graph = build_m02_reference_graph()
+
+    pollex_phalanges = [
+        edge.from_id
+        for edge in graph.edges
+        if edge.to_id == "digit:right_pollex" and edge.kind == EdgeKind.PART_OF
+    ]
+    hallux_phalanges = [
+        edge.from_id
+        for edge in graph.edges
+        if edge.to_id == "digit:right_hallux" and edge.kind == EdgeKind.PART_OF
+    ]
+
+    assert sorted(pollex_phalanges) == [
+        "bone:right_pollex_distal_phalanx",
+        "bone:right_pollex_proximal_phalanx",
+    ]
+    assert sorted(hallux_phalanges) == [
+        "bone:right_hallux_distal_phalanx",
+        "bone:right_hallux_proximal_phalanx",
+    ]
+
+
+def test_m02_llm_registry_exposes_new_anatomy_controls_without_unsourced_nodes():
+    graph = build_m02_reference_graph()
+
+    registry = {item["id"]: item for item in graph.llm_control_registry()}
+
+    assert registry["joint:right_knee"]["control_channels"] == [
+        "flexion_extension",
+        "stability_state",
+        "anatomy_layer",
+    ]
+    assert registry["region:right_hand"]["control_channels"] == [
+        "open_close",
+        "finger_curl",
+        "anatomy_layer",
+    ]
+    assert registry["digit:right_hallux"]["control_channels"] == [
+        "flexion_extension",
+        "ground_contact",
+    ]
+    assert "bone:right_fibula" not in registry
