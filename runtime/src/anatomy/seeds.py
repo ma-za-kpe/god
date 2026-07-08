@@ -196,7 +196,9 @@ def build_m01_reference_graph() -> AnatomyGraph:
         EdgeKind.PART_OF,
         sources=(FIPAT_TA2,),
     )
-    add_edge("population:scalp_hair_follicles", "region:head", EdgeKind.LOCATED_IN, sources=(FIPAT_TA2,))
+    add_edge(
+        "population:scalp_hair_follicles", "region:head", EdgeKind.LOCATED_IN, sources=(FIPAT_TA2,)
+    )
 
     add_node(
         "render:forehead_sweat_proxy",
@@ -361,7 +363,9 @@ def build_m02_reference_graph() -> AnatomyGraph:
         control_channels=("flexion_extension", "abduction_adduction"),
         llm_visible=True,
     )
-    add_edge("digit:right_index_finger", "region:right_hand", EdgeKind.PART_OF, sources=(OPENSTAX_8_2,))
+    add_edge(
+        "digit:right_index_finger", "region:right_hand", EdgeKind.PART_OF, sources=(OPENSTAX_8_2,)
+    )
 
     # Right knee seed.
     add_node(

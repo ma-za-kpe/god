@@ -765,6 +765,7 @@ body {
   --hand-reach: 0;
   --knee-flex: 0;
   --toe-pulse: 0;
+  --graph-pulse: 0;
   position: relative;
   min-width: 0;
   min-height: 0;
@@ -812,6 +813,14 @@ body {
 
 .anatomy-shadow ellipse {
   fill: rgba(0, 0, 0, 0.28);
+}
+
+.anatomy-graph-grid path {
+  fill: none;
+  stroke: rgba(84, 200, 255, calc(0.08 + var(--graph-pulse) * 0.22));
+  stroke-width: 1.5;
+  stroke-dasharray: 8 12;
+  animation: anatomyGraphPulse 2s ease-in-out infinite;
 }
 
 .anatomy-figure {
@@ -1118,6 +1127,11 @@ body {
 @keyframes anatomyToePulse {
   0%, 100% { transform: scale(0.8); opacity: calc(0.3 + var(--toe-pulse) * 0.35); }
   50% { transform: scale(calc(1 + var(--toe-pulse) * 0.42)); opacity: 1; }
+}
+
+@keyframes anatomyGraphPulse {
+  0%, 100% { opacity: calc(0.18 + var(--graph-pulse) * 0.22); }
+  50% { opacity: calc(0.38 + var(--graph-pulse) * 0.48); }
 }
 
 @media (max-width: 860px) {

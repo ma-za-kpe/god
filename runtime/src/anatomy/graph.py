@@ -187,9 +187,13 @@ class AnatomyGraph:
                     ValidationError("UNKNOWN_EDGE_FROM", subject, f"Unknown from_id {edge.from_id}")
                 )
             if edge.to_id not in self.nodes:
-                errors.append(ValidationError("UNKNOWN_EDGE_TO", subject, f"Unknown to_id {edge.to_id}"))
+                errors.append(
+                    ValidationError("UNKNOWN_EDGE_TO", subject, f"Unknown to_id {edge.to_id}")
+                )
             if edge.from_id == edge.to_id:
-                errors.append(ValidationError("SELF_EDGE", subject, "Anatomy edges cannot point to self"))
+                errors.append(
+                    ValidationError("SELF_EDGE", subject, "Anatomy edges cannot point to self")
+                )
             if edge.kind == EdgeKind.PART_OF:
                 part_of_parent_count[edge.from_id] = part_of_parent_count.get(edge.from_id, 0) + 1
             edge_from = self.nodes.get(edge.from_id)
@@ -346,8 +350,7 @@ class AnatomyGraph:
         return (
             "CREATE CONSTRAINT anatomy_node_id IF NOT EXISTS "
             "FOR (n:AnatomyNode) REQUIRE n.id IS UNIQUE",
-            "CREATE INDEX anatomy_node_kind IF NOT EXISTS "
-            "FOR (n:AnatomyNode) ON (n.kind)",
+            "CREATE INDEX anatomy_node_kind IF NOT EXISTS FOR (n:AnatomyNode) ON (n.kind)",
             "CREATE INDEX anatomy_node_materialization IF NOT EXISTS "
             "FOR (n:AnatomyNode) ON (n.materialization)",
         )
@@ -385,7 +388,10 @@ def _validate_node(node: AnatomyNode) -> list[ValidationError]:
                 "LLM-visible nodes must declare bounded control channels.",
             )
         )
-    if node.kind == AnatomyKind.RENDER_PROXY and node.materialization != MaterializationState.RENDER_PROXY:
+    if (
+        node.kind == AnatomyKind.RENDER_PROXY
+        and node.materialization != MaterializationState.RENDER_PROXY
+    ):
         errors.append(
             ValidationError(
                 "RENDER_PROXY_STATE_MISMATCH",
@@ -414,9 +420,13 @@ def _validate_sources(subject: str, sources: tuple[SourceRef, ...]) -> list[Vali
     for index, source in enumerate(sources):
         source_subject = f"{subject}.source[{index}]"
         if not source.source_id.strip():
-            errors.append(ValidationError("MISSING_SOURCE_ID", source_subject, "source_id is required"))
+            errors.append(
+                ValidationError("MISSING_SOURCE_ID", source_subject, "source_id is required")
+            )
         if not source.citation.strip():
-            errors.append(ValidationError("MISSING_CITATION", source_subject, "citation is required"))
+            errors.append(
+                ValidationError("MISSING_CITATION", source_subject, "citation is required")
+            )
         if not source.url.strip():
             errors.append(ValidationError("MISSING_SOURCE_URL", source_subject, "url is required"))
         if not 0 <= source.confidence <= 1:

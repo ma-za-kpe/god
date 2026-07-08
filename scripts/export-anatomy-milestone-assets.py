@@ -13,7 +13,12 @@ RUNTIME_SRC = ROOT / "runtime" / "src"
 if str(RUNTIME_SRC) not in sys.path:
     sys.path.insert(0, str(RUNTIME_SRC))
 
-from anatomy import build_m01_reference_graph, build_m02_reference_graph  # noqa: E402
+from anatomy import (  # noqa: E402
+    build_m01_reference_graph,
+    build_m02_reference_graph,
+    neo4j_schema_statements,
+    neo4j_validation_queries,
+)
 
 
 def _milestone_payload(milestone: str) -> dict:
@@ -38,6 +43,17 @@ def _milestone_payload(milestone: str) -> dict:
             "region:right_foot",
             "digit:right_hallux",
             "skin:right_hallux",
+            "skin:forehead",
+        )
+    elif milestone == "M03":
+        graph = build_m02_reference_graph()
+        focus_ids = (
+            "region:head",
+            "bone:skull",
+            "region:right_hand",
+            "joint:right_knee",
+            "region:right_foot",
+            "digit:right_hallux",
             "skin:forehead",
         )
     else:
@@ -93,7 +109,9 @@ def _milestone_payload(milestone: str) -> dict:
         "neo4j": {
             "node_records": len(graph.to_neo4j_nodes()),
             "relationship_records": len(graph.to_neo4j_relationships()),
-            "constraints": list(graph.neo4j_constraints()),
+            "schema_statement_count": len(neo4j_schema_statements()),
+            "validation_query_count": len(neo4j_validation_queries(graph)),
+            "constraints": list(neo4j_schema_statements()),
         },
     }
 
@@ -101,12 +119,12 @@ def _milestone_payload(milestone: str) -> dict:
 def main() -> int:
     output_dir = ROOT / "observer" / "public" / "assets" / "anatomy"
     output_dir.mkdir(parents=True, exist_ok=True)
-    for milestone in ("M01", "M02"):
+    for milestone in ("M01", "M02", "M03"):
         payload = _milestone_payload(milestone)
         output = output_dir / f"{milestone.lower()}-graph.json"
         output.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
         print(output)
-        if milestone == "M02":
+        if milestone == "M03":
             latest = output_dir / "latest-graph.json"
             latest.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
             print(latest)

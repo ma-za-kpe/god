@@ -114,12 +114,31 @@
   "milestone": "M01",
   "neo4j": {
     "constraints": [
-      "CREATE CONSTRAINT anatomy_node_id IF NOT EXISTS FOR (n:AnatomyNode) REQUIRE n.id IS UNIQUE",
+      "CREATE CONSTRAINT anatomy_node_id_unique IF NOT EXISTS FOR (n:AnatomyNode) REQUIRE n.id IS UNIQUE",
       "CREATE INDEX anatomy_node_kind IF NOT EXISTS FOR (n:AnatomyNode) ON (n.kind)",
-      "CREATE INDEX anatomy_node_materialization IF NOT EXISTS FOR (n:AnatomyNode) ON (n.materialization)"
+      "CREATE INDEX anatomy_node_materialization IF NOT EXISTS FOR (n:AnatomyNode) ON (n.materialization)",
+      "CREATE INDEX anatomy_node_llm_visible IF NOT EXISTS FOR (n:AnatomyNode) ON (n.llm_visible)",
+      "CREATE TEXT INDEX anatomy_node_label_text IF NOT EXISTS FOR (n:AnatomyNode) ON (n.label)",
+      "CREATE CONSTRAINT anatomy_rel_adjacent_to_graph_key IF NOT EXISTS FOR ()-[r:ADJACENT_TO]-() REQUIRE r.graph_key IS UNIQUE",
+      "CREATE CONSTRAINT anatomy_rel_connects_to_graph_key IF NOT EXISTS FOR ()-[r:CONNECTS_TO]-() REQUIRE r.graph_key IS UNIQUE",
+      "CREATE CONSTRAINT anatomy_rel_controls_graph_key IF NOT EXISTS FOR ()-[r:CONTROLS]-() REQUIRE r.graph_key IS UNIQUE",
+      "CREATE CONSTRAINT anatomy_rel_drains_to_graph_key IF NOT EXISTS FOR ()-[r:DRAINS_TO]-() REQUIRE r.graph_key IS UNIQUE",
+      "CREATE CONSTRAINT anatomy_rel_has_population_graph_key IF NOT EXISTS FOR ()-[r:HAS_POPULATION]-() REQUIRE r.graph_key IS UNIQUE",
+      "CREATE CONSTRAINT anatomy_rel_innervates_graph_key IF NOT EXISTS FOR ()-[r:INNERVATES]-() REQUIRE r.graph_key IS UNIQUE",
+      "CREATE CONSTRAINT anatomy_rel_inserts_on_graph_key IF NOT EXISTS FOR ()-[r:INSERTS_ON]-() REQUIRE r.graph_key IS UNIQUE",
+      "CREATE CONSTRAINT anatomy_rel_located_in_graph_key IF NOT EXISTS FOR ()-[r:LOCATED_IN]-() REQUIRE r.graph_key IS UNIQUE",
+      "CREATE CONSTRAINT anatomy_rel_materializes_as_graph_key IF NOT EXISTS FOR ()-[r:MATERIALIZES_AS]-() REQUIRE r.graph_key IS UNIQUE",
+      "CREATE CONSTRAINT anatomy_rel_member_of_graph_key IF NOT EXISTS FOR ()-[r:MEMBER_OF]-() REQUIRE r.graph_key IS UNIQUE",
+      "CREATE CONSTRAINT anatomy_rel_origin_on_graph_key IF NOT EXISTS FOR ()-[r:ORIGIN_ON]-() REQUIRE r.graph_key IS UNIQUE",
+      "CREATE CONSTRAINT anatomy_rel_part_of_graph_key IF NOT EXISTS FOR ()-[r:PART_OF]-() REQUIRE r.graph_key IS UNIQUE",
+      "CREATE CONSTRAINT anatomy_rel_projects_to_render_graph_key IF NOT EXISTS FOR ()-[r:PROJECTS_TO_RENDER]-() REQUIRE r.graph_key IS UNIQUE",
+      "CREATE CONSTRAINT anatomy_rel_projects_to_simulation_graph_key IF NOT EXISTS FOR ()-[r:PROJECTS_TO_SIMULATION]-() REQUIRE r.graph_key IS UNIQUE",
+      "CREATE CONSTRAINT anatomy_rel_supplies_graph_key IF NOT EXISTS FOR ()-[r:SUPPLIES]-() REQUIRE r.graph_key IS UNIQUE"
     ],
     "node_records": 21,
-    "relationship_records": 23
+    "relationship_records": 23,
+    "schema_statement_count": 20,
+    "validation_query_count": 5
   },
   "nodes": [
     {

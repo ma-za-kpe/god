@@ -24,6 +24,10 @@ export function summarizeAnatomyMilestone(payload = {}) {
     hasRightKnee: nodes.some((node) => node.id === 'joint:right_knee'),
     hasRightHallux: nodes.some((node) => node.id === 'digit:right_hallux'),
     hasSkull: nodes.some((node) => node.id === 'bone:skull'),
+    neo4jNodeRecords: Number(payload.neo4j?.node_records || 0),
+    neo4jRelationshipRecords: Number(payload.neo4j?.relationship_records || 0),
+    neo4jSchemaStatementCount: Number(payload.neo4j?.schema_statement_count || 0),
+    neo4jValidationQueryCount: Number(payload.neo4j?.validation_query_count || 0),
   };
 }
 
@@ -40,5 +44,6 @@ export function buildMorphChannels(summary = {}) {
     handReach: summary.hasRightHand ? 1 : 0,
     kneeFlex: summary.hasRightKnee ? 1 : 0,
     toePulse: summary.hasRightHallux ? 1 : 0,
+    graphPulse: summary.neo4jSchemaStatementCount ? 1 : 0,
   };
 }

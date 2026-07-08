@@ -18,7 +18,7 @@ repos:
         args: [--maxkb=512]
       - id: detect-private-key
       - id: mixed-line-ending
-        args: [--fix=lf]
+        args: [--fix=no]
       - id: no-commit-to-branch
         args: [--branch, main, --branch, develop]
 
@@ -47,6 +47,13 @@ repos:
 
   - repo: local
     hooks:
+      - id: secret-literal-scan
+        name: secret literal scan
+        entry: python scripts/precommit-secret-scan.py
+        language: system
+        pass_filenames: true
+        types: [text]
+        stages: [pre-commit]
       - id: validation-pipeline
         name: validation pipeline
         entry: python scripts/validate-local.py

@@ -43,6 +43,7 @@ export function AnatomyMilestoneLab() {
     '--hand-reach': morph.handReach,
     '--knee-flex': morph.kneeFlex,
     '--toe-pulse': morph.toePulse,
+    '--graph-pulse': morph.graphPulse,
   };
 
   return (
@@ -78,6 +79,9 @@ export function AnatomyMilestoneLab() {
           </defs>
           <g className="anatomy-shadow">
             <ellipse cx="210" cy="716" rx="112" ry="24" />
+          </g>
+          <g className="anatomy-graph-grid" aria-hidden="true">
+            <path d="M116 198 H304 M104 322 H316 M98 446 H322 M210 190 V704" />
           </g>
           <g className="anatomy-figure">
             <g className="anatomy-head">
@@ -141,6 +145,8 @@ export function AnatomyMilestoneLab() {
           {summary.hasRightHand && <span>right hand</span>}
           {summary.hasRightKnee && <span>right knee</span>}
           {summary.hasRightHallux && <span>right hallux</span>}
+          {summary.neo4jSchemaStatementCount > 0 && <span>neo4j schema {summary.neo4jSchemaStatementCount}</span>}
+          {summary.neo4jValidationQueryCount > 0 && <span>cypher checks {summary.neo4jValidationQueryCount}</span>}
         </div>
       </section>
       <aside className="anatomy-panel">
@@ -153,6 +159,12 @@ export function AnatomyMilestoneLab() {
           <div><strong>{summary.edgeCount}</strong><span>edges</span></div>
           <div><strong>{summary.llmHandleCount}</strong><span>LLM handles</span></div>
           <div><strong>{summary.focusNodeCount || summary.workingSetNodeCount}</strong><span>focus nodes</span></div>
+          {summary.neo4jSchemaStatementCount > 0 && (
+            <div><strong>{summary.neo4jSchemaStatementCount}</strong><span>schema</span></div>
+          )}
+          {summary.neo4jValidationQueryCount > 0 && (
+            <div><strong>{summary.neo4jValidationQueryCount}</strong><span>cypher checks</span></div>
+          )}
         </div>
         <section>
           <h2>Working Set</h2>

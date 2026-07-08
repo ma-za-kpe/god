@@ -13,6 +13,12 @@ test('summarizes anatomy milestone graph evidence for the browser morph gate', (
       llm_handle_count: 5,
       working_set_node_count: 3,
     },
+    neo4j: {
+      node_records: 21,
+      relationship_records: 23,
+      schema_statement_count: 20,
+      validation_query_count: 5,
+    },
     nodes: [
       { id: 'skin:forehead', kind: 'skin' },
       { id: 'render:forehead_sweat_proxy', kind: 'render_proxy' },
@@ -44,6 +50,10 @@ test('summarizes anatomy milestone graph evidence for the browser morph gate', (
   assert.equal(summary.hasRightHallux, true);
   assert.equal(summary.hasSkull, true);
   assert.equal(summary.focusNodeCount, 2);
+  assert.equal(summary.neo4jNodeRecords, 21);
+  assert.equal(summary.neo4jRelationshipRecords, 23);
+  assert.equal(summary.neo4jSchemaStatementCount, 20);
+  assert.equal(summary.neo4jValidationQueryCount, 5);
 });
 
 test('builds visible morph channels from sourced anatomy graph features', () => {
@@ -58,6 +68,7 @@ test('builds visible morph channels from sourced anatomy graph features', () => 
     hasRightKnee: true,
     hasRightHallux: true,
     hasSkull: true,
+    neo4jSchemaStatementCount: 20,
   });
 
   assert.equal(channels.headTiltDegrees, 11);
@@ -68,4 +79,5 @@ test('builds visible morph channels from sourced anatomy graph features', () => 
   assert.equal(channels.handReach, 1);
   assert.equal(channels.kneeFlex, 1);
   assert.equal(channels.toePulse, 1);
+  assert.equal(channels.graphPulse, 1);
 });

@@ -11,6 +11,10 @@ from anatomy import (
     SourceRef,
     build_m01_reference_graph,
     build_m02_reference_graph,
+    neo4j_cypher_script,
+    neo4j_load_statements,
+    neo4j_schema_statements,
+    neo4j_validation_queries,
 )
 
 
@@ -286,3 +290,57 @@ def test_m02_llm_registry_exposes_new_anatomy_controls_without_unsourced_nodes()
         "ground_contact",
     ]
     assert "bone:right_fibula" not in registry
+
+
+def test_m03_neo4j_schema_is_idempotent_and_community_safe():
+    statements = neo4j_schema_statements()
+
+    assert any("FOR (n:AnatomyNode) REQUIRE n.id IS UNIQUE" in item for item in statements)
+    assert any("CREATE TEXT INDEX anatomy_node_label_text" in item for item in statements)
+    assert any("FOR ()-[r:PART_OF]-() REQUIRE r.graph_key IS UNIQUE" in item for item in statements)
+    assert all("IF NOT EXISTS" in item for item in statements)
+    assert not any(" IS NOT NULL" in item for item in statements)
+    assert not any(" IS NODE KEY" in item for item in statements)
+    assert not any(" IS TYPED" in item for item in statements)
+
+
+def test_m03_neo4j_load_statements_cover_m02_nodes_and_edges():
+    graph = build_m02_reference_graph()
+
+    statements = neo4j_load_statements(graph, reset=True)
+    node_merges = [item for item in statements if item.startswith("MERGE (n:")]
+    relationship_merges = [item for item in statements if "MERGE (from)-[r:" in item]
+
+    assert statements[0] == "MATCH (n:AnatomyNode) DETACH DELETE n"
+    assert len(node_merges) == len(graph.nodes)
+    assert len(relationship_merges) == len(graph.edges)
+    assert any(
+        "MERGE (n:AnatomyNode:Bone:Canonical {id: 'bone:skull'})" in item for item in node_merges
+    )
+    assert any("source_ids" in item and "llm_visible" in item for item in node_merges)
+    assert any("graph_key:" in item and "PART_OF" in item for item in relationship_merges)
+
+
+def test_m03_neo4j_validation_queries_pin_expected_counts():
+    graph = build_m02_reference_graph()
+
+    queries = neo4j_validation_queries(graph)
+
+    assert any("invalid_node_count" in query for query in queries)
+    assert any("invalid_relationship_count" in query for query in queries)
+    assert any(f"{len(graph.nodes)} AS expected_nodes" in query for query in queries)
+    assert any(f"{len(graph.edges)} AS expected_relationships" in query for query in queries)
+    assert any("duplicate_node_id_count" in query for query in queries)
+
+
+def test_m03_neo4j_cypher_script_is_cypher_shell_ready():
+    graph = build_m02_reference_graph()
+
+    script = neo4j_cypher_script(graph, reset=True)
+
+    assert script.startswith("// Anatomy Neo4j schema\n")
+    assert script.endswith(";\n")
+    assert "CREATE CONSTRAINT anatomy_node_id_unique IF NOT EXISTS" in script
+    assert "MATCH (n:AnatomyNode) DETACH DELETE n;" in script
+    assert "MERGE (n:AnatomyNode:Bone:Canonical {id: 'bone:skull'})" in script
+    assert "RETURN count(n) AS invalid_node_count;" in script
