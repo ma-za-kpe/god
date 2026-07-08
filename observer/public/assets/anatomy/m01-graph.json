@@ -1,0 +1,368 @@
+{
+  "forehead_working_set": [
+    {
+      "id": "population:forehead_eccrine_sweat_glands",
+      "kind": "population_template",
+      "label": "Forehead eccrine sweat gland population",
+      "materialization": "population_template"
+    },
+    {
+      "id": "render:forehead_sweat_proxy",
+      "kind": "render_proxy",
+      "label": "Forehead sweat droplet render proxy",
+      "materialization": "render_proxy"
+    },
+    {
+      "id": "skin:forehead",
+      "kind": "skin",
+      "label": "Skin of forehead",
+      "materialization": "aggregate"
+    }
+  ],
+  "llm_registry": [
+    {
+      "control_channels": [
+        "sweat_emission",
+        "materialize_visible_instances"
+      ],
+      "id": "population:forehead_eccrine_sweat_glands",
+      "kind": "population_template",
+      "label": "Forehead eccrine sweat gland population",
+      "materialization": "population_template",
+      "source_ids": [
+        "fipat-ta2-2019",
+        "hra-kg-v2.2-paper"
+      ]
+    },
+    {
+      "control_channels": [
+        "bend_proxy",
+        "sway_proxy",
+        "materialize_visible_instances"
+      ],
+      "id": "population:scalp_hair_follicles",
+      "kind": "population_template",
+      "label": "Scalp hair follicle population",
+      "materialization": "population_template",
+      "source_ids": [
+        "fipat-ta2-2019",
+        "hra-kg-v2.2-paper"
+      ]
+    },
+    {
+      "control_channels": [
+        "camera_focus",
+        "anatomy_layer",
+        "pose_focus"
+      ],
+      "id": "region:head",
+      "kind": "region",
+      "label": "Head",
+      "materialization": "canonical",
+      "source_ids": [
+        "fipat-ta2-2019"
+      ]
+    },
+    {
+      "control_channels": [
+        "opacity",
+        "droplet_rate"
+      ],
+      "id": "render:forehead_sweat_proxy",
+      "kind": "render_proxy",
+      "label": "Forehead sweat droplet render proxy",
+      "materialization": "render_proxy",
+      "source_ids": [
+        "hra-kg-v2.2-paper"
+      ]
+    },
+    {
+      "control_channels": [
+        "sweat",
+        "flush",
+        "detail_lod"
+      ],
+      "id": "skin:forehead",
+      "kind": "skin",
+      "label": "Skin of forehead",
+      "materialization": "aggregate",
+      "source_ids": [
+        "fipat-ta2-2019"
+      ]
+    }
+  ],
+  "milestone": "M01",
+  "neo4j": {
+    "constraints": [
+      "CREATE CONSTRAINT anatomy_node_id IF NOT EXISTS FOR (n:AnatomyNode) REQUIRE n.id IS UNIQUE",
+      "CREATE INDEX anatomy_node_kind IF NOT EXISTS FOR (n:AnatomyNode) ON (n.kind)",
+      "CREATE INDEX anatomy_node_materialization IF NOT EXISTS FOR (n:AnatomyNode) ON (n.materialization)"
+    ],
+    "node_records": 21,
+    "relationship_records": 23
+  },
+  "nodes": [
+    {
+      "control_channels": [],
+      "id": "body:human",
+      "kind": "body",
+      "label": "Human body",
+      "llm_visible": false,
+      "materialization": "canonical",
+      "source_ids": [
+        "openstax-ap-2e-1.2"
+      ]
+    },
+    {
+      "control_channels": [],
+      "id": "organ:brain",
+      "kind": "organ",
+      "label": "Brain",
+      "llm_visible": false,
+      "materialization": "canonical",
+      "source_ids": [
+        "fipat-ta2-2019"
+      ]
+    },
+    {
+      "control_channels": [],
+      "id": "organ:skin",
+      "kind": "skin",
+      "label": "Skin",
+      "llm_visible": false,
+      "materialization": "canonical",
+      "source_ids": [
+        "openstax-ap-2e-1.2",
+        "fipat-ta2-2019"
+      ]
+    },
+    {
+      "control_channels": [
+        "sweat_emission",
+        "materialize_visible_instances"
+      ],
+      "id": "population:forehead_eccrine_sweat_glands",
+      "kind": "population_template",
+      "label": "Forehead eccrine sweat gland population",
+      "llm_visible": true,
+      "materialization": "population_template",
+      "source_ids": [
+        "fipat-ta2-2019",
+        "hra-kg-v2.2-paper"
+      ]
+    },
+    {
+      "control_channels": [
+        "bend_proxy",
+        "sway_proxy",
+        "materialize_visible_instances"
+      ],
+      "id": "population:scalp_hair_follicles",
+      "kind": "population_template",
+      "label": "Scalp hair follicle population",
+      "llm_visible": true,
+      "materialization": "population_template",
+      "source_ids": [
+        "fipat-ta2-2019",
+        "hra-kg-v2.2-paper"
+      ]
+    },
+    {
+      "control_channels": [
+        "camera_focus",
+        "anatomy_layer",
+        "pose_focus"
+      ],
+      "id": "region:head",
+      "kind": "region",
+      "label": "Head",
+      "llm_visible": true,
+      "materialization": "canonical",
+      "source_ids": [
+        "fipat-ta2-2019"
+      ]
+    },
+    {
+      "control_channels": [
+        "opacity",
+        "droplet_rate"
+      ],
+      "id": "render:forehead_sweat_proxy",
+      "kind": "render_proxy",
+      "label": "Forehead sweat droplet render proxy",
+      "llm_visible": true,
+      "materialization": "render_proxy",
+      "source_ids": [
+        "hra-kg-v2.2-paper"
+      ]
+    },
+    {
+      "control_channels": [
+        "sweat",
+        "flush",
+        "detail_lod"
+      ],
+      "id": "skin:forehead",
+      "kind": "skin",
+      "label": "Skin of forehead",
+      "llm_visible": true,
+      "materialization": "aggregate",
+      "source_ids": [
+        "fipat-ta2-2019"
+      ]
+    },
+    {
+      "control_channels": [],
+      "id": "structure:hair",
+      "kind": "hair",
+      "label": "Hair",
+      "llm_visible": false,
+      "materialization": "canonical",
+      "source_ids": [
+        "openstax-ap-2e-1.2",
+        "fipat-ta2-2019"
+      ]
+    },
+    {
+      "control_channels": [],
+      "id": "structure:nails",
+      "kind": "nail",
+      "label": "Nails",
+      "llm_visible": false,
+      "materialization": "canonical",
+      "source_ids": [
+        "openstax-ap-2e-1.2",
+        "fipat-ta2-2019"
+      ]
+    },
+    {
+      "control_channels": [],
+      "id": "system:cardiovascular",
+      "kind": "system",
+      "label": "Cardiovascular system",
+      "llm_visible": false,
+      "materialization": "canonical",
+      "source_ids": [
+        "openstax-ap-2e-1.2"
+      ]
+    },
+    {
+      "control_channels": [],
+      "id": "system:digestive",
+      "kind": "system",
+      "label": "Digestive system",
+      "llm_visible": false,
+      "materialization": "canonical",
+      "source_ids": [
+        "openstax-ap-2e-1.2"
+      ]
+    },
+    {
+      "control_channels": [],
+      "id": "system:endocrine",
+      "kind": "system",
+      "label": "Endocrine system",
+      "llm_visible": false,
+      "materialization": "canonical",
+      "source_ids": [
+        "openstax-ap-2e-1.2"
+      ]
+    },
+    {
+      "control_channels": [],
+      "id": "system:integumentary",
+      "kind": "system",
+      "label": "Integumentary system",
+      "llm_visible": false,
+      "materialization": "canonical",
+      "source_ids": [
+        "openstax-ap-2e-1.2"
+      ]
+    },
+    {
+      "control_channels": [],
+      "id": "system:lymphatic",
+      "kind": "system",
+      "label": "Lymphatic system",
+      "llm_visible": false,
+      "materialization": "canonical",
+      "source_ids": [
+        "openstax-ap-2e-1.2"
+      ]
+    },
+    {
+      "control_channels": [],
+      "id": "system:muscular",
+      "kind": "system",
+      "label": "Muscular system",
+      "llm_visible": false,
+      "materialization": "canonical",
+      "source_ids": [
+        "openstax-ap-2e-1.2"
+      ]
+    },
+    {
+      "control_channels": [],
+      "id": "system:nervous",
+      "kind": "system",
+      "label": "Nervous system",
+      "llm_visible": false,
+      "materialization": "canonical",
+      "source_ids": [
+        "openstax-ap-2e-1.2"
+      ]
+    },
+    {
+      "control_channels": [],
+      "id": "system:reproductive",
+      "kind": "system",
+      "label": "Reproductive system",
+      "llm_visible": false,
+      "materialization": "canonical",
+      "source_ids": [
+        "openstax-ap-2e-1.2"
+      ]
+    },
+    {
+      "control_channels": [],
+      "id": "system:respiratory",
+      "kind": "system",
+      "label": "Respiratory system",
+      "llm_visible": false,
+      "materialization": "canonical",
+      "source_ids": [
+        "openstax-ap-2e-1.2"
+      ]
+    },
+    {
+      "control_channels": [],
+      "id": "system:skeletal",
+      "kind": "system",
+      "label": "Skeletal system",
+      "llm_visible": false,
+      "materialization": "canonical",
+      "source_ids": [
+        "openstax-ap-2e-1.2"
+      ]
+    },
+    {
+      "control_channels": [],
+      "id": "system:urinary",
+      "kind": "system",
+      "label": "Urinary system",
+      "llm_visible": false,
+      "materialization": "canonical",
+      "source_ids": [
+        "openstax-ap-2e-1.2"
+      ]
+    }
+  ],
+  "status": "complete",
+  "summary": {
+    "edge_count": 23,
+    "llm_handle_count": 5,
+    "node_count": 21,
+    "working_set_node_count": 3,
+    "working_set_root": "skin:forehead"
+  }
+}

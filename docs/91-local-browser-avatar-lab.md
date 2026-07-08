@@ -25,6 +25,11 @@ the gap tracker in `docs/92-avatar-lab-gap-tracker.md`.
 
 The browser route is `/avatar-lab`.
 
+The anatomy milestone route is `/anatomy-lab`. It loads generated graph evidence
+from `observer/public/assets/anatomy/m01-graph.json` and renders a browser body
+projection that visibly morphs from the milestone graph working set. This is the
+early milestone visual gate before full anatomy-aware avatar rendering.
+
 It provides:
 
 - A local Three.js avatar surface using the existing `ControlledAvatar` adapter.

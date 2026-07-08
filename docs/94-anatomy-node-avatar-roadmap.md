@@ -18,8 +18,9 @@ Every milestone must end with:
   changed.
 - Unit tests for the new behavior.
 - Lint/build/compile checks for the touched stack.
-- Browser screenshot or rendered artifact when visual output is part of the
-  milestone.
+- Browser-visible body morph/projection evidence. Early data milestones may use
+  the anatomy projection route; renderer milestones must use the real avatar
+  renderer. Restart the browser before capture and save screenshots.
 - No silent degradation. Unsupported controls, missing nodes, missing sources,
   and renderer gaps must be explicit diagnostics.
 
@@ -39,7 +40,7 @@ Every milestone must end with:
 
 | ID | Status | Goal | Exit Criteria |
 | --- | --- | --- | --- |
-| M01 | complete | Anatomy graph contract and provenance validator. | Python domain model exists; every node/edge requires source provenance; Neo4j export shape exists; LLM registry excludes invalid/unsupported nodes; tests pass; evidence screenshot exists at `artifacts/m01-anatomy-graph-evidence.png`. |
+| M01 | complete | Anatomy graph contract and provenance validator. | Python domain model exists; every node/edge requires source provenance; Neo4j export shape exists; LLM registry excludes invalid/unsupported nodes; tests pass; browser body morph evidence exists at `/anatomy-lab` and `artifacts/m01-anatomy-browser-morph.png`. |
 | M02 | next | Canonical seed graph for body, systems, head, knee, hand, and toe. | Seed data is source-cited; top-level OpenStax/FIPAT structure is represented; validation fails on missing relationships; tests cover head/knee/toe breakdown. |
 | M03 | pending | Neo4j local graph service and constraints. | Docker service exists; indexes/constraints are generated; seed graph loads into Neo4j; Cypher validation tests pass locally. |
 | M04 | pending | GraphRAG retrieval and LOD compiler. | Queries such as `wave`, `run`, and `sweat on forehead` compile into bounded working sets; no million-node context dumps; tests prove LOD behavior. |
@@ -56,6 +57,11 @@ Do not skip ahead. If a renderer milestone exposes a graph flaw, return to the
 graph milestone and fix the contract. If an LLM milestone invents nodes, fix the
 registry and validator. If a mature tool already solves a subproblem, build an
 adapter instead of rebuilding the tool.
+
+Every milestone must make the body visibly change in the browser at the
+appropriate fidelity for that milestone. The change can be an anatomy projection
+for graph/data milestones or the full avatar renderer for animation milestones,
+but it must be screenshot-verified after restarting the browser.
 
 The ambition remains explicit, large-scale anatomy addressability. The runtime
 discipline is compiled working sets, lazy materialization, source provenance,
