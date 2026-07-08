@@ -8,6 +8,7 @@ import os
 from pathlib import Path
 from http.server import HTTPServer, SimpleHTTPRequestHandler
 from urllib.parse import unquote, urlsplit
+from urllib.request import Request, urlopen
 
 _ROOT = os.path.dirname(os.path.abspath(__file__))
 _DIST = Path(_ROOT) / "dist"
@@ -15,6 +16,7 @@ _SOURCE = Path(_ROOT)
 _DIST_ROOT = _DIST.resolve()
 _SOURCE_ROOT = _SOURCE.resolve()
 _ALLOW_ORIGIN = os.getenv("OBSERVER_ALLOW_ORIGIN", "").strip()
+_OLLAMA_PROXY_URL = os.getenv("OLLAMA_PROXY_URL", "http://host.docker.internal:11434").rstrip("/")
 
 
 def _contained_path(root: Path, request_path: str) -> Path | None:
@@ -48,11 +50,57 @@ class ObserverHandler(SimpleHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(data)
 
+    def _proxy_ollama(self) -> None:
+        path = unquote(urlsplit(self.path).path)
+        upstream_path = path.replace("/ollama", "", 1) or "/"
+        query = urlsplit(self.path).query
+        upstream_url = f"{_OLLAMA_PROXY_URL}{upstream_path}"
+        if query:
+            upstream_url = f"{upstream_url}?{query}"
+
+        body = None
+        if self.command in ("POST", "PUT", "PATCH"):
+            length = int(self.headers.get("Content-Length", "0") or "0")
+            body = self.rfile.read(length) if length > 0 else b""
+
+        headers = {
+            "Content-Type": self.headers.get("Content-Type", "application/json"),
+            "Accept": self.headers.get("Accept", "application/json"),
+        }
+        request = Request(upstream_url, data=body, headers=headers, method=self.command)
+        try:
+            with urlopen(request, timeout=120) as response:
+                data = response.read()
+                self.send_response(response.status)
+                self.send_header("Content-Type", response.headers.get("Content-Type", "application/json"))
+                self.send_header("Content-Length", str(len(data)))
+                self._gpu_headers()
+                self.end_headers()
+                self.wfile.write(data)
+        except Exception as exc:
+            data = (f'{{"error":"ollama proxy failed","detail":{str(exc)!r}}}').encode("utf-8")
+            self.send_response(502)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(data)))
+            self._gpu_headers()
+            self.end_headers()
+            self.wfile.write(data)
+
+    def do_OPTIONS(self) -> None:
+        self.send_response(204)
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type, Accept")
+        self._gpu_headers()
+        self.end_headers()
+
     def do_GET(self) -> None:
         path = unquote(urlsplit(self.path).path).rstrip("/") or "/"
         if "\x00" in path:
             self.send_error(400, "Invalid path")
             return
+
+        if path == "/ollama" or path.startswith("/ollama/"):
+            return self._proxy_ollama()
 
         if path in ("/maku", "/classic"):
             return self._serve_file(_SOURCE / "maku.html" if path == "/maku" else _SOURCE / "stage.html")
@@ -78,6 +126,12 @@ class ObserverHandler(SimpleHTTPRequestHandler):
         if (_DIST / "index.html").exists():
             return self._serve_file(_DIST / "index.html")
         return self._serve_file(_SOURCE / "stage.html")
+
+    def do_POST(self) -> None:
+        path = unquote(urlsplit(self.path).path).rstrip("/") or "/"
+        if path == "/ollama" or path.startswith("/ollama/"):
+            return self._proxy_ollama()
+        self.send_error(404, "File not found")
 
 
 def main() -> None:

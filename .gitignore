@@ -68,3 +68,7 @@ pr_fresh_update.txt
 
 # Documentation release build output
 dist/
+
+# Local reference caches. Keep source URLs and checksums in manifests.
+docs/reference/anatomy/*.pdf
+docs/reference/anatomy/*-full-text.txt

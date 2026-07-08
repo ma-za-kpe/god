@@ -1,1 +1,2 @@
 *.sh text eol=lf
+observer/public/assets/avatars/*.glb filter=lfs diff=lfs merge=lfs -text

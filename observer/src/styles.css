@@ -548,3 +548,213 @@ body {
 .minimal .world-shell {
   min-height: 100%;
 }
+
+.avatar-lab-shell {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 390px;
+  background: #071014;
+}
+
+.avatar-lab-stage {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+}
+
+.avatar-lab-stage canvas {
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
+}
+
+.talkinghead-stage {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  background: #071014;
+}
+
+.talkinghead-canvas {
+  width: 100%;
+  height: 100%;
+}
+
+.talkinghead-canvas canvas {
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
+}
+
+.talkinghead-status {
+  position: absolute;
+  left: 16px;
+  bottom: 16px;
+  z-index: 2;
+  padding: 8px 10px;
+  border: 1px solid rgba(158, 230, 181, 0.26);
+  border-radius: 6px;
+  background: rgba(7, 16, 20, 0.82);
+  color: #9ee6b5;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}
+
+.talkinghead-status small {
+  display: block;
+  max-width: min(70vw, 620px);
+  margin-top: 6px;
+  color: rgba(237, 241, 255, 0.78);
+  font-size: 0.72rem;
+  line-height: 1.35;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.avatar-lab-controls {
+  min-width: 0;
+  height: 100%;
+  overflow: auto;
+  display: grid;
+  align-content: start;
+  gap: 14px;
+  padding: 14px;
+  border-left: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(9, 15, 17, 0.96);
+}
+
+.avatar-lab-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+  gap: 12px;
+}
+
+.avatar-lab-title {
+  font-size: 1rem;
+  font-weight: 760;
+}
+
+.avatar-lab-status {
+  margin-top: 3px;
+  color: #9ee6b5;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}
+
+.avatar-lab-status.secondary {
+  color: rgba(214, 220, 255, 0.64);
+}
+
+.avatar-lab-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.avatar-lab-actions.wide {
+  justify-content: stretch;
+}
+
+.avatar-lab-actions button {
+  min-width: 66px;
+  min-height: 34px;
+  border: 1px solid rgba(158, 230, 181, 0.22);
+  border-radius: 6px;
+  background: rgba(158, 230, 181, 0.08);
+  color: #edf1ff;
+  font: inherit;
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+
+.avatar-lab-actions button.active {
+  border-color: rgba(158, 230, 181, 0.68);
+  background: rgba(158, 230, 181, 0.2);
+  color: #ffffff;
+}
+
+.avatar-lab-field,
+.avatar-lab-grid label,
+.avatar-lab-sliders label {
+  display: grid;
+  gap: 6px;
+}
+
+.avatar-lab-field span,
+.avatar-lab-grid span,
+.avatar-lab-sliders span {
+  color: rgba(214, 220, 255, 0.68);
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}
+
+.avatar-lab-field textarea,
+.avatar-lab-grid input {
+  width: 100%;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.045);
+  color: #edf1ff;
+  font: inherit;
+  font-size: 0.86rem;
+}
+
+.avatar-lab-field textarea {
+  resize: vertical;
+  min-height: 92px;
+  padding: 10px;
+  line-height: 1.45;
+}
+
+.avatar-lab-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+}
+
+.avatar-lab-grid input {
+  height: 34px;
+  padding: 0 9px;
+}
+
+.avatar-lab-sliders {
+  display: grid;
+  gap: 10px;
+}
+
+.avatar-lab-sliders input {
+  width: 100%;
+  accent-color: #9ee6b5;
+}
+
+.avatar-lab-json {
+  min-height: 220px;
+  margin: 0;
+  overflow: auto;
+  padding: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.04);
+  color: #d6dcff;
+  font-size: 0.72rem;
+  line-height: 1.45;
+  white-space: pre-wrap;
+}
+
+@media (max-width: 860px) {
+  .avatar-lab-shell {
+    grid-template-columns: 1fr;
+    grid-template-rows: minmax(45vh, 1fr) minmax(260px, 45vh);
+  }
+
+  .avatar-lab-controls {
+    border-left: 0;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+  }
+}

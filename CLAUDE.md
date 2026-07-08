@@ -9,6 +9,7 @@ This repository is an ecology, not a toy demo.
 - Keep tool use structured and explicit. Never let free-form text silently become an action.
 - Let agents think for themselves inside the ecology. Do not over-pad the world just to make it feel safe.
 - When improving prompt safety, harden the control plane, not the ecology.
+- Avatar lab work follows [Agent Steering](./AGENTS.md): hard-coded avatar behavior is only a test fallback; code owns schema and clamps, while the LLM owns dialogue, camera/framing, mood, gesture, gaze, full-body pose, hair, face, hands/fingers, wardrobe/body presentation, lighting, stage, and every exposed renderer node.
 
 ## Editing Preference
 

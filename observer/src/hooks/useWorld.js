@@ -215,7 +215,7 @@ function startVoiceMeterFromElement(audio, playback) {
   } catch {}
 }
 
-function armPlaybackEndedWatchdog(playback, extra = {}) {
+function armPlaybackEndedWatchdog(playback) {
   clearActiveAudioTimer();
   const durationMs = Number(playback?.durationSeconds || 0) * 1000;
   if (!Number.isFinite(durationMs) || durationMs <= 0) return;
@@ -228,7 +228,7 @@ function startVoicePlayback(playback, audioUrl, extra = {}) {
   const nextPlayback = { ...(playback || {}), ...extra };
   markVoicePlayback('starting', nextPlayback, {
     audioUrl,
-    transport: extra.transport || 'fish-audio',
+    transport: extra.transport || 'runtime-tts-audio',
     ...extra,
   });
   _playAudioUrl(audioUrl, nextPlayback);
@@ -421,12 +421,12 @@ export function useWorld() {
             const audioUrl = resolveVoiceAudioUrl(snap?.voice?.synthesis?.audio_url, uid);
             _lastPlayedUtteranceId = uid;
             startVoicePlayback(playback, audioUrl, {
-              transport: 'fish-audio+rigged-avatar',
+              transport: 'runtime-tts+rigged-avatar',
             });
           } else if (!uid || !synthOk) {
             _alphabetSpeaking = false;
             _alphabetNextAt = Date.now() + 1200;
-            useObserverStore.getState().setOneAlphabetStatus('waiting-for-fish-audio');
+            useObserverStore.getState().setOneAlphabetStatus('waiting-for-tts-audio');
           }
         } else {
           _alphabetSpeaking = false;

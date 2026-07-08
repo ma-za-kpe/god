@@ -31,7 +31,7 @@ def test_react_one_page_selects_voice_speaker():
     )
 
 
-def test_react_one_page_has_alphabet_caption_and_fish_audio_gate():
+def test_react_one_page_has_alphabet_caption_and_tts_audio_gate():
     app = _read("observer/src/App.jsx")
     avatar = _read("observer/src/components/AgentAvatar.jsx")
     rig = _read("observer/src/components/ControlledAvatar.jsx")
@@ -52,7 +52,7 @@ def test_react_one_page_has_alphabet_caption_and_fish_audio_gate():
     assert "const playback = playbackContextFromSnapshot(snap);" in hook
     assert "const audioUrl = resolveVoiceAudioUrl(snap?.voice?.synthesis?.audio_url, uid);" in hook
     assert "startVoicePlayback(playback, audioUrl, {" in hook
-    assert "transport: 'fish-audio+rigged-avatar'" in hook
+    assert "transport: 'runtime-tts+rigged-avatar'" in hook
     assert "startVoiceMeterFromAnalyser" in hook
     assert "audioRmsFromAnalyser" in hook
     assert "audio_analyser+viseme_track" in hook
@@ -61,7 +61,7 @@ def test_react_one_page_has_alphabet_caption_and_fish_audio_gate():
     assert "fish-audio+live-video" not in hook
     assert "waiting-for-live-video" not in hook
     assert "} else if (!uid || !synthOk) {" in hook
-    assert "waiting-for-fish-audio" in hook
+    assert "waiting-for-tts-audio" in hook
     assert "waiting-for-alphabet-line" in hook
     assert "speechSynthesis" not in hook
     assert "ensureOneAlphabetDrill" not in hook
