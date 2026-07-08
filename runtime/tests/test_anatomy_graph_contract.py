@@ -9,8 +9,12 @@ from anatomy import (
     EdgeKind,
     MaterializationState,
     SourceRef,
+    ActionLOD,
+    AnatomyActionRequest,
     build_m01_reference_graph,
     build_m02_reference_graph,
+    compile_lod_action_bundle,
+    neo4j_lod_retrieval_cypher,
     neo4j_cypher_script,
     neo4j_load_statements,
     neo4j_schema_statements,
@@ -344,3 +348,103 @@ def test_m03_neo4j_cypher_script_is_cypher_shell_ready():
     assert "MATCH (n:AnatomyNode) DETACH DELETE n;" in script
     assert "MERGE (n:AnatomyNode:Bone:Canonical {id: 'bone:skull'})" in script
     assert "RETURN count(n) AS invalid_node_count;" in script
+
+
+def test_m04_wave_request_compiles_to_bounded_upper_limb_bundle():
+    graph = build_m02_reference_graph()
+    request = AnatomyActionRequest(
+        action="wave",
+        seed_node_ids=("region:right_hand", "digit:right_pollex", "digit:right_index_finger"),
+        lod=ActionLOD.MESO,
+        max_nodes=16,
+        requested_capabilities=("open_close", "finger_curl"),
+    )
+
+    bundle = compile_lod_action_bundle(graph, request)
+    bundle_ids = {node.id for node in bundle.nodes}
+
+    assert len(bundle.nodes) <= 16
+    assert {"region:right_hand", "digit:right_pollex", "digit:right_index_finger"}.issubset(
+        bundle_ids
+    )
+    assert "joint:right_knee" not in bundle_ids
+    assert any(node.role.value == "primary" for node in bundle.nodes)
+    assert "unsupported_capability:digit:right_pollex:open_close" in bundle.diagnostics
+    assert "MATCH path=(seed)-[:" in bundle.cypher
+
+
+def test_m04_run_request_stays_bounded_and_reports_no_context_explosion():
+    graph = build_m02_reference_graph()
+    request = AnatomyActionRequest(
+        action="run",
+        seed_node_ids=(
+            "joint:right_knee",
+            "digit:right_hallux",
+            "system:muscular",
+            "system:cardiovascular",
+            "system:respiratory",
+            "skin:forehead",
+        ),
+        lod=ActionLOD.MACRO,
+        max_nodes=14,
+    )
+
+    bundle = compile_lod_action_bundle(graph, request)
+    bundle_ids = {node.id for node in bundle.nodes}
+
+    assert len(bundle.nodes) <= 14
+    assert "joint:right_knee" in bundle_ids
+    assert "digit:right_hallux" in bundle_ids
+    assert "system:cardiovascular" in bundle_ids
+    assert all(not diagnostic.startswith("missing_seed_node") for diagnostic in bundle.diagnostics)
+
+
+def test_m04_sweat_request_uses_micro_lod_without_expanding_virtual_instances():
+    graph = build_m02_reference_graph()
+    request = AnatomyActionRequest(
+        action="sweat_forehead",
+        seed_node_ids=(
+            "skin:forehead",
+            "population:forehead_eccrine_sweat_glands",
+            "render:forehead_sweat_proxy",
+        ),
+        lod=ActionLOD.MICRO,
+        max_nodes=12,
+        requested_capabilities=("sweat",),
+    )
+
+    bundle = compile_lod_action_bundle(graph, request)
+    bundle_by_id = {node.id: node for node in bundle.nodes}
+
+    assert len(bundle.nodes) <= 12
+    assert bundle_by_id["skin:forehead"].role.value == "primary"
+    assert bundle_by_id["render:forehead_sweat_proxy"].role.value == "primary"
+    assert "virtual:forehead_sweat_gland_0001" not in bundle_by_id
+
+
+def test_m04_missing_seed_nodes_become_diagnostics_not_fake_nodes():
+    graph = build_m02_reference_graph()
+    request = AnatomyActionRequest(
+        action="blink",
+        seed_node_ids=("region:right_eye", "bone:skull"),
+        lod=ActionLOD.MESO,
+        max_nodes=8,
+    )
+
+    bundle = compile_lod_action_bundle(graph, request)
+    bundle_ids = {node.id for node in bundle.nodes}
+
+    assert "missing_seed_node:region:right_eye" in bundle.diagnostics
+    assert "region:right_eye" not in bundle_ids
+    assert "bone:skull" in bundle_ids
+
+
+def test_m04_neo4j_lod_cypher_uses_bounded_graph_traversal():
+    cypher = neo4j_lod_retrieval_cypher(2)
+
+    assert "seed.id IN $seed_node_ids" in cypher
+    assert "*0..2" in cypher
+    assert "LIMIT $max_nodes" in cypher
+    assert "interior.kind IN ['body', 'system']" in cypher
+    assert "PART_OF" in cypher
+    assert "PROJECTS_TO_RENDER" in cypher

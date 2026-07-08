@@ -16,6 +16,9 @@ if str(RUNTIME_SRC) not in sys.path:
 from anatomy import (  # noqa: E402
     build_m01_reference_graph,
     build_m02_reference_graph,
+    ActionLOD,
+    AnatomyActionRequest,
+    compile_lod_action_bundle,
     neo4j_schema_statements,
     neo4j_validation_queries,
 )
@@ -56,6 +59,18 @@ def _milestone_payload(milestone: str) -> dict:
             "digit:right_hallux",
             "skin:forehead",
         )
+    elif milestone == "M04":
+        graph = build_m02_reference_graph()
+        focus_ids = (
+            "region:right_hand",
+            "digit:right_pollex",
+            "digit:right_index_finger",
+            "joint:right_knee",
+            "digit:right_hallux",
+            "skin:forehead",
+            "population:forehead_eccrine_sweat_glands",
+            "render:forehead_sweat_proxy",
+        )
     else:
         raise ValueError(f"Unsupported anatomy milestone: {milestone}")
 
@@ -72,6 +87,55 @@ def _milestone_payload(milestone: str) -> dict:
         if node_id in graph.nodes
     ]
 
+    action_bundles = []
+    if milestone == "M04":
+        action_bundles = [
+            compile_lod_action_bundle(
+                graph,
+                AnatomyActionRequest(
+                    action="wave",
+                    seed_node_ids=(
+                        "region:right_hand",
+                        "digit:right_pollex",
+                        "digit:right_index_finger",
+                    ),
+                    lod=ActionLOD.MESO,
+                    max_nodes=16,
+                    requested_capabilities=("open_close", "finger_curl"),
+                ),
+            ).to_dict(),
+            compile_lod_action_bundle(
+                graph,
+                AnatomyActionRequest(
+                    action="run",
+                    seed_node_ids=(
+                        "joint:right_knee",
+                        "digit:right_hallux",
+                        "system:muscular",
+                        "system:cardiovascular",
+                        "system:respiratory",
+                        "skin:forehead",
+                    ),
+                    lod=ActionLOD.MACRO,
+                    max_nodes=14,
+                ),
+            ).to_dict(),
+            compile_lod_action_bundle(
+                graph,
+                AnatomyActionRequest(
+                    action="sweat_forehead",
+                    seed_node_ids=(
+                        "skin:forehead",
+                        "population:forehead_eccrine_sweat_glands",
+                        "render:forehead_sweat_proxy",
+                    ),
+                    lod=ActionLOD.MICRO,
+                    max_nodes=12,
+                    requested_capabilities=("sweat",),
+                ),
+            ).to_dict(),
+        ]
+
     return {
         "milestone": milestone,
         "status": "complete",
@@ -82,6 +146,11 @@ def _milestone_payload(milestone: str) -> dict:
             "working_set_root": working_set.root_id,
             "working_set_node_count": len(working_set.node_ids),
             "focus_node_count": len(focus_nodes),
+            "action_bundle_count": len(action_bundles),
+            "max_action_bundle_node_count": max(
+                (bundle["node_count"] for bundle in action_bundles),
+                default=0,
+            ),
         },
         "nodes": [
             {
@@ -106,6 +175,7 @@ def _milestone_payload(milestone: str) -> dict:
             for node_id in working_set.node_ids
         ],
         "focus_nodes": focus_nodes,
+        "action_bundles": action_bundles,
         "neo4j": {
             "node_records": len(graph.to_neo4j_nodes()),
             "relationship_records": len(graph.to_neo4j_relationships()),
@@ -119,14 +189,16 @@ def _milestone_payload(milestone: str) -> dict:
 def main() -> int:
     output_dir = ROOT / "observer" / "public" / "assets" / "anatomy"
     output_dir.mkdir(parents=True, exist_ok=True)
-    for milestone in ("M01", "M02", "M03"):
+    for milestone in ("M01", "M02", "M03", "M04"):
         payload = _milestone_payload(milestone)
         output = output_dir / f"{milestone.lower()}-graph.json"
         output.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
         print(output)
-        if milestone == "M03":
+        if milestone == "M04":
             latest = output_dir / "latest-graph.json"
-            latest.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+            latest.write_text(
+                json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+            )
             print(latest)
     return 0
 

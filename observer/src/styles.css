@@ -766,6 +766,7 @@ body {
   --knee-flex: 0;
   --toe-pulse: 0;
   --graph-pulse: 0;
+  --lod-pulse: 0;
   position: relative;
   min-width: 0;
   min-height: 0;
@@ -821,6 +822,15 @@ body {
   stroke-width: 1.5;
   stroke-dasharray: 8 12;
   animation: anatomyGraphPulse 2s ease-in-out infinite;
+}
+
+.anatomy-lod-ring ellipse {
+  fill: none;
+  stroke: rgba(244, 201, 93, calc(0.08 + var(--lod-pulse) * 0.36));
+  stroke-width: 2;
+  stroke-dasharray: 14 16;
+  transform-origin: 210px 430px;
+  animation: anatomyLodPulse 2.4s ease-in-out infinite;
 }
 
 .anatomy-figure {
@@ -1132,6 +1142,11 @@ body {
 @keyframes anatomyGraphPulse {
   0%, 100% { opacity: calc(0.18 + var(--graph-pulse) * 0.22); }
   50% { opacity: calc(0.38 + var(--graph-pulse) * 0.48); }
+}
+
+@keyframes anatomyLodPulse {
+  0%, 100% { transform: scale(0.96); opacity: calc(0.16 + var(--lod-pulse) * 0.24); }
+  50% { transform: scale(calc(1 + var(--lod-pulse) * 0.04)); opacity: calc(0.46 + var(--lod-pulse) * 0.34); }
 }
 
 @media (max-width: 860px) {

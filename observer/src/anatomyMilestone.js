@@ -2,6 +2,7 @@ export function summarizeAnatomyMilestone(payload = {}) {
   const nodes = Array.isArray(payload.nodes) ? payload.nodes : [];
   const registry = Array.isArray(payload.llm_registry) ? payload.llm_registry : [];
   const focusNodes = Array.isArray(payload.focus_nodes) ? payload.focus_nodes : [];
+  const actionBundles = Array.isArray(payload.action_bundles) ? payload.action_bundles : [];
   const workingSet = Array.isArray(payload.forehead_working_set) ? payload.forehead_working_set : [];
   const byKind = nodes.reduce((summary, node) => {
     const kind = node?.kind || 'unknown';
@@ -16,6 +17,8 @@ export function summarizeAnatomyMilestone(payload = {}) {
     llmHandleCount: Number(payload.summary?.llm_handle_count || registry.length || 0),
     workingSetNodeCount: Number(payload.summary?.working_set_node_count || workingSet.length || 0),
     focusNodeCount: Number(payload.summary?.focus_node_count || focusNodes.length || 0),
+    actionBundleCount: Number(payload.summary?.action_bundle_count || actionBundles.length || 0),
+    maxActionBundleNodeCount: Number(payload.summary?.max_action_bundle_node_count || 0),
     byKind,
     hasForeheadSkin: nodes.some((node) => node.id === 'skin:forehead'),
     hasSweatProxy: nodes.some((node) => node.id === 'render:forehead_sweat_proxy'),
@@ -45,5 +48,6 @@ export function buildMorphChannels(summary = {}) {
     kneeFlex: summary.hasRightKnee ? 1 : 0,
     toePulse: summary.hasRightHallux ? 1 : 0,
     graphPulse: summary.neo4jSchemaStatementCount ? 1 : 0,
+    lodPulse: summary.actionBundleCount ? Math.min(1, summary.maxActionBundleNodeCount / 20) : 0,
   };
 }

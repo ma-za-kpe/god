@@ -1,4 +1,5 @@
 {
+  "action_bundles": [],
   "focus_nodes": [
     {
       "id": "region:head",
@@ -1059,9 +1060,11 @@
   ],
   "status": "complete",
   "summary": {
+    "action_bundle_count": 0,
     "edge_count": 68,
     "focus_node_count": 12,
     "llm_handle_count": 13,
+    "max_action_bundle_node_count": 0,
     "node_count": 60,
     "working_set_node_count": 3,
     "working_set_root": "skin:forehead"

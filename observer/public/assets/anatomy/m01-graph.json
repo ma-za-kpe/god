@@ -1,4 +1,5 @@
 {
+  "action_bundles": [],
   "focus_nodes": [
     {
       "id": "skin:forehead",
@@ -398,9 +399,11 @@
   ],
   "status": "complete",
   "summary": {
+    "action_bundle_count": 0,
     "edge_count": 23,
     "focus_node_count": 3,
     "llm_handle_count": 5,
+    "max_action_bundle_node_count": 0,
     "node_count": 21,
     "working_set_node_count": 3,
     "working_set_root": "skin:forehead"
