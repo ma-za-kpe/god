@@ -11,6 +11,10 @@ export function summarizeAnatomyMilestone(payload = {}) {
     controlContract.validated_plan && typeof controlContract.validated_plan === 'object'
       ? controlContract.validated_plan
       : {};
+  const motionProjection =
+    payload.motion_projection && typeof payload.motion_projection === 'object'
+      ? payload.motion_projection
+      : {};
   const workingSet = Array.isArray(payload.forehead_working_set) ? payload.forehead_working_set : [];
   const byKind = nodes.reduce((summary, node) => {
     const kind = node?.kind || 'unknown';
@@ -33,6 +37,19 @@ export function summarizeAnatomyMilestone(payload = {}) {
     renderLayerCount: Number(payload.summary?.render_layer_count || 0),
     renderPrimitiveCount: Number(payload.summary?.render_primitive_count || 0),
     renderMissingMappingCount: Number(payload.summary?.render_missing_mapping_count || 0),
+    motionPlanCount: Number(payload.summary?.motion_plan_count || motionProjection.plan_count || 0),
+    motionRendererControlCount: Number(
+      payload.summary?.motion_renderer_control_count || motionProjection.renderer_control_count || 0,
+    ),
+    motionSimulationHintCount: Number(
+      payload.summary?.motion_simulation_hint_count || motionProjection.simulation_hint_count || 0,
+    ),
+    motionVisualCueCount: Number(
+      payload.summary?.motion_visual_cue_count || motionProjection.visual_cue_count || 0,
+    ),
+    motionDiagnosticCount: Number(
+      payload.summary?.motion_diagnostic_count || motionProjection.diagnostic_count || 0,
+    ),
     byKind,
     hasForeheadSkin: nodes.some((node) => node.id === 'skin:forehead'),
     hasSweatProxy: nodes.some((node) => node.id === 'render:forehead_sweat_proxy'),
@@ -68,6 +85,16 @@ export function buildMorphChannels(summary = {}) {
       : 0,
     renderPulse: summary.renderPrimitiveCount
       ? Math.min(1, summary.renderPrimitiveCount / Math.max(1, summary.nodeCount))
+      : 0,
+    motionPulse: summary.motionPlanCount
+      ? Math.min(
+        1,
+        (
+          summary.motionRendererControlCount
+          + summary.motionSimulationHintCount
+          + summary.motionVisualCueCount
+        ) / 24,
+      )
       : 0,
   };
 }
@@ -105,4 +132,90 @@ export function getAnatomyRenderProjection(payload = {}) {
       };
     }),
   };
+}
+
+export function getAnatomyMotionProjection(payload = {}) {
+  const projection = payload.motion_projection && typeof payload.motion_projection === 'object'
+    ? payload.motion_projection
+    : {};
+  const plans = Array.isArray(projection.plans) ? projection.plans : [];
+  const diagnostics = Array.isArray(projection.diagnostics) ? projection.diagnostics : [];
+  const nodeById = new Map((Array.isArray(payload.nodes) ? payload.nodes : []).map((node) => [node.id, node]));
+  const hydratedPlans = plans.map((plan) => {
+    const sourceBundleNodeIds = (Array.isArray(plan.source_bundle_node_ids)
+      ? plan.source_bundle_node_ids
+      : []
+    ).filter((nodeId) => nodeById.has(nodeId));
+    const sourceBundleNodeIdSet = new Set(sourceBundleNodeIds);
+    const planDiagnostics = Array.isArray(plan.diagnostics) ? [...plan.diagnostics] : [];
+    const rendererControls = sanitizeMotionRecords(
+      plan.renderer_controls,
+      nodeById,
+      sourceBundleNodeIdSet,
+    );
+    const simulationHints = sanitizeMotionRecords(
+      plan.simulation_hints,
+      nodeById,
+      sourceBundleNodeIdSet,
+    );
+    const visualCues = sanitizeMotionRecords(
+      plan.visual_cues,
+      nodeById,
+      sourceBundleNodeIdSet,
+    );
+    const rawRecordCount =
+      safeArray(plan.renderer_controls).length
+      + safeArray(plan.simulation_hints).length
+      + safeArray(plan.visual_cues).length;
+    const acceptedRecordCount =
+      rendererControls.length + simulationHints.length + visualCues.length;
+    const droppedRecordCount = rawRecordCount - acceptedRecordCount;
+    if (droppedRecordCount > 0) {
+      planDiagnostics.push(`dropped_unbacked_motion_records:${droppedRecordCount}`);
+    }
+
+    return {
+      action: String(plan.action || ''),
+      status: planDiagnostics.length ? 'degraded' : (plan.status || 'complete'),
+      rendererControls,
+      simulationHints,
+      visualCues,
+      sourceBundleNodeIds,
+      diagnostics: planDiagnostics,
+    };
+  });
+
+  return {
+    schema: projection.schema || '',
+    status: diagnostics.length ? 'degraded' : (projection.status || 'unknown'),
+    diagnostics,
+    plans: hydratedPlans,
+    planCount: hydratedPlans.length,
+    rendererControlCount: hydratedPlans.reduce(
+      (count, plan) => count + plan.rendererControls.length,
+      0,
+    ),
+    simulationHintCount: hydratedPlans.reduce(
+      (count, plan) => count + plan.simulationHints.length,
+      0,
+    ),
+    visualCueCount: hydratedPlans.reduce((count, plan) => count + plan.visualCues.length, 0),
+  };
+}
+
+function safeArray(value) {
+  return Array.isArray(value) ? value : [];
+}
+
+function sanitizeMotionRecords(records, nodeById, sourceBundleNodeIdSet) {
+  return safeArray(records)
+    .filter((record) => (
+      nodeById.has(record?.node_id)
+      && (!sourceBundleNodeIdSet.size || sourceBundleNodeIdSet.has(record.node_id))
+    ))
+    .map((record) => ({
+      ...record,
+      label: nodeById.get(record.node_id)?.label || record.node_id,
+      kind: nodeById.get(record.node_id)?.kind || 'unknown',
+    }));
 }

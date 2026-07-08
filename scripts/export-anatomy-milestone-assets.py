@@ -15,11 +15,12 @@ if str(RUNTIME_SRC) not in sys.path:
 
 from anatomy import (  # noqa: E402
     ANATOMY_CONTROL_SCHEMA_VERSION,
-    build_m01_reference_graph,
-    build_m02_reference_graph,
     ActionLOD,
     AnatomyActionRequest,
+    build_anatomy_motion_projection,
     build_anatomy_render_projection,
+    build_m01_reference_graph,
+    build_m02_reference_graph,
     build_ollama_anatomy_control_request,
     compile_lod_action_bundle,
     neo4j_schema_statements,
@@ -63,7 +64,7 @@ def _milestone_payload(milestone: str) -> dict:
             "digit:right_hallux",
             "skin:forehead",
         )
-    elif milestone in {"M04", "M05", "M06"}:
+    elif milestone in {"M04", "M05", "M06", "M07"}:
         graph = build_m02_reference_graph()
         focus_ids = (
             "body:human",
@@ -107,13 +108,19 @@ def _milestone_payload(milestone: str) -> dict:
     action_bundles = []
     control_contract = {}
     render_projection = {}
-    if milestone in {"M04", "M05", "M06"}:
-        compiled_bundles = _compile_reference_action_bundles(graph)
+    motion_projection = {}
+    if milestone in {"M04", "M05", "M06", "M07"}:
+        compiled_bundles = _compile_reference_action_bundles(
+            graph,
+            include_sit=milestone == "M07",
+        )
         action_bundles = [bundle.to_dict() for bundle in compiled_bundles]
-        if milestone in {"M05", "M06"}:
+        if milestone in {"M05", "M06", "M07"}:
             control_contract = _build_reference_control_contract(compiled_bundles[0])
-        if milestone == "M06":
+        if milestone in {"M06", "M07"}:
             render_projection = build_anatomy_render_projection(graph).to_dict()
+        if milestone == "M07":
+            motion_projection = build_anatomy_motion_projection(compiled_bundles).to_dict()
 
     return {
         "milestone": milestone,
@@ -145,6 +152,11 @@ def _milestone_payload(milestone: str) -> dict:
             "render_layer_count": len(render_projection.get("layers", [])),
             "render_primitive_count": len(render_projection.get("primitives", [])),
             "render_missing_mapping_count": render_projection.get("missing_mapping_count", 0),
+            "motion_plan_count": motion_projection.get("plan_count", 0),
+            "motion_renderer_control_count": motion_projection.get("renderer_control_count", 0),
+            "motion_simulation_hint_count": motion_projection.get("simulation_hint_count", 0),
+            "motion_visual_cue_count": motion_projection.get("visual_cue_count", 0),
+            "motion_diagnostic_count": motion_projection.get("diagnostic_count", 0),
         },
         "nodes": [
             {
@@ -172,6 +184,7 @@ def _milestone_payload(milestone: str) -> dict:
         "action_bundles": action_bundles,
         "control_contract": control_contract,
         "render_projection": render_projection,
+        "motion_projection": motion_projection,
         "neo4j": {
             "node_records": len(graph.to_neo4j_nodes()),
             "relationship_records": len(graph.to_neo4j_relationships()),
@@ -185,12 +198,12 @@ def _milestone_payload(milestone: str) -> dict:
 def main() -> int:
     output_dir = ROOT / "observer" / "public" / "assets" / "anatomy"
     output_dir.mkdir(parents=True, exist_ok=True)
-    for milestone in ("M01", "M02", "M03", "M04", "M05", "M06"):
+    for milestone in ("M01", "M02", "M03", "M04", "M05", "M06", "M07"):
         payload = _milestone_payload(milestone)
         output = output_dir / f"{milestone.lower()}-graph.json"
         output.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
         print(output)
-        if milestone == "M06":
+        if milestone == "M07":
             latest = output_dir / "latest-graph.json"
             latest.write_text(
                 json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8"
@@ -199,8 +212,30 @@ def main() -> int:
     return 0
 
 
-def _compile_reference_action_bundles(graph):
-    return [
+def _compile_reference_action_bundles(graph, include_sit=False):
+    run_seed_node_ids = (
+        (
+            "joint:right_knee",
+            "digit:right_hallux",
+            "region:right_foot",
+            "system:muscular",
+            "system:cardiovascular",
+            "system:respiratory",
+            "skin:forehead",
+            "joint:right_ankle",
+            "region:pelvis",
+        )
+        if include_sit
+        else (
+            "joint:right_knee",
+            "digit:right_hallux",
+            "system:muscular",
+            "system:cardiovascular",
+            "system:respiratory",
+            "skin:forehead",
+        )
+    )
+    bundles = [
         compile_lod_action_bundle(
             graph,
             AnatomyActionRequest(
@@ -214,38 +249,62 @@ def _compile_reference_action_bundles(graph):
                 max_nodes=16,
                 requested_capabilities=("open_close", "finger_curl"),
             ),
-        ),
-        compile_lod_action_bundle(
-            graph,
-            AnatomyActionRequest(
-                action="run",
-                seed_node_ids=(
-                    "joint:right_knee",
-                    "digit:right_hallux",
-                    "system:muscular",
-                    "system:cardiovascular",
-                    "system:respiratory",
-                    "skin:forehead",
-                ),
-                lod=ActionLOD.MACRO,
-                max_nodes=14,
-            ),
-        ),
-        compile_lod_action_bundle(
-            graph,
-            AnatomyActionRequest(
-                action="sweat_forehead",
-                seed_node_ids=(
-                    "skin:forehead",
-                    "population:forehead_eccrine_sweat_glands",
-                    "render:forehead_sweat_proxy",
-                ),
-                lod=ActionLOD.MICRO,
-                max_nodes=12,
-                requested_capabilities=("sweat",),
-            ),
-        ),
+        )
     ]
+    if include_sit:
+        bundles.append(
+            compile_lod_action_bundle(
+                graph,
+                AnatomyActionRequest(
+                    action="sit",
+                    seed_node_ids=(
+                        "joint:right_knee",
+                        "region:right_foot",
+                        "digit:right_hallux",
+                        "joint:right_hip",
+                        "region:pelvis",
+                    ),
+                    lod=ActionLOD.MESO,
+                    max_nodes=16,
+                    requested_capabilities=(
+                        "flexion_extension",
+                        "weight_bearing",
+                        "ground_contact",
+                    ),
+                ),
+            )
+        )
+    bundles.extend(
+        [
+            compile_lod_action_bundle(
+                graph,
+                AnatomyActionRequest(
+                    action="run",
+                    seed_node_ids=run_seed_node_ids,
+                    lod=ActionLOD.MACRO,
+                    max_nodes=16 if include_sit else 14,
+                    requested_capabilities=("flexion_extension", "ground_contact")
+                    if include_sit
+                    else (),
+                ),
+            ),
+            compile_lod_action_bundle(
+                graph,
+                AnatomyActionRequest(
+                    action="sweat_forehead",
+                    seed_node_ids=(
+                        "skin:forehead",
+                        "population:forehead_eccrine_sweat_glands",
+                        "render:forehead_sweat_proxy",
+                    ),
+                    lod=ActionLOD.MICRO,
+                    max_nodes=12,
+                    requested_capabilities=("sweat",),
+                ),
+            ),
+        ]
+    )
+    return bundles
 
 
 def _build_reference_control_contract(wave_bundle):

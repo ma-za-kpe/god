@@ -942,6 +942,7 @@
     }
   ],
   "milestone": "M06",
+  "motion_projection": {},
   "neo4j": {
     "constraints": [
       "CREATE CONSTRAINT anatomy_node_id_unique IF NOT EXISTS FOR (n:AnatomyNode) REQUIRE n.id IS UNIQUE",
@@ -2254,6 +2255,11 @@
     "focus_node_count": 21,
     "llm_handle_count": 13,
     "max_action_bundle_node_count": 14,
+    "motion_diagnostic_count": 0,
+    "motion_plan_count": 0,
+    "motion_renderer_control_count": 0,
+    "motion_simulation_hint_count": 0,
+    "motion_visual_cue_count": 0,
     "node_count": 60,
     "render_layer_count": 5,
     "render_missing_mapping_count": 7,

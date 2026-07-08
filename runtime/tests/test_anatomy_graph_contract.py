@@ -2,6 +2,7 @@ import pytest
 
 from anatomy import (
     ANATOMY_CONTROL_SCHEMA_VERSION,
+    ANATOMY_MOTION_SCHEMA_VERSION,
     ANATOMY_RENDER_SCHEMA_VERSION,
     AnatomyEdge,
     AnatomyGraph,
@@ -14,6 +15,7 @@ from anatomy import (
     ActionLOD,
     AnatomyActionRequest,
     anatomy_control_json_schema,
+    build_anatomy_motion_projection,
     build_anatomy_render_projection,
     build_m01_reference_graph,
     build_m02_reference_graph,
@@ -625,6 +627,63 @@ def test_m06_render_projection_reports_real_missing_mappings_as_degraded():
     assert missing_system_ids.issubset(graph.nodes)
 
 
+def test_m07_motion_projection_compiles_wave_sit_run_plans():
+    projection = build_anatomy_motion_projection(_m07_motion_bundles()).to_dict()
+    plan_by_action = {plan["action"]: plan for plan in projection["plans"]}
+
+    assert projection["schema"] == ANATOMY_MOTION_SCHEMA_VERSION
+    assert list(plan_by_action) == ["wave", "sit", "run"]
+    assert projection["plan_count"] == 3
+    assert projection["renderer_control_count"] >= 8
+    assert projection["simulation_hint_count"] >= 8
+    assert plan_by_action["wave"]["renderer_control_count"] == 3
+    assert plan_by_action["sit"]["renderer_control_count"] == 3
+    assert plan_by_action["run"]["renderer_control_count"] == 3
+    assert plan_by_action["run"]["simulation_hint_count"] == 4
+
+
+def test_m07_motion_projection_controls_are_source_backed_and_bundle_scoped():
+    projection = build_anatomy_motion_projection(_m07_motion_bundles()).to_dict()
+
+    for plan in projection["plans"]:
+        bundle_node_ids = set(plan["source_bundle_node_ids"])
+        for control in plan["renderer_controls"]:
+            assert control["node_id"] in bundle_node_ids
+            assert control["source_ids"]
+            assert control["adapter"] in {"browser_svg"}
+        for hint in plan["simulation_hints"]:
+            assert hint["node_id"] in bundle_node_ids
+            assert hint["source_ids"]
+            assert hint["backend"] in {"opensim", "opensim_moco", "muskemo"}
+        for cue in plan["visual_cues"]:
+            assert cue["node_id"] in bundle_node_ids
+            assert cue["source_ids"]
+
+    all_control_node_ids = {
+        control["node_id"] for plan in projection["plans"] for control in plan["renderer_controls"]
+    }
+    assert "bone:made_up" not in all_control_node_ids
+    assert "joint:right_hip" not in all_control_node_ids
+
+
+def test_m07_motion_projection_reports_missing_depth_as_diagnostics():
+    projection = build_anatomy_motion_projection(_m07_motion_bundles()).to_dict()
+    diagnostics = set(projection["diagnostics"])
+
+    assert projection["status"] == "degraded"
+    assert "wave:missing_motion_node:joint:right_shoulder" in diagnostics
+    assert "wave:missing_motion_node:joint:right_elbow" in diagnostics
+    assert "sit:missing_motion_node:joint:right_hip" in diagnostics
+    assert "sit:missing_motion_node:region:pelvis" in diagnostics
+    assert "run:missing_motion_node:joint:right_ankle" in diagnostics
+    assert "run:missing_motion_node:region:pelvis" in diagnostics
+    assert not any(
+        "joint:right_hip" in control["node_id"]
+        for plan in projection["plans"]
+        for control in plan["renderer_controls"]
+    )
+
+
 def _m05_wave_bundle():
     graph = build_m02_reference_graph()
     return compile_lod_action_bundle(
@@ -637,3 +696,47 @@ def _m05_wave_bundle():
             requested_capabilities=("open_close", "finger_curl"),
         ),
     )
+
+
+def _m07_motion_bundles():
+    graph = build_m02_reference_graph()
+    requests = (
+        AnatomyActionRequest(
+            action="wave",
+            seed_node_ids=("region:right_hand", "digit:right_pollex", "digit:right_index_finger"),
+            lod=ActionLOD.MESO,
+            max_nodes=16,
+            requested_capabilities=("open_close", "finger_curl"),
+        ),
+        AnatomyActionRequest(
+            action="sit",
+            seed_node_ids=(
+                "joint:right_knee",
+                "region:right_foot",
+                "digit:right_hallux",
+                "joint:right_hip",
+                "region:pelvis",
+            ),
+            lod=ActionLOD.MESO,
+            max_nodes=16,
+            requested_capabilities=("flexion_extension", "weight_bearing", "ground_contact"),
+        ),
+        AnatomyActionRequest(
+            action="run",
+            seed_node_ids=(
+                "joint:right_knee",
+                "digit:right_hallux",
+                "region:right_foot",
+                "system:muscular",
+                "system:cardiovascular",
+                "system:respiratory",
+                "skin:forehead",
+                "joint:right_ankle",
+                "region:pelvis",
+            ),
+            lod=ActionLOD.MACRO,
+            max_nodes=16,
+            requested_capabilities=("flexion_extension", "ground_contact"),
+        ),
+    )
+    return tuple(compile_lod_action_bundle(graph, request) for request in requests)

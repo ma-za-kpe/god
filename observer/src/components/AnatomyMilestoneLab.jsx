@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   buildMorphChannels,
+  getAnatomyMotionProjection,
   getAnatomyRenderProjection,
   summarizeAnatomyMilestone,
 } from '../anatomyMilestone';
@@ -35,6 +36,7 @@ export function AnatomyMilestoneLab() {
   const summary = useMemo(() => summarizeAnatomyMilestone(payload || {}), [payload]);
   const morph = useMemo(() => buildMorphChannels(summary), [summary]);
   const renderProjection = useMemo(() => getAnatomyRenderProjection(payload || {}), [payload]);
+  const motionProjection = useMemo(() => getAnatomyMotionProjection(payload || {}), [payload]);
   const workingSet = Array.isArray(payload?.focus_nodes) && payload.focus_nodes.length
     ? payload.focus_nodes
     : (Array.isArray(payload?.forehead_working_set) ? payload.forehead_working_set : []);
@@ -52,6 +54,7 @@ export function AnatomyMilestoneLab() {
     '--lod-pulse': morph.lodPulse,
     '--contract-pulse': morph.contractPulse,
     '--render-pulse': morph.renderPulse,
+    '--motion-pulse': morph.motionPulse,
   };
 
   return (
@@ -162,14 +165,37 @@ export function AnatomyMilestoneLab() {
               </g>
             ))}
           </g>
-          <g className="anatomy-annotations" aria-hidden="true">
-            <path className="anatomy-leader" d="M342 514 L326 538" />
-            <text className="anatomy-node-label" x="346" y="514">right hand</text>
-            <path className="anatomy-leader" d="M314 588 L274 562" />
-            <text className="anatomy-node-label" x="318" y="592">right knee</text>
-            <path className="anatomy-leader" d="M310 716 L280 694" />
-            <text className="anatomy-node-label" x="314" y="720">hallux</text>
+          <g
+            className="anatomy-motion-projection"
+            data-testid="anatomy-motion-bridge"
+            aria-hidden="true"
+          >
+            {motionProjection.plans.map((plan) => (
+              <g
+                key={plan.action}
+                className={`anatomy-motion-plan anatomy-motion-${plan.action}`}
+                data-action={plan.action}
+                data-status={plan.status}
+              >
+                {plan.visualCues.map((cue) => (
+                  <MotionCue
+                    key={`${plan.action}:${cue.node_id}:${cue.shape}:${cue.class_name || 'cue'}`}
+                    cue={cue}
+                  />
+                ))}
+              </g>
+            ))}
           </g>
+          {renderProjection.layers.length === 0 && (
+            <g className="anatomy-annotations" aria-hidden="true">
+              <path className="anatomy-leader" d="M342 514 L326 538" />
+              <text className="anatomy-node-label" x="346" y="514">right hand</text>
+              <path className="anatomy-leader" d="M314 588 L274 562" />
+              <text className="anatomy-node-label" x="318" y="592">right knee</text>
+              <path className="anatomy-leader" d="M310 716 L280 694" />
+              <text className="anatomy-node-label" x="314" y="720">hallux</text>
+            </g>
+          )}
         </svg>
         <div className="anatomy-morph-readout" data-testid="anatomy-morph-readout">
           <span>morph active</span>
@@ -188,6 +214,10 @@ export function AnatomyMilestoneLab() {
           {summary.renderLayerCount > 0 && <span>render layers {summary.renderLayerCount}</span>}
           {summary.renderPrimitiveCount > 0 && <span>mapped {summary.renderPrimitiveCount}</span>}
           {summary.renderMissingMappingCount > 0 && <span>degraded {summary.renderMissingMappingCount}</span>}
+          {summary.motionPlanCount > 0 && <span>motion plans {summary.motionPlanCount}</span>}
+          {summary.motionRendererControlCount > 0 && <span>motion controls {summary.motionRendererControlCount}</span>}
+          {summary.motionSimulationHintCount > 0 && <span>sim hints {summary.motionSimulationHintCount}</span>}
+          {summary.motionDiagnosticCount > 0 && <span>motion degraded {summary.motionDiagnosticCount}</span>}
         </div>
       </section>
       <aside className="anatomy-panel">
@@ -227,7 +257,47 @@ export function AnatomyMilestoneLab() {
           {summary.renderMissingMappingCount > 0 && (
             <div><strong>{summary.renderMissingMappingCount}</strong><span>degraded maps</span></div>
           )}
+          {summary.motionPlanCount > 0 && (
+            <div><strong>{summary.motionPlanCount}</strong><span>motion plans</span></div>
+          )}
+          {summary.motionRendererControlCount > 0 && (
+            <div><strong>{summary.motionRendererControlCount}</strong><span>motion controls</span></div>
+          )}
+          {summary.motionSimulationHintCount > 0 && (
+            <div><strong>{summary.motionSimulationHintCount}</strong><span>sim hints</span></div>
+          )}
+          {summary.motionVisualCueCount > 0 && (
+            <div><strong>{summary.motionVisualCueCount}</strong><span>visual cues</span></div>
+          )}
         </div>
+        {motionProjection.plans.length > 0 && (
+          <section>
+            <h2>Motion Plans</h2>
+            <ul>
+              {motionProjection.plans.map((plan) => (
+                <li key={plan.action}>
+                  <strong>{plan.action}</strong>
+                  <span>
+                    {plan.rendererControls.length} controls / {plan.simulationHints.length} hints / {plan.status}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+        {motionProjection.diagnostics.length > 0 && (
+          <section>
+            <h2>Motion Diagnostics</h2>
+            <ul>
+              {motionProjection.diagnostics.slice(0, 8).map((diagnostic) => (
+                <li key={diagnostic}>
+                  <strong>{diagnostic}</strong>
+                  <span>motion bridge diagnostic</span>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
         {renderProjection.layers.length > 0 && (
           <section>
             <h2>Inspection Layers</h2>
@@ -281,6 +351,43 @@ export function AnatomyMilestoneLab() {
       </aside>
     </main>
   );
+}
+
+function MotionCue({ cue }) {
+  const geometry = cue.geometry && typeof cue.geometry === 'object' ? cue.geometry : {};
+  const className = [
+    'anatomy-motion-cue',
+    `anatomy-motion-${cue.action}`,
+    `anatomy-motion-${cue.class_name || cue.shape}`,
+  ].join(' ');
+  const common = {
+    className,
+    'data-node-id': cue.node_id,
+  };
+  const title = <title>{cue.label}</title>;
+
+  if (cue.shape === 'path') {
+    return <path {...common} d={geometry.d || ''}>{title}</path>;
+  }
+  if (cue.shape === 'circle') {
+    return <circle {...common} cx={geometry.cx} cy={geometry.cy} r={geometry.r}>{title}</circle>;
+  }
+  if (cue.shape === 'ellipse') {
+    return (
+      <ellipse {...common} cx={geometry.cx} cy={geometry.cy} rx={geometry.rx} ry={geometry.ry}>
+        {title}
+      </ellipse>
+    );
+  }
+  if (cue.shape === 'line') {
+    return (
+      <line {...common} x1={geometry.x1} y1={geometry.y1} x2={geometry.x2} y2={geometry.y2}>
+        {title}
+      </line>
+    );
+  }
+
+  return null;
 }
 
 function RenderProjectionPrimitive({ primitive }) {

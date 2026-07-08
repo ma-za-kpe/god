@@ -769,6 +769,7 @@ body {
   --lod-pulse: 0;
   --contract-pulse: 0;
   --render-pulse: 0;
+  --motion-pulse: 0;
   position: relative;
   min-width: 0;
   min-height: 0;
@@ -975,6 +976,52 @@ body {
   letter-spacing: 0;
 }
 
+.anatomy-motion-projection {
+  pointer-events: none;
+  opacity: calc(0.6 + var(--motion-pulse) * 0.32);
+}
+
+.anatomy-motion-plan {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.anatomy-motion-cue {
+  fill: none;
+  vector-effect: non-scaling-stroke;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  animation: anatomyMotionCuePulse 1.25s ease-in-out infinite;
+}
+
+.anatomy-motion-wave-arc {
+  stroke: rgba(255, 211, 95, 0.94);
+  stroke-width: 6;
+  stroke-dasharray: 16 12;
+  filter: drop-shadow(0 0 8px rgba(255, 211, 95, 0.46));
+}
+
+.anatomy-motion-sit-knee {
+  stroke: rgba(82, 255, 181, 0.9);
+  stroke-width: 7;
+  stroke-dasharray: 10 8;
+  filter: drop-shadow(0 0 9px rgba(82, 255, 181, 0.42));
+}
+
+.anatomy-motion-run-stride {
+  stroke: rgba(255, 107, 136, 0.86);
+  stroke-width: 6;
+  stroke-dasharray: 18 10;
+  filter: drop-shadow(0 0 9px rgba(255, 107, 136, 0.38));
+}
+
+.anatomy-motion-run-toe-off {
+  stroke: rgba(84, 200, 255, 0.92);
+  stroke-width: 6;
+  stroke-dasharray: 7 9;
+  filter: drop-shadow(0 0 8px rgba(84, 200, 255, 0.42));
+}
+
 .anatomy-figure {
   transform-origin: 210px 420px;
   animation: anatomyBodyBreathe 2.8s ease-in-out infinite;
@@ -1119,12 +1166,13 @@ body {
 .anatomy-morph-readout {
   position: absolute;
   left: 18px;
-  right: 18px;
+  right: auto;
   bottom: 18px;
   z-index: 2;
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+  max-width: min(42vw, 440px);
 }
 
 .anatomy-morph-readout span {
@@ -1299,6 +1347,17 @@ body {
 @keyframes anatomyRenderNodePulse {
   0%, 100% { opacity: calc(0.58 + var(--render-pulse) * 0.2); }
   50% { opacity: 1; }
+}
+
+@keyframes anatomyMotionCuePulse {
+  0%, 100% {
+    opacity: calc(0.34 + var(--motion-pulse) * 0.38);
+    stroke-dashoffset: 0;
+  }
+  50% {
+    opacity: 1;
+    stroke-dashoffset: -18;
+  }
 }
 
 @media (max-width: 860px) {

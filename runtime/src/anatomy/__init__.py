@@ -34,6 +34,15 @@ from .render_projection import (
     AnatomyRenderProjection,
     build_anatomy_render_projection,
 )
+from .motion_projection import (
+    ANATOMY_MOTION_SCHEMA_VERSION,
+    AnatomyMotionPlan,
+    AnatomyMotionProjection,
+    AnatomyMotionRendererControl,
+    AnatomyMotionSimulationHint,
+    AnatomyMotionVisualCue,
+    build_anatomy_motion_projection,
+)
 from .retrieval import (
     ActionBundle,
     ActionBundleNode,
@@ -73,6 +82,13 @@ __all__ = [
     "AnatomyRenderPrimitive",
     "AnatomyRenderProjection",
     "build_anatomy_render_projection",
+    "ANATOMY_MOTION_SCHEMA_VERSION",
+    "AnatomyMotionPlan",
+    "AnatomyMotionProjection",
+    "AnatomyMotionRendererControl",
+    "AnatomyMotionSimulationHint",
+    "AnatomyMotionVisualCue",
+    "build_anatomy_motion_projection",
     "parse_anatomy_control_response",
     "validate_anatomy_control_plan",
     "ActionBundle",

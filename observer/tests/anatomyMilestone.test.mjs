@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 
 import {
   buildMorphChannels,
+  getAnatomyMotionProjection,
   getAnatomyRenderProjection,
   summarizeAnatomyMilestone,
 } from '../src/anatomyMilestone.js';
@@ -23,6 +24,11 @@ test('summarizes anatomy milestone graph evidence for the browser morph gate', (
       render_layer_count: 5,
       render_primitive_count: 23,
       render_missing_mapping_count: 7,
+      motion_plan_count: 3,
+      motion_renderer_control_count: 9,
+      motion_simulation_hint_count: 9,
+      motion_visual_cue_count: 4,
+      motion_diagnostic_count: 6,
     },
     neo4j: {
       node_records: 21,
@@ -85,6 +91,11 @@ test('summarizes anatomy milestone graph evidence for the browser morph gate', (
   assert.equal(summary.renderLayerCount, 5);
   assert.equal(summary.renderPrimitiveCount, 23);
   assert.equal(summary.renderMissingMappingCount, 7);
+  assert.equal(summary.motionPlanCount, 3);
+  assert.equal(summary.motionRendererControlCount, 9);
+  assert.equal(summary.motionSimulationHintCount, 9);
+  assert.equal(summary.motionVisualCueCount, 4);
+  assert.equal(summary.motionDiagnosticCount, 6);
 });
 
 test('builds visible morph channels from sourced anatomy graph features', () => {
@@ -105,6 +116,10 @@ test('builds visible morph channels from sourced anatomy graph features', () => 
     controlPlanCount: 3,
     controlRejectionCount: 2,
     renderPrimitiveCount: 23,
+    motionPlanCount: 3,
+    motionRendererControlCount: 9,
+    motionSimulationHintCount: 9,
+    motionVisualCueCount: 4,
   });
 
   assert.equal(channels.headTiltDegrees, 11);
@@ -119,6 +134,7 @@ test('builds visible morph channels from sourced anatomy graph features', () => 
   assert.equal(channels.lodPulse, 0.7);
   assert.equal(channels.contractPulse, 0.625);
   assert.equal(channels.renderPulse > 0, true);
+  assert.equal(channels.motionPulse > 0, true);
 });
 
 test('builds graph-backed anatomy render projection layers without fake primitives', () => {
@@ -182,5 +198,74 @@ test('builds graph-backed anatomy render projection layers without fake primitiv
       layer.primitives.some((primitive) => primitive.node_id === 'bone:made_up'),
     ),
     false,
+  );
+});
+
+test('builds source-backed motion projection and drops fake motion records', () => {
+  const projection = getAnatomyMotionProjection({
+    nodes: [
+      { id: 'region:right_hand', label: 'Right hand', kind: 'region' },
+      { id: 'joint:right_knee', label: 'Right knee joint', kind: 'joint' },
+    ],
+    motion_projection: {
+      schema: 'god.anatomy_motion_projection.v1',
+      status: 'degraded',
+      diagnostics: ['wave:missing_motion_node:joint:right_elbow'],
+      plans: [
+        {
+          action: 'wave',
+          status: 'degraded',
+          source_bundle_node_ids: ['region:right_hand', 'joint:right_knee'],
+          diagnostics: ['missing_motion_node:joint:right_elbow'],
+          renderer_controls: [
+            {
+              node_id: 'region:right_hand',
+              adapter: 'browser_svg',
+              target: 'right_arm',
+              channel: 'wave_arc',
+            },
+            {
+              node_id: 'bone:made_up',
+              adapter: 'browser_svg',
+              target: 'fake',
+              channel: 'fake',
+            },
+          ],
+          simulation_hints: [
+            {
+              node_id: 'joint:right_knee',
+              backend: 'opensim',
+              component: 'coordinate_hint',
+              coordinate: 'knee_angle_r',
+            },
+          ],
+          visual_cues: [
+            {
+              action: 'wave',
+              node_id: 'region:right_hand',
+              shape: 'path',
+              geometry: { d: 'M0 0 L1 1' },
+            },
+          ],
+        },
+      ],
+    },
+  });
+
+  assert.equal(projection.schema, 'god.anatomy_motion_projection.v1');
+  assert.equal(projection.status, 'degraded');
+  assert.equal(projection.planCount, 1);
+  assert.equal(projection.rendererControlCount, 1);
+  assert.equal(projection.simulationHintCount, 1);
+  assert.equal(projection.visualCueCount, 1);
+  assert.equal(projection.plans[0].rendererControls[0].label, 'Right hand');
+  assert.equal(projection.plans[0].simulationHints[0].label, 'Right knee joint');
+  assert.equal(
+    projection.plans[0].rendererControls.some((control) => control.node_id === 'bone:made_up'),
+    false,
+  );
+  assert.equal(
+    projection.plans[0].diagnostics.includes('dropped_unbacked_motion_records:1'),
+    true,
   );
 });
