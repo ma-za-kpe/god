@@ -56,6 +56,8 @@ logs/
 coverage/
 .coverage
 htmlcov/
+artifacts/*-profile/
+artifacts/*.dom.html
 
 # Field operator dumps — paste in PR comments, never commit
 agent_data_full.json
@@ -68,3 +70,7 @@ pr_fresh_update.txt
 
 # Documentation release build output
 dist/
+
+# Local reference caches. Keep source URLs and checksums in manifests.
+docs/reference/anatomy/*.pdf
+docs/reference/anatomy/*-full-text.txt

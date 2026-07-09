@@ -548,3 +548,975 @@ body {
 .minimal .world-shell {
   min-height: 100%;
 }
+
+.avatar-lab-shell {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 390px;
+  background: #071014;
+}
+
+.avatar-lab-stage {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+}
+
+.avatar-lab-stage canvas {
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
+}
+
+.talkinghead-stage {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  background: #071014;
+}
+
+.talkinghead-canvas {
+  width: 100%;
+  height: 100%;
+}
+
+.talkinghead-canvas canvas {
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
+}
+
+.talkinghead-status {
+  position: absolute;
+  left: 16px;
+  bottom: 16px;
+  z-index: 2;
+  padding: 8px 10px;
+  border: 1px solid rgba(158, 230, 181, 0.26);
+  border-radius: 6px;
+  background: rgba(7, 16, 20, 0.82);
+  color: #9ee6b5;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}
+
+.talkinghead-status small {
+  display: block;
+  max-width: min(70vw, 620px);
+  margin-top: 6px;
+  color: rgba(237, 241, 255, 0.78);
+  font-size: 0.72rem;
+  line-height: 1.35;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.avatar-lab-controls {
+  min-width: 0;
+  height: 100%;
+  overflow: auto;
+  display: grid;
+  align-content: start;
+  gap: 14px;
+  padding: 14px;
+  border-left: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(9, 15, 17, 0.96);
+}
+
+.avatar-lab-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+  gap: 12px;
+}
+
+.avatar-lab-title {
+  font-size: 1rem;
+  font-weight: 760;
+}
+
+.avatar-lab-status {
+  margin-top: 3px;
+  color: #9ee6b5;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}
+
+.avatar-lab-status.secondary {
+  color: rgba(214, 220, 255, 0.64);
+}
+
+.avatar-lab-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.avatar-lab-actions.wide {
+  justify-content: stretch;
+}
+
+.avatar-lab-actions button {
+  min-width: 66px;
+  min-height: 34px;
+  border: 1px solid rgba(158, 230, 181, 0.22);
+  border-radius: 6px;
+  background: rgba(158, 230, 181, 0.08);
+  color: #edf1ff;
+  font: inherit;
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+
+.avatar-lab-actions button.active {
+  border-color: rgba(158, 230, 181, 0.68);
+  background: rgba(158, 230, 181, 0.2);
+  color: #ffffff;
+}
+
+.avatar-lab-field,
+.avatar-lab-grid label,
+.avatar-lab-sliders label {
+  display: grid;
+  gap: 6px;
+}
+
+.avatar-lab-field span,
+.avatar-lab-grid span,
+.avatar-lab-sliders span {
+  color: rgba(214, 220, 255, 0.68);
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}
+
+.avatar-lab-field textarea,
+.avatar-lab-grid input {
+  width: 100%;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.045);
+  color: #edf1ff;
+  font: inherit;
+  font-size: 0.86rem;
+}
+
+.avatar-lab-field textarea {
+  resize: vertical;
+  min-height: 92px;
+  padding: 10px;
+  line-height: 1.45;
+}
+
+.avatar-lab-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+}
+
+.avatar-lab-grid input {
+  height: 34px;
+  padding: 0 9px;
+}
+
+.avatar-lab-sliders {
+  display: grid;
+  gap: 10px;
+}
+
+.avatar-lab-sliders input {
+  width: 100%;
+  accent-color: #9ee6b5;
+}
+
+.avatar-lab-json {
+  min-height: 220px;
+  margin: 0;
+  overflow: auto;
+  padding: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.04);
+  color: #d6dcff;
+  font-size: 0.72rem;
+  line-height: 1.45;
+  white-space: pre-wrap;
+}
+
+.anatomy-lab {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 390px;
+  background: #081017;
+  color: #eef4f6;
+}
+
+.anatomy-stage {
+  --body-scale: 1;
+  --head-tilt: 0deg;
+  --sweat-pulse: 0;
+  --hair-sway: 0;
+  --registry-reach: 0;
+  --hand-reach: 0;
+  --knee-flex: 0;
+  --toe-pulse: 0;
+  --graph-pulse: 0;
+  --lod-pulse: 0;
+  --contract-pulse: 0;
+  --render-pulse: 0;
+  --motion-pulse: 0;
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 50% 18%, rgba(68, 215, 168, 0.16), transparent 28%),
+    linear-gradient(180deg, #0c1820 0%, #081017 100%);
+}
+
+.anatomy-stage-header {
+  position: absolute;
+  z-index: 2;
+  top: 18px;
+  left: 18px;
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+  border: 1px solid rgba(143, 184, 217, 0.28);
+  border-radius: 6px;
+  background: rgba(8, 16, 23, 0.82);
+}
+
+.anatomy-stage-header span,
+.anatomy-panel header span {
+  color: #96d3b7;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.anatomy-stage-header strong,
+.anatomy-panel header strong {
+  color: #eef4f6;
+  font-size: 0.94rem;
+}
+
+.anatomy-body-svg {
+  width: min(86vw, 620px);
+  height: min(88vh, 760px);
+  filter: drop-shadow(0 28px 60px rgba(0, 0, 0, 0.38));
+}
+
+.anatomy-shadow ellipse {
+  fill: rgba(0, 0, 0, 0.28);
+}
+
+.anatomy-graph-grid path {
+  fill: none;
+  stroke: rgba(84, 200, 255, calc(0.08 + var(--graph-pulse) * 0.22));
+  stroke-width: 1.5;
+  stroke-dasharray: 8 12;
+  animation: anatomyGraphPulse 2s ease-in-out infinite;
+}
+
+.anatomy-lod-ring ellipse {
+  fill: none;
+  stroke: rgba(244, 201, 93, calc(0.08 + var(--lod-pulse) * 0.36));
+  stroke-width: 2;
+  stroke-dasharray: 14 16;
+  transform-origin: 210px 430px;
+  animation: anatomyLodPulse 2.4s ease-in-out infinite;
+}
+
+.anatomy-contract-ring ellipse {
+  fill: none;
+  stroke: rgba(89, 244, 184, calc(0.08 + var(--contract-pulse) * 0.4));
+  stroke-width: 2;
+  stroke-dasharray: 3 13;
+  transform-origin: 210px 430px;
+  animation: anatomyContractPulse 1.8s ease-in-out infinite;
+}
+
+.anatomy-render-projection {
+  pointer-events: none;
+  opacity: calc(0.68 + var(--render-pulse) * 0.28);
+}
+
+.anatomy-render-node {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: anatomyRenderNodePulse 2.1s ease-in-out infinite;
+}
+
+.anatomy-render-primitive {
+  vector-effect: non-scaling-stroke;
+}
+
+.anatomy-render-body-outline {
+  fill: rgba(98, 116, 255, 0.04);
+  stroke: rgba(126, 146, 255, 0.42);
+  stroke-width: 2;
+  stroke-dasharray: 10 10;
+}
+
+.anatomy-render-system-integumentary {
+  fill: rgba(255, 162, 136, 0.12);
+  stroke: rgba(255, 162, 136, 0.6);
+  stroke-width: 3;
+}
+
+.anatomy-render-system-skeletal {
+  fill: none;
+  stroke: rgba(238, 244, 246, 0.86);
+  stroke-width: 4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.anatomy-render-system-nervous,
+.anatomy-render-head-brain {
+  fill: rgba(204, 134, 255, 0.24);
+  stroke: rgba(216, 162, 255, 0.86);
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.anatomy-render-system-cardiovascular {
+  fill: rgba(255, 91, 124, 0.24);
+  stroke: rgba(255, 107, 136, 0.88);
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.anatomy-render-head-region {
+  fill: rgba(84, 200, 255, 0.08);
+  stroke: rgba(84, 200, 255, 0.55);
+  stroke-width: 2;
+}
+
+.anatomy-render-head-skull {
+  fill: rgba(238, 244, 246, 0.08);
+  stroke: rgba(238, 244, 246, 0.94);
+  stroke-width: 2.5;
+  stroke-dasharray: 4 5;
+}
+
+.anatomy-render-head-forehead {
+  fill: rgba(255, 189, 123, 0.36);
+  stroke: rgba(255, 226, 170, 0.7);
+  stroke-width: 2;
+}
+
+.anatomy-render-head-hair-population {
+  fill: rgba(35, 42, 54, 0.72);
+  stroke: rgba(150, 211, 183, 0.65);
+  stroke-width: 2;
+}
+
+.anatomy-render-head-sweat-population {
+  fill: rgba(92, 201, 255, 0.48);
+  stroke: rgba(210, 244, 255, 0.9);
+  stroke-width: 2;
+}
+
+.anatomy-render-knee-joint {
+  fill: rgba(244, 201, 93, 0.22);
+  stroke: rgba(244, 201, 93, 0.95);
+  stroke-width: 3;
+}
+
+.anatomy-render-knee-bone,
+.anatomy-render-toe-bone {
+  stroke: rgba(238, 244, 246, 0.95);
+  stroke-width: 7;
+  stroke-linecap: round;
+}
+
+.anatomy-render-knee-patella {
+  fill: rgba(238, 244, 246, 0.9);
+  stroke: rgba(244, 201, 93, 0.86);
+  stroke-width: 2;
+}
+
+.anatomy-render-knee-ligament {
+  stroke: rgba(78, 255, 181, 0.88);
+  stroke-width: 3;
+  stroke-linecap: round;
+}
+
+.anatomy-render-toe-digit {
+  fill: rgba(84, 200, 255, 0.22);
+  stroke: rgba(84, 200, 255, 0.95);
+  stroke-width: 3;
+}
+
+.anatomy-render-toe-skin {
+  fill: rgba(255, 162, 136, 0.16);
+  stroke: rgba(255, 184, 144, 0.82);
+  stroke-width: 2;
+}
+
+.anatomy-inspection-pinky {
+  opacity: calc(0.65 + var(--hand-digit-reach) * 0.35);
+}
+
+.anatomy-lab[data-milestone="M08"] .anatomy-figure,
+.anatomy-lab[data-milestone="M08"] .anatomy-inspection-layer:not(.anatomy-inspection-pinky) {
+  opacity: 0;
+}
+
+.anatomy-lab[data-milestone="M08"] .anatomy-graph-grid,
+.anatomy-lab[data-milestone="M08"] .anatomy-lod-ring,
+.anatomy-lab[data-milestone="M08"] .anatomy-contract-ring {
+  opacity: 0.16;
+}
+
+.anatomy-render-pinky-upper-limb-context {
+  fill: none;
+  stroke: rgba(126, 146, 255, 0.2);
+  stroke-width: 4;
+  stroke-linecap: round;
+}
+
+.anatomy-render-pinky-hand-context {
+  fill: rgba(84, 200, 255, 0.06);
+  stroke: rgba(84, 200, 255, 0.74);
+  stroke-width: 2;
+}
+
+.anatomy-render-pinky-carpals {
+  fill: rgba(244, 201, 93, 0.08);
+  stroke: rgba(244, 201, 93, 0.66);
+  stroke-width: 3;
+}
+
+.anatomy-render-pinky-metacarpal-fan,
+.anatomy-render-pinky-phalange-fan {
+  fill: none;
+  stroke: rgba(190, 203, 212, 0.44);
+  stroke-width: 3.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.anatomy-render-pinky-phalange-fan {
+  stroke: rgba(190, 203, 212, 0.34);
+  stroke-width: 2.7;
+  opacity: calc(0.45 + var(--hand-phalanx-reach) * 0.55);
+}
+
+.anatomy-render-hand-digit {
+  fill: none;
+  stroke: rgba(84, 200, 255, 0.18);
+  stroke-width: 11;
+  stroke-linecap: round;
+}
+
+.anatomy-render-hand-metacarpal,
+.anatomy-render-hand-phalanx {
+  stroke: rgba(190, 203, 212, 0.72);
+  stroke-linecap: round;
+}
+
+.anatomy-render-hand-metacarpal {
+  stroke-width: 6;
+}
+
+.anatomy-render-hand-phalanx {
+  stroke-width: 5;
+}
+
+.anatomy-render-hand-joint {
+  fill: rgba(244, 201, 93, 0.58);
+  stroke: rgba(42, 52, 60, 0.9);
+  stroke-width: 1.2;
+}
+
+.anatomy-render-hand-cmc-joint {
+  fill: rgba(126, 146, 255, 0.5);
+  stroke: rgba(42, 52, 60, 0.85);
+  stroke-width: 1.2;
+}
+
+.anatomy-render-pinky-digit {
+  fill: none;
+  stroke: rgba(78, 255, 181, 0.58);
+  stroke-width: 16;
+  stroke-linecap: round;
+}
+
+.anatomy-render-pinky-metacarpal {
+  stroke: rgba(190, 203, 212, 0.9);
+  stroke-width: 8;
+  stroke-linecap: round;
+}
+
+.anatomy-render-pinky-phalanx {
+  stroke: rgba(238, 244, 246, 0.98);
+  stroke-width: 7;
+  stroke-linecap: round;
+  animation: anatomyPinkyFlex 1.55s ease-in-out infinite;
+}
+
+.anatomy-render-pinky-joint {
+  fill: rgba(244, 201, 93, 0.92);
+  stroke: rgba(42, 52, 60, 0.95);
+  stroke-width: 1.5;
+}
+
+.anatomy-render-label {
+  fill: rgba(238, 244, 246, 0.92);
+  stroke: rgba(8, 16, 23, 0.9);
+  stroke-width: 3;
+  paint-order: stroke;
+  font-size: 13px;
+  font-weight: 760;
+  letter-spacing: 0;
+}
+
+.anatomy-motion-projection {
+  pointer-events: none;
+  opacity: calc(0.6 + var(--motion-pulse) * 0.32);
+}
+
+.anatomy-motion-plan {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.anatomy-motion-cue {
+  fill: none;
+  vector-effect: non-scaling-stroke;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  animation: anatomyMotionCuePulse 1.25s ease-in-out infinite;
+}
+
+.anatomy-motion-wave-arc {
+  stroke: rgba(255, 211, 95, 0.94);
+  stroke-width: 6;
+  stroke-dasharray: 16 12;
+  filter: drop-shadow(0 0 8px rgba(255, 211, 95, 0.46));
+}
+
+.anatomy-motion-sit-knee {
+  stroke: rgba(82, 255, 181, 0.9);
+  stroke-width: 7;
+  stroke-dasharray: 10 8;
+  filter: drop-shadow(0 0 9px rgba(82, 255, 181, 0.42));
+}
+
+.anatomy-motion-run-stride {
+  stroke: rgba(255, 107, 136, 0.86);
+  stroke-width: 6;
+  stroke-dasharray: 18 10;
+  filter: drop-shadow(0 0 9px rgba(255, 107, 136, 0.38));
+}
+
+.anatomy-motion-run-toe-off {
+  stroke: rgba(84, 200, 255, 0.92);
+  stroke-width: 6;
+  stroke-dasharray: 7 9;
+  filter: drop-shadow(0 0 8px rgba(84, 200, 255, 0.42));
+}
+
+.anatomy-figure {
+  transform-origin: 210px 420px;
+  animation: anatomyBodyBreathe 2.8s ease-in-out infinite;
+}
+
+.anatomy-skin,
+.anatomy-neck,
+.anatomy-torso {
+  fill: url("#anatomySkin");
+  stroke: rgba(238, 244, 246, 0.56);
+  stroke-width: 2;
+}
+
+.anatomy-torso {
+  fill: rgba(68, 215, 168, 0.18);
+  stroke: rgba(68, 215, 168, 0.78);
+}
+
+.anatomy-head {
+  transform-origin: 210px 155px;
+  animation: anatomyHeadTilt 2.6s ease-in-out infinite;
+}
+
+.anatomy-hair {
+  fill: rgba(25, 34, 44, 0.95);
+  stroke: rgba(150, 211, 183, 0.45);
+  stroke-width: 2;
+  transform-origin: 210px 98px;
+  animation: anatomyHairSway 1.9s ease-in-out infinite;
+}
+
+.anatomy-forehead {
+  fill: rgba(255, 162, 136, calc(0.32 + var(--registry-reach) * 0.3));
+  stroke: rgba(255, 220, 190, 0.65);
+  stroke-width: 1.5;
+  animation: anatomyForeheadPulse 1.5s ease-in-out infinite;
+}
+
+.anatomy-skull {
+  fill: rgba(238, 244, 246, 0.14);
+  stroke: rgba(238, 244, 246, 0.82);
+  stroke-width: 2;
+  stroke-dasharray: 4 5;
+  transform-origin: 210px 115px;
+  animation: anatomySkullPulse 1.8s ease-in-out infinite;
+}
+
+.anatomy-sweat circle {
+  fill: rgba(92, 201, 255, calc(0.25 + var(--sweat-pulse) * 0.75));
+  animation: anatomySweatDrop 1.15s ease-in-out infinite;
+}
+
+.anatomy-sweat circle:nth-child(2) {
+  animation-delay: 0.22s;
+}
+
+.anatomy-sweat circle:nth-child(3) {
+  animation-delay: 0.36s;
+}
+
+.anatomy-eye {
+  fill: #081017;
+}
+
+.anatomy-mouth,
+.anatomy-spine,
+.anatomy-ribs,
+.anatomy-arm path,
+.anatomy-leg path {
+  fill: none;
+  stroke: rgba(238, 244, 246, 0.78);
+  stroke-width: 10;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.anatomy-spine,
+.anatomy-ribs {
+  stroke: rgba(68, 215, 168, 0.8);
+  stroke-width: 4;
+}
+
+.anatomy-arm,
+.anatomy-leg {
+  transform-box: fill-box;
+}
+
+.anatomy-arm-left {
+  transform-origin: 150px 225px;
+  animation: anatomyLeftArm 2.2s ease-in-out infinite;
+}
+
+.anatomy-arm-right {
+  transform-origin: 270px 225px;
+  animation: anatomyRightArm 2.2s ease-in-out infinite;
+}
+
+.anatomy-leg-left {
+  transform-origin: 174px 454px;
+  animation: anatomyLeftLeg 2.6s ease-in-out infinite;
+}
+
+.anatomy-leg-right {
+  transform-origin: 246px 454px;
+  animation: anatomyRightLeg 2.6s ease-in-out infinite;
+}
+
+.anatomy-lab[data-milestone="M08"] .anatomy-figure,
+.anatomy-lab[data-milestone="M08"] .anatomy-head,
+.anatomy-lab[data-milestone="M08"] .anatomy-hair,
+.anatomy-lab[data-milestone="M08"] .anatomy-forehead,
+.anatomy-lab[data-milestone="M08"] .anatomy-skull,
+.anatomy-lab[data-milestone="M08"] .anatomy-sweat circle,
+.anatomy-lab[data-milestone="M08"] .anatomy-arm-left,
+.anatomy-lab[data-milestone="M08"] .anatomy-arm-right,
+.anatomy-lab[data-milestone="M08"] .anatomy-leg-left,
+.anatomy-lab[data-milestone="M08"] .anatomy-leg-right,
+.anatomy-lab[data-milestone="M08"] .anatomy-toe-pulse,
+.anatomy-lab[data-milestone="M08"] .anatomy-render-node,
+.anatomy-lab[data-milestone="M08"] .anatomy-render-pinky-phalanx {
+  animation: none;
+}
+
+.anatomy-node-label {
+  fill: rgba(238, 244, 246, 0.9);
+  stroke: none;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0;
+  paint-order: stroke;
+}
+
+.anatomy-annotations {
+  pointer-events: none;
+}
+
+.anatomy-leader {
+  fill: none;
+  stroke: rgba(238, 244, 246, 0.55);
+  stroke-width: 1.5;
+  stroke-dasharray: 3 4;
+}
+
+.anatomy-toe-pulse {
+  fill: rgba(84, 200, 255, calc(0.18 + var(--toe-pulse) * 0.52));
+  stroke: rgba(238, 244, 246, 0.82);
+  stroke-width: 2;
+  animation: anatomyToePulse 1.25s ease-in-out infinite;
+}
+
+.anatomy-arm circle,
+.anatomy-knee {
+  fill: url("#anatomySystem");
+  stroke: rgba(238, 244, 246, 0.76);
+  stroke-width: 2;
+}
+
+.anatomy-morph-readout {
+  position: absolute;
+  left: 18px;
+  right: auto;
+  bottom: 18px;
+  z-index: 2;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  max-width: min(42vw, 440px);
+}
+
+.anatomy-morph-readout span {
+  padding: 7px 9px;
+  border: 1px solid rgba(68, 215, 168, 0.28);
+  border-radius: 6px;
+  background: rgba(8, 16, 23, 0.82);
+  color: #cfeee0;
+  font-size: 0.72rem;
+}
+
+.anatomy-panel {
+  min-width: 0;
+  height: 100%;
+  overflow: auto;
+  display: grid;
+  align-content: start;
+  gap: 16px;
+  padding: 16px;
+  border-left: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(10, 18, 25, 0.96);
+}
+
+.anatomy-panel header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.anatomy-metrics {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+
+.anatomy-metrics div {
+  min-height: 74px;
+  display: grid;
+  align-content: center;
+  gap: 4px;
+  padding: 10px;
+  border: 1px solid rgba(143, 184, 217, 0.18);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.anatomy-metrics strong {
+  color: #54c8ff;
+  font-size: 1.8rem;
+}
+
+.anatomy-metrics span {
+  color: rgba(238, 244, 246, 0.68);
+  font-size: 0.72rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.anatomy-panel section {
+  display: grid;
+  gap: 8px;
+}
+
+.anatomy-panel h2 {
+  margin: 0;
+  color: #96d3b7;
+  font-size: 0.76rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.anatomy-panel ul {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.anatomy-panel li {
+  display: grid;
+  gap: 3px;
+  padding: 9px;
+  border: 1px solid rgba(143, 184, 217, 0.14);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.anatomy-panel li strong {
+  overflow-wrap: anywhere;
+  color: #eef4f6;
+  font-size: 0.82rem;
+}
+
+.anatomy-panel li span {
+  overflow-wrap: anywhere;
+  color: rgba(238, 244, 246, 0.62);
+  font-size: 0.72rem;
+}
+
+@keyframes anatomyBodyBreathe {
+  0%, 100% { transform: scale(var(--body-scale)); }
+  50% { transform: scale(calc(var(--body-scale) + 0.028)); }
+}
+
+@keyframes anatomyHeadTilt {
+  0%, 100% { transform: rotate(calc(var(--head-tilt) * -0.55)); }
+  50% { transform: rotate(var(--head-tilt)); }
+}
+
+@keyframes anatomyHairSway {
+  0%, 100% { transform: skewX(calc(var(--hair-sway) * -4deg)); }
+  50% { transform: skewX(calc(var(--hair-sway) * 5deg)); }
+}
+
+@keyframes anatomyForeheadPulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(calc(1 + var(--registry-reach) * 0.08)); }
+}
+
+@keyframes anatomySkullPulse {
+  0%, 100% { opacity: calc(0.28 + var(--hand-reach) * 0.2); }
+  50% { opacity: 0.95; }
+}
+
+@keyframes anatomySweatDrop {
+  0%, 100% { transform: translateY(0); opacity: calc(0.2 + var(--sweat-pulse) * 0.55); }
+  50% { transform: translateY(calc(var(--sweat-pulse) * 12px)); opacity: 1; }
+}
+
+@keyframes anatomyLeftArm {
+  0%, 100% { transform: rotate(-4deg); }
+  50% { transform: rotate(calc(-18deg * var(--registry-reach))); }
+}
+
+@keyframes anatomyRightArm {
+  0%, 100% { transform: rotate(4deg); }
+  50% { transform: rotate(calc(8deg + 22deg * var(--hand-reach))); }
+}
+
+@keyframes anatomyLeftLeg {
+  0%, 100% { transform: rotate(0deg); }
+  50% { transform: rotate(-3deg); }
+}
+
+@keyframes anatomyRightLeg {
+  0%, 100% { transform: rotate(0deg); }
+  50% { transform: rotate(calc(3deg + 7deg * var(--knee-flex))); }
+}
+
+@keyframes anatomyToePulse {
+  0%, 100% { transform: scale(0.8); opacity: calc(0.3 + var(--toe-pulse) * 0.35); }
+  50% { transform: scale(calc(1 + var(--toe-pulse) * 0.42)); opacity: 1; }
+}
+
+@keyframes anatomyGraphPulse {
+  0%, 100% { opacity: calc(0.18 + var(--graph-pulse) * 0.22); }
+  50% { opacity: calc(0.38 + var(--graph-pulse) * 0.48); }
+}
+
+@keyframes anatomyLodPulse {
+  0%, 100% { transform: scale(0.96); opacity: calc(0.16 + var(--lod-pulse) * 0.24); }
+  50% { transform: scale(calc(1 + var(--lod-pulse) * 0.04)); opacity: calc(0.46 + var(--lod-pulse) * 0.34); }
+}
+
+@keyframes anatomyContractPulse {
+  0%, 100% { transform: scale(0.97); opacity: calc(0.14 + var(--contract-pulse) * 0.26); }
+  50% { transform: scale(calc(1 + var(--contract-pulse) * 0.05)); opacity: calc(0.5 + var(--contract-pulse) * 0.35); }
+}
+
+@keyframes anatomyRenderNodePulse {
+  0%, 100% { opacity: calc(0.58 + var(--render-pulse) * 0.2); }
+  50% { opacity: 1; }
+}
+
+@keyframes anatomyMotionCuePulse {
+  0%, 100% {
+    opacity: calc(0.34 + var(--motion-pulse) * 0.38);
+    stroke-dashoffset: 0;
+  }
+  50% {
+    opacity: 1;
+    stroke-dashoffset: -18;
+  }
+}
+
+@keyframes anatomyPinkyFlex {
+  0%, 100% {
+    transform: rotate(0deg);
+  }
+
+  50% {
+    transform: rotate(calc(var(--pinky-reach) * -5deg));
+  }
+}
+
+@media (max-width: 860px) {
+  .avatar-lab-shell {
+    grid-template-columns: 1fr;
+    grid-template-rows: minmax(45vh, 1fr) minmax(260px, 45vh);
+  }
+
+  .avatar-lab-controls {
+    border-left: 0;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  .anatomy-lab {
+    grid-template-columns: 1fr;
+    grid-template-rows: minmax(52vh, 1fr) minmax(300px, 48vh);
+  }
+
+  .anatomy-panel {
+    border-left: 0;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  .anatomy-body-svg {
+    width: min(96vw, 460px);
+    height: min(56vh, 560px);
+  }
+}

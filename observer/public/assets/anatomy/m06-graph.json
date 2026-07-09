@@ -1,0 +1,2270 @@
+{
+  "action_bundles": [
+    {
+      "action": "wave",
+      "cypher": "MATCH (seed:AnatomyNode) WHERE seed.id IN $seed_node_ids MATCH path=(seed)-[:CONTROLS|HAS_POPULATION|LOCATED_IN|MATERIALIZES_AS|MEMBER_OF|PART_OF|PROJECTS_TO_RENDER|PROJECTS_TO_SIMULATION*0..2]-(node:AnatomyNode) WHERE length(path) < 2 OR all(interior IN nodes(path)[1..length(path)] WHERE NOT interior.kind IN ['body', 'system']) WITH node, min(length(path)) AS depth RETURN node.id AS id, node.label AS label, node.kind AS kind, node.materialization AS materialization, depth ORDER BY depth ASC, id ASC LIMIT $max_nodes",
+      "diagnostics": [
+        "unsupported_capability:digit:right_pollex:open_close",
+        "unsupported_capability:digit:right_pollex:finger_curl",
+        "unsupported_capability:digit:right_index_finger:open_close",
+        "unsupported_capability:digit:right_index_finger:finger_curl"
+      ],
+      "lod": "meso",
+      "max_nodes": 16,
+      "node_count": 9,
+      "nodes": [
+        {
+          "control_channels": [
+            "flexion_extension",
+            "abduction_adduction"
+          ],
+          "id": "digit:right_index_finger",
+          "kind": "structure",
+          "label": "Right index finger",
+          "materialization": "canonical",
+          "role": "primary",
+          "source_ids": [
+            "openstax-ap-2e-8.2",
+            "fipat-ta2-2019"
+          ]
+        },
+        {
+          "control_channels": [
+            "opposition",
+            "flexion_extension"
+          ],
+          "id": "digit:right_pollex",
+          "kind": "structure",
+          "label": "Right thumb",
+          "materialization": "canonical",
+          "role": "primary",
+          "source_ids": [
+            "openstax-ap-2e-8.2",
+            "fipat-ta2-2019"
+          ]
+        },
+        {
+          "control_channels": [
+            "open_close",
+            "finger_curl",
+            "anatomy_layer"
+          ],
+          "id": "region:right_hand",
+          "kind": "region",
+          "label": "Right hand",
+          "materialization": "canonical",
+          "role": "primary",
+          "source_ids": [
+            "openstax-ap-2e-8.2",
+            "fipat-ta2-2019"
+          ]
+        },
+        {
+          "control_channels": [],
+          "id": "aggregate:right_carpals",
+          "kind": "bone",
+          "label": "Right carpal bones",
+          "materialization": "aggregate",
+          "role": "secondary",
+          "source_ids": [
+            "openstax-ap-2e-8.2"
+          ]
+        },
+        {
+          "control_channels": [],
+          "id": "aggregate:right_hand_phalanges",
+          "kind": "bone",
+          "label": "Right hand phalanges",
+          "materialization": "aggregate",
+          "role": "secondary",
+          "source_ids": [
+            "openstax-ap-2e-8.2"
+          ]
+        },
+        {
+          "control_channels": [],
+          "id": "aggregate:right_metacarpals",
+          "kind": "bone",
+          "label": "Right metacarpal bones",
+          "materialization": "aggregate",
+          "role": "secondary",
+          "source_ids": [
+            "openstax-ap-2e-8.2"
+          ]
+        },
+        {
+          "control_channels": [],
+          "id": "body:human",
+          "kind": "body",
+          "label": "Human body",
+          "materialization": "canonical",
+          "role": "secondary",
+          "source_ids": [
+            "openstax-ap-2e-1.2"
+          ]
+        },
+        {
+          "control_channels": [],
+          "id": "bone:right_pollex_distal_phalanx",
+          "kind": "bone",
+          "label": "Right thumb distal phalanx",
+          "materialization": "canonical",
+          "role": "secondary",
+          "source_ids": [
+            "openstax-ap-2e-8.2",
+            "fipat-ta2-2019"
+          ]
+        },
+        {
+          "control_channels": [],
+          "id": "bone:right_pollex_proximal_phalanx",
+          "kind": "bone",
+          "label": "Right thumb proximal phalanx",
+          "materialization": "canonical",
+          "role": "secondary",
+          "source_ids": [
+            "openstax-ap-2e-8.2",
+            "fipat-ta2-2019"
+          ]
+        }
+      ],
+      "parameters": {
+        "max_nodes": 16,
+        "seed_node_ids": [
+          "region:right_hand",
+          "digit:right_pollex",
+          "digit:right_index_finger"
+        ]
+      }
+    },
+    {
+      "action": "run",
+      "cypher": "MATCH (seed:AnatomyNode) WHERE seed.id IN $seed_node_ids MATCH path=(seed)-[:CONTROLS|HAS_POPULATION|LOCATED_IN|MATERIALIZES_AS|MEMBER_OF|PART_OF|PROJECTS_TO_RENDER|PROJECTS_TO_SIMULATION*0..1]-(node:AnatomyNode) WHERE length(path) < 2 OR all(interior IN nodes(path)[1..length(path)] WHERE NOT interior.kind IN ['body', 'system']) WITH node, min(length(path)) AS depth RETURN node.id AS id, node.label AS label, node.kind AS kind, node.materialization AS materialization, depth ORDER BY depth ASC, id ASC LIMIT $max_nodes",
+      "diagnostics": [
+        "truncated:4"
+      ],
+      "lod": "macro",
+      "max_nodes": 14,
+      "node_count": 14,
+      "nodes": [
+        {
+          "control_channels": [
+            "flexion_extension",
+            "ground_contact"
+          ],
+          "id": "digit:right_hallux",
+          "kind": "structure",
+          "label": "Right great toe",
+          "materialization": "canonical",
+          "role": "primary",
+          "source_ids": [
+            "openstax-ap-2e-8.4",
+            "fipat-ta2-2019"
+          ]
+        },
+        {
+          "control_channels": [
+            "flexion_extension",
+            "stability_state",
+            "anatomy_layer"
+          ],
+          "id": "joint:right_knee",
+          "kind": "joint",
+          "label": "Right knee joint",
+          "materialization": "canonical",
+          "role": "primary",
+          "source_ids": [
+            "openstax-ap-2e-8.4",
+            "ncbi-statpearls-knee-2023",
+            "fipat-ta2-2019"
+          ]
+        },
+        {
+          "control_channels": [
+            "sweat",
+            "flush",
+            "detail_lod"
+          ],
+          "id": "skin:forehead",
+          "kind": "skin",
+          "label": "Skin of forehead",
+          "materialization": "aggregate",
+          "role": "primary",
+          "source_ids": [
+            "fipat-ta2-2019"
+          ]
+        },
+        {
+          "control_channels": [],
+          "id": "system:cardiovascular",
+          "kind": "system",
+          "label": "Cardiovascular system",
+          "materialization": "canonical",
+          "role": "primary",
+          "source_ids": [
+            "openstax-ap-2e-1.2"
+          ]
+        },
+        {
+          "control_channels": [],
+          "id": "system:muscular",
+          "kind": "system",
+          "label": "Muscular system",
+          "materialization": "canonical",
+          "role": "primary",
+          "source_ids": [
+            "openstax-ap-2e-1.2"
+          ]
+        },
+        {
+          "control_channels": [],
+          "id": "system:respiratory",
+          "kind": "system",
+          "label": "Respiratory system",
+          "materialization": "canonical",
+          "role": "primary",
+          "source_ids": [
+            "openstax-ap-2e-1.2"
+          ]
+        },
+        {
+          "control_channels": [
+            "sweat_emission",
+            "materialize_visible_instances"
+          ],
+          "id": "population:forehead_eccrine_sweat_glands",
+          "kind": "population_template",
+          "label": "Forehead eccrine sweat gland population",
+          "materialization": "population_template",
+          "role": "passive",
+          "source_ids": [
+            "fipat-ta2-2019",
+            "hra-kg-v2.2-paper"
+          ]
+        },
+        {
+          "control_channels": [
+            "camera_focus",
+            "anatomy_layer",
+            "pose_focus"
+          ],
+          "id": "region:head",
+          "kind": "region",
+          "label": "Head",
+          "materialization": "canonical",
+          "role": "secondary",
+          "source_ids": [
+            "fipat-ta2-2019"
+          ]
+        },
+        {
+          "control_channels": [
+            "weight_bearing",
+            "toe_curl",
+            "anatomy_layer"
+          ],
+          "id": "region:right_foot",
+          "kind": "region",
+          "label": "Right foot",
+          "materialization": "canonical",
+          "role": "secondary",
+          "source_ids": [
+            "openstax-ap-2e-8.4",
+            "fipat-ta2-2019"
+          ]
+        },
+        {
+          "control_channels": [
+            "pressure_flush",
+            "sweat",
+            "contact_deformation"
+          ],
+          "id": "skin:right_hallux",
+          "kind": "skin",
+          "label": "Skin of right great toe",
+          "materialization": "aggregate",
+          "role": "secondary",
+          "source_ids": [
+            "fipat-ta2-2019",
+            "hra-kg-v2.2-paper"
+          ]
+        },
+        {
+          "control_channels": [],
+          "id": "body:human",
+          "kind": "body",
+          "label": "Human body",
+          "materialization": "canonical",
+          "role": "secondary",
+          "source_ids": [
+            "openstax-ap-2e-1.2"
+          ]
+        },
+        {
+          "control_channels": [],
+          "id": "bone:right_hallux_distal_phalanx",
+          "kind": "bone",
+          "label": "Right great toe distal phalanx",
+          "materialization": "canonical",
+          "role": "secondary",
+          "source_ids": [
+            "openstax-ap-2e-8.4",
+            "fipat-ta2-2019"
+          ]
+        },
+        {
+          "control_channels": [],
+          "id": "bone:right_hallux_proximal_phalanx",
+          "kind": "bone",
+          "label": "Right great toe proximal phalanx",
+          "materialization": "canonical",
+          "role": "secondary",
+          "source_ids": [
+            "openstax-ap-2e-8.4",
+            "fipat-ta2-2019"
+          ]
+        },
+        {
+          "control_channels": [],
+          "id": "ligament:right_acl",
+          "kind": "ligament",
+          "label": "Right anterior cruciate ligament",
+          "materialization": "canonical",
+          "role": "secondary",
+          "source_ids": [
+            "ncbi-statpearls-knee-2023",
+            "fipat-ta2-2019"
+          ]
+        }
+      ],
+      "parameters": {
+        "max_nodes": 14,
+        "seed_node_ids": [
+          "joint:right_knee",
+          "digit:right_hallux",
+          "system:muscular",
+          "system:cardiovascular",
+          "system:respiratory",
+          "skin:forehead"
+        ]
+      }
+    },
+    {
+      "action": "sweat_forehead",
+      "cypher": "MATCH (seed:AnatomyNode) WHERE seed.id IN $seed_node_ids MATCH path=(seed)-[:CONTROLS|HAS_POPULATION|LOCATED_IN|MATERIALIZES_AS|MEMBER_OF|PART_OF|PROJECTS_TO_RENDER|PROJECTS_TO_SIMULATION*0..3]-(node:AnatomyNode) WHERE length(path) < 2 OR all(interior IN nodes(path)[1..length(path)] WHERE NOT interior.kind IN ['body', 'system']) WITH node, min(length(path)) AS depth RETURN node.id AS id, node.label AS label, node.kind AS kind, node.materialization AS materialization, depth ORDER BY depth ASC, id ASC LIMIT $max_nodes",
+      "diagnostics": [
+        "truncated:5",
+        "unsupported_capability:population:forehead_eccrine_sweat_glands:sweat",
+        "unsupported_capability:render:forehead_sweat_proxy:sweat"
+      ],
+      "lod": "micro",
+      "max_nodes": 12,
+      "node_count": 12,
+      "nodes": [
+        {
+          "control_channels": [
+            "sweat_emission",
+            "materialize_visible_instances"
+          ],
+          "id": "population:forehead_eccrine_sweat_glands",
+          "kind": "population_template",
+          "label": "Forehead eccrine sweat gland population",
+          "materialization": "population_template",
+          "role": "primary",
+          "source_ids": [
+            "fipat-ta2-2019",
+            "hra-kg-v2.2-paper"
+          ]
+        },
+        {
+          "control_channels": [
+            "opacity",
+            "droplet_rate"
+          ],
+          "id": "render:forehead_sweat_proxy",
+          "kind": "render_proxy",
+          "label": "Forehead sweat droplet render proxy",
+          "materialization": "render_proxy",
+          "role": "primary",
+          "source_ids": [
+            "hra-kg-v2.2-paper"
+          ]
+        },
+        {
+          "control_channels": [
+            "sweat",
+            "flush",
+            "detail_lod"
+          ],
+          "id": "skin:forehead",
+          "kind": "skin",
+          "label": "Skin of forehead",
+          "materialization": "aggregate",
+          "role": "primary",
+          "source_ids": [
+            "fipat-ta2-2019"
+          ]
+        },
+        {
+          "control_channels": [
+            "anatomy_layer",
+            "head_pose_proxy"
+          ],
+          "id": "bone:skull",
+          "kind": "bone",
+          "label": "Skull",
+          "materialization": "canonical",
+          "role": "secondary",
+          "source_ids": [
+            "openstax-ap-2e-7.2",
+            "fipat-ta2-2019"
+          ]
+        },
+        {
+          "control_channels": [
+            "flexion_extension",
+            "ground_contact"
+          ],
+          "id": "digit:right_hallux",
+          "kind": "structure",
+          "label": "Right great toe",
+          "materialization": "canonical",
+          "role": "secondary",
+          "source_ids": [
+            "openstax-ap-2e-8.4",
+            "fipat-ta2-2019"
+          ]
+        },
+        {
+          "control_channels": [
+            "bend_proxy",
+            "sway_proxy",
+            "materialize_visible_instances"
+          ],
+          "id": "population:scalp_hair_follicles",
+          "kind": "population_template",
+          "label": "Scalp hair follicle population",
+          "materialization": "population_template",
+          "role": "passive",
+          "source_ids": [
+            "fipat-ta2-2019",
+            "hra-kg-v2.2-paper"
+          ]
+        },
+        {
+          "control_channels": [
+            "camera_focus",
+            "anatomy_layer",
+            "pose_focus"
+          ],
+          "id": "region:head",
+          "kind": "region",
+          "label": "Head",
+          "materialization": "canonical",
+          "role": "secondary",
+          "source_ids": [
+            "fipat-ta2-2019"
+          ]
+        },
+        {
+          "control_channels": [
+            "pressure_flush",
+            "sweat",
+            "contact_deformation"
+          ],
+          "id": "skin:right_hallux",
+          "kind": "skin",
+          "label": "Skin of right great toe",
+          "materialization": "aggregate",
+          "role": "secondary",
+          "source_ids": [
+            "fipat-ta2-2019",
+            "hra-kg-v2.2-paper"
+          ]
+        },
+        {
+          "control_channels": [],
+          "id": "aggregate:brain_case_bones",
+          "kind": "structure",
+          "label": "Brain-case bones",
+          "materialization": "aggregate",
+          "role": "secondary",
+          "source_ids": [
+            "openstax-ap-2e-7.2"
+          ]
+        },
+        {
+          "control_channels": [],
+          "id": "aggregate:facial_bones",
+          "kind": "structure",
+          "label": "Facial bones",
+          "materialization": "aggregate",
+          "role": "secondary",
+          "source_ids": [
+            "openstax-ap-2e-7.2"
+          ]
+        },
+        {
+          "control_channels": [],
+          "id": "body:human",
+          "kind": "body",
+          "label": "Human body",
+          "materialization": "canonical",
+          "role": "secondary",
+          "source_ids": [
+            "openstax-ap-2e-1.2"
+          ]
+        },
+        {
+          "control_channels": [],
+          "id": "organ:brain",
+          "kind": "organ",
+          "label": "Brain",
+          "materialization": "canonical",
+          "role": "secondary",
+          "source_ids": [
+            "fipat-ta2-2019"
+          ]
+        }
+      ],
+      "parameters": {
+        "max_nodes": 12,
+        "seed_node_ids": [
+          "skin:forehead",
+          "population:forehead_eccrine_sweat_glands",
+          "render:forehead_sweat_proxy"
+        ]
+      }
+    }
+  ],
+  "control_contract": {
+    "ollama": {
+      "allowed_node_count": 3,
+      "endpoint": "/api/chat",
+      "format_type": "object",
+      "message_count": 2,
+      "model": "llama3.1:8b",
+      "stream": false,
+      "temperature": 0
+    },
+    "schema": "god.body_control.v1",
+    "validated_plan": {
+      "action": "wave",
+      "control_count": 3,
+      "controls": [
+        {
+          "capability": "open_close",
+          "duration_ms": 900,
+          "node_id": "region:right_hand",
+          "rationale": "open the right hand for the visible wave",
+          "source_ids": [
+            "openstax-ap-2e-8.2",
+            "fipat-ta2-2019"
+          ],
+          "value": 0.82,
+          "weight": 0.9
+        },
+        {
+          "capability": "finger_curl",
+          "duration_ms": 900,
+          "node_id": "region:right_hand",
+          "rationale": "keep fingers relaxed rather than clenched",
+          "source_ids": [
+            "openstax-ap-2e-8.2",
+            "fipat-ta2-2019"
+          ],
+          "value": 0.18,
+          "weight": 0.65
+        },
+        {
+          "capability": "opposition",
+          "duration_ms": 700,
+          "node_id": "digit:right_pollex",
+          "rationale": "thumb participates subtly",
+          "source_ids": [
+            "openstax-ap-2e-8.2",
+            "fipat-ta2-2019"
+          ],
+          "value": 0.35,
+          "weight": 0.45
+        }
+      ],
+      "diagnostic_expectations": [
+        "right hand opens and curls within the source-backed wave bundle",
+        "unsupported knee and invented bone controls are rejected"
+      ],
+      "diagnostics": [
+        "unsupported_capability:digit:right_pollex:open_close",
+        "unsupported_capability:digit:right_pollex:finger_curl",
+        "unsupported_capability:digit:right_index_finger:open_close",
+        "unsupported_capability:digit:right_index_finger:finger_curl",
+        "rejected_unknown_node:joint:right_knee",
+        "rejected_unknown_node:bone:made_up"
+      ],
+      "schema": "god.body_control.v1"
+    }
+  },
+  "focus_nodes": [
+    {
+      "id": "body:human",
+      "kind": "body",
+      "label": "Human body",
+      "materialization": "canonical"
+    },
+    {
+      "id": "system:integumentary",
+      "kind": "system",
+      "label": "Integumentary system",
+      "materialization": "canonical"
+    },
+    {
+      "id": "system:skeletal",
+      "kind": "system",
+      "label": "Skeletal system",
+      "materialization": "canonical"
+    },
+    {
+      "id": "system:nervous",
+      "kind": "system",
+      "label": "Nervous system",
+      "materialization": "canonical"
+    },
+    {
+      "id": "system:cardiovascular",
+      "kind": "system",
+      "label": "Cardiovascular system",
+      "materialization": "canonical"
+    },
+    {
+      "id": "region:head",
+      "kind": "region",
+      "label": "Head",
+      "materialization": "canonical"
+    },
+    {
+      "id": "bone:skull",
+      "kind": "bone",
+      "label": "Skull",
+      "materialization": "canonical"
+    },
+    {
+      "id": "organ:brain",
+      "kind": "organ",
+      "label": "Brain",
+      "materialization": "canonical"
+    },
+    {
+      "id": "region:right_hand",
+      "kind": "region",
+      "label": "Right hand",
+      "materialization": "canonical"
+    },
+    {
+      "id": "digit:right_pollex",
+      "kind": "structure",
+      "label": "Right thumb",
+      "materialization": "canonical"
+    },
+    {
+      "id": "digit:right_index_finger",
+      "kind": "structure",
+      "label": "Right index finger",
+      "materialization": "canonical"
+    },
+    {
+      "id": "joint:right_knee",
+      "kind": "joint",
+      "label": "Right knee joint",
+      "materialization": "canonical"
+    },
+    {
+      "id": "bone:right_femur",
+      "kind": "bone",
+      "label": "Right femur",
+      "materialization": "canonical"
+    },
+    {
+      "id": "bone:right_tibia",
+      "kind": "bone",
+      "label": "Right tibia",
+      "materialization": "canonical"
+    },
+    {
+      "id": "bone:right_patella",
+      "kind": "bone",
+      "label": "Right patella",
+      "materialization": "canonical"
+    },
+    {
+      "id": "digit:right_hallux",
+      "kind": "structure",
+      "label": "Right great toe",
+      "materialization": "canonical"
+    },
+    {
+      "id": "skin:right_hallux",
+      "kind": "skin",
+      "label": "Skin of right great toe",
+      "materialization": "aggregate"
+    },
+    {
+      "id": "skin:forehead",
+      "kind": "skin",
+      "label": "Skin of forehead",
+      "materialization": "aggregate"
+    },
+    {
+      "id": "population:scalp_hair_follicles",
+      "kind": "population_template",
+      "label": "Scalp hair follicle population",
+      "materialization": "population_template"
+    },
+    {
+      "id": "population:forehead_eccrine_sweat_glands",
+      "kind": "population_template",
+      "label": "Forehead eccrine sweat gland population",
+      "materialization": "population_template"
+    },
+    {
+      "id": "render:forehead_sweat_proxy",
+      "kind": "render_proxy",
+      "label": "Forehead sweat droplet render proxy",
+      "materialization": "render_proxy"
+    }
+  ],
+  "forehead_working_set": [
+    {
+      "id": "population:forehead_eccrine_sweat_glands",
+      "kind": "population_template",
+      "label": "Forehead eccrine sweat gland population",
+      "materialization": "population_template"
+    },
+    {
+      "id": "render:forehead_sweat_proxy",
+      "kind": "render_proxy",
+      "label": "Forehead sweat droplet render proxy",
+      "materialization": "render_proxy"
+    },
+    {
+      "id": "skin:forehead",
+      "kind": "skin",
+      "label": "Skin of forehead",
+      "materialization": "aggregate"
+    }
+  ],
+  "llm_registry": [
+    {
+      "control_channels": [
+        "anatomy_layer",
+        "head_pose_proxy"
+      ],
+      "id": "bone:skull",
+      "kind": "bone",
+      "label": "Skull",
+      "materialization": "canonical",
+      "source_ids": [
+        "openstax-ap-2e-7.2",
+        "fipat-ta2-2019"
+      ]
+    },
+    {
+      "control_channels": [
+        "flexion_extension",
+        "ground_contact"
+      ],
+      "id": "digit:right_hallux",
+      "kind": "structure",
+      "label": "Right great toe",
+      "materialization": "canonical",
+      "source_ids": [
+        "openstax-ap-2e-8.4",
+        "fipat-ta2-2019"
+      ]
+    },
+    {
+      "control_channels": [
+        "flexion_extension",
+        "abduction_adduction"
+      ],
+      "id": "digit:right_index_finger",
+      "kind": "structure",
+      "label": "Right index finger",
+      "materialization": "canonical",
+      "source_ids": [
+        "openstax-ap-2e-8.2",
+        "fipat-ta2-2019"
+      ]
+    },
+    {
+      "control_channels": [
+        "opposition",
+        "flexion_extension"
+      ],
+      "id": "digit:right_pollex",
+      "kind": "structure",
+      "label": "Right thumb",
+      "materialization": "canonical",
+      "source_ids": [
+        "openstax-ap-2e-8.2",
+        "fipat-ta2-2019"
+      ]
+    },
+    {
+      "control_channels": [
+        "flexion_extension",
+        "stability_state",
+        "anatomy_layer"
+      ],
+      "id": "joint:right_knee",
+      "kind": "joint",
+      "label": "Right knee joint",
+      "materialization": "canonical",
+      "source_ids": [
+        "openstax-ap-2e-8.4",
+        "ncbi-statpearls-knee-2023",
+        "fipat-ta2-2019"
+      ]
+    },
+    {
+      "control_channels": [
+        "sweat_emission",
+        "materialize_visible_instances"
+      ],
+      "id": "population:forehead_eccrine_sweat_glands",
+      "kind": "population_template",
+      "label": "Forehead eccrine sweat gland population",
+      "materialization": "population_template",
+      "source_ids": [
+        "fipat-ta2-2019",
+        "hra-kg-v2.2-paper"
+      ]
+    },
+    {
+      "control_channels": [
+        "bend_proxy",
+        "sway_proxy",
+        "materialize_visible_instances"
+      ],
+      "id": "population:scalp_hair_follicles",
+      "kind": "population_template",
+      "label": "Scalp hair follicle population",
+      "materialization": "population_template",
+      "source_ids": [
+        "fipat-ta2-2019",
+        "hra-kg-v2.2-paper"
+      ]
+    },
+    {
+      "control_channels": [
+        "camera_focus",
+        "anatomy_layer",
+        "pose_focus"
+      ],
+      "id": "region:head",
+      "kind": "region",
+      "label": "Head",
+      "materialization": "canonical",
+      "source_ids": [
+        "fipat-ta2-2019"
+      ]
+    },
+    {
+      "control_channels": [
+        "weight_bearing",
+        "toe_curl",
+        "anatomy_layer"
+      ],
+      "id": "region:right_foot",
+      "kind": "region",
+      "label": "Right foot",
+      "materialization": "canonical",
+      "source_ids": [
+        "openstax-ap-2e-8.4",
+        "fipat-ta2-2019"
+      ]
+    },
+    {
+      "control_channels": [
+        "open_close",
+        "finger_curl",
+        "anatomy_layer"
+      ],
+      "id": "region:right_hand",
+      "kind": "region",
+      "label": "Right hand",
+      "materialization": "canonical",
+      "source_ids": [
+        "openstax-ap-2e-8.2",
+        "fipat-ta2-2019"
+      ]
+    },
+    {
+      "control_channels": [
+        "opacity",
+        "droplet_rate"
+      ],
+      "id": "render:forehead_sweat_proxy",
+      "kind": "render_proxy",
+      "label": "Forehead sweat droplet render proxy",
+      "materialization": "render_proxy",
+      "source_ids": [
+        "hra-kg-v2.2-paper"
+      ]
+    },
+    {
+      "control_channels": [
+        "sweat",
+        "flush",
+        "detail_lod"
+      ],
+      "id": "skin:forehead",
+      "kind": "skin",
+      "label": "Skin of forehead",
+      "materialization": "aggregate",
+      "source_ids": [
+        "fipat-ta2-2019"
+      ]
+    },
+    {
+      "control_channels": [
+        "pressure_flush",
+        "sweat",
+        "contact_deformation"
+      ],
+      "id": "skin:right_hallux",
+      "kind": "skin",
+      "label": "Skin of right great toe",
+      "materialization": "aggregate",
+      "source_ids": [
+        "fipat-ta2-2019",
+        "hra-kg-v2.2-paper"
+      ]
+    }
+  ],
+  "milestone": "M06",
+  "motion_projection": {},
+  "neo4j": {
+    "constraints": [
+      "CREATE CONSTRAINT anatomy_node_id_unique IF NOT EXISTS FOR (n:AnatomyNode) REQUIRE n.id IS UNIQUE",
+      "CREATE INDEX anatomy_node_kind IF NOT EXISTS FOR (n:AnatomyNode) ON (n.kind)",
+      "CREATE INDEX anatomy_node_materialization IF NOT EXISTS FOR (n:AnatomyNode) ON (n.materialization)",
+      "CREATE INDEX anatomy_node_llm_visible IF NOT EXISTS FOR (n:AnatomyNode) ON (n.llm_visible)",
+      "CREATE TEXT INDEX anatomy_node_label_text IF NOT EXISTS FOR (n:AnatomyNode) ON (n.label)",
+      "CREATE CONSTRAINT anatomy_rel_adjacent_to_graph_key IF NOT EXISTS FOR ()-[r:ADJACENT_TO]-() REQUIRE r.graph_key IS UNIQUE",
+      "CREATE CONSTRAINT anatomy_rel_connects_to_graph_key IF NOT EXISTS FOR ()-[r:CONNECTS_TO]-() REQUIRE r.graph_key IS UNIQUE",
+      "CREATE CONSTRAINT anatomy_rel_controls_graph_key IF NOT EXISTS FOR ()-[r:CONTROLS]-() REQUIRE r.graph_key IS UNIQUE",
+      "CREATE CONSTRAINT anatomy_rel_drains_to_graph_key IF NOT EXISTS FOR ()-[r:DRAINS_TO]-() REQUIRE r.graph_key IS UNIQUE",
+      "CREATE CONSTRAINT anatomy_rel_has_population_graph_key IF NOT EXISTS FOR ()-[r:HAS_POPULATION]-() REQUIRE r.graph_key IS UNIQUE",
+      "CREATE CONSTRAINT anatomy_rel_innervates_graph_key IF NOT EXISTS FOR ()-[r:INNERVATES]-() REQUIRE r.graph_key IS UNIQUE",
+      "CREATE CONSTRAINT anatomy_rel_inserts_on_graph_key IF NOT EXISTS FOR ()-[r:INSERTS_ON]-() REQUIRE r.graph_key IS UNIQUE",
+      "CREATE CONSTRAINT anatomy_rel_located_in_graph_key IF NOT EXISTS FOR ()-[r:LOCATED_IN]-() REQUIRE r.graph_key IS UNIQUE",
+      "CREATE CONSTRAINT anatomy_rel_materializes_as_graph_key IF NOT EXISTS FOR ()-[r:MATERIALIZES_AS]-() REQUIRE r.graph_key IS UNIQUE",
+      "CREATE CONSTRAINT anatomy_rel_member_of_graph_key IF NOT EXISTS FOR ()-[r:MEMBER_OF]-() REQUIRE r.graph_key IS UNIQUE",
+      "CREATE CONSTRAINT anatomy_rel_origin_on_graph_key IF NOT EXISTS FOR ()-[r:ORIGIN_ON]-() REQUIRE r.graph_key IS UNIQUE",
+      "CREATE CONSTRAINT anatomy_rel_part_of_graph_key IF NOT EXISTS FOR ()-[r:PART_OF]-() REQUIRE r.graph_key IS UNIQUE",
+      "CREATE CONSTRAINT anatomy_rel_projects_to_render_graph_key IF NOT EXISTS FOR ()-[r:PROJECTS_TO_RENDER]-() REQUIRE r.graph_key IS UNIQUE",
+      "CREATE CONSTRAINT anatomy_rel_projects_to_simulation_graph_key IF NOT EXISTS FOR ()-[r:PROJECTS_TO_SIMULATION]-() REQUIRE r.graph_key IS UNIQUE",
+      "CREATE CONSTRAINT anatomy_rel_supplies_graph_key IF NOT EXISTS FOR ()-[r:SUPPLIES]-() REQUIRE r.graph_key IS UNIQUE"
+    ],
+    "node_records": 60,
+    "relationship_records": 68,
+    "schema_statement_count": 20,
+    "validation_query_count": 5
+  },
+  "nodes": [
+    {
+      "control_channels": [],
+      "id": "aggregate:brain_case_bones",
+      "kind": "structure",
+      "label": "Brain-case bones",
+      "llm_visible": false,
+      "materialization": "aggregate",
+      "source_ids": [
+        "openstax-ap-2e-7.2"
+      ]
+    },
+    {
+      "control_channels": [],
+      "id": "aggregate:facial_bones",
+      "kind": "structure",
+      "label": "Facial bones",
+      "llm_visible": false,
+      "materialization": "aggregate",
+      "source_ids": [
+        "openstax-ap-2e-7.2"
+      ]
+    },
+    {
+      "control_channels": [],
+      "id": "aggregate:right_carpals",
+      "kind": "bone",
+      "label": "Right carpal bones",
+      "llm_visible": false,
+      "materialization": "aggregate",
+      "source_ids": [
+        "openstax-ap-2e-8.2"
+      ]
+    },
+    {
+      "control_channels": [],
+      "id": "aggregate:right_foot_phalanges",
+      "kind": "bone",
+      "label": "Right foot phalanges",
+      "llm_visible": false,
+      "materialization": "aggregate",
+      "source_ids": [
+        "openstax-ap-2e-8.4"
+      ]
+    },
+    {
+      "control_channels": [],
+      "id": "aggregate:right_hand_phalanges",
+      "kind": "bone",
+      "label": "Right hand phalanges",
+      "llm_visible": false,
+      "materialization": "aggregate",
+      "source_ids": [
+        "openstax-ap-2e-8.2"
+      ]
+    },
+    {
+      "control_channels": [],
+      "id": "aggregate:right_metacarpals",
+      "kind": "bone",
+      "label": "Right metacarpal bones",
+      "llm_visible": false,
+      "materialization": "aggregate",
+      "source_ids": [
+        "openstax-ap-2e-8.2"
+      ]
+    },
+    {
+      "control_channels": [],
+      "id": "aggregate:right_metatarsals",
+      "kind": "bone",
+      "label": "Right metatarsal bones",
+      "llm_visible": false,
+      "materialization": "aggregate",
+      "source_ids": [
+        "openstax-ap-2e-8.4"
+      ]
+    },
+    {
+      "control_channels": [],
+      "id": "aggregate:right_tarsals",
+      "kind": "bone",
+      "label": "Right tarsal bones",
+      "llm_visible": false,
+      "materialization": "aggregate",
+      "source_ids": [
+        "openstax-ap-2e-8.4"
+      ]
+    },
+    {
+      "control_channels": [],
+      "id": "body:human",
+      "kind": "body",
+      "label": "Human body",
+      "llm_visible": false,
+      "materialization": "canonical",
+      "source_ids": [
+        "openstax-ap-2e-1.2"
+      ]
+    },
+    {
+      "control_channels": [],
+      "id": "bone:ethmoid",
+      "kind": "bone",
+      "label": "Ethmoid bone",
+      "llm_visible": false,
+      "materialization": "canonical",
+      "source_ids": [
+        "openstax-ap-2e-7.2",
+        "fipat-ta2-2019"
+      ]
+    },
+    {
+      "control_channels": [],
+      "id": "bone:frontal",
+      "kind": "bone",
+      "label": "Frontal bone",
+      "llm_visible": false,
+      "materialization": "canonical",
+      "source_ids": [
+        "openstax-ap-2e-7.2",
+        "fipat-ta2-2019"
+      ]
+    },
+    {
+      "control_channels": [],
+      "id": "bone:mandible",
+      "kind": "bone",
+      "label": "Mandible",
+      "llm_visible": false,
+      "materialization": "canonical",
+      "source_ids": [
+        "openstax-ap-2e-7.2",
+        "fipat-ta2-2019"
+      ]
+    },
+    {
+      "control_channels": [],
+      "id": "bone:maxilla_pair",
+      "kind": "bone",
+      "label": "Maxillae",
+      "llm_visible": false,
+      "materialization": "canonical",
+      "source_ids": [
+        "openstax-ap-2e-7.2",
+        "fipat-ta2-2019"
+      ]
+    },
+    {
+      "control_channels": [],
+      "id": "bone:nasal_pair",
+      "kind": "bone",
+      "label": "Nasal bones",
+      "llm_visible": false,
+      "materialization": "canonical",
+      "source_ids": [
+        "openstax-ap-2e-7.2",
+        "fipat-ta2-2019"
+      ]
+    },
+    {
+      "control_channels": [],
+      "id": "bone:occipital",
+      "kind": "bone",
+      "label": "Occipital bone",
+      "llm_visible": false,
+      "materialization": "canonical",
+      "source_ids": [
+        "openstax-ap-2e-7.2",
+        "fipat-ta2-2019"
+      ]
+    },
+    {
+      "control_channels": [],
+      "id": "bone:parietal_pair",
+      "kind": "bone",
+      "label": "Parietal bones",
+      "llm_visible": false,
+      "materialization": "canonical",
+      "source_ids": [
+        "openstax-ap-2e-7.2",
+        "fipat-ta2-2019"
+      ]
+    },
+    {
+      "control_channels": [],
+      "id": "bone:right_femur",
+      "kind": "bone",
+      "label": "Right femur",
+      "llm_visible": false,
+      "materialization": "canonical",
+      "source_ids": [
+        "openstax-ap-2e-8.4",
+        "fipat-ta2-2019"
+      ]
+    },
+    {
+      "control_channels": [],
+      "id": "bone:right_fibula",
+      "kind": "bone",
+      "label": "Right fibula",
+      "llm_visible": false,
+      "materialization": "canonical",
+      "source_ids": [
+        "openstax-ap-2e-8.4",
+        "ncbi-statpearls-knee-2023",
+        "fipat-ta2-2019"
+      ]
+    },
+    {
+      "control_channels": [],
+      "id": "bone:right_hallux_distal_phalanx",
+      "kind": "bone",
+      "label": "Right great toe distal phalanx",
+      "llm_visible": false,
+      "materialization": "canonical",
+      "source_ids": [
+        "openstax-ap-2e-8.4",
+        "fipat-ta2-2019"
+      ]
+    },
+    {
+      "control_channels": [],
+      "id": "bone:right_hallux_proximal_phalanx",
+      "kind": "bone",
+      "label": "Right great toe proximal phalanx",
+      "llm_visible": false,
+      "materialization": "canonical",
+      "source_ids": [
+        "openstax-ap-2e-8.4",
+        "fipat-ta2-2019"
+      ]
+    },
+    {
+      "control_channels": [],
+      "id": "bone:right_patella",
+      "kind": "bone",
+      "label": "Right patella",
+      "llm_visible": false,
+      "materialization": "canonical",
+      "source_ids": [
+        "openstax-ap-2e-8.4",
+        "fipat-ta2-2019"
+      ]
+    },
+    {
+      "control_channels": [],
+      "id": "bone:right_pollex_distal_phalanx",
+      "kind": "bone",
+      "label": "Right thumb distal phalanx",
+      "llm_visible": false,
+      "materialization": "canonical",
+      "source_ids": [
+        "openstax-ap-2e-8.2",
+        "fipat-ta2-2019"
+      ]
+    },
+    {
+      "control_channels": [],
+      "id": "bone:right_pollex_proximal_phalanx",
+      "kind": "bone",
+      "label": "Right thumb proximal phalanx",
+      "llm_visible": false,
+      "materialization": "canonical",
+      "source_ids": [
+        "openstax-ap-2e-8.2",
+        "fipat-ta2-2019"
+      ]
+    },
+    {
+      "control_channels": [],
+      "id": "bone:right_tibia",
+      "kind": "bone",
+      "label": "Right tibia",
+      "llm_visible": false,
+      "materialization": "canonical",
+      "source_ids": [
+        "openstax-ap-2e-8.4",
+        "fipat-ta2-2019"
+      ]
+    },
+    {
+      "control_channels": [
+        "anatomy_layer",
+        "head_pose_proxy"
+      ],
+      "id": "bone:skull",
+      "kind": "bone",
+      "label": "Skull",
+      "llm_visible": true,
+      "materialization": "canonical",
+      "source_ids": [
+        "openstax-ap-2e-7.2",
+        "fipat-ta2-2019"
+      ]
+    },
+    {
+      "control_channels": [],
+      "id": "bone:sphenoid",
+      "kind": "bone",
+      "label": "Sphenoid bone",
+      "llm_visible": false,
+      "materialization": "canonical",
+      "source_ids": [
+        "openstax-ap-2e-7.2",
+        "fipat-ta2-2019"
+      ]
+    },
+    {
+      "control_channels": [],
+      "id": "bone:temporal_pair",
+      "kind": "bone",
+      "label": "Temporal bones",
+      "llm_visible": false,
+      "materialization": "canonical",
+      "source_ids": [
+        "openstax-ap-2e-7.2",
+        "fipat-ta2-2019"
+      ]
+    },
+    {
+      "control_channels": [],
+      "id": "bone:vomer",
+      "kind": "bone",
+      "label": "Vomer",
+      "llm_visible": false,
+      "materialization": "canonical",
+      "source_ids": [
+        "openstax-ap-2e-7.2",
+        "fipat-ta2-2019"
+      ]
+    },
+    {
+      "control_channels": [],
+      "id": "bone:zygomatic_pair",
+      "kind": "bone",
+      "label": "Zygomatic bones",
+      "llm_visible": false,
+      "materialization": "canonical",
+      "source_ids": [
+        "openstax-ap-2e-7.2",
+        "fipat-ta2-2019"
+      ]
+    },
+    {
+      "control_channels": [
+        "flexion_extension",
+        "ground_contact"
+      ],
+      "id": "digit:right_hallux",
+      "kind": "structure",
+      "label": "Right great toe",
+      "llm_visible": true,
+      "materialization": "canonical",
+      "source_ids": [
+        "openstax-ap-2e-8.4",
+        "fipat-ta2-2019"
+      ]
+    },
+    {
+      "control_channels": [
+        "flexion_extension",
+        "abduction_adduction"
+      ],
+      "id": "digit:right_index_finger",
+      "kind": "structure",
+      "label": "Right index finger",
+      "llm_visible": true,
+      "materialization": "canonical",
+      "source_ids": [
+        "openstax-ap-2e-8.2",
+        "fipat-ta2-2019"
+      ]
+    },
+    {
+      "control_channels": [
+        "opposition",
+        "flexion_extension"
+      ],
+      "id": "digit:right_pollex",
+      "kind": "structure",
+      "label": "Right thumb",
+      "llm_visible": true,
+      "materialization": "canonical",
+      "source_ids": [
+        "openstax-ap-2e-8.2",
+        "fipat-ta2-2019"
+      ]
+    },
+    {
+      "control_channels": [
+        "flexion_extension",
+        "stability_state",
+        "anatomy_layer"
+      ],
+      "id": "joint:right_knee",
+      "kind": "joint",
+      "label": "Right knee joint",
+      "llm_visible": true,
+      "materialization": "canonical",
+      "source_ids": [
+        "openstax-ap-2e-8.4",
+        "ncbi-statpearls-knee-2023",
+        "fipat-ta2-2019"
+      ]
+    },
+    {
+      "control_channels": [],
+      "id": "ligament:right_acl",
+      "kind": "ligament",
+      "label": "Right anterior cruciate ligament",
+      "llm_visible": false,
+      "materialization": "canonical",
+      "source_ids": [
+        "ncbi-statpearls-knee-2023",
+        "fipat-ta2-2019"
+      ]
+    },
+    {
+      "control_channels": [],
+      "id": "ligament:right_lcl",
+      "kind": "ligament",
+      "label": "Right lateral collateral ligament",
+      "llm_visible": false,
+      "materialization": "canonical",
+      "source_ids": [
+        "ncbi-statpearls-knee-2023",
+        "fipat-ta2-2019"
+      ]
+    },
+    {
+      "control_channels": [],
+      "id": "ligament:right_mcl",
+      "kind": "ligament",
+      "label": "Right medial collateral ligament",
+      "llm_visible": false,
+      "materialization": "canonical",
+      "source_ids": [
+        "ncbi-statpearls-knee-2023",
+        "fipat-ta2-2019"
+      ]
+    },
+    {
+      "control_channels": [],
+      "id": "ligament:right_pcl",
+      "kind": "ligament",
+      "label": "Right posterior cruciate ligament",
+      "llm_visible": false,
+      "materialization": "canonical",
+      "source_ids": [
+        "ncbi-statpearls-knee-2023",
+        "fipat-ta2-2019"
+      ]
+    },
+    {
+      "control_channels": [],
+      "id": "organ:brain",
+      "kind": "organ",
+      "label": "Brain",
+      "llm_visible": false,
+      "materialization": "canonical",
+      "source_ids": [
+        "fipat-ta2-2019"
+      ]
+    },
+    {
+      "control_channels": [],
+      "id": "organ:skin",
+      "kind": "skin",
+      "label": "Skin",
+      "llm_visible": false,
+      "materialization": "canonical",
+      "source_ids": [
+        "openstax-ap-2e-1.2",
+        "fipat-ta2-2019"
+      ]
+    },
+    {
+      "control_channels": [
+        "sweat_emission",
+        "materialize_visible_instances"
+      ],
+      "id": "population:forehead_eccrine_sweat_glands",
+      "kind": "population_template",
+      "label": "Forehead eccrine sweat gland population",
+      "llm_visible": true,
+      "materialization": "population_template",
+      "source_ids": [
+        "fipat-ta2-2019",
+        "hra-kg-v2.2-paper"
+      ]
+    },
+    {
+      "control_channels": [
+        "bend_proxy",
+        "sway_proxy",
+        "materialize_visible_instances"
+      ],
+      "id": "population:scalp_hair_follicles",
+      "kind": "population_template",
+      "label": "Scalp hair follicle population",
+      "llm_visible": true,
+      "materialization": "population_template",
+      "source_ids": [
+        "fipat-ta2-2019",
+        "hra-kg-v2.2-paper"
+      ]
+    },
+    {
+      "control_channels": [
+        "camera_focus",
+        "anatomy_layer",
+        "pose_focus"
+      ],
+      "id": "region:head",
+      "kind": "region",
+      "label": "Head",
+      "llm_visible": true,
+      "materialization": "canonical",
+      "source_ids": [
+        "fipat-ta2-2019"
+      ]
+    },
+    {
+      "control_channels": [
+        "weight_bearing",
+        "toe_curl",
+        "anatomy_layer"
+      ],
+      "id": "region:right_foot",
+      "kind": "region",
+      "label": "Right foot",
+      "llm_visible": true,
+      "materialization": "canonical",
+      "source_ids": [
+        "openstax-ap-2e-8.4",
+        "fipat-ta2-2019"
+      ]
+    },
+    {
+      "control_channels": [
+        "open_close",
+        "finger_curl",
+        "anatomy_layer"
+      ],
+      "id": "region:right_hand",
+      "kind": "region",
+      "label": "Right hand",
+      "llm_visible": true,
+      "materialization": "canonical",
+      "source_ids": [
+        "openstax-ap-2e-8.2",
+        "fipat-ta2-2019"
+      ]
+    },
+    {
+      "control_channels": [
+        "opacity",
+        "droplet_rate"
+      ],
+      "id": "render:forehead_sweat_proxy",
+      "kind": "render_proxy",
+      "label": "Forehead sweat droplet render proxy",
+      "llm_visible": true,
+      "materialization": "render_proxy",
+      "source_ids": [
+        "hra-kg-v2.2-paper"
+      ]
+    },
+    {
+      "control_channels": [
+        "sweat",
+        "flush",
+        "detail_lod"
+      ],
+      "id": "skin:forehead",
+      "kind": "skin",
+      "label": "Skin of forehead",
+      "llm_visible": true,
+      "materialization": "aggregate",
+      "source_ids": [
+        "fipat-ta2-2019"
+      ]
+    },
+    {
+      "control_channels": [
+        "pressure_flush",
+        "sweat",
+        "contact_deformation"
+      ],
+      "id": "skin:right_hallux",
+      "kind": "skin",
+      "label": "Skin of right great toe",
+      "llm_visible": true,
+      "materialization": "aggregate",
+      "source_ids": [
+        "fipat-ta2-2019",
+        "hra-kg-v2.2-paper"
+      ]
+    },
+    {
+      "control_channels": [],
+      "id": "structure:hair",
+      "kind": "hair",
+      "label": "Hair",
+      "llm_visible": false,
+      "materialization": "canonical",
+      "source_ids": [
+        "openstax-ap-2e-1.2",
+        "fipat-ta2-2019"
+      ]
+    },
+    {
+      "control_channels": [],
+      "id": "structure:nails",
+      "kind": "nail",
+      "label": "Nails",
+      "llm_visible": false,
+      "materialization": "canonical",
+      "source_ids": [
+        "openstax-ap-2e-1.2",
+        "fipat-ta2-2019"
+      ]
+    },
+    {
+      "control_channels": [],
+      "id": "system:cardiovascular",
+      "kind": "system",
+      "label": "Cardiovascular system",
+      "llm_visible": false,
+      "materialization": "canonical",
+      "source_ids": [
+        "openstax-ap-2e-1.2"
+      ]
+    },
+    {
+      "control_channels": [],
+      "id": "system:digestive",
+      "kind": "system",
+      "label": "Digestive system",
+      "llm_visible": false,
+      "materialization": "canonical",
+      "source_ids": [
+        "openstax-ap-2e-1.2"
+      ]
+    },
+    {
+      "control_channels": [],
+      "id": "system:endocrine",
+      "kind": "system",
+      "label": "Endocrine system",
+      "llm_visible": false,
+      "materialization": "canonical",
+      "source_ids": [
+        "openstax-ap-2e-1.2"
+      ]
+    },
+    {
+      "control_channels": [],
+      "id": "system:integumentary",
+      "kind": "system",
+      "label": "Integumentary system",
+      "llm_visible": false,
+      "materialization": "canonical",
+      "source_ids": [
+        "openstax-ap-2e-1.2"
+      ]
+    },
+    {
+      "control_channels": [],
+      "id": "system:lymphatic",
+      "kind": "system",
+      "label": "Lymphatic system",
+      "llm_visible": false,
+      "materialization": "canonical",
+      "source_ids": [
+        "openstax-ap-2e-1.2"
+      ]
+    },
+    {
+      "control_channels": [],
+      "id": "system:muscular",
+      "kind": "system",
+      "label": "Muscular system",
+      "llm_visible": false,
+      "materialization": "canonical",
+      "source_ids": [
+        "openstax-ap-2e-1.2"
+      ]
+    },
+    {
+      "control_channels": [],
+      "id": "system:nervous",
+      "kind": "system",
+      "label": "Nervous system",
+      "llm_visible": false,
+      "materialization": "canonical",
+      "source_ids": [
+        "openstax-ap-2e-1.2"
+      ]
+    },
+    {
+      "control_channels": [],
+      "id": "system:reproductive",
+      "kind": "system",
+      "label": "Reproductive system",
+      "llm_visible": false,
+      "materialization": "canonical",
+      "source_ids": [
+        "openstax-ap-2e-1.2"
+      ]
+    },
+    {
+      "control_channels": [],
+      "id": "system:respiratory",
+      "kind": "system",
+      "label": "Respiratory system",
+      "llm_visible": false,
+      "materialization": "canonical",
+      "source_ids": [
+        "openstax-ap-2e-1.2"
+      ]
+    },
+    {
+      "control_channels": [],
+      "id": "system:skeletal",
+      "kind": "system",
+      "label": "Skeletal system",
+      "llm_visible": false,
+      "materialization": "canonical",
+      "source_ids": [
+        "openstax-ap-2e-1.2"
+      ]
+    },
+    {
+      "control_channels": [],
+      "id": "system:urinary",
+      "kind": "system",
+      "label": "Urinary system",
+      "llm_visible": false,
+      "materialization": "canonical",
+      "source_ids": [
+        "openstax-ap-2e-1.2"
+      ]
+    }
+  ],
+  "render_projection": {
+    "diagnostics": [
+      "missing_render_mapping:systems:system:digestive",
+      "missing_render_mapping:systems:system:endocrine",
+      "missing_render_mapping:systems:system:lymphatic",
+      "missing_render_mapping:systems:system:muscular",
+      "missing_render_mapping:systems:system:reproductive",
+      "missing_render_mapping:systems:system:respiratory",
+      "missing_render_mapping:systems:system:urinary"
+    ],
+    "layer_count": 5,
+    "layers": [
+      {
+        "id": "body",
+        "label": "Body",
+        "mapped_count": 1,
+        "mapped_node_ids": [
+          "body:human"
+        ],
+        "missing_count": 0,
+        "missing_node_ids": [],
+        "status": "complete",
+        "target_count": 1,
+        "target_node_ids": [
+          "body:human"
+        ]
+      },
+      {
+        "id": "systems",
+        "label": "Systems",
+        "mapped_count": 4,
+        "mapped_node_ids": [
+          "system:cardiovascular",
+          "system:integumentary",
+          "system:nervous",
+          "system:skeletal"
+        ],
+        "missing_count": 7,
+        "missing_node_ids": [
+          "system:digestive",
+          "system:endocrine",
+          "system:lymphatic",
+          "system:muscular",
+          "system:reproductive",
+          "system:respiratory",
+          "system:urinary"
+        ],
+        "status": "degraded",
+        "target_count": 11,
+        "target_node_ids": [
+          "system:cardiovascular",
+          "system:digestive",
+          "system:endocrine",
+          "system:integumentary",
+          "system:lymphatic",
+          "system:muscular",
+          "system:nervous",
+          "system:reproductive",
+          "system:respiratory",
+          "system:skeletal",
+          "system:urinary"
+        ]
+      },
+      {
+        "id": "head",
+        "label": "Head",
+        "mapped_count": 6,
+        "mapped_node_ids": [
+          "region:head",
+          "bone:skull",
+          "organ:brain",
+          "skin:forehead",
+          "population:scalp_hair_follicles",
+          "population:forehead_eccrine_sweat_glands"
+        ],
+        "missing_count": 0,
+        "missing_node_ids": [],
+        "status": "complete",
+        "target_count": 6,
+        "target_node_ids": [
+          "region:head",
+          "bone:skull",
+          "organ:brain",
+          "skin:forehead",
+          "population:scalp_hair_follicles",
+          "population:forehead_eccrine_sweat_glands"
+        ]
+      },
+      {
+        "id": "knee",
+        "label": "Right knee",
+        "mapped_count": 8,
+        "mapped_node_ids": [
+          "joint:right_knee",
+          "bone:right_femur",
+          "bone:right_tibia",
+          "bone:right_patella",
+          "ligament:right_acl",
+          "ligament:right_pcl",
+          "ligament:right_mcl",
+          "ligament:right_lcl"
+        ],
+        "missing_count": 0,
+        "missing_node_ids": [],
+        "status": "complete",
+        "target_count": 8,
+        "target_node_ids": [
+          "joint:right_knee",
+          "bone:right_femur",
+          "bone:right_tibia",
+          "bone:right_patella",
+          "ligament:right_acl",
+          "ligament:right_pcl",
+          "ligament:right_mcl",
+          "ligament:right_lcl"
+        ]
+      },
+      {
+        "id": "toe",
+        "label": "Right hallux",
+        "mapped_count": 4,
+        "mapped_node_ids": [
+          "digit:right_hallux",
+          "skin:right_hallux",
+          "bone:right_hallux_proximal_phalanx",
+          "bone:right_hallux_distal_phalanx"
+        ],
+        "missing_count": 0,
+        "missing_node_ids": [],
+        "status": "complete",
+        "target_count": 4,
+        "target_node_ids": [
+          "digit:right_hallux",
+          "skin:right_hallux",
+          "bone:right_hallux_proximal_phalanx",
+          "bone:right_hallux_distal_phalanx"
+        ]
+      }
+    ],
+    "missing_mapping_count": 7,
+    "primitive_count": 23,
+    "primitives": [
+      {
+        "class_name": "body-outline",
+        "geometry": {
+          "d": "M210 70 C151 70 133 142 142 204 C98 248 76 347 73 433 C70 520 101 640 132 707 C177 732 244 732 288 707 C319 640 350 520 347 433 C344 347 322 248 278 204 C287 142 269 70 210 70 Z"
+        },
+        "label_anchor": {
+          "x": 44,
+          "y": 64
+        },
+        "layer_id": "body",
+        "node_id": "body:human",
+        "shape": "path",
+        "source_ids": [
+          "openstax-ap-2e-1.2"
+        ]
+      },
+      {
+        "class_name": "system-cardiovascular",
+        "geometry": {
+          "d": "M210 281 C195 260 166 279 184 304 C196 320 210 331 210 331 C210 331 224 320 236 304 C254 279 225 260 210 281 M210 331 V430 M210 331 C178 372 132 393 94 427 M210 331 C242 372 288 393 326 427"
+        },
+        "label_anchor": {
+          "x": 247,
+          "y": 366
+        },
+        "layer_id": "systems",
+        "node_id": "system:cardiovascular",
+        "shape": "path",
+        "source_ids": [
+          "openstax-ap-2e-1.2"
+        ]
+      },
+      {
+        "class_name": "system-integumentary",
+        "geometry": {
+          "d": "M151 210 C169 188 250 188 269 210 L289 432 C255 466 165 466 131 432 Z"
+        },
+        "label_anchor": {
+          "x": 294,
+          "y": 274
+        },
+        "layer_id": "systems",
+        "node_id": "system:integumentary",
+        "shape": "path",
+        "source_ids": [
+          "openstax-ap-2e-1.2"
+        ]
+      },
+      {
+        "class_name": "system-nervous",
+        "geometry": {
+          "d": "M191 114 C195 88 226 88 230 114 C235 143 184 143 191 114 M210 146 V440 M204 246 L180 318 M216 246 L241 318"
+        },
+        "label_anchor": {
+          "x": 246,
+          "y": 154
+        },
+        "layer_id": "systems",
+        "node_id": "system:nervous",
+        "shape": "path",
+        "source_ids": [
+          "openstax-ap-2e-1.2"
+        ]
+      },
+      {
+        "class_name": "system-skeletal",
+        "geometry": {
+          "d": "M210 112 V436 M169 264 C192 248 228 248 251 264 M162 304 C192 288 228 288 258 304 M151 224 L79 424 M269 224 L346 424 M174 454 L143 688 M246 454 L278 688"
+        },
+        "label_anchor": {
+          "x": 298,
+          "y": 314
+        },
+        "layer_id": "systems",
+        "node_id": "system:skeletal",
+        "shape": "path",
+        "source_ids": [
+          "openstax-ap-2e-1.2"
+        ]
+      },
+      {
+        "class_name": "head-region",
+        "geometry": {
+          "cx": 210,
+          "cy": 119,
+          "r": 57
+        },
+        "label_anchor": {
+          "x": 271,
+          "y": 90
+        },
+        "layer_id": "head",
+        "node_id": "region:head",
+        "shape": "circle",
+        "source_ids": [
+          "fipat-ta2-2019"
+        ]
+      },
+      {
+        "class_name": "head-skull",
+        "geometry": {
+          "d": "M174 115 C174 73 246 73 246 115 C246 154 174 154 174 115 Z"
+        },
+        "label_anchor": {
+          "x": 263,
+          "y": 118
+        },
+        "layer_id": "head",
+        "node_id": "bone:skull",
+        "shape": "path",
+        "source_ids": [
+          "openstax-ap-2e-7.2",
+          "fipat-ta2-2019"
+        ]
+      },
+      {
+        "class_name": "head-brain",
+        "geometry": {
+          "d": "M185 112 C184 92 204 86 211 98 C221 84 242 94 237 117 C235 137 210 139 202 128 C194 139 181 130 185 112 Z"
+        },
+        "label_anchor": {
+          "x": 251,
+          "y": 142
+        },
+        "layer_id": "head",
+        "node_id": "organ:brain",
+        "shape": "path",
+        "source_ids": [
+          "fipat-ta2-2019"
+        ]
+      },
+      {
+        "class_name": "head-forehead",
+        "geometry": {
+          "d": "M176 101 C188 76 233 76 246 101 C228 92 194 92 176 101 Z"
+        },
+        "label_anchor": null,
+        "layer_id": "head",
+        "node_id": "skin:forehead",
+        "shape": "path",
+        "source_ids": [
+          "fipat-ta2-2019"
+        ]
+      },
+      {
+        "class_name": "head-hair-population",
+        "geometry": {
+          "d": "M165 108 C166 55 254 54 257 109 C243 86 184 84 165 108 Z"
+        },
+        "label_anchor": null,
+        "layer_id": "head",
+        "node_id": "population:scalp_hair_follicles",
+        "shape": "path",
+        "source_ids": [
+          "fipat-ta2-2019",
+          "hra-kg-v2.2-paper"
+        ]
+      },
+      {
+        "class_name": "head-sweat-population",
+        "geometry": {
+          "cx": 211,
+          "cy": 94,
+          "r": 8
+        },
+        "label_anchor": null,
+        "layer_id": "head",
+        "node_id": "population:forehead_eccrine_sweat_glands",
+        "shape": "circle",
+        "source_ids": [
+          "fipat-ta2-2019",
+          "hra-kg-v2.2-paper"
+        ]
+      },
+      {
+        "class_name": "knee-joint",
+        "geometry": {
+          "cx": 267,
+          "cy": 560,
+          "r": 24
+        },
+        "label_anchor": {
+          "x": 305,
+          "y": 558
+        },
+        "layer_id": "knee",
+        "node_id": "joint:right_knee",
+        "shape": "circle",
+        "source_ids": [
+          "openstax-ap-2e-8.4",
+          "ncbi-statpearls-knee-2023",
+          "fipat-ta2-2019"
+        ]
+      },
+      {
+        "class_name": "knee-bone",
+        "geometry": {
+          "x1": 246,
+          "x2": 267,
+          "y1": 454,
+          "y2": 542
+        },
+        "label_anchor": null,
+        "layer_id": "knee",
+        "node_id": "bone:right_femur",
+        "shape": "line",
+        "source_ids": [
+          "openstax-ap-2e-8.4",
+          "fipat-ta2-2019"
+        ]
+      },
+      {
+        "class_name": "knee-bone",
+        "geometry": {
+          "x1": 267,
+          "x2": 278,
+          "y1": 578,
+          "y2": 685
+        },
+        "label_anchor": null,
+        "layer_id": "knee",
+        "node_id": "bone:right_tibia",
+        "shape": "line",
+        "source_ids": [
+          "openstax-ap-2e-8.4",
+          "fipat-ta2-2019"
+        ]
+      },
+      {
+        "class_name": "knee-patella",
+        "geometry": {
+          "cx": 256,
+          "cy": 560,
+          "r": 7
+        },
+        "label_anchor": null,
+        "layer_id": "knee",
+        "node_id": "bone:right_patella",
+        "shape": "circle",
+        "source_ids": [
+          "openstax-ap-2e-8.4",
+          "fipat-ta2-2019"
+        ]
+      },
+      {
+        "class_name": "knee-ligament",
+        "geometry": {
+          "x1": 257,
+          "x2": 277,
+          "y1": 546,
+          "y2": 574
+        },
+        "label_anchor": null,
+        "layer_id": "knee",
+        "node_id": "ligament:right_acl",
+        "shape": "line",
+        "source_ids": [
+          "ncbi-statpearls-knee-2023",
+          "fipat-ta2-2019"
+        ]
+      },
+      {
+        "class_name": "knee-ligament",
+        "geometry": {
+          "x1": 277,
+          "x2": 257,
+          "y1": 546,
+          "y2": 574
+        },
+        "label_anchor": null,
+        "layer_id": "knee",
+        "node_id": "ligament:right_pcl",
+        "shape": "line",
+        "source_ids": [
+          "ncbi-statpearls-knee-2023",
+          "fipat-ta2-2019"
+        ]
+      },
+      {
+        "class_name": "knee-ligament",
+        "geometry": {
+          "x1": 245,
+          "x2": 247,
+          "y1": 546,
+          "y2": 574
+        },
+        "label_anchor": null,
+        "layer_id": "knee",
+        "node_id": "ligament:right_mcl",
+        "shape": "line",
+        "source_ids": [
+          "ncbi-statpearls-knee-2023",
+          "fipat-ta2-2019"
+        ]
+      },
+      {
+        "class_name": "knee-ligament",
+        "geometry": {
+          "x1": 289,
+          "x2": 287,
+          "y1": 546,
+          "y2": 574
+        },
+        "label_anchor": null,
+        "layer_id": "knee",
+        "node_id": "ligament:right_lcl",
+        "shape": "line",
+        "source_ids": [
+          "ncbi-statpearls-knee-2023",
+          "fipat-ta2-2019"
+        ]
+      },
+      {
+        "class_name": "toe-digit",
+        "geometry": {
+          "cx": 278,
+          "cy": 690,
+          "rx": 25,
+          "ry": 13
+        },
+        "label_anchor": {
+          "x": 314,
+          "y": 722
+        },
+        "layer_id": "toe",
+        "node_id": "digit:right_hallux",
+        "shape": "ellipse",
+        "source_ids": [
+          "openstax-ap-2e-8.4",
+          "fipat-ta2-2019"
+        ]
+      },
+      {
+        "class_name": "toe-skin",
+        "geometry": {
+          "cx": 278,
+          "cy": 690,
+          "rx": 32,
+          "ry": 17
+        },
+        "label_anchor": null,
+        "layer_id": "toe",
+        "node_id": "skin:right_hallux",
+        "shape": "ellipse",
+        "source_ids": [
+          "fipat-ta2-2019",
+          "hra-kg-v2.2-paper"
+        ]
+      },
+      {
+        "class_name": "toe-bone",
+        "geometry": {
+          "x1": 257,
+          "x2": 277,
+          "y1": 686,
+          "y2": 689
+        },
+        "label_anchor": null,
+        "layer_id": "toe",
+        "node_id": "bone:right_hallux_proximal_phalanx",
+        "shape": "line",
+        "source_ids": [
+          "openstax-ap-2e-8.4",
+          "fipat-ta2-2019"
+        ]
+      },
+      {
+        "class_name": "toe-bone",
+        "geometry": {
+          "x1": 278,
+          "x2": 299,
+          "y1": 690,
+          "y2": 694
+        },
+        "label_anchor": null,
+        "layer_id": "toe",
+        "node_id": "bone:right_hallux_distal_phalanx",
+        "shape": "line",
+        "source_ids": [
+          "openstax-ap-2e-8.4",
+          "fipat-ta2-2019"
+        ]
+      }
+    ],
+    "schema": "god.anatomy_render_projection.v1",
+    "status": "degraded"
+  },
+  "status": "complete",
+  "summary": {
+    "action_bundle_count": 3,
+    "control_plan_count": 3,
+    "control_rejection_count": 2,
+    "edge_count": 68,
+    "focus_node_count": 21,
+    "llm_handle_count": 13,
+    "max_action_bundle_node_count": 14,
+    "motion_diagnostic_count": 0,
+    "motion_plan_count": 0,
+    "motion_renderer_control_count": 0,
+    "motion_simulation_hint_count": 0,
+    "motion_visual_cue_count": 0,
+    "node_count": 60,
+    "render_layer_count": 5,
+    "render_missing_mapping_count": 7,
+    "render_primitive_count": 23,
+    "working_set_node_count": 3,
+    "working_set_root": "skin:forehead"
+  }
+}

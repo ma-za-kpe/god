@@ -1,5 +1,21 @@
 # Commands
 
+Avatar lab prime directive: see [AGENTS.md](./AGENTS.md). The local avatar goal
+is continuous LLM-directed browser video; hard-coded avatar behavior is only an
+explicit test fallback, never the product path.
+
+Local browser avatar lab:
+
+```powershell
+.\scripts\start-local-avatar-lab.ps1 -OpenBrowser
+```
+
+Dry run without starting Docker:
+
+```powershell
+.\scripts\start-local-avatar-lab.ps1 -DryRun
+```
+
 Single command to bring the Vast stack up and wait for everything required by `/stage`:
 
 ```bash

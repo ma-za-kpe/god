@@ -1,4 +1,4 @@
-import React, { Suspense, useMemo } from 'react';
+import React, { Suspense, lazy, useMemo } from 'react';
 import { useWorld } from './hooks/useWorld';
 import { Header } from './components/Header';
 import { WorldMap } from './components/WorldMap';
@@ -6,6 +6,13 @@ import { DramaFeed } from './components/DramaFeed';
 import { AgentInspector } from './components/AgentInspector';
 import { MilestoneBar } from './components/MilestoneBar';
 import { useObserverStore } from './store';
+
+const LocalAvatarLab = lazy(() => import('./components/LocalAvatarLab').then((module) => ({
+  default: module.LocalAvatarLab,
+})));
+const AnatomyMilestoneLab = lazy(() => import('./components/AnatomyMilestoneLab').then((module) => ({
+  default: module.AnatomyMilestoneLab,
+})));
 
 class ObserverErrorBoundary extends React.Component {
   constructor(props) {
@@ -40,14 +47,15 @@ class ObserverErrorBoundary extends React.Component {
 function currentMode() {
   const pathname = window.location.pathname.replace(/\/+$/, '');
   const params = new URLSearchParams(window.location.search);
+  if (pathname === '/anatomy-lab' || params.get('lab') === 'anatomy') return 'anatomy-lab';
+  if (pathname === '/avatar-lab' || pathname === '/lab' || params.get('lab') === 'avatar') return 'avatar-lab';
   if (pathname === '/one-red' || params.get('debug') === 'red') return 'red';
   if (pathname === '/one' || params.get('solo') === '1') return 'one';
   return 'stage';
 }
 
-export default function App() {
+function RuntimeObserverApp({ mode }) {
   useWorld();
-  const mode = useMemo(() => currentMode(), []);
   const agents = useObserverStore((s) => s.agents);
   const selectedSoulId = useObserverStore((s) => s.selectedSoulId);
   const observerHealth = useObserverStore((s) => s.observerHealth);
@@ -138,4 +146,48 @@ export default function App() {
       </div>
     </div>
   );
+}
+
+export default function App() {
+  const mode = useMemo(() => currentMode(), []);
+
+  if (mode === 'avatar-lab') {
+    return (
+      <ObserverErrorBoundary>
+        <Suspense
+          fallback={
+            <div className="debug-red-screen">
+              <div className="debug-red-card">
+                <div className="debug-red-title">loading avatar lab</div>
+                <div className="debug-red-copy">Waiting for the local avatar control surface.</div>
+              </div>
+            </div>
+          }
+        >
+          <LocalAvatarLab />
+        </Suspense>
+      </ObserverErrorBoundary>
+    );
+  }
+
+  if (mode === 'anatomy-lab') {
+    return (
+      <ObserverErrorBoundary>
+        <Suspense
+          fallback={
+            <div className="debug-red-screen">
+              <div className="debug-red-card">
+                <div className="debug-red-title">loading anatomy lab</div>
+                <div className="debug-red-copy">Waiting for the anatomy graph projection.</div>
+              </div>
+            </div>
+          }
+        >
+          <AnatomyMilestoneLab />
+        </Suspense>
+      </ObserverErrorBoundary>
+    );
+  }
+
+  return <RuntimeObserverApp mode={mode} />;
 }
