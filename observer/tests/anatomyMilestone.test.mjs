@@ -53,6 +53,25 @@ test('summarizes anatomy milestone graph evidence for the browser morph gate', (
       { id: 'render:forehead_sweat_proxy', kind: 'render_proxy' },
       { id: 'population:scalp_hair_follicles', kind: 'population_template' },
       { id: 'region:right_hand', kind: 'region' },
+      { id: 'digit:right_pollex', kind: 'structure' },
+      { id: 'digit:right_index_finger', kind: 'structure' },
+      { id: 'digit:right_middle_finger', kind: 'structure' },
+      { id: 'digit:right_ring_finger', kind: 'structure' },
+      { id: 'digit:right_little_finger', kind: 'structure' },
+      { id: 'bone:right_pollex_proximal_phalanx', kind: 'bone' },
+      { id: 'bone:right_pollex_distal_phalanx', kind: 'bone' },
+      { id: 'bone:right_index_finger_proximal_phalanx', kind: 'bone' },
+      { id: 'bone:right_index_finger_middle_phalanx', kind: 'bone' },
+      { id: 'bone:right_index_finger_distal_phalanx', kind: 'bone' },
+      { id: 'bone:right_middle_finger_proximal_phalanx', kind: 'bone' },
+      { id: 'bone:right_middle_finger_middle_phalanx', kind: 'bone' },
+      { id: 'bone:right_middle_finger_distal_phalanx', kind: 'bone' },
+      { id: 'bone:right_ring_finger_proximal_phalanx', kind: 'bone' },
+      { id: 'bone:right_ring_finger_middle_phalanx', kind: 'bone' },
+      { id: 'bone:right_ring_finger_distal_phalanx', kind: 'bone' },
+      { id: 'bone:right_little_finger_proximal_phalanx', kind: 'bone' },
+      { id: 'bone:right_little_finger_middle_phalanx', kind: 'bone' },
+      { id: 'bone:right_little_finger_distal_phalanx', kind: 'bone' },
       { id: 'joint:right_knee', kind: 'joint' },
       { id: 'digit:right_hallux', kind: 'structure' },
       { id: 'bone:skull', kind: 'bone' },
@@ -75,6 +94,10 @@ test('summarizes anatomy milestone graph evidence for the browser morph gate', (
   assert.equal(summary.hasSweatProxy, true);
   assert.equal(summary.hasHairPopulation, true);
   assert.equal(summary.hasRightHand, true);
+  assert.equal(summary.rightHandDigitCount, 5);
+  assert.equal(summary.rightHandPhalanxCount, 14);
+  assert.equal(summary.hasRightLittleFinger, true);
+  assert.equal(summary.rightLittleFingerPhalanxCount, 3);
   assert.equal(summary.hasRightKnee, true);
   assert.equal(summary.hasRightHallux, true);
   assert.equal(summary.hasSkull, true);
@@ -107,6 +130,10 @@ test('builds visible morph channels from sourced anatomy graph features', () => 
     hasSweatProxy: true,
     hasHairPopulation: true,
     hasRightHand: true,
+    rightHandDigitCount: 5,
+    rightHandPhalanxCount: 14,
+    hasRightLittleFinger: true,
+    rightLittleFingerPhalanxCount: 3,
     hasRightKnee: true,
     hasRightHallux: true,
     hasSkull: true,
@@ -128,6 +155,9 @@ test('builds visible morph channels from sourced anatomy graph features', () => 
   assert.equal(channels.bodyScale > 1, true);
   assert.equal(channels.registryReach > 0, true);
   assert.equal(channels.handReach, 1);
+  assert.equal(channels.handDigitReach, 1);
+  assert.equal(channels.handPhalanxReach, 1);
+  assert.equal(channels.pinkyReach, 1);
   assert.equal(channels.kneeFlex, 1);
   assert.equal(channels.toePulse, 1);
   assert.equal(channels.graphPulse, 1);

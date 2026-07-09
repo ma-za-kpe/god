@@ -19,6 +19,8 @@ from anatomy import (
     build_anatomy_render_projection,
     build_m01_reference_graph,
     build_m02_reference_graph,
+    build_m08_pinky_reference_graph,
+    build_m08_right_hand_digits_reference_graph,
     build_anatomy_control_messages,
     build_ollama_anatomy_control_request,
     compile_lod_action_bundle,
@@ -682,6 +684,202 @@ def test_m07_motion_projection_reports_missing_depth_as_diagnostics():
         for plan in projection["plans"]
         for control in plan["renderer_controls"]
     )
+
+
+def test_m08_hand_graph_exposes_all_digit_phalanges_and_joint_chains():
+    graph = build_m08_right_hand_digits_reference_graph()
+
+    graph.assert_valid()
+
+    part_of_edges = {
+        (edge.from_id, edge.to_id) for edge in graph.edges if edge.kind == EdgeKind.PART_OF
+    }
+    assert ("region:right_upper_limb", "body:human") in part_of_edges
+    assert ("region:right_hand", "region:right_upper_limb") in part_of_edges
+    assert ("region:right_hand", "body:human") not in part_of_edges
+
+    expected_phalanges_by_digit = {
+        "digit:right_pollex": {
+            "bone:right_pollex_proximal_phalanx",
+            "bone:right_pollex_distal_phalanx",
+        },
+        "digit:right_index_finger": {
+            "bone:right_index_finger_proximal_phalanx",
+            "bone:right_index_finger_middle_phalanx",
+            "bone:right_index_finger_distal_phalanx",
+        },
+        "digit:right_middle_finger": {
+            "bone:right_middle_finger_proximal_phalanx",
+            "bone:right_middle_finger_middle_phalanx",
+            "bone:right_middle_finger_distal_phalanx",
+        },
+        "digit:right_ring_finger": {
+            "bone:right_ring_finger_proximal_phalanx",
+            "bone:right_ring_finger_middle_phalanx",
+            "bone:right_ring_finger_distal_phalanx",
+        },
+        "digit:right_little_finger": {
+            "bone:right_little_finger_proximal_phalanx",
+            "bone:right_little_finger_middle_phalanx",
+            "bone:right_little_finger_distal_phalanx",
+        },
+    }
+    for digit_id, phalanx_ids in expected_phalanges_by_digit.items():
+        assert (digit_id, "region:right_hand") in part_of_edges
+        assert {
+            edge.from_id
+            for edge in graph.edges
+            if edge.kind == EdgeKind.PART_OF and edge.to_id == digit_id
+        } >= phalanx_ids
+
+    assert sum(len(phalanx_ids) for phalanx_ids in expected_phalanges_by_digit.values()) == 14
+
+    joint_connections = {
+        edge.to_id: set()
+        for edge in graph.edges
+        if edge.kind == EdgeKind.CONNECTS_TO and edge.to_id.startswith("joint:right_")
+    }
+    for edge in graph.edges:
+        if edge.kind == EdgeKind.CONNECTS_TO and edge.to_id in joint_connections:
+            joint_connections[edge.to_id].add(edge.from_id)
+
+    expected_connections = {
+        "joint:right_first_metacarpophalangeal": {
+            "bone:right_first_metacarpal",
+            "bone:right_pollex_proximal_phalanx",
+        },
+        "joint:right_pollex_interphalangeal": {
+            "bone:right_pollex_proximal_phalanx",
+            "bone:right_pollex_distal_phalanx",
+        },
+        "joint:right_second_metacarpophalangeal": {
+            "bone:right_second_metacarpal",
+            "bone:right_index_finger_proximal_phalanx",
+        },
+        "joint:right_index_finger_proximal_interphalangeal": {
+            "bone:right_index_finger_proximal_phalanx",
+            "bone:right_index_finger_middle_phalanx",
+        },
+        "joint:right_index_finger_distal_interphalangeal": {
+            "bone:right_index_finger_middle_phalanx",
+            "bone:right_index_finger_distal_phalanx",
+        },
+        "joint:right_third_metacarpophalangeal": {
+            "bone:right_third_metacarpal",
+            "bone:right_middle_finger_proximal_phalanx",
+        },
+        "joint:right_middle_finger_proximal_interphalangeal": {
+            "bone:right_middle_finger_proximal_phalanx",
+            "bone:right_middle_finger_middle_phalanx",
+        },
+        "joint:right_middle_finger_distal_interphalangeal": {
+            "bone:right_middle_finger_middle_phalanx",
+            "bone:right_middle_finger_distal_phalanx",
+        },
+        "joint:right_fourth_metacarpophalangeal": {
+            "bone:right_fourth_metacarpal",
+            "bone:right_ring_finger_proximal_phalanx",
+        },
+        "joint:right_ring_finger_proximal_interphalangeal": {
+            "bone:right_ring_finger_proximal_phalanx",
+            "bone:right_ring_finger_middle_phalanx",
+        },
+        "joint:right_ring_finger_distal_interphalangeal": {
+            "bone:right_ring_finger_middle_phalanx",
+            "bone:right_ring_finger_distal_phalanx",
+        },
+        "joint:right_fifth_metacarpophalangeal": {
+            "bone:right_fifth_metacarpal",
+            "bone:right_little_finger_proximal_phalanx",
+        },
+        "joint:right_little_finger_proximal_interphalangeal": {
+            "bone:right_little_finger_proximal_phalanx",
+            "bone:right_little_finger_middle_phalanx",
+        },
+        "joint:right_little_finger_distal_interphalangeal": {
+            "bone:right_little_finger_middle_phalanx",
+            "bone:right_little_finger_distal_phalanx",
+        },
+    }
+    for joint_id, connected_bones in expected_connections.items():
+        assert joint_connections[joint_id] == connected_bones
+
+    for ordinal in ("first", "second", "third", "fourth", "fifth"):
+        cmc_joint_id = f"joint:right_{ordinal}_carpometacarpal"
+        assert "aggregate:right_carpals" in joint_connections[cmc_joint_id]
+
+    registry_by_id = {node["id"]: node for node in graph.llm_control_registry()}
+    assert registry_by_id["digit:right_little_finger"]["control_channels"] == [
+        "flexion_extension",
+        "abduction_adduction",
+        "circumduction_proxy",
+        "finger_curl",
+        "palm_cupping",
+    ]
+    assert "palm_cupping_proxy" in registry_by_id["bone:right_fifth_metacarpal"]["control_channels"]
+    assert "opposition_proxy" in registry_by_id["bone:right_first_metacarpal"]["control_channels"]
+    assert (
+        "circumduction_proxy"
+        in registry_by_id["joint:right_fifth_metacarpophalangeal"]["control_channels"]
+    )
+    assert all(
+        node_id in registry_by_id
+        for phalanx_ids in expected_phalanges_by_digit.values()
+        for node_id in phalanx_ids
+    )
+
+
+def test_m08_pinky_render_projection_draws_only_real_graph_nodes():
+    graph = build_m08_pinky_reference_graph()
+
+    projection = build_anatomy_render_projection(graph).to_dict()
+    layer_by_id = {layer["id"]: layer for layer in projection["layers"]}
+    pinky_layer = layer_by_id["pinky"]
+    primitive_node_ids = {
+        primitive["node_id"]
+        for primitive in projection["primitives"]
+        if primitive["layer_id"] == "pinky"
+    }
+
+    assert pinky_layer["status"] == "complete"
+    assert len(pinky_layer["target_node_ids"]) == 48
+    assert set(pinky_layer["target_node_ids"]) == primitive_node_ids
+    assert "aggregate:right_carpals" in primitive_node_ids
+    assert "aggregate:right_metacarpals" in primitive_node_ids
+    assert "aggregate:right_hand_phalanges" in primitive_node_ids
+    assert "digit:right_pollex" in primitive_node_ids
+    assert "digit:right_index_finger" in primitive_node_ids
+    assert "digit:right_middle_finger" in primitive_node_ids
+    assert "digit:right_ring_finger" in primitive_node_ids
+    assert "digit:right_little_finger" in primitive_node_ids
+    assert "joint:right_first_carpometacarpal" in primitive_node_ids
+    assert "joint:right_second_carpometacarpal" in primitive_node_ids
+    assert "joint:right_third_carpometacarpal" in primitive_node_ids
+    assert "joint:right_fourth_carpometacarpal" in primitive_node_ids
+    assert "joint:right_fifth_carpometacarpal" in primitive_node_ids
+    assert "bone:right_little_finger_distal_phalanx" in primitive_node_ids
+    assert primitive_node_ids.issubset(graph.nodes)
+    assert not any(
+        diagnostic.startswith("missing_render_mapping:pinky:")
+        for diagnostic in projection["diagnostics"]
+    )
+
+    primitive_by_node_id = {
+        primitive["node_id"]: primitive
+        for primitive in projection["primitives"]
+        if primitive["layer_id"] == "pinky"
+    }
+    fifth_metacarpal = primitive_by_node_id["bone:right_fifth_metacarpal"]["geometry"]
+    proximal_phalanx = primitive_by_node_id["bone:right_little_finger_proximal_phalanx"]["geometry"]
+    middle_phalanx = primitive_by_node_id["bone:right_little_finger_middle_phalanx"]["geometry"]
+    distal_phalanx = primitive_by_node_id["bone:right_little_finger_distal_phalanx"]["geometry"]
+
+    assert fifth_metacarpal["y1"] > fifth_metacarpal["y2"]
+    assert proximal_phalanx["y1"] > proximal_phalanx["y2"]
+    assert middle_phalanx["y1"] > middle_phalanx["y2"]
+    assert distal_phalanx["y1"] > distal_phalanx["y2"]
+    assert distal_phalanx["y2"] < 300
+    assert fifth_metacarpal["x1"] < fifth_metacarpal["x2"] < distal_phalanx["x2"]
 
 
 def _m05_wave_bundle():

@@ -52,7 +52,12 @@ from .retrieval import (
     compile_lod_action_bundle,
     neo4j_lod_retrieval_cypher,
 )
-from .seeds import build_m01_reference_graph, build_m02_reference_graph
+from .seeds import (
+    build_m01_reference_graph,
+    build_m02_reference_graph,
+    build_m08_pinky_reference_graph,
+    build_m08_right_hand_digits_reference_graph,
+)
 
 __all__ = [
     "AnatomyEdge",
@@ -72,6 +77,8 @@ __all__ = [
     "build_ollama_anatomy_control_request",
     "build_m01_reference_graph",
     "build_m02_reference_graph",
+    "build_m08_pinky_reference_graph",
+    "build_m08_right_hand_digits_reference_graph",
     "neo4j_cypher_script",
     "neo4j_load_statements",
     "neo4j_lod_retrieval_cypher",

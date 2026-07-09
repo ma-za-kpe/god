@@ -48,6 +48,9 @@ export function AnatomyMilestoneLab() {
     '--hair-sway': morph.hairSway,
     '--registry-reach': morph.registryReach,
     '--hand-reach': morph.handReach,
+    '--hand-digit-reach': morph.handDigitReach,
+    '--hand-phalanx-reach': morph.handPhalanxReach,
+    '--pinky-reach': morph.pinkyReach,
     '--knee-flex': morph.kneeFlex,
     '--toe-pulse': morph.toePulse,
     '--graph-pulse': morph.graphPulse,
@@ -204,6 +207,15 @@ export function AnatomyMilestoneLab() {
           <span>forehead sweat proxy</span>
           <span>scalp hair population</span>
           {summary.hasRightHand && <span>right hand</span>}
+          {summary.rightHandDigitCount > 0 && (
+            <span>hand digits {summary.rightHandDigitCount}/5</span>
+          )}
+          {summary.rightHandPhalanxCount > 0 && (
+            <span>hand phalanges {summary.rightHandPhalanxCount}/14</span>
+          )}
+          {summary.hasRightLittleFinger && (
+            <span>pinky phalanges {summary.rightLittleFingerPhalanxCount}/3</span>
+          )}
           {summary.hasRightKnee && <span>right knee</span>}
           {summary.hasRightHallux && <span>right hallux</span>}
           {summary.neo4jSchemaStatementCount > 0 && <span>neo4j schema {summary.neo4jSchemaStatementCount}</span>}

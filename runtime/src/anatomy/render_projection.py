@@ -137,10 +137,71 @@ def build_anatomy_render_projection(graph: AnatomyGraph) -> AnatomyRenderProject
 
 
 def _layer_targets(graph: AnatomyGraph) -> tuple[tuple[str, str, tuple[str, ...]], ...]:
+    if "digit:right_little_finger" in graph.nodes:
+        return (
+            (
+                "pinky",
+                "Right hand digits",
+                _existing(
+                    graph,
+                    (
+                        "region:right_upper_limb",
+                        "region:right_hand",
+                        "aggregate:right_carpals",
+                        "aggregate:right_metacarpals",
+                        "aggregate:right_hand_phalanges",
+                        "digit:right_pollex",
+                        "bone:right_first_metacarpal",
+                        "joint:right_first_carpometacarpal",
+                        "joint:right_first_metacarpophalangeal",
+                        "bone:right_pollex_proximal_phalanx",
+                        "joint:right_pollex_interphalangeal",
+                        "bone:right_pollex_distal_phalanx",
+                        "digit:right_index_finger",
+                        "bone:right_second_metacarpal",
+                        "joint:right_second_carpometacarpal",
+                        "joint:right_second_metacarpophalangeal",
+                        "bone:right_index_finger_proximal_phalanx",
+                        "joint:right_index_finger_proximal_interphalangeal",
+                        "bone:right_index_finger_middle_phalanx",
+                        "joint:right_index_finger_distal_interphalangeal",
+                        "bone:right_index_finger_distal_phalanx",
+                        "digit:right_middle_finger",
+                        "bone:right_third_metacarpal",
+                        "joint:right_third_carpometacarpal",
+                        "joint:right_third_metacarpophalangeal",
+                        "bone:right_middle_finger_proximal_phalanx",
+                        "joint:right_middle_finger_proximal_interphalangeal",
+                        "bone:right_middle_finger_middle_phalanx",
+                        "joint:right_middle_finger_distal_interphalangeal",
+                        "bone:right_middle_finger_distal_phalanx",
+                        "digit:right_ring_finger",
+                        "bone:right_fourth_metacarpal",
+                        "joint:right_fourth_carpometacarpal",
+                        "joint:right_fourth_metacarpophalangeal",
+                        "bone:right_ring_finger_proximal_phalanx",
+                        "joint:right_ring_finger_proximal_interphalangeal",
+                        "bone:right_ring_finger_middle_phalanx",
+                        "joint:right_ring_finger_distal_interphalangeal",
+                        "bone:right_ring_finger_distal_phalanx",
+                        "digit:right_little_finger",
+                        "bone:right_fifth_metacarpal",
+                        "joint:right_fifth_carpometacarpal",
+                        "joint:right_fifth_metacarpophalangeal",
+                        "bone:right_little_finger_proximal_phalanx",
+                        "joint:right_little_finger_proximal_interphalangeal",
+                        "bone:right_little_finger_middle_phalanx",
+                        "joint:right_little_finger_distal_interphalangeal",
+                        "bone:right_little_finger_distal_phalanx",
+                    ),
+                ),
+            ),
+        )
+
     system_ids = tuple(
         sorted(node.id for node in graph.nodes.values() if node.kind == AnatomyKind.SYSTEM)
     )
-    return (
+    layers = (
         ("body", "Body", _existing(graph, ("body:human",))),
         ("systems", "Systems", system_ids),
         (
@@ -189,6 +250,7 @@ def _layer_targets(graph: AnatomyGraph) -> tuple[tuple[str, str, tuple[str, ...]
             ),
         ),
     )
+    return layers
 
 
 def _existing(graph: AnatomyGraph, node_ids: tuple[str, ...]) -> tuple[str, ...]:
@@ -363,5 +425,320 @@ _PRIMITIVES_BY_NODE_ID: dict[str, dict[str, Any]] = {
         "shape": "line",
         "class_name": "toe-bone",
         "geometry": {"x1": 278, "y1": 690, "x2": 299, "y2": 694},
+    },
+    "region:right_upper_limb": {
+        "layer_id": "pinky",
+        "shape": "path",
+        "class_name": "pinky-upper-limb-context",
+        "geometry": {"d": "M169 720 C181 654 193 594 205 560 M251 720 C239 654 227 594 214 560"},
+    },
+    "region:right_hand": {
+        "layer_id": "pinky",
+        "shape": "path",
+        "class_name": "pinky-hand-context",
+        "geometry": {
+            "d": "M142 559 C118 514 109 450 120 389 "
+            "C124 354 132 310 129 276 C128 258 144 252 153 268 "
+            "C160 286 160 329 157 356 C162 306 166 256 172 225 "
+            "C176 205 195 206 198 227 C200 260 195 318 194 358 "
+            "C201 294 206 236 213 204 C218 184 238 187 239 210 "
+            "C239 255 230 319 229 359 C241 300 252 251 263 224 "
+            "C272 204 291 211 289 234 C286 275 270 330 265 363 "
+            "C281 324 297 292 313 270 C326 252 342 266 333 287 "
+            "C320 319 300 352 286 389 C308 405 323 441 320 482 "
+            "C317 531 284 563 229 568 C193 571 163 568 142 559 Z"
+        },
+    },
+    "aggregate:right_carpals": {
+        "layer_id": "pinky",
+        "shape": "ellipse",
+        "class_name": "pinky-carpals",
+        "geometry": {"cx": 209, "cy": 538, "rx": 43, "ry": 24},
+        "label_anchor": {"x": 130, "y": 556},
+    },
+    "aggregate:right_metacarpals": {
+        "layer_id": "pinky",
+        "shape": "path",
+        "class_name": "pinky-metacarpal-fan",
+        "geometry": {
+            "d": "M182 519 L139 455 M195 514 L177 383 M209 512 L213 376 "
+            "M223 514 L250 383 M235 520 L286 389"
+        },
+        "label_anchor": {"x": 122, "y": 382},
+    },
+    "aggregate:right_hand_phalanges": {
+        "layer_id": "pinky",
+        "shape": "path",
+        "class_name": "pinky-phalange-fan",
+        "geometry": {
+            "d": "M139 455 C124 439 107 420 92 405 "
+            "M177 383 C171 328 171 283 177 242 "
+            "M213 376 C213 314 217 264 225 217 "
+            "M250 383 C260 326 270 281 284 240 "
+            "M286 389 C306 340 322 300 336 263"
+        },
+    },
+    "digit:right_pollex": {
+        "layer_id": "pinky",
+        "shape": "path",
+        "class_name": "hand-digit",
+        "geometry": {"d": "M139 455 C124 439 107 420 92 405"},
+        "label_anchor": {"x": 68, "y": 399},
+    },
+    "bone:right_first_metacarpal": {
+        "layer_id": "pinky",
+        "shape": "line",
+        "class_name": "hand-metacarpal",
+        "geometry": {"x1": 182, "y1": 519, "x2": 139, "y2": 455},
+    },
+    "joint:right_first_carpometacarpal": {
+        "layer_id": "pinky",
+        "shape": "circle",
+        "class_name": "hand-cmc-joint",
+        "geometry": {"cx": 182, "cy": 519, "r": 5},
+    },
+    "joint:right_first_metacarpophalangeal": {
+        "layer_id": "pinky",
+        "shape": "circle",
+        "class_name": "hand-joint",
+        "geometry": {"cx": 139, "cy": 455, "r": 6},
+    },
+    "bone:right_pollex_proximal_phalanx": {
+        "layer_id": "pinky",
+        "shape": "line",
+        "class_name": "hand-phalanx",
+        "geometry": {"x1": 136, "y1": 452, "x2": 112, "y2": 428},
+    },
+    "joint:right_pollex_interphalangeal": {
+        "layer_id": "pinky",
+        "shape": "circle",
+        "class_name": "hand-joint",
+        "geometry": {"cx": 108, "cy": 425, "r": 5},
+    },
+    "bone:right_pollex_distal_phalanx": {
+        "layer_id": "pinky",
+        "shape": "line",
+        "class_name": "hand-phalanx",
+        "geometry": {"x1": 105, "y1": 421, "x2": 92, "y2": 405},
+    },
+    "digit:right_index_finger": {
+        "layer_id": "pinky",
+        "shape": "path",
+        "class_name": "hand-digit",
+        "geometry": {"d": "M177 383 C171 328 171 283 177 242"},
+        "label_anchor": {"x": 131, "y": 236},
+    },
+    "bone:right_second_metacarpal": {
+        "layer_id": "pinky",
+        "shape": "line",
+        "class_name": "hand-metacarpal",
+        "geometry": {"x1": 195, "y1": 514, "x2": 177, "y2": 383},
+    },
+    "joint:right_second_carpometacarpal": {
+        "layer_id": "pinky",
+        "shape": "circle",
+        "class_name": "hand-cmc-joint",
+        "geometry": {"cx": 195, "cy": 514, "r": 5},
+    },
+    "joint:right_second_metacarpophalangeal": {
+        "layer_id": "pinky",
+        "shape": "circle",
+        "class_name": "hand-joint",
+        "geometry": {"cx": 177, "cy": 383, "r": 6},
+    },
+    "bone:right_index_finger_proximal_phalanx": {
+        "layer_id": "pinky",
+        "shape": "line",
+        "class_name": "hand-phalanx",
+        "geometry": {"x1": 177, "y1": 376, "x2": 174, "y2": 327},
+    },
+    "joint:right_index_finger_proximal_interphalangeal": {
+        "layer_id": "pinky",
+        "shape": "circle",
+        "class_name": "hand-joint",
+        "geometry": {"cx": 173, "cy": 321, "r": 5},
+    },
+    "bone:right_index_finger_middle_phalanx": {
+        "layer_id": "pinky",
+        "shape": "line",
+        "class_name": "hand-phalanx",
+        "geometry": {"x1": 173, "y1": 315, "x2": 173, "y2": 284},
+    },
+    "joint:right_index_finger_distal_interphalangeal": {
+        "layer_id": "pinky",
+        "shape": "circle",
+        "class_name": "hand-joint",
+        "geometry": {"cx": 173, "cy": 278, "r": 4.5},
+    },
+    "bone:right_index_finger_distal_phalanx": {
+        "layer_id": "pinky",
+        "shape": "line",
+        "class_name": "hand-phalanx",
+        "geometry": {"x1": 174, "y1": 272, "x2": 177, "y2": 242},
+    },
+    "digit:right_middle_finger": {
+        "layer_id": "pinky",
+        "shape": "path",
+        "class_name": "hand-digit",
+        "geometry": {"d": "M213 376 C213 314 217 264 225 217"},
+        "label_anchor": {"x": 230, "y": 213},
+    },
+    "bone:right_third_metacarpal": {
+        "layer_id": "pinky",
+        "shape": "line",
+        "class_name": "hand-metacarpal",
+        "geometry": {"x1": 209, "y1": 512, "x2": 213, "y2": 376},
+    },
+    "joint:right_third_carpometacarpal": {
+        "layer_id": "pinky",
+        "shape": "circle",
+        "class_name": "hand-cmc-joint",
+        "geometry": {"cx": 209, "cy": 512, "r": 5},
+    },
+    "joint:right_third_metacarpophalangeal": {
+        "layer_id": "pinky",
+        "shape": "circle",
+        "class_name": "hand-joint",
+        "geometry": {"cx": 213, "cy": 376, "r": 6},
+    },
+    "bone:right_middle_finger_proximal_phalanx": {
+        "layer_id": "pinky",
+        "shape": "line",
+        "class_name": "hand-phalanx",
+        "geometry": {"x1": 214, "y1": 369, "x2": 217, "y2": 312},
+    },
+    "joint:right_middle_finger_proximal_interphalangeal": {
+        "layer_id": "pinky",
+        "shape": "circle",
+        "class_name": "hand-joint",
+        "geometry": {"cx": 218, "cy": 306, "r": 5},
+    },
+    "bone:right_middle_finger_middle_phalanx": {
+        "layer_id": "pinky",
+        "shape": "line",
+        "class_name": "hand-phalanx",
+        "geometry": {"x1": 219, "y1": 300, "x2": 222, "y2": 260},
+    },
+    "joint:right_middle_finger_distal_interphalangeal": {
+        "layer_id": "pinky",
+        "shape": "circle",
+        "class_name": "hand-joint",
+        "geometry": {"cx": 223, "cy": 254, "r": 4.5},
+    },
+    "bone:right_middle_finger_distal_phalanx": {
+        "layer_id": "pinky",
+        "shape": "line",
+        "class_name": "hand-phalanx",
+        "geometry": {"x1": 224, "y1": 248, "x2": 225, "y2": 217},
+    },
+    "digit:right_ring_finger": {
+        "layer_id": "pinky",
+        "shape": "path",
+        "class_name": "hand-digit",
+        "geometry": {"d": "M250 383 C260 326 270 281 284 240"},
+        "label_anchor": {"x": 289, "y": 235},
+    },
+    "bone:right_fourth_metacarpal": {
+        "layer_id": "pinky",
+        "shape": "line",
+        "class_name": "hand-metacarpal",
+        "geometry": {"x1": 223, "y1": 514, "x2": 250, "y2": 383},
+    },
+    "joint:right_fourth_carpometacarpal": {
+        "layer_id": "pinky",
+        "shape": "circle",
+        "class_name": "hand-cmc-joint",
+        "geometry": {"cx": 223, "cy": 514, "r": 5},
+    },
+    "joint:right_fourth_metacarpophalangeal": {
+        "layer_id": "pinky",
+        "shape": "circle",
+        "class_name": "hand-joint",
+        "geometry": {"cx": 250, "cy": 383, "r": 6},
+    },
+    "bone:right_ring_finger_proximal_phalanx": {
+        "layer_id": "pinky",
+        "shape": "line",
+        "class_name": "hand-phalanx",
+        "geometry": {"x1": 252, "y1": 376, "x2": 260, "y2": 326},
+    },
+    "joint:right_ring_finger_proximal_interphalangeal": {
+        "layer_id": "pinky",
+        "shape": "circle",
+        "class_name": "hand-joint",
+        "geometry": {"cx": 261, "cy": 320, "r": 5},
+    },
+    "bone:right_ring_finger_middle_phalanx": {
+        "layer_id": "pinky",
+        "shape": "line",
+        "class_name": "hand-phalanx",
+        "geometry": {"x1": 263, "y1": 314, "x2": 272, "y2": 281},
+    },
+    "joint:right_ring_finger_distal_interphalangeal": {
+        "layer_id": "pinky",
+        "shape": "circle",
+        "class_name": "hand-joint",
+        "geometry": {"cx": 274, "cy": 275, "r": 4.5},
+    },
+    "bone:right_ring_finger_distal_phalanx": {
+        "layer_id": "pinky",
+        "shape": "line",
+        "class_name": "hand-phalanx",
+        "geometry": {"x1": 276, "y1": 269, "x2": 284, "y2": 240},
+    },
+    "digit:right_little_finger": {
+        "layer_id": "pinky",
+        "shape": "path",
+        "class_name": "pinky-digit",
+        "geometry": {"d": "M286 389 C306 340 322 300 336 263"},
+        "label_anchor": {"x": 299, "y": 252},
+    },
+    "bone:right_fifth_metacarpal": {
+        "layer_id": "pinky",
+        "shape": "line",
+        "class_name": "pinky-metacarpal",
+        "geometry": {"x1": 235, "y1": 520, "x2": 286, "y2": 389},
+    },
+    "joint:right_fifth_carpometacarpal": {
+        "layer_id": "pinky",
+        "shape": "circle",
+        "class_name": "hand-cmc-joint",
+        "geometry": {"cx": 235, "cy": 520, "r": 5},
+    },
+    "joint:right_fifth_metacarpophalangeal": {
+        "layer_id": "pinky",
+        "shape": "circle",
+        "class_name": "pinky-joint",
+        "geometry": {"cx": 286, "cy": 389, "r": 7},
+    },
+    "bone:right_little_finger_proximal_phalanx": {
+        "layer_id": "pinky",
+        "shape": "line",
+        "class_name": "pinky-phalanx",
+        "geometry": {"x1": 289, "y1": 382, "x2": 306, "y2": 340},
+    },
+    "joint:right_little_finger_proximal_interphalangeal": {
+        "layer_id": "pinky",
+        "shape": "circle",
+        "class_name": "pinky-joint",
+        "geometry": {"cx": 308, "cy": 334, "r": 5.5},
+    },
+    "bone:right_little_finger_middle_phalanx": {
+        "layer_id": "pinky",
+        "shape": "line",
+        "class_name": "pinky-phalanx",
+        "geometry": {"x1": 310, "y1": 328, "x2": 323, "y2": 297},
+    },
+    "joint:right_little_finger_distal_interphalangeal": {
+        "layer_id": "pinky",
+        "shape": "circle",
+        "class_name": "pinky-joint",
+        "geometry": {"cx": 325, "cy": 291, "r": 5},
+    },
+    "bone:right_little_finger_distal_phalanx": {
+        "layer_id": "pinky",
+        "shape": "line",
+        "class_name": "pinky-phalanx",
+        "geometry": {"x1": 327, "y1": 285, "x2": 336, "y2": 263},
     },
 }

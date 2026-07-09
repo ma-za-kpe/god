@@ -1,3 +1,19 @@
+const RIGHT_HAND_DIGIT_IDS = new Set([
+  'digit:right_pollex',
+  'digit:right_index_finger',
+  'digit:right_middle_finger',
+  'digit:right_ring_finger',
+  'digit:right_little_finger',
+]);
+
+const RIGHT_HAND_PHALANX_PREFIXES = [
+  'bone:right_pollex_',
+  'bone:right_index_finger_',
+  'bone:right_middle_finger_',
+  'bone:right_ring_finger_',
+  'bone:right_little_finger_',
+];
+
 export function summarizeAnatomyMilestone(payload = {}) {
   const nodes = Array.isArray(payload.nodes) ? payload.nodes : [];
   const registry = Array.isArray(payload.llm_registry) ? payload.llm_registry : [];
@@ -55,6 +71,16 @@ export function summarizeAnatomyMilestone(payload = {}) {
     hasSweatProxy: nodes.some((node) => node.id === 'render:forehead_sweat_proxy'),
     hasHairPopulation: nodes.some((node) => node.id === 'population:scalp_hair_follicles'),
     hasRightHand: nodes.some((node) => node.id === 'region:right_hand'),
+    rightHandDigitCount: nodes.filter((node) => RIGHT_HAND_DIGIT_IDS.has(node.id)).length,
+    rightHandPhalanxCount: nodes.filter((node) => (
+      typeof node.id === 'string'
+      && RIGHT_HAND_PHALANX_PREFIXES.some((prefix) => node.id.startsWith(prefix))
+      && node.id.endsWith('_phalanx')
+    )).length,
+    hasRightLittleFinger: nodes.some((node) => node.id === 'digit:right_little_finger'),
+    rightLittleFingerPhalanxCount: nodes.filter((node) => (
+      typeof node.id === 'string' && node.id.startsWith('bone:right_little_finger_')
+    )).length,
     hasRightKnee: nodes.some((node) => node.id === 'joint:right_knee'),
     hasRightHallux: nodes.some((node) => node.id === 'digit:right_hallux'),
     hasSkull: nodes.some((node) => node.id === 'bone:skull'),
@@ -76,6 +102,11 @@ export function buildMorphChannels(summary = {}) {
     hairSway: summary.hasHairPopulation ? Math.min(1, llmHandleCount / 8) : 0,
     registryReach: Math.min(1, llmHandleCount / Math.max(1, nodeCount)),
     handReach: summary.hasRightHand ? 1 : 0,
+    handDigitReach: Math.min(1, Number(summary.rightHandDigitCount || 0) / 5),
+    handPhalanxReach: Math.min(1, Number(summary.rightHandPhalanxCount || 0) / 14),
+    pinkyReach: summary.hasRightLittleFinger
+      ? Math.min(1, Number(summary.rightLittleFingerPhalanxCount || 0) / 3)
+      : 0,
     kneeFlex: summary.hasRightKnee ? 1 : 0,
     toePulse: summary.hasRightHallux ? 1 : 0,
     graphPulse: summary.neo4jSchemaStatementCount ? 1 : 0,
